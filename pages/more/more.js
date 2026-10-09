@@ -175,6 +175,7 @@ Page({
           menus: [
             { key: "map", icon: "map", t: "地图导引", d: "每天真实坐标标点 + 导航" },
             { key: "food", icon: "food", t: "美食名店", d: "必吃清单 + 可导航的老店" },
+            { key: "deep", icon: "bulb", t: "城市深度玩法", d: "本地节奏 / 避坑 / 机位 / 顺手加一日" },
             { key: "assistant", icon: "search", t: "本地速查", d: "离线速查：天气/美食/门票/预算…" },
             { key: "toolkit", icon: "sparkle", t: "旅行百宝箱", d: "体检/文案/灵感/百科等 " + TOOL_TOTAL + " 个工具" }
           ]
@@ -200,6 +201,7 @@ Page({
           title: "行前与账本",
           menus: [
             { key: "ledger", icon: "wallet", t: "记账 · AA", d: "还没行程也能先随手记账" },
+            { key: "deep", icon: "bulb", t: "城市深度玩法", d: "本地节奏 / 避坑 / 机位 / 顺手加一日" },
             { key: "toolkit", icon: "sparkle", t: "旅行百宝箱", d: "城市灵感池随时可用" }
           ]
         },
@@ -263,9 +265,9 @@ Page({
     if (k === "backupOut") { this.backupOut(); return; }
     if (k === "backupIn") { this.backupIn(); return; }
     // 本地速查/记账/百宝箱无需行程也可用；其余行程页需要先生成攻略
-    if (!this.data.hasPlan && k !== "ledger" && k !== "assistant" && k !== "toolkit" && k !== "boost") { wx.showToast({ title: "先回「出发」页生成攻略", icon: "none" }); return; }
+    if (!this.data.hasPlan && k !== "ledger" && k !== "assistant" && k !== "toolkit" && k !== "boost" && k !== "deep") { wx.showToast({ title: "先回「出发」页生成攻略", icon: "none" }); return; }
     // v1.19.31 修复：工具页都在分包 subpkg 下，必须用 /subpkg/ 前缀（此前误用 /pages/ 导致全部点不动，同 HOME_TILES 旧 bug）
-    const PKG = { map: "/subpkg/map/map", food: "/subpkg/food/food", ledger: "/subpkg/ledger/ledger", rank: "/subpkg/rank/rank", prep: "/subpkg/prep/prep", assistant: "/subpkg/assistant/assistant", toolkit: "/subpkg/toolkit/toolkit", boost: "/subdata/boost/boost" };
+    const PKG = { map: "/subpkg/map/map", food: "/subpkg/food/food", ledger: "/subpkg/ledger/ledger", rank: "/subpkg/rank/rank", prep: "/subpkg/prep/prep", assistant: "/subpkg/assistant/assistant", toolkit: "/subpkg/toolkit/toolkit", boost: "/subdata/boost/boost", deep: "/subai/deep/deep" };
     if (PKG[k]) { wx.navigateTo({ url: PKG[k] }); return; }
     // 防御：未知 key 不再跳转到非法拼接路径（避免死链/白屏），明确提示
     wx.showToast({ title: "该功能暂未开放", icon: "none" });

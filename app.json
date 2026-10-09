@@ -79,6 +79,12 @@
       "pages": [
         "boost3/boost3"
       ]
+    },
+    {
+      "root": "subai",
+      "pages": [
+        "deep/deep"
+      ]
     }
   ]
 }

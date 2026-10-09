@@ -1,6 +1,8 @@
 // plan：每日行程浏览 + 详情 + 导航/百科/想玩 + 手动调整 + 按想玩重新生成
 const T = require("../../utils/travel.js");
 const W = require("../../utils/weather.js");
+const A = require("../../utils/aicontent.js");
+const R = require("../../utils/remind.js");
 const app = getApp();
 
 function isFrame(n) { return T.isFrameName(n); }
@@ -45,7 +47,9 @@ Page({
   // v1.8.5 C5：顶部天数快速导航
   topDays: [], dsActive: -1,
   // v1.19.77：拖动排序（dragSh 为逐条预计算的 transform 字符串，WXML 只做数组取值）
-  dragOn: false, dragDi: -1, dragI: -1, dragSh: []
+  dragOn: false, dragDi: -1, dragI: -1, dragSh: [],
+  // v1.19.78：城市深度玩法（随 subai 分包懒加载；未收录城市保持 null → UI 自动不显示）
+  deep: null
  },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
@@ -68,6 +72,7 @@ Page({
     if (!this.data.hasPlan) this.setData({ hasPlan: true });
     this.__animOn = true;   // v1.19.77：进页才放错落入场动效
     this._render(plan);
+    this._checkDueRemind();
    } catch (e) {
     wx.showToast({ title: "行程加载异常，请重试", icon: "none" });
    }
@@ -225,6 +230,117 @@ Page({
    topDays
   });
   this._maybeLoadWx(plan);
+  this._loadDeep(plan);
+ },
+
+ // v1.19.78：深度玩法 —— 从「主城 + 各站」里挑第一座有内容的城市，展示 3 条速览
+ // 设计原则：内容是增强项，加载失败 / 城市未收录都静默降级为不显示，绝不阻塞行程本身
+ _planCities(plan) {
+  const out = [];
+  const push = (v) => {
+   const s = String(v == null ? "" : v).trim();
+   if (s && out.indexOf(s) < 0) out.push(s);
+  };
+  try { push(plan.cityName); } catch (e) {}
+  try {
+   const ss = plan.segments || [];
+   for (let i = 0; i < ss.length; i++) push(ss[i].city || ss[i].cityName || ss[i].name);
+  } catch (e) {}
+  return out;
+ },
+ _loadDeep(plan) {
+  const cands = this._planCities(plan);
+  if (!cands.length) return;
+  try {
+   A.initDeep().then(() => {
+    let hit = null;
+    for (let i = 0; i < cands.length; i++) {
+     if (A.hasDeep(cands[i])) { hit = cands[i]; break; }
+    }
+    if (!hit) return;
+    const raw = A.deepOf(hit);
+    if (!raw) return;
+    let total = 0;
+    const bs = raw.blocks || [];
+    for (let i = 0; i < bs.length; i++) total += ((bs[i].items || []).length + (bs[i].trips || []).length);
+    const teasers = (raw.teaser || []).slice(0, 3);
+    // 渲染期可能已切走 / 已生成新行程，用 try 包住避免异步落地时页面已卸载
+    try {
+     this.setData({
+      deep: { city: hit, updated: A.updatedAt(), total: total, teasers: teasers }
+     });
+    } catch (e) {}
+   }).catch(() => {});
+  } catch (e) {}
+ },
+ // v1.19.78：出发提醒 —— 没有服务端时，唯一真能响铃的通道是「加入手机日历」，
+ // 所以那个选项永远排第一；订阅消息只在真的配置了模板 ID + 云开发后才出现。
+ _remindItem(plan) {
+  const d = (plan.days && plan.days[0] && String(plan.days[0].date) || "").slice(0, 10);
+  if (!d) return null;
+  const city = plan.cityName || (plan.province ? plan.province + " 全省" : "目的地");
+  return {
+   planId: String(plan.id || "") || city + d,
+   date: d,
+   city: city,
+   title: city + " · 出发当天",
+   note: (plan.totalDays || plan.days.length) + " 天行程，出发前再把证件和预约确认一遍"
+  };
+ },
+ onRemind() {
+  try {
+   const plan = app.globalData && app.globalData.plan;
+   const item = plan && this._remindItem(plan);
+   if (!item) { wx.showToast({ title: "行程还没有出发日期", icon: "none" }); return; }
+   const items = ["加入手机日历（离线，到点响铃）"];
+   const itemsUse = R.subscribeAvailable() ? items.concat(["订阅微信服务通知"]) : items;
+   wx.showActionSheet({
+    itemList: itemsUse,
+    success: (r) => {
+     const idx = Number(r && r.tapIndex);
+     if (idx === 0) {
+      R.addToCalendar(item).then((okd) => {
+       R.add(Object.assign({}, item, { via: "calendar" }));
+       wx.showToast({ title: okd ? "已加入手机日历" : "日历写入失败，可改用自己手机日历手动添加", icon: "none" });
+      });
+     } else if (idx === 1) {
+      R.requestSubscribe().then(() => {
+       R.scheduleCloud(item).then((okd) => {
+        R.add(Object.assign({}, item, { via: okd ? "cloud" : "local" }));
+        wx.showToast({ title: okd ? "已预约，出发当天微信会提醒你" : "预约失败，已改为站内提醒", icon: "none" });
+       });
+      });
+     }
+    },
+    fail: () => {}
+   });
+  } catch (e) {
+   wx.showToast({ title: "设置提醒失败", icon: "none" });
+  }
+ },
+ // 站内轻提醒：到点（含已过）且没弹过的，进行程页时弹一次
+ _checkDueRemind() {
+  try {
+   const due = R.dueToday();
+   if (!due.length) return;
+   const it = due[0];
+   R.ack(it.id);
+   if (R.cloudReady()) return;   // 云端会发，不必再打扰
+   wx.showModal({
+    title: "出发提醒",
+    content: it.title + "（" + it.date + "）" + (it.note ? "\n" + it.note : ""),
+    confirmText: "知道了",
+    showCancel: false
+   });
+  } catch (e) {}
+ },
+
+ onDeep() {
+  const d = this.data.deep;
+  if (!d || !d.city) return;
+  try {
+   wx.navigateTo({ url: "/subai/deep/deep?city=" + encodeURIComponent(d.city) });
+  } catch (e) {}
  },
 
  // v1.8.5 C1/C2/C4：行程体检融合（门票预估 / 天数偏长 / 预算体检 → 并入既有 check 卡，避免新增卡片）

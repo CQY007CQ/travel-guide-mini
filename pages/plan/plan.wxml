@@ -61,6 +61,7 @@
       <view class="tool" wx:if="{{!segs.length && !isProv}}" catchtap="onSwitchAlt"><image class="ic" src="/images/icons/shuffle.png"/>换方案 · {{altNames[altIdx]}}</view>
       <view class="tool" catchtap="onExportICS"><image class="ic" src="/images/icons/calendar.png"/>一键加入日历</view>
       <view class="tool" catchtap="onShareImg"><image class="ic" src="/images/icons/export.png"/>生成分享图</view>
+      <view class="tool" catchtap="onRemind"><image class="ic" src="/images/icons/clock.png"/>出发提醒</view>
     </view>
 
     <!-- 只玩勾选提示条 -->
@@ -369,6 +370,16 @@
       </view>
     </view>
   </block>
+
+  <!-- v1.19.78：城市深度玩法（内容随 subai 分包懒加载；未收录城市自动不显示） -->
+  <view class="card dpp-card" wx:if="{{deep}}">
+    <view class="dpp-head">
+      <view class="dpp-t"><image class="ic" src="/images/icons/bulb.png"/>{{deep.city}} · 深度玩法</view>
+      <text class="dpp-u dim">{{deep.updated}} 整理</text>
+    </view>
+    <view class="dpp-li" wx:for="{{deep.teasers}}" wx:key="*this"><text class="dpp-dot"></text>{{item}}</view>
+    <view class="dpp-more" bindtap="onDeep">看全部 {{deep.total}} 条本地玩法 ›</view>
+  </view>
 
   <view class="tip">点行展开可换景点 / 百科 / 打卡 / 调序 · 按住右侧手柄可直接拖动</view>
 

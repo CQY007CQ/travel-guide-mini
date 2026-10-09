@@ -159,25 +159,9 @@ step "高强度压测 (v1.17.5)" "$NODE" tools/stress-test.mjs
 step "WXML 结构校验" "$NODE" tools/check-wxml.mjs
 step "页面结构 + 事件配对" "$NODE" tools/check-handlers.mjs
 
-step "主包体积预警 (P2-8)" bash -c '
-  out=$('"$NODE"' -e "
-    const fs=require(\"fs\"),path=require(\"path\"),zlib=require(\"zlib\");
-    const EXC=new Set([\"tools\",\"shots\",\".qr\",\"outputs\",\"node_modules\",\".git\",\".workbuddy\"]);
-    const acc={raw:0,gzip:0};
-    (function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){if(e.name===\".\"||e.name===\"..\")continue;if(EXC.has(e.name))continue;const p=path.join(d,e.name);if(e.isDirectory())walk(p);else{try{const b=fs.statSync(p).size;acc.raw+=b;acc.gzip+=zlib.gzipSync(fs.readFileSync(p)).length;}catch(_){}}}})(process.cwd());
-    const rawKB=Math.round(acc.raw/1024),gzipKB=Math.round(acc.gzip/1024);
-    console.log(\"  raw KB:\",rawKB,\"| gzip KB:\",gzipKB);
-    // 微信 2MB 上限按【压缩后体积】计（官方：开发者工具显示未压缩，平台实际上传检测压缩后大小）。
-    // raw 仅作黄色预警参考（开发者工具面板会显示 raw，偏大属正常），不以 raw 判失败。
-    if(rawKB>1850)console.log(\"  [warn] raw 进入黄色区(>1850KB)，开发者工具将显示偏大，上传按压缩后计，正常\");
-    if(gzipKB>1850)console.log(\"  [warn] 压缩后体积进入黄色区(>1850KB gzip)，接近微信 2MB 压缩上限\");
-    if(gzipKB>2048){console.log(\"  [fail] 压缩后超过微信主包 2048KB 上限(gzip)!\");process.exit(2);}
-    else console.log(\"  [ok] 主包体积安全(压缩后 < 2048KB)\");
-  " 2>&1)
-  rc=$?
-  if [ $rc -eq 2 ]; then exit 1; fi
-  exit 0
-'
+# 【v1.19.78 修正】微信约束是「每包独立 2MB 压缩后红线」，旧版把全项目（含 1.7MB 数据分包）
+# 累加成一个数去比对 2MB → 必然误报。改为按 app.json 主包+各分包逐包核算（tools/check-pkgsize.mjs）。
+step "分包体积体检 (每包 2MB 红线)" "$NODE" tools/check-pkgsize.mjs
 
 echo ""
 echo "══════════════════════════════════════════════════"
