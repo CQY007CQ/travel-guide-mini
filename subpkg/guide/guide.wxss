@@ -1,0 +1,98 @@
+/* 使用指南：简洁文档风，双主题变量；金色仅作点缀 */
+.page { padding: 20rpx 24rpx 60rpx; }
+
+/* ── 顶部定位横幅 ── */
+.g-hero {
+  padding: 30rpx 32rpx;
+  background: linear-gradient(135deg, rgba(212, 169, 78, .14), rgba(212, 169, 78, .03) 70%), var(--card, #ffffff);
+  border: 1rpx solid rgba(212, 169, 78, .28);
+}
+.gh-t { font-size: calc(31rpx * var(--fs, 1)); font-weight: 800; color: var(--t1, #18233a); line-height: 1.55; letter-spacing: .5rpx; }
+.gh-s { font-size: calc(23rpx * var(--fs, 1)); color: var(--t3, #64748b); margin-top: 12rpx; line-height: 1.7; }
+
+/* ── 顶部 tab ── */
+.g-seg {
+  display: flex;
+  background: rgba(var(--ln-rgb, 19, 29, 49), 0.07);
+  border-radius: 18rpx;
+  padding: 6rpx;
+  margin: 18rpx 0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.g-seg-it {
+  flex: 1; text-align: center; padding: 14rpx 0; border-radius: 14rpx;
+  font-size: calc(24rpx * var(--fs, 1)); font-weight: 600; color: var(--t3, #8fa3bc);
+  background: transparent; transition: all .18s ease;
+}
+.g-seg-it.on {
+  color: #171107; font-weight: 800;
+  background: linear-gradient(135deg, #e6bb62, #d4a94e 55%, #c19337);
+  box-shadow: 0 6rpx 16rpx rgba(212, 169, 78, .25);
+}
+
+/* ── 卡片 ── */
+.g-card { padding: 26rpx 30rpx; margin-bottom: 18rpx; }
+.g-card + .g-card { margin-top: 0; }
+.g-title {
+  display: flex; align-items: center; gap: 14rpx;
+  font-size: calc(28rpx * var(--fs, 1)); font-weight: 800; color: var(--t1, #18233a);
+  margin-bottom: 6rpx; letter-spacing: .5rpx;
+}
+.g-title.small { font-size: calc(25rpx * var(--fs, 1)); color: var(--gold-tx, #8f6a1f); }
+.gt-num {
+  width: 40rpx; height: 40rpx; border-radius: 12rpx; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #e2b65c, #b8892f);
+  color: #171107; font-size: calc(23rpx * var(--fs, 1)); font-weight: 900;
+}
+
+/* ── 条目 ── */
+.g-item {
+  display: flex; flex-direction: column;
+  padding: 16rpx 2rpx;
+  border-bottom: 1rpx solid rgba(var(--ln-rgb, 19, 29, 49), .06);
+}
+.g-item:active { opacity: .75; }
+.g-item:last-child { border-bottom: none; }
+.gi-t { font-size: calc(26rpx * var(--fs, 1)); font-weight: 700; color: var(--t2, #5b6b82); }
+.gi-x { font-size: calc(22rpx * var(--fs, 1)); color: var(--t4, #7d92ab); margin-top: 6rpx; line-height: 1.65; }
+
+/* ── FAQ ── */
+.g-qa { padding: 8rpx 2rpx 18rpx; border-bottom: 1rpx solid rgba(var(--ln-rgb, 19, 29, 49), .07); }
+.g-qa:last-child { border-bottom: none; padding-bottom: 4rpx; }
+.gq-q { font-size: calc(26rpx * var(--fs, 1)); font-weight: 800; color: var(--t2, #5b6b82); line-height: 1.5; }
+.gq-a { font-size: calc(23rpx * var(--fs, 1)); color: var(--t4, #7d92ab); margin-top: 10rpx; line-height: 1.75; }
+
+.g-tip { font-size: calc(22rpx * var(--fs, 1)); line-height: 1.7; padding: 6rpx 10rpx 18rpx; }
+.g-foot { text-align: center; font-size: calc(20rpx * var(--fs, 1)); padding: 26rpx 0 8rpx; }
+
+/* ── v1.8.4 A9：阅读字号调节条（长辈友好） ── */
+.fz-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14rpx; margin: 4rpx 0 18rpx; padding: 10rpx 14rpx;
+  background: rgba(var(--ln-rgb, 148, 163, 184), .06);
+  border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .12);
+  border-radius: 99rpx;
+}
+.fz-btn {
+  font-size: calc(21rpx * var(--fs, 1)); font-weight: 600; color: var(--t3, #8fa3bc);
+  padding: 8rpx 20rpx; border-radius: 99rpx; background: transparent;
+  transition: all .18s ease;
+}
+.fz-btn:active { opacity: .7; }
+.fz-btn.on {
+  color: #171107; background: linear-gradient(135deg, #e6bb62, #c19337);
+  font-weight: 800; box-shadow: 0 4rpx 12rpx rgba(212, 169, 78, .22);
+}
+.fz-nums { display: flex; align-items: center; gap: 10rpx; }
+.fz-dot {
+  width: 12rpx; height: 12rpx; border-radius: 50%;
+  background: rgba(var(--ln-rgb, 148, 163, 184), .25);
+  transition: all .2s ease;
+}
+.fz-dot.on { background: linear-gradient(135deg, #e6bb62, #c19337); box-shadow: 0 0 8rpx rgba(212,169,78,.5); }
+
+/* 字号档位覆盖已改为全局机制（app.wxss 的 .fz2/.fz3 设置 --fs，所有 font-size 经 calc 统一缩放），
+   此处不再写死覆盖值，避免与全局缩放打架；fz-bar / fz-btn / fz-dot 控件样式保留在上方。 */

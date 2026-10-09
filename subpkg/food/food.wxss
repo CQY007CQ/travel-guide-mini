@@ -1,0 +1,40 @@
+.page { padding-bottom: 80rpx; }
+
+/* 多站城市切换条 */
+.segs-scroll { margin: 20rpx 0 -6rpx; white-space: nowrap; }
+.segs { display: inline-flex; gap: 14rpx; padding: 0 24rpx 6rpx; }
+.seg-chip { display: inline-flex; align-items: center; flex-shrink: 0; padding: 12rpx 26rpx;
+  font-size: calc(24rpx * var(--fs, 1)); color: var(--t2, #c9d4e4); background: rgba(var(--ln-rgb, 148,163,184),.04);
+  border: 1rpx solid rgba(var(--ln-rgb, 148,163,184),.2); border-radius: 99rpx; }
+.seg-chip.on { color: #14100a; background: linear-gradient(135deg, #e2b65c, #b8892f);
+  font-weight: 800; border-color: transparent; }
+.food-tags { margin-top: 18rpx; }
+.note { font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); line-height: 1.75; margin-top: 16rpx; }
+.shop { border-bottom: 1rpx solid rgba(var(--ln-rgb, 148,163,184),.08); padding: 22rpx 6rpx; border-radius: 16rpx; }
+.shop:active { background: rgba(212,169,78,.06); }
+.shop:last-child { border-bottom: none; }
+.shop-top { display: flex; align-items: center; }
+.shop-name { font-size: calc(29rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); flex: 1; min-width: 0; }
+.shop-price { font-size: calc(22rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); background: rgba(212,169,78,.12); padding: 4rpx 16rpx; border-radius: 99rpx; }
+.shop-sub { font-size: calc(23rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 8rpx; line-height: 1.6; }
+
+/* 预算贴合（budget × 名店分组） */
+.budget-tip { font-size: calc(22rpx * var(--fs, 1)); color: var(--gold-tx, #e8c877); margin: 18rpx 0 4rpx;
+  padding: 14rpx 18rpx; border-radius: 14rpx;
+  background: linear-gradient(90deg, rgba(212,169,78,.1), rgba(212,169,78,.03));
+  border: 1rpx dashed rgba(212,169,78,.35); }
+.band-tag { flex-shrink: 0; font-size: calc(20rpx * var(--fs, 1)); font-weight: 600; margin-left: 10rpx;
+  padding: 2rpx 12rpx; border-radius: 99rpx; border: 1rpx solid transparent; }
+.band-tag.band-low { color: var(--green, #4cd49c); background: rgba(76,212,156,.12); border-color: rgba(76,212,156,.3); }
+.band-tag.band-mid { color: var(--blue, #8ec9ff); background: rgba(125,211,252,.12); border-color: rgba(125,211,252,.3); }
+.band-tag.band-high { color: var(--gold-tx, #f5c76a); background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.32); }
+.shop.hit { background: linear-gradient(90deg, rgba(212,169,78,.08), rgba(212,169,78,.02));
+  box-shadow: inset 4rpx 0 0 #d4a94e; }
+
+/* v1.8.4 A3 时段切换 */
+.slot-bar { display: flex; gap: 12rpx; flex-wrap: wrap; padding: 16rpx 26rpx; }
+.slot-chip { font-size: calc(24rpx * var(--fs, 1)); padding: 8rpx 24rpx; border-radius: 28rpx; background: rgba(var(--ln-rgb, 100,116,139), .07); border: 1rpx solid rgba(var(--ln-rgb, 100,116,139), .14); color: var(--tx-2, #46536b); }
+.slot-chip.on { background: rgba(212,169,78,.16); color: var(--acc, #b3872e); border-color: rgba(212,169,78,.42); font-weight: 600; }
+
+/* v1.9.0：口味小标签 */
+.tag-sub { opacity: .6; font-size: calc(18rpx * var(--fs, 1)); margin-left: 6rpx; }

@@ -1,0 +1,36 @@
+{
+  "compileType": "miniprogram",
+  "libVersion": "3.8.12",
+  "appid": "wxa365d49bc3366f95",
+  "projectname": "travel-guide-mini",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": false,
+    "coverView": true,
+    "ignoreUploadUnusedFiles": true
+  },
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "shots"
+      },
+      {
+        "type": "folder",
+        "value": ".qr"
+      },
+      {
+        "type": "folder",
+        "value": "tools"
+      },
+      {
+        "type": "folder",
+        "value": "outputs"
+      }
+    ]
+  },
+  "condition": {}
+}

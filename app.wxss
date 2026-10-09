@@ -1,0 +1,313 @@
+/* 全局样式 —— 移植自网页版暗色主题
+   2026-09 主题化改造：CSS 变量双主题（默认浅色 #eaeff7 冷灰蓝；.td 切回暗色原值）
+   所有 var 均带原值兜底；rgba(148,163,184)/rgba(138,165,192) 由 --ln-rgb 统一接管 */
+page {
+  --bg-img: radial-gradient(120% 46% at 50% -8%, rgba(212, 169, 78, 0.06), rgba(234, 239, 247, 0) 62%), #eaeff7;
+  --bg-solid: #eaeff7;
+  --card: #ffffff;
+  --well: #ffffff;
+  --panel: #ffffff;
+  --t1: #18233a;
+  --t2: #5b6b82;
+  --t3: #64748b;
+  --t4: #7d92ab;
+  --gold: #d4a94e;
+  --gold-tx: #8f6a1f;
+  --chip-tx: #14100a;
+  /* v1.11：金色/强调色「底上的文字色」与其次级透明度，替代各处写死的 #fff / rgba(255,255,255,.92) */
+  --on-gold: #ffffff;
+  --on-gold-2: rgba(255, 255, 255, .92);
+  --green: #15855c;
+  --red: #cc3d3d;
+  --blue: #1a74c2;
+  --pink: #b94f52;
+  --ln-rgb: 19, 29, 49;
+  /* 浅色主题补充语义变量（此前多处 var(--tx/--tx-2/--tx-3/--dim/--acc) 依赖硬编码兜底，暗色下会发黑看不清） */
+  --tx: #18233a;
+  --tx-2: #46536b;
+  --tx-3: #64748b;
+  --dim: #5b6b82;
+  --acc: #b3872e;
+  --dock-rgb: 255, 255, 255;
+  /* 浅色主题：行程卡"今天干什么"渐变（米色 + 金色淡彩，从左上到右下收回到纯白） */
+  --strip-sheen: rgba(212, 169, 78, 0.20);
+  --strip-bg: linear-gradient(135deg, rgba(212, 169, 78, .20) 0%, rgba(212, 169, 78, .06) 60%, #ffffff 100%);
+  /* 浅色主题：卡片阴影更轻，避免白底上黑色阴影过于突兀 */
+  --card-shadow: 0 6rpx 22rpx rgba(19, 29, 49, 0.06), 0 1rpx 3rpx rgba(19, 29, 49, 0.04);
+  --card-inset: inset 0 1rpx 0 rgba(255, 255, 255, 0.6);
+  background: var(--bg-img);
+  color: var(--t1, #18233a);
+  /* 全局字号缩放因子：--fs 由 .fz1/.fz2/.fz3 覆盖，所有 font-size 经 calc(* var(--fs,1)) 统一缩放 */
+  --fs: 1;
+  font-size: calc(28rpx * var(--fs, 1));
+  line-height: 1.55;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+.td {
+  --bg-img: radial-gradient(120% 46% at 50% -8%, rgba(212, 169, 78, 0.10), rgba(10, 15, 28, 0) 62%), radial-gradient(90% 40% at 88% 0%, rgba(95, 185, 138, 0.05), rgba(10, 15, 28, 0) 55%), #0a0f1c;
+  --bg-solid: #0a0f1c;
+  --card: #131d31;
+  --well: #101a2c;
+  --panel: #18233a;
+  --t1: #eaeff7;
+  --t2: #c9d4e4;
+  --t3: #8fa3bc;
+  --t4: #5b6b82;
+  --gold: #d4a94e;
+  --gold-tx: #d4a94e;
+  --chip-tx: #d4a94e;
+  /* 深色主题下金底仍是亮面，文字维持白；变量化后两个主题可独立调整对比度 */
+  --on-gold: #ffffff;
+  --on-gold-2: rgba(255, 255, 255, .92);
+  --green: #5fb98a;
+  --red: #e56a6a;
+  --blue: #7dd3fc;
+  --pink: #f29bb8;
+  --ln-rgb: 148, 163, 184;
+  /* 暗色主题补充语义变量 */
+  --tx: #eaeff7;
+  --tx-2: #c9d4e4;
+  --tx-3: #8fa3bc;
+  --dim: #8fa3bc;
+  --acc: #d4a94e;
+  --acc-soft: rgba(212, 169, 78, 0.16);
+  --dock-rgb: 10, 15, 28;
+  --strip-sheen: rgba(19, 29, 49, 0.46);
+  /* 深色主题：行程卡"今天干什么"渐变（金色高光 + 海军蓝深色） */
+  --strip-bg: linear-gradient(135deg, rgba(212, 169, 78, .13) 0%, rgba(19, 29, 49, .46) 55%, #131d31 100%);
+  /* 深色主题：卡片阴影（重一点，对应深底） */
+  --card-shadow: 0 12rpx 36rpx rgba(3, 7, 18, 0.32), inset 0 1rpx 0 rgba(255, 255, 255, 0.035);
+  --card-inset: inset 0 1rpx 0 rgba(255, 255, 255, 0.035);
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--bg-img);
+  color: var(--t1);
+}
+
+/* ═══ 全局字号（长辈友好）：三档缩放作用于所有页面根 view ═══
+   .page 根持有 --fs；每个 font-size 都写成 calc(Nrpx * var(--fs,1)) 才会被统一缩放。
+   .fz2 / .fz3 挂在根 view 上覆盖 --fs（与 .page 同特异性，靠后声明胜出）。 */
+.page { --fs: 1; font-size: calc(28rpx * var(--fs, 1)); }
+.fz1 { --fs: 1; }
+.fz2 { --fs: 1.15; }
+.fz3 { --fs: 1.35; }
+
+/* ═══ v1.19.2 暗色对比度补丁 ═══
+   以下页面级类此前把「语义色」硬编码成深色（#a0402b / #3f7a4e / #2f6fce / #b3541e…），
+   浅色底上正常，暗色底上几乎不可读。统一改走已按主题调亮的语义变量。
+   用 `.td` 前缀提高特异性（3 类 > 页面里的 2 类），覆盖生效且不必改动各页面 wxss。 */
+.td .over-line.over { color: var(--red, #e56a6a); background: rgba(229, 106, 106, .14); }
+.td .holi-line.holi-big { color: var(--red, #e56a6a); }
+.td .rm-t { color: var(--gold, #d4a94e); }
+.td .hint-strip.big .hint-t { color: var(--red, #e56a6a); }
+.td .day-load.load-ok { color: var(--green, #5fb98a); }
+.td .day-load.load-over { color: var(--red, #e56a6a); }
+.td .iou-ok { color: var(--green, #5fb98a); }
+.td .iou-del { color: var(--red, #e56a6a); }
+.td .w-tag.tp { color: var(--blue, #7dd3fc); }
+
+.card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 46%), var(--card, #131d31);
+  border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), 0.12);
+  border-radius: 28rpx;
+  padding: 30rpx 28rpx;
+  margin: 20rpx 24rpx;
+  box-sizing: border-box;
+  box-shadow: var(--card-shadow, 0 12rpx 36rpx rgba(3, 7, 18, 0.32)), var(--card-inset, inset 0 1rpx 0 rgba(255, 255, 255, 0.035));
+}
+
+.card + .card { margin-top: 20rpx; }
+
+.h2 { font-size: calc(30rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); }
+
+.h3 { font-size: calc(26rpx * var(--fs, 1)); font-weight: 700; color: var(--t3, #8fa3bc); letter-spacing: 1rpx; }
+
+.dim { color: var(--t4, #5b6b82); }
+
+.gold { color: var(--gold-tx, #d4a94e); }
+
+.btn-primary {
+  background: linear-gradient(135deg, #e6bb62, #d4a94e 45%, #b8892f);
+  color: #14100a;
+  font-weight: 800;
+  border-radius: 22rpx;
+  text-align: center;
+  padding: 26rpx 0;
+  font-size: calc(32rpx * var(--fs, 1));
+  letter-spacing: 1rpx;
+  border: none;
+  line-height: 1.4;
+  box-shadow: 0 14rpx 30rpx rgba(212, 169, 78, 0.24), inset 0 1rpx 0 rgba(255, 255, 255, 0.4);
+}
+
+.btn-primary:active { opacity: .85; transform: translateY(1rpx); }
+
+.btn-primary::after, .em-btn::after { border: none; }
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 2rpx;
+  border-bottom: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), 0.07);
+}
+
+.field-row:last-child { border-bottom: none; }
+
+.field-label { color: var(--t3, #8fa3bc); font-size: calc(27rpx * var(--fs, 1)); }
+
+.field-value { color: var(--t1, #eaeff7); font-size: calc(28rpx * var(--fs, 1)); display: flex; align-items: center; }
+
+.arrow { color: var(--t4, #5b6b82); margin-left: 10rpx; font-size: calc(32rpx * var(--fs, 1)); }
+
+.pick-value { color: var(--gold-tx, #d4a94e); }
+
+.tag {
+  display: inline-block;
+  padding: 6rpx 18rpx;
+  border-radius: 99rpx;
+  font-size: calc(22rpx * var(--fs, 1));
+  background: rgba(212, 169, 78, 0.16);
+  color: var(--chip-tx, #d4a94e);
+  margin: 6rpx 8rpx 0 0;
+}
+
+.tip {
+  background: rgba(var(--ln-rgb, 138, 165, 192), 0.08);
+  border: 1rpx solid rgba(var(--ln-rgb, 138, 165, 192), 0.18);
+  border-radius: 18rpx;
+  padding: 20rpx 24rpx;
+  font-size: calc(25rpx * var(--fs, 1));
+  color: var(--t3, #8fa3bc);
+  line-height: 1.6;
+  margin: 16rpx 24rpx;
+}
+
+/* ============ 统一空态（卡片化图形引导） ============ */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin: 24rpx;
+  padding: 72rpx 48rpx;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 60%), var(--well, #101a2c);
+  border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), 0.12);
+  border-radius: 32rpx;
+  box-sizing: border-box;
+}
+
+.empty .em-ic {
+  font-size: calc(76rpx * var(--fs, 1));
+  line-height: 1;
+  filter: drop-shadow(0 10rpx 18rpx rgba(212, 169, 78, 0.25));
+}
+
+.empty .em-t { font-size: calc(31rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); margin-top: 26rpx; line-height: 1.5; }
+
+.empty .em-s { font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 14rpx; line-height: 1.75; }
+
+.empty .em-btn { margin-top: 34rpx; width: 70%; }
+
+.empty .em-cta {
+  margin-top: 32rpx;
+  padding: 16rpx 54rpx;
+  font-size: calc(26rpx * var(--fs, 1));
+  font-weight: 700;
+  color: #14100a;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f);
+  border-radius: 999rpx;
+  box-shadow: 0 10rpx 24rpx rgba(212, 169, 78, 0.2);
+}
+
+/* 入场动效：渐入上浮（页面级错峰更柔），开启减少动画偏好时自动停止 */
+@keyframes fb-fade-up {
+  0% { opacity: 0; transform: translate3d(0, 14rpx, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes fb-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.fb-fade { animation: fb-fade-up .42s ease both; }
+
+.fb-fade-d1 { animation: fb-fade-up .42s ease .06s both; }
+
+.fb-fade-d2 { animation: fb-fade-up .42s ease .12s both; }
+
+.fb-fade-d3 { animation: fb-fade-up .42s ease .18s both; }
+
+.fb-pulse { animation: fb-pulse 1.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fb-fade, .fb-fade-d1, .fb-fade-d2, .fb-fade-d3, .fb-pulse { animation: none; }
+}
+
+/* v1.19.77 · 微动效：按压缩放（给"摸得到"的反馈，不影响布局） */
+.fx-press { transition: transform .16s cubic-bezier(.2, .9, .3, 1), background .18s ease, opacity .18s ease; }
+.fx-press:active { transform: scale(.955); }
+
+/* 卡片错落入场：延迟由 JS 预计算后写进 style（WXML 不做运算） */
+.fx-stagger { animation: fb-fade-up .42s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-press, .fx-press:active { transform: none; transition: none; }
+  .fx-stagger { animation: none; }
+}
+
+/* 主色边光（聚焦卡片边框光晕，常用于「当前选中」「首屏高亮」场景） */
+.fb-glow {
+  position: relative;
+}
+
+.fb-glow::after {
+  content: "";
+  position: absolute;
+  inset: -1rpx;
+  border-radius: inherit;
+  padding: 1rpx;
+  background: linear-gradient(135deg, rgba(226,182,92,.65), rgba(212,169,78,.35) 40%, rgba(95,185,138,.35));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.empty .em-cta:active { opacity: .85; }
+
+/* ─── 全局 PNG 图标（替换 emoji，双主题通用金色线性） ─── */
+.ic { width: 28rpx; height: 28rpx; margin-right: 8rpx; flex-shrink: 0; vertical-align: -4rpx; }
+
+.ic-sm { width: 22rpx; height: 22rpx; margin-right: 6rpx; vertical-align: -3rpx; }
+
+.ic-title { width: 34rpx; height: 34rpx; }
+
+.em-img { width: 44rpx; height: 44rpx; }
+
+.h3-row, .h3-l, .pool-t, .q-title, .q-lab, .tc-head2, .wish-line, .keep-btn,
+.tk-est, .date-pick, .adv-ex, .next-line, .budget-tip, .tk-op-row, .layer-chip {
+  display: flex; align-items: center;
+}
+
+/* v1.7.1 版本号防呆（首页 / 更多页底部） */
+.ver { text-align: center; font-size: calc(20rpx * var(--fs, 1)); margin-top: 10rpx; padding-bottom: env(safe-area-inset-bottom); }
+
+/* ============================================================
+   v1.11 UI 减法 · 原子工具类
+   原来散落在 4 个页面共 17 处的内联 style（font-size: calc(20rpx * var(--fs, 1)) / margin-top:14rpx …）
+   全部收编到这里：改字号只需要改一处，且天然继承双主题变量。
+   ============================================================ */
+.u-fs20 { font-size: calc(20rpx * var(--fs, 1)); }
+.u-fs21 { font-size: calc(21rpx * var(--fs, 1)); }
+.u-fs22 { font-size: calc(22rpx * var(--fs, 1)); }
+.u-mt10 { margin-top: 10rpx; }
+.u-mt14 { margin-top: 14rpx; }
+.u-mt20 { margin-top: 20rpx; }
+.u-mb10 { margin-bottom: 10rpx; }
+.u-ml22 { margin-left: 22rpx; }
+.u-myx  { margin: -6rpx 0 14rpx; }
+.u-padc { padding: 30rpx 0; text-align: center; }

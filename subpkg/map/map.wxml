@@ -1,0 +1,86 @@
+<view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <view wx:if="{{!hasPlan}}" class="empty">
+    <view class="em-ic"><image class="em-img" src="/images/icons/map.png"/></view>
+    <view class="em-t">先去生成攻略</view>
+    <view class="em-s">这里会按天显示真实坐标标点与当天行进连线</view>
+  </view>
+
+  <block wx:if="{{hasPlan}}">
+    <view class="day-nav">
+      <view class="dn-btn" bindtap="onPrev">‹</view>
+      <view class="dn-txt">{{dayText}}</view>
+      <view class="dn-btn" bindtap="onNext">›</view>
+    </view>
+
+    <!-- 图层切换 -->
+    <view class="layer-bar">
+      <view class="layer-chip {{layer==='spots'?'on':''}}" data-layer="spots" bindtap="onLayer"><image class="ic ic-sm" src="/images/icons/pin.png"/> 景点</view>
+      <view class="layer-chip {{layer==='food'?'on':''}}" data-layer="food" bindtap="onLayer"><image class="ic ic-sm" src="/images/icons/food.png"/> 美食</view>
+      <view class="layer-chip {{layer==='stay'?'on':''}}" data-layer="stay" bindtap="onLayer"><image class="ic ic-sm" src="/images/icons/home.png"/> 住宿</view>
+    </view>
+
+    <!-- v1.8.4 B11：动线顺路度评分 -->
+    <view class="route-bar card" wx:if="{{layer==='spots' && route && route.ok}}">
+      <view class="rb-score {{route.scoreCls}}">{{route.score}}</view>
+      <view class="rb-main">
+        <view class="rb-t">{{route.feel}} · 顺路度</view>
+        <view class="rb-s dim">{{route.txt}}</view>
+      </view>
+    </view>
+    <view class="route-bar card" wx:if="{{layer==='spots' && route && !route.ok}}">
+      <view class="rb-score rb-na">—</view>
+      <view class="rb-main">
+        <view class="rb-t">当日点位暂无足够精确坐标</view>
+        <view class="rb-s dim">到当地后点列表行即可导航，连线会随真实坐标自动出现</view>
+      </view>
+    </view>
+
+    <!-- 编号标点 + 当天连线 polyline（仅景点图层显示） -->
+    <map id="map" class="the-map" latitude="{{center.latitude}}" longitude="{{center.longitude}}"
+         markers="{{markers}}" polyline="{{polyline}}"
+         bindmarkertap="onMarkerTap" bindcallouttap="onMarkerTap"
+         scale="{{scale}}"></map>
+    <view class="tip-inner dim" wx:if="{{markerNote}}">{{markerNote}}</view>
+
+    <!-- 景点图层：当天游玩点列表（点任意一行 → 直接定位/导航） -->
+    <view wx:if="{{layer==='spots'}}" class="card">
+      <view class="h3">当天游玩点（点一下直接导航）</view>
+      <view class="tag-bar" wx:if="{{tagList.length}}">
+        <view class="tag-chip {{tagFilter==='' ? 'on' : ''}}" data-tag="" bindtap="onTagFilter">全部</view>
+        <view class="tag-chip {{tagFilter===item ? 'on' : ''}}" wx:for="{{tagList}}" wx:key="*this" data-tag="{{item}}" bindtap="onTagFilter">{{item}}</view>
+      </view>
+      <view class="spot" wx:for="{{list}}" wx:key="name" data-name="{{item.name}}" bindtap="goNav">
+        <text wx:if="{{item.seq}}" class="seq">{{item.seq}}</text>
+        <text wx:else class="seq approx-seq">≈</text>
+        <text class="p">{{item.period}}</text>
+        <text class="n {{item.real ? '' : 'dim'}}">{{item.name}}</text>
+        <text wx:if="{{!item.real}}" class="approx">看方向</text>
+        <text wx:if="{{item.real}}" class="nav">导航</text>
+      </view>
+      <!-- v1.19.2：新手看不懂「≈ 看方向」是什么意思，这里把两种状态一次讲清 -->
+      <view class="tip-inner dim" wx:if="{{list.length}}">数字 = 当天游览顺序，点行直接导航；标「≈」的是只精确到城市级的点，点开先看大致方向，到现场再用地图搜店名 / 景点名</view>
+    </view>
+
+    <!-- 美食图层：名店列表 -->
+    <view wx:if="{{layer==='food'}}" class="card">
+      <view class="h3">当地名店（点击导航）</view>
+      <view class="food" wx:for="{{foodList}}" wx:key="id" data-i="{{index}}" bindtap="goFood">
+        <text class="f-em">{{item.food}}</text>
+        <text class="f-shop">{{item.shop}}</text>
+        <text class="f-addr dim">{{item.addr}}</text>
+        <text wx:if="{{item.price}}" class="f-price">{{item.price}}</text>
+      </view>
+      <view class="tip-inner dim" wx:if="{{!foodList.length}}">本城暂无收录的美食名店（看看必吃清单吧）</view>
+    </view>
+
+    <!-- 住宿图层 -->
+    <view wx:if="{{layer==='stay'}}" class="card">
+      <view class="h3">建议住宿区</view>
+      <view wx:if="{{hotel}}" class="hotel" bindtap="goHotel">
+        <text class="h-em">{{hotel.name}}</text>
+        <text class="h-sub dim">点击定位酒店，可一键导航</text>
+      </view>
+      <view wx:else class="tip-inner dim">本城暂无酒店坐标，参考下方建议</view>
+    </view>
+  </block>
+</view>

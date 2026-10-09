@@ -1,0 +1,65 @@
+# ============================================================
+# 旅行攻略生成器 · 微信小程序 —— Git 忽略规则
+# 原则：源码 / 数据 / 文档 入库；凭证、缓存、备份、中间产物 不入库
+# ============================================================
+
+# ---------- 1. 敏感凭证（绝不能入库） ----------
+tools/geocode.key
+tools/geocode.keys
+tools/*.key
+tools/*.keys
+*secrets*.json
+.env
+.env.*
+*.pem
+*.p12
+
+# ---------- 2. 缓存与抓取中间态（可由管道重跑） ----------
+tools/amap-spots-cache.json
+tools/geocode-cache*.json
+tools/geocode-official-cache.json
+tools/geocode-curated-cache.json
+tools/geocode-promote-cache.json
+tools/geocode-pending*.json
+tools/*-cache.json
+tools/province-lists.json
+
+# ---------- 3. 备份与一次性修复脚本产物 ----------
+tools/_bak-*/
+tools/_bak*/
+tools/.tone-bak/
+tools/_dl/
+tools/_img-unused/
+tools/*.bak
+tools/*.bak.js
+tools/*.bak-*
+tools/*.orig
+tools/*.pre-*
+
+# ---------- 4. 超大历史数据快照（>1MB，已合并进 utils/data.js） ----------
+tools/data-before-merge.bak.js
+tools/v199-amap-spots.js
+tools/v199-amap-spots.js.bak-before-scrape
+tools/v200-official-import.js
+tools/v199-coords-geocoded.js
+tools/_imported-*.json
+
+# ---------- 5. 系统与编辑器 ----------
+.DS_Store
+._*
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# ---------- 6. 运行产物 ----------
+node_modules/
+.qr/
+shots/
+*.log
+.workbuddy/
+project.private.config.json
+
+# ---------- 7. 本地临时脚本（下划线开头的一次性脚本不入库） ----------
+tools/_tmp-*
+tools/_scratch-*

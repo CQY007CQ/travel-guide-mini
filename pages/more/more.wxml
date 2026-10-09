@@ -1,0 +1,302 @@
+<view class="page {{td ? 'td' : ''}} fz{{fz}}">
+
+  <!-- 分组菜单（减法：顶部行程卡与底部「今天」tab 重复，已移除；行程身份看下方「旅行小结」） -->
+  <view class="group" wx:for="{{groups}}" wx:key="title" wx:for-item="g">
+    <view class="group-title">{{g.title}}</view>
+    <view class="card group-card">
+      <!-- 通用组首项：深色模式开关 + 二态外观（浅色/深色） -->
+      <view wx:if="{{g.title === '通用'}}" class="menu theme-menu">
+        <view class="m-txt">
+          <view class="m-t">深色模式</view>
+          <view class="m-d dim">暗夜护眼，适合夜间使用</view>
+        </view>
+        <switch checked="{{dark}}" color="#d4a94e" bindchange="onTheme"/>
+      </view>
+      <view wx:if="{{g.title === '通用'}}" class="theme-row">
+        <view class="th-chip {{themePref==='light'?'on':''}}" data-m="light" bindtap="onThemePref">浅色</view>
+        <view class="th-chip {{themePref==='dark'?'on':''}}" data-m="dark" bindtap="onThemePref">深色</view>
+      </view>
+      <view class="menu" wx:for="{{g.menus}}" wx:key="key" data-k="{{item.key}}" bindtap="go">
+        <image class="m-ic" src="/images/icons/{{item.icon}}.png"/>
+        <view class="m-txt">
+          <view class="m-t">{{item.t}}</view>
+          <view class="m-d dim">{{item.d}}</view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 我的行程存档 -->
+  <view class="group" wx:if="{{savedPlans.length}}">
+    <view class="group-title">我的行程</view>
+    <view class="card group-card">
+      <view class="menu" wx:for="{{savedPlans}}" wx:key="id">
+        <image class="m-ic" src="/images/icons/luggage.png"/>
+        <view class="m-txt" data-id="{{item.id}}" bindtap="onRestorePlan">
+          <view class="m-t">{{item.name}}</view>
+          <view class="m-d dim">{{item.sub}}</view>
+        </view>
+        <view class="ps-restore" data-id="{{item.id}}" catchtap="onRestorePlan">恢复</view>
+        <view class="ps-del" data-id="{{item.id}}" catchtap="onDelPlan">✕</view>
+      </view>
+      <view class="sp-tip dim">点行程名或「恢复」切换</view>
+    </view>
+  </view>
+
+  <!-- 旅行足迹 -->
+  <view class="group" wx:if="{{foot.spots > 0 || foot.cities > 0}}">
+    <view class="group-title">旅行足迹</view>
+    <view class="card group-card">
+      <view class="foot-line">
+        <text class="foot-big">{{foot.cities}}</text><text class="foot-lb"> 座城市</text>
+        <text class="foot-sep">·</text>
+        <text class="foot-big">{{foot.spots}}</text><text class="foot-lb"> 个景点打卡</text>
+      </view>
+      <!-- v1.9：省份集章进度 -->
+      <view class="stamp-row" wx:if="{{stamp && stamp.cities > 0}}">
+        <view class="stamp-track">
+          <view class="stamp-fill" style="width:{{stamp.pct}}%"></view>
+        </view>
+        <text class="stamp-t dim">点亮 {{stamp.provs}}/{{stamp.total}} 个省级行政区</text>
+      </view>
+      <view class="chips" wx:if="{{foot.cityList.length}}">
+        <text class="chip fcity" wx:for="{{foot.cityList}}" wx:key="*this" data-city="{{item}}" bindtap="onFootCity">{{item}}</text>
+      </view>
+      <!-- v1.8.5 C12：足迹清单一键复制（发朋友圈 / 存回忆） -->
+      <view class="foot-copy" catchtap="onFootCopy"><image class="ic ic-sm" src="/images/icons/copy.png"/>复制足迹清单</view>
+      <!-- v1.9：旅行人格 -->
+      <view class="persona-line" wx:if="{{persona}}"><image class="ic ic-sm" src="/images/icons/medal.png"/>{{persona.txt}}</view>
+      <view class="sp-tip dim">点城市看打过卡的地方</view>
+    </view>
+  </view>
+
+  <!-- 旅行手记 -->
+  <view class="group" wx:if="{{notes.length}}">
+    <view class="group-title">旅行手记</view>
+    <view class="card group-card">
+      <view class="menu" wx:for="{{notes}}" wx:key="date">
+        <image class="m-ic" src="/images/icons/bulb.png"/>
+        <view class="m-txt">
+          <view class="m-t">{{item.txt}}</view>
+          <view class="m-d dim">{{item.date}}</view>
+        </view>
+        <view class="ps-del" data-date="{{item.date}}" catchtap="onDelNote">✕</view>
+      </view>
+      <view class="sp-tip dim">在「今天」页旅行途中写一句，就会出现在这里</view>
+    </view>
+  </view>
+
+  <!-- 旅行小结（天数 / 景点 / 打卡 / 花费 / 最贵分类） -->
+  <view class="group" wx:if="{{review}}">
+    <view class="group-title">旅行小结</view>
+    <view class="card group-card">
+      <view class="rv-title">{{review.title}}</view>
+      <view class="rv-grid">
+        <view class="rv-n"><text class="rv-v">{{review.days}}</text><text class="rv-l">天数</text></view>
+        <view class="rv-n"><text class="rv-v">{{review.spots}}</text><text class="rv-l">景点</text></view>
+        <view class="rv-n"><text class="rv-v">{{review.visited}}</text><text class="rv-l">已打卡</text></view>
+        <view class="rv-n"><text class="rv-v gold">{{review.spent}}</text><text class="rv-l">总花费</text></view>
+        <view class="rv-n"><text class="rv-v">{{review.avg}}</text><text class="rv-l">日均</text></view>
+      </view>
+      <view class="rv-tx dim" wx:if="{{review.topCat}}">花得最多：{{review.topCat}} ¥{{review.topCatAmt}}<text wx:if="{{review.topDayAmt}}"> · 最贵一天 ¥{{review.topDayAmt}}</text></view>
+      <view class="rv-tx dim">共 {{review.bills}} 笔账 · {{review.notes}} 篇手记</view>
+    </view>
+  </view>
+
+  <!-- v1.7 · 旅行灵感（随机目的地） -->
+  <view class="group" wx:if="{{insp}}">
+    <view class="group-title">去哪儿好呢</view>
+    <view class="card insp-card" bindtap="useInspire">
+      <view class="insp-l">
+        <image class="ic" src="/images/icons/sparkle.png"/>
+        <view class="insp-txt">
+          <view class="insp-n">{{insp.name}}<text class="insp-pv dim"> · {{insp.province}}</text></view>
+          <view class="insp-d dim">{{insp.why}}</view>
+        </view>
+      </view>
+      <view class="insp-r">
+        <view class="insp-days">{{insp.days}} 天</view>
+        <view class="insp-best dim">{{insp.best}}</view>
+      </view>
+    </view>
+    <view class="insp-ops">
+      <view class="insp-btn" catchtap="onInspire"><image class="ic ic-sm" src="/images/icons/dice.png"/>换一个</view>
+      <view class="insp-btn insp-btn-main" catchtap="useInspire"><image class="ic ic-sm" src="/images/icons/route.png"/>就它了</view>
+      <view class="insp-btn" wx:if="{{favN >= 2}}" catchtap="genFavTrip"><image class="ic ic-sm" src="/images/icons/heart-on.png"/>串起收藏 {{favN}} 城</view>
+    </view>
+  </view>
+
+  <!-- v1.8.4 B16：跟同行人交换「想玩清单 + 整份行程」（协作包） -->
+  <view class="group" wx:if="{{hasPlan || wish.length}}">
+    <view class="group-title">行程协作</view>
+    <view class="card group-card">
+      <view class="menu" bindtap="onMergeOut">
+        <image class="m-ic" src="/images/icons/export.png"/>
+        <view class="m-txt">
+          <view class="m-t">把我的行程 + 想玩发给同行人</view>
+          <view class="m-d dim">复制协作包：TA 粘贴后想玩直接并入、行程存入 TA 的「我的行程」</view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+      <view class="menu" bindtap="onMergeIn">
+        <image class="m-ic" src="/images/icons/import.png"/>
+        <view class="m-txt">
+          <view class="m-t">粘贴 TA 的协作包并合并</view>
+          <view class="m-d dim">TA 想玩并入我的清单，TA 的行程变成一份存档</view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- v1.8.4 B13 · 旅行年鉴 -->
+  <view class="group" wx:if="{{yearRpt && (yearRpt.citiesN > 0 || yearRpt.spent > 0 || yearRpt.notesN > 0)}}">
+    <view class="group-title">旅行年鉴</view>
+    <view class="card group-card">
+      <view class="rv-nums">
+        <view class="rv-n"><text class="rv-v">{{yearRpt.citiesN}}</text><text class="rv-l">座城市</text></view>
+        <view class="rv-n"><text class="rv-v">{{yearRpt.spotsN}}</text><text class="rv-l">次景点打卡</text></view>
+        <view class="rv-n"><text class="rv-v gold">¥{{yearRpt.spent}}</text><text class="rv-l">账本合计</text></view>
+        <view class="rv-n"><text class="rv-v">{{yearRpt.notesN}}</text><text class="rv-l">篇手记</text></view>
+        <view class="rv-n"><text class="rv-v">{{yearRpt.plansN}}</text><text class="rv-l">份行程</text></view>
+      </view>
+      <!-- v1.11：cities.join / 分隔符拼接移到 JS 预计算（yearRpt.citiesTx / yearRpt.topCatsTx） -->
+      <view class="rv-tx dim" wx:if="{{yearRpt.citiesTx}}">去过：{{yearRpt.citiesTx}}</view>
+      <view class="rv-tx dim" wx:if="{{yearRpt.topCatsTx}}">花得最多：{{yearRpt.topCatsTx}}</view>
+    </view>
+  </view>
+
+  <!-- v1.7 · 足迹热力图 -->
+  <view class="group" wx:if="{{heat.visited}}">
+    <view class="group-title">足迹热力图</view>
+    <view class="card group-card">
+      <view class="foot-line">
+        <text class="foot-big">{{heat.visited}}<text class="foot-lb">/34</text></text><text class="foot-lb"> 个省份已点亮 · {{heat.cities}} 座城市</text>
+      </view>
+      <view class="heat-grid">
+        <view class="heat-cell l{{item.level}}" wx:for="{{heat.provs}}" wx:key="name">
+          <text class="hc-n">{{item.name}}</text>
+          <text class="hc-c">{{item.n}}</text>
+        </view>
+      </view>
+      <view class="heat-legend dim">
+        <text class="hl-t">少</text>
+        <view class="hl-c l1"></view><view class="hl-c l2"></view><view class="hl-c l3"></view><view class="hl-c l4"></view>
+        <text class="hl-t">多</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- v1.7 · 首页快捷入口 + 夜间自动深色 -->
+  <view class="group">
+    <view class="group-title">界面设置</view>
+    <view class="card group-card">
+      <view class="set-row">
+        <view class="set-l">
+          <view class="set-t">夜间自动深色</view>
+          <view class="set-d dim">22:00 - 07:00 自动切深色，白天恢复</view>
+        </view>
+        <switch checked="{{nite.on}}" color="#d4a94e" bindchange="onNight"/>
+      </view>
+      <view class="set-sep"></view>
+      <view class="set-block">
+        <view class="set-t">阅读字号</view>
+        <view class="set-d dim">放大后全站文字同步变大（长辈友好）</view>
+        <view class="fz-row">
+          <view class="th-chip {{fz === 1 ? 'on' : ''}}" data-v="1" bindtap="onFontScale">标准</view>
+          <view class="th-chip {{fz === 2 ? 'on' : ''}}" data-v="2" bindtap="onFontScale">大</view>
+          <view class="th-chip {{fz === 3 ? 'on' : ''}}" data-v="3" bindtap="onFontScale">特大</view>
+        </view>
+      </view>
+      <view class="set-sep"></view>
+      <view class="set-block u-mb10"><view class="set-t">首页快捷入口</view></view>
+      <view class="tile-grid">
+        <view class="tile {{item.on ? 'on' : ''}}" wx:for="{{tiles}}" wx:key="k" data-k="{{item.k}}" bindtap="onTile">
+          <image class="tile-ic" src="/images/icons/{{item.ic}}.png"/>
+          <text class="tile-t">{{item.t}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 旅行成就（足迹 / 手记 / 账本 / 存档 驱动的徽章） -->
+  <view class="group" wx:if="{{ach}}">
+    <view class="group-title">旅行成就</view>
+    <view class="card group-card">
+      <view class="foot-line">
+        <text class="foot-big">{{ach.got}}</text><text class="foot-lb"> / {{ach.total}} 枚徽章已解锁</text>
+      </view>
+      <view class="ach-bar"><view class="ach-fill" style="width:{{ach.pct}}%"></view></view>
+      <view class="ach-grid">
+        <view class="ach-it {{item.ok ? 'on' : ''}}" wx:for="{{ach.list}}" wx:key="id">
+          <image class="ach-ic" src="/images/icons/medal.png"/>
+          <text class="ach-t">{{item.t}}</text>
+          <text class="ach-d dim">{{item.d}}</text>
+          <text class="ach-p">{{item.ptxt}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 想玩清单：内嵌可管理 -->
+  <view class="group">
+    <view class="group-title">想玩清单</view>
+    <view class="card">
+      <block wx:if="{{wish.length}}">
+        <view wx:for="{{wishGroups}}" wx:for-item="g" wx:for-index="gi" wx:key="city">
+          <view class="wg">
+            <text class="wg-dot"></text>{{g.city}}<text class="wg-n dim">{{g.items.length}} 个</text>
+          </view>
+          <view class="wish-item" wx:for="{{g.items}}" wx:for-item="it" wx:key="i">
+            <image class="m-ic" src="/images/icons/pin.png"/>
+            <view class="m-txt">
+              <view class="m-t">{{it.name}}</view>
+              <view class="m-d dim" wx:if="{{it.city}}">{{it.city}}</view>
+            </view>
+            <!-- v1.8.5 C11：想玩状态（已排 / 去过） -->
+            <view class="w-tags" wx:if="{{it.planned || it.visited}}">
+              <text class="w-tag tp" wx:if="{{it.planned}}">已排</text>
+              <text class="w-tag tv" wx:if="{{it.visited}}">去过</text>
+            </view>
+            <view class="w-del" data-i="{{it.i}}" catchtap="delWish">✕</view>
+          </view>
+        </view>
+        <view class="wish-ops">
+          <view class="op-btn" catchtap="goGen">去添加</view>
+          <view class="op-btn" catchtap="onWishDice"><image class="ic ic-sm" src="/images/icons/dice.png"/>摇一个</view>
+          <view class="op-btn danger" catchtap="clearAll">清空</view>
+        </view>
+      </block>
+      <view class="wish-empty" wx:else>
+        <image class="we-ic" src="/images/icons/star.png"/>
+        <view class="we-t">还没有想玩的地方</view>
+        <view class="we-d dim">去「出发」页生成攻略，或点下方按钮手动添加</view>
+        <view class="op-btn wide" catchtap="goGen">去添加想去的地方</view>
+      </view>
+    </view>
+    <view class="wish-tip dim">重新生成攻略时会优先安排清单里的景点</view>
+  </view>
+
+  <!-- v1.19.2：本地数据一键重置（重度用户反复测试 / 换机场景的显式出口） -->
+  <view class="group">
+    <view class="group-title">数据与隐私</view>
+    <view class="card group-card">
+      <view class="menu" bindtap="clearAllData">
+        <image class="m-ic" src="/images/icons/close.png"/>
+        <view class="m-txt">
+          <view class="m-t">清空全部本地数据</view>
+          <view class="m-d dim">行程 / 账本 / 想玩 / 足迹 全部重置，不可恢复</view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="foot dim">数据均存本机 · 旅途中离线可用（地图需联网）</view>
+  <!-- v1.8.5 C13：关于与版本 -->
+  <view class="ver-row" bindtap="onAbout">
+    <text class="ver dim">旅行攻略生成器 · v{{ver}}</text>
+    <text class="arrow dim">›</text>
+  </view>
+</view>

@@ -1,0 +1,459 @@
+// more：功能聚合（分组）+ 想玩清单（内嵌可管理）
+const T = require("../../utils/travel.js");
+const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
+const TOOL_TOTAL = Array.isArray(TOOL_GROUPS) ? TOOL_GROUPS.reduce((s, g) => s + (g.items ? g.items.length : 0), 0) : 0;
+const app = getApp();
+
+Page({
+  data: {
+    fz: 1, td: false, hasPlan: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null },
+
+    _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
+  // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
+  onLoad() { this.__boot = T.ready().catch(() => null); },
+  onShow() {
+    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
+
+  /* ---------- v1.7 ---------- */
+  // 夜间自动深色（独立于手动主题，夜间小时段强制深色）
+  onNight(e) {
+    const v = !!(e.detail && e.detail.value);
+    const c = T.setNightCfg({ on: v });
+    this.setData({ nite: c });
+    this._theme();
+    wx.showToast({ title: v ? "夜间自动深色已开" : "已关闭夜间自动深色", icon: "none" });
+  },
+  // 首页快捷入口开关
+  onTile(e) {
+    const k = e.currentTarget.dataset.k;
+    const cur = T.homeTiles();
+    const i = cur.indexOf(k);
+    if (i >= 0) cur.splice(i, 1); else cur.push(k);
+    T.setHomeTiles(cur);
+    this.setData({
+      tiles: T.HOME_TILES.map(x => ({ k: x.k, t: x.t, ic: x.ic, on: cur.indexOf(x.k) >= 0 }))
+    });
+  },
+  // 换一个灵感目的地
+  onInspire() {
+    const x = T.inspire();
+    this.setData({ insp: x });
+    wx.vibrateShort && wx.vibrateShort({ type: "light" });
+  },
+  // 用灵感城市直接生成行程
+  useInspire() {
+    const it = this.data.insp;
+    if (!it) return;
+    const self = this;
+    wx.showModal({
+      title: "去 " + it.name + " 怎么样",
+      content: "建议 " + it.days + " 天 · " + it.best + "\n用默认预算生成一份行程？",
+      confirmText: "生成",
+      success(r) {
+        if (!r.confirm) return;
+        self._gen(it.name, it.province, it.days);
+      }
+    });
+  },
+  // 收藏城市串成多站行程
+  genFavTrip() {
+    const route = T.favRoute(4);
+    if (route.length < 2) { wx.showToast({ title: "至少先收藏 2 个城市", icon: "none" }); return; }
+    const self = this;
+    wx.showModal({
+      title: "串联收藏的城市",
+      content: route.map(r => r.name).join(" → ") + "\n每站 2 天，共 " + (route.length * 2) + " 天，出发日按下周末算",
+      confirmText: "生成",
+      success(r) { if (r.confirm) self._genMulti(route); }
+    });
+  },
+  _departIn(days) {
+    const d = new Date(Date.now() + (days || 7) * 86400000);
+    const pad = n => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  },
+  _gen(name, province, days) {
+    try {
+      const depart = this._departIn(7);
+      const daysArr = T.buildPlan({ city: name, province: province, days: days || 3, depart: depart, budget: "mid", pace: "balance" });
+      T.resetPackChecks(); // v1.13.1：新行程落地前重置行李清单勾选
+      app.setPlan({
+        cityName: name, province: province, totalDays: daysArr.length,
+        depart: depart, days: daysArr, budget: "mid", people: 1,
+        pace: "balance", isMulti: false, savedAt: Date.now()
+      });
+      wx.showToast({ title: "已生成，去看看吧", icon: "none" });
+      wx.switchTab({ url: "/pages/plan/plan" });
+    } catch (e) {
+      wx.showToast({ title: "生成失败：" + (e.message || ""), icon: "none" });
+    }
+  },
+  _genMulti(route) {
+    try {
+      const depart = this._departIn(7);
+      const out = T.buildMultiPlan({ route: route, depart: depart, budget: "mid", pace: "balance", people: 1 });
+      T.resetPackChecks(); // v1.13.1：新行程落地前重置行李清单勾选
+      app.setPlan({
+        cityName: route.map(s => s.name).join(" → "),
+        province: route[0].province, totalDays: out.totalDays,
+        depart: depart, days: out.days, segments: out.segments, route: out.route,
+        budget: "mid", people: 1, pace: "balance", isMulti: true, savedAt: Date.now()
+      });
+      wx.showToast({ title: "已生成多站行程", icon: "success" });
+      wx.switchTab({ url: "/pages/plan/plan" });
+    } catch (e) {
+      wx.showToast({ title: "生成失败：" + (e.message || ""), icon: "none" });
+    }
+  },
+  // 自动化辅助：静默设置主题（不弹 toast），供双主题截图回归调用
+  setThemeQuiet(m) {
+    const v = (m === "dark");
+    T.setThemeMode(v ? "dark" : "light");
+    this.setData({ td: v, dark: v });
+    T.applyNav();
+  },
+
+  refresh() {
+    const p = app.globalData.plan;
+    const hasPlan = !!(p && p.days && p.days.length);
+    // v1.8.5 C11：想玩清单带状态（已排进当前行程 / 已打卡去过）
+    const wish = T.wishStateMark(T.getWish(), p).map((x, i) => ({
+      i, name: x.name, city: x.city || "", planned: !!x.planned, visited: !!x.visited
+    }));
+    // C1（v1.9.1）：想玩按城市分组（多优先在前；空 city 归「未标注城市」并排最后）
+    const wmap = {};
+    wish.forEach(x => { const k = x.city || "未标注城市"; (wmap[k] = wmap[k] || []).push(x); });
+    const wishGroups = Object.keys(wmap)
+      .sort((a, b) => {
+        if ((a === "未标注城市") !== (b === "未标注城市")) return a === "未标注城市" ? 1 : -1;
+        return (wmap[b].length - wmap[a].length) || a.localeCompare(b, "zh");
+      })
+      .map(city => ({ city, items: wmap[city] }));
+    // 行程存档（不含当前行程本身，避免与「旅行小结」重复展示）与足迹
+    const curSig = hasPlan ? ((p.cityName || "") + "|" + p.days.length + "|" + (p.days[0] && p.days[0].date ? String(p.days[0].date).slice(0, 10) : "")) : "";
+    const savedPlans = T.listSavedPlans().filter(x => x.sig !== curSig);
+    const foot = T.footStats();
+    // v1.8.5 C14：本地数据积累提示（备份入口文案随数据量变化）
+    const bkTip = (savedPlans.length || (foot && (foot.spots || foot.cities)) || T.getNotes().length || wish.length || T.getLedger().length)
+      ? "已积累本地数据，换机 / 卸载前导出一份更安心" : "行程/账本/想玩/待办 全量导出";
+    this.setData({
+      dark: T.themeMode() === "dark",
+      themePref: T.themePref(),
+      review: hasPlan ? T.tripReview(p) : null,
+      hasPlan,
+      wish,
+      wishGroups,
+      savedPlans,
+      foot,
+      notes: T.getNotes().slice(-8).reverse(),
+      ach: T.achievements(),
+      // v1.9：省章进度 / 旅行人格 / 想玩骰子
+      stamp: T.provStamp(),
+      persona: T.travelPersona(),
+      // v1.7
+      heat: T.footHeatmap(),
+      nite: T.nightCfg(),
+      tiles: T.HOME_TILES.map(x => ({ k: x.k, t: x.t, ic: x.ic, on: T.homeTiles().indexOf(x.k) >= 0 })),
+      insp: T.inspire(),
+      favN: T.getFavs().length,
+      // v1.8.4 B13：旅行年鉴（足迹/账本/手记/存档全量聚合）
+      // v1.11：城市串 / 花销串 在 JS 里拼好，WXML 不再有 .join() 与 for+if 同节点
+      yearRpt: (() => {
+        const r = T.yearReport() || {};
+        return Object.assign({}, r, {
+          citiesTx: (Array.isArray(r.cities) ? r.cities : []).join("、"),
+          topCatsTx: (Array.isArray(r.topCats) ? r.topCats : [])
+            .map(c => (c && c.cat ? c.cat : "") + " ¥" + (c && c.amt != null ? c.amt : 0)).join(" · ")
+        });
+      })(),
+      backupTip: bkTip,
+      // 减法：无行程时只留「记账(可独立用) + 通用」，地图/美食/准备/速查待生成行程后再出现，减少空转入口
+      groups: hasPlan ? [
+        {
+          title: "旅途中",
+          menus: [
+            { key: "map", icon: "map", t: "地图导引", d: "每天真实坐标标点 + 导航" },
+            { key: "food", icon: "food", t: "美食名店", d: "必吃清单 + 可导航的老店" },
+            { key: "assistant", icon: "search", t: "本地速查", d: "离线速查：天气/美食/门票/预算…" },
+            { key: "toolkit", icon: "sparkle", t: "旅行百宝箱", d: "体检/文案/灵感/百科等 " + TOOL_TOTAL + " 个工具" }
+          ]
+        },
+        {
+          title: "行前与账本",
+          menus: [
+            { key: "prep", icon: "ticket", t: "出行准备", d: "票价预约 / 酒店比价 / 团队分工" },
+            { key: "boost", icon: "sparkle", t: "行程增强", d: "体检 / 问答 / 一键换景点 / 成就" },
+            { key: "ledger", icon: "wallet", t: "记账 · AA", d: "随手记一笔，对比预算" },
+            { key: "rank", icon: "medal", t: "旅行排行榜", d: "多档位排名 · 同行互相比较" }
+          ]
+        },
+        {
+          title: "通用",
+          menus: [
+            { key: "backupOut", icon: "export", t: "备份到剪贴板", d: bkTip },
+            { key: "backupIn", icon: "import", t: "从剪贴板恢复", d: "粘贴备份内容一键还原" }
+          ]
+        }
+      ] : [
+        {
+          title: "行前与账本",
+          menus: [
+            { key: "ledger", icon: "wallet", t: "记账 · AA", d: "还没行程也能先随手记账" },
+            { key: "toolkit", icon: "sparkle", t: "旅行百宝箱", d: "城市灵感池随时可用" }
+          ]
+        },
+        {
+          title: "通用",
+          menus: [
+            { key: "backupOut", icon: "export", t: "备份到剪贴板", d: bkTip },
+            { key: "backupIn", icon: "import", t: "从剪贴板恢复", d: "粘贴备份内容一键还原" }
+          ]
+        }
+      ]
+    });
+  },
+
+  /* ---- v1.9：想玩骰子（随机抽一条想玩） ---- */
+  onWishDice() {
+    const d = T.wishDice();
+    if (!d) { wx.showToast({ title: "想玩清单还空着，先加几个", icon: "none" }); return; }
+    wx.showModal({
+      title: "摇一摇 · 抽中「" + d.name + "」",
+      content: (d.city ? "在 " + d.city + (d.days ? " · 建议 " + d.days + " 天" : "") + "\n" : "") + (d.best ? "最佳时节 " + d.best : "") + "\n\n重新生成攻略时会优先安排它",
+      showCancel: false,
+      confirmText: "记住它了"
+    });
+  },
+
+  /* ---- v1.8.5 C12/C15/C13：足迹清单复制 · 城市详情 · 关于 ---- */
+  onFootCopy() {
+    const txt = T.footStoryText();
+    if (!txt || txt.length < 8) { wx.showToast({ title: "还没有足迹可复制", icon: "none" }); return; }
+    wx.setClipboardData({
+      data: txt,
+      success: () => wx.showToast({ title: "足迹清单已复制", icon: "success" })
+    });
+  },
+  onFootCity(e) {
+    const c = e.currentTarget.dataset.city;
+    if (!c) return;
+    const d = T.footCityDetail(c);
+    if (!d || !d.list.length) return;
+    const names = d.list.map(x => x.name);
+    const more = names.length > 10 ? ("…等 " + names.length + " 个") : "";
+    wx.showModal({
+      title: "在 " + c + " 打过卡",
+      content: names.slice(0, 10).join("、") + more,
+      showCancel: false,
+      confirmText: "好的"
+    });
+  },
+  onAbout() {
+    wx.showModal({
+      title: "关于 旅行攻略生成器",
+      content: "版本 v" + T.APP_VER + "\n\n行程全部在本机生成：数据不出手机、不上传，飞行模式也能规划（天气、地图需联网）。\n\n景点与票价按通用公开资料整理，请以官方最新公告为准。\n\n祝你每次都玩得尽兴。",
+      showCancel: false,
+      confirmText: "好的"
+    });
+  },
+
+  go(e) {
+    const k = e.currentTarget.dataset.k;
+    if (k === "backupOut") { this.backupOut(); return; }
+    if (k === "backupIn") { this.backupIn(); return; }
+    // 本地速查/记账/百宝箱无需行程也可用；其余行程页需要先生成攻略
+    if (!this.data.hasPlan && k !== "ledger" && k !== "assistant" && k !== "toolkit" && k !== "boost") { wx.showToast({ title: "先回「出发」页生成攻略", icon: "none" }); return; }
+    // v1.19.31 修复：工具页都在分包 subpkg 下，必须用 /subpkg/ 前缀（此前误用 /pages/ 导致全部点不动，同 HOME_TILES 旧 bug）
+    const PKG = { map: "/subpkg/map/map", food: "/subpkg/food/food", ledger: "/subpkg/ledger/ledger", rank: "/subpkg/rank/rank", prep: "/subpkg/prep/prep", assistant: "/subpkg/assistant/assistant", toolkit: "/subpkg/toolkit/toolkit", boost: "/subdata/boost/boost" };
+    if (PKG[k]) { wx.navigateTo({ url: PKG[k] }); return; }
+    // 防御：未知 key 不再跳转到非法拼接路径（避免死链/白屏），明确提示
+    wx.showToast({ title: "该功能暂未开放", icon: "none" });
+  },
+
+  /* ---- 行程存档：恢复 / 删除 ---- */
+  onRestorePlan(e) {
+    const id = e.currentTarget.dataset.id;
+    const plan = T.restorePlanSlot(id);
+    if (!plan) { wx.showToast({ title: "存档已失效", icon: "none" }); this.refresh(); return; }
+    app.setPlan(plan);
+    wx.showToast({ title: "已切换到该行程", icon: "success" });
+    setTimeout(() => wx.switchTab({ url: "/pages/plan/plan" }), 600);
+  },
+  onDelNote(e) {
+    const date = e.currentTarget.dataset.date;
+    T.delNote(date);
+    this.refresh();
+    wx.showToast({ title: "已删除手记", icon: "none" });
+  },
+  onDelPlan(e) {
+    const id = e.currentTarget.dataset.id;
+    wx.showModal({
+      title: "删除这份行程存档？",
+      content: "删除后不可恢复（不影响当前行程）",
+      confirmColor: "#cc3d3d",
+      success: (r) => { if (r.confirm) { T.delPlanSlot(id); this.refresh(); wx.showToast({ title: "已删除", icon: "none" }); } }
+    });
+  },
+
+  /* ---- 备份 / 恢复（剪贴板） ---- */
+  backupOut() {
+    let s = "";
+    try { s = T.exportBackup(); } catch (e) {}
+    if (!s) { wx.showToast({ title: "暂无可备份内容", icon: "none" }); return; }
+    wx.setClipboardData({
+      data: s,
+      success: () => wx.showToast({ title: "已复制备份（" + s.length + " 字符），换机后点「恢复」", icon: "none", duration: 2600 })
+    });
+  },
+  backupIn() {
+    wx.getClipboardData({
+      success: (res) => {
+        try {
+          const r = T.importBackup(res.data);
+          if (r.hasPlan && r.plan) {
+            app.setPlan(r.plan);
+            wx.showToast({ title: "已恢复行程与 " + r.count + " 组数据 ✓", icon: "none" });
+          } else {
+            wx.showToast({ title: "已恢复 " + r.count + " 组数据（无行程）", icon: "none" });
+          }
+          this.refresh();
+        } catch (e) {
+          wx.showToast({ title: "剪贴板内容不是有效备份", icon: "none" });
+        }
+      },
+      fail: () => wx.showToast({ title: "读取剪贴板被拒绝", icon: "none" })
+    });
+  },
+
+  onShareAppMessage() {
+    const p = app.globalData.plan;
+    return {
+      title: (p ? p.cityName + " · " + (p.totalDays || p.days.length) + " 天攻略，离线也能规划" : "旅行攻略生成器：出发前准备、旅途中都能用") + "（离线可用）",
+      path: "/pages/index/index"
+    };
+  },
+
+  /* ---- 想玩管理 ---- */
+  delWish(e) {
+    const w = this.data.wish[Number(e.currentTarget.dataset.i)];
+    if (!w) return;
+    T.toggleWish(w.name, w.city);
+    wx.showToast({ title: "已移除", icon: "none" });
+    this.refresh();
+  },
+  clearAll() {
+    wx.showModal({
+      title: "清空想玩清单？",
+      content: "清空后重新生成时不再优先安排这些景点。",
+      success: (res) => {
+        if (!res.confirm) return;
+        T.clearWish();
+        this.refresh();
+      }
+    });
+  },
+  goGen() { wx.switchTab({ url: "/pages/index/index" }); },
+
+  // v1.19.2：重度用户反复测试、或换机前想彻底重置，此前没有任何入口（只能卸载小程序）。
+  // 数据全在本机，必须给显式出口，且用二次确认 + 提示先备份，避免误清。
+  clearAllData() {
+    wx.showModal({
+      title: "清空全部本地数据？",
+      content: "行程、存档、账本、想玩、待办、手记、足迹都会删除且不可恢复。建议先「备份到剪贴板」。",
+      confirmText: "仍要清空",
+      confirmColor: "#cc3d3d",
+      success: (r) => {
+        if (!r.confirm) return;
+        try { wx.clearStorageSync(); } catch (e) {}
+        try { app.clearPlan(); } catch (e) {}
+        wx.showToast({ title: "已清空，回到初始状态", icon: "none" });
+        setTimeout(() => { try { wx.reLaunch({ url: "/pages/index/index" }); } catch (_) {} }, 700);
+      }
+    });
+  },
+
+  /* ---- v1.8.4 B16：同行人协作包（想玩清单 + 整份行程 JSON，剪贴板） ---- */
+  onMergeOut() {
+    const plan = app.globalData.plan;
+    if (!(plan && plan.days && plan.days.length) && !T.getWish().length) {
+      wx.showToast({ title: "先有行程或想玩清单再分享", icon: "none" }); return;
+    }
+    let s = "";
+    try { s = T.exportCollabPlan(plan || null); } catch (e) {}
+    if (!s) { wx.showToast({ title: "暂无可分享内容", icon: "none" }); return; }
+    wx.setClipboardData({
+      data: s,
+      success: () => wx.showToast({ title: "协作包已复制（含行程 + " + T.getWish().length + " 个想玩）", icon: "none", duration: 2600 })
+    });
+  },
+  onMergeIn() {
+    const self = this;
+    wx.getClipboardData({
+      success: (res) => {
+        const text = String(res.data || "");
+        // ① 新格式：协作包 JSON（想玩 + 整份行程）
+        if (text.indexOf("travel-collab") >= 0) {
+          try {
+            const r = T.mergeCollabPlan(text);
+            const parts = [];
+            if (r.added) parts.push("并入想玩 " + r.added + " 个");
+            if (r.existed) parts.push("TA 的行程你已有存档");
+            else if (r.saved) parts.push("TA 的行程已存入「我的行程」");
+            wx.showToast({ title: parts.length ? parts.join(" · ") : "内容都已在，无需合并", icon: parts.length ? "success" : "none" });
+            self.refresh();
+          } catch (e) {
+            wx.showToast({ title: "协作包解析失败", icon: "none" });
+          }
+          return;
+        }
+        // ② 旧格式：纯想玩文本（兼容 v1.8.3 前的分享）
+        try {
+          if (text.indexOf("想玩清单") < 0) { wx.showToast({ title: "剪贴板内容不像协作包/想玩清单", icon: "none" }); return; }
+          const ws = T.getWish();
+          let addN = 0;
+          text.split("\n").forEach(line => {
+            if (!line || line[0] === "#") return;
+            const i = line.indexOf("|");
+            if (i <= 0) return;
+            const c = line.slice(0, i).trim();
+            const nm = line.slice(i + 1).trim();
+            if (!nm || nm.length > 30) return;
+            if (ws.some(w => w.name === nm)) return;
+            T.toggleWish(nm, c);
+            addN++;
+          });
+          if (!addN) { wx.showToast({ title: "没有新景点可合并（可能都在清单里了）", icon: "none" }); }
+          else { wx.showToast({ title: "已并入 " + addN + " 个想玩", icon: "none" }); }
+          self.refresh();
+        } catch (e) { wx.showToast({ title: "解析失败，请确认复制内容", icon: "none" }); }
+      },
+      fail: () => wx.showToast({ title: "读取剪贴板被拒绝", icon: "none" })
+    });
+  },
+
+  onTheme(e) {
+    const v = !!(e.detail && e.detail.value);
+    T.setThemeMode(v ? "dark" : "light");
+    this.setData({ td: v, dark: v, themePref: T.themePref() });
+    T.applyTabBar(); // 同步刷新原生 tabBar 配色
+    wx.showToast({ title: v ? "已切换深色模式" : "已切换浅色模式", icon: "none" });
+  },
+  // v1.13：外观二态（浅色 / 深色，「跟随系统」已移除）
+  onThemePref(e) {
+    const m = e.currentTarget.dataset.m || "light";
+    T.setThemePref(m);
+    const d = T.themeMode() === "dark";
+    this.setData({ td: d, dark: d, themePref: T.themePref() });
+    T.applyNav();
+    T.applyTabBar();
+    wx.showToast({ title: "外观：" + (m === "dark" ? "深色" : "浅色"), icon: "none" });
+  },
+  // 全局阅读字号三档（标准 1 / 大 2 / 特大 3），与指南页 A⁻/A⁺ 共用同一设置
+  onFontScale(e) {
+    const v = Number(e.currentTarget.dataset.v) || 1;
+    T.setFontScale(v);
+    this.setData({ fz: T.fontScale() });
+    wx.showToast({ title: (v === 1 ? "标准字号" : (v === 2 ? "大字号" : "特大字号")), icon: "none" });
+  }
+});

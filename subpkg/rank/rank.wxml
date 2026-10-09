@@ -1,0 +1,73 @@
+<view class="page">
+  <!-- 口径切换：六个指标共用一套榜单，改的是「按什么排」 -->
+  <view class="card">
+    <view class="h3">排行口径</view>
+    <view class="rk-tabs">
+      <view
+        class="rk-tab {{item.on ? 'on' : ''}}"
+        wx:for="{{metrics}}" wx:key="k"
+        data-k="{{item.k}}" bindtap="onMetric"
+      >{{item.n}}</view>
+    </view>
+    <view class="dim rk-desc">{{metricDesc}}</view>
+  </view>
+
+  <!-- 我在哪 -->
+  <view class="card rk-mecard" wx:if="{{me}}">
+    <view class="rk-mehead">
+      <text class="rk-menm">{{me.name}}</text>
+      <input class="rk-rename" value="{{me.name}}" placeholder="改个名字" confirm-type="done" bindblur="onRenameMe" bindconfirm="onRenameMe" />
+    </view>
+    <view class="rk-mebig">
+      <text class="rk-myval">{{noData ? '—' : me.rank}}</text>
+      <text class="rk-mylab">名 · 共 {{total}} 份</text>
+    </view>
+    <view class="dim" wx:if="{{noData}}">
+      还没有可用于排名的记录。去记一笔账、打个卡，这个位置就会有名字。
+    </view>
+    <view class="rk-memetric" wx:else>当前口径：{{me.val}} {{metricUnit}}</view>
+    <view class="rk-meacts">
+      <view class="rk-mini" bindtap="onRefreshMine">按当前记录刷新</view>
+      <view class="rk-mini" bindtap="onAddToggle">{{adding ? '取消' : '加一份档案'}}</view>
+    </view>
+  </view>
+
+  <!-- 新增档案 -->
+  <view class="card" wx:if="{{adding}}">
+    <view class="h3">新增一份档案</view>
+    <view class="dim rk-desc">为同行的人各建一份，之后你们就能互相比较。从当前这台设备上的记录起算。</view>
+    <input class="rk-input" value="{{draftName}}" placeholder="比如：同行的小林" bindinput="onNameInput" confirm-type="done" bindconfirm="onAdd" />
+    <view class="rk-msg" wx:if="{{msg}}">{{msg}}</view>
+    <view class="btn-primary rk-addbtn" bindtap="onAdd">加入榜单</view>
+  </view>
+
+  <view class="rk-msg" wx:if="{{msg && !adding}}">{{msg}}</view>
+
+  <!-- 榜单 -->
+  <view class="card" wx:if="{{list.length}}">
+    <view class="h3">榜单 · 按{{metricName}}排序</view>
+    <view class="rk-row" wx:for="{{list}}" wx:key="id">
+      <view class="rk-no rk-no-{{index < 3 ? (index + 1) : 'n'}}">{{index < 3 ? '' : item.rank}}</view>
+      <view class="rk-main">
+        <view class="rk-nm">
+          {{item.name}}
+          <text class="tag rk-tagme" wx:if="{{item.me}}">我</text>
+        </view>
+        <view class="dim rk-sub">
+          {{item.m.cities}} 城 · {{item.m.spots}} 景 · {{item.m.plans}} 行程 · {{item.m.notes}} 笔记
+        </view>
+      </view>
+      <view class="rk-val">{{item.val}}<text class="rk-unit"> {{metricUnit}}</text></view>
+      <view class="rk-ops" wx:if="{{!item.me}}">
+        <view class="rk-mini" data-id="{{item.id}}" bindtap="onSetMe">设为我</view>
+        <view class="rk-mini rk-del" data-id="{{item.id}}" data-name="{{item.name}}" bindtap="onRemove">移除</view>
+      </view>
+    </view>
+    <view class="dim rk-note">同分同名次，后续名次跳号（如 1、2、2、4）。名次按存档时的记录算，不随别人新增而变动。</view>
+  </view>
+
+  <view class="card" wx:else>
+    <view class="empty">还没有任何档案</view>
+    <view class="dim rk-desc">点上面的「加一份档案」开始。</view>
+  </view>
+</view>

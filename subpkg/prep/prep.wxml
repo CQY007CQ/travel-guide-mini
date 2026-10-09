@@ -1,0 +1,115 @@
+<view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <view wx:if="{{!hasPlan}}" class="empty">
+    <view class="em-ic"><image class="em-img" src="/images/icons/luggage.png"/></view>
+    <view class="em-t">先去生成攻略</view>
+    <view class="em-s">这里会整理票价预约、酒店比价与团队分工</view>
+  </view>
+
+  <block wx:if="{{hasPlan}}">
+    <view class="card">
+      <view class="h3 h3-row"><image class="ic" src="/images/icons/ticket.png"/>行程景点 · 票价与预约</view>
+      <view class="tk-head" wx:if="{{tickets.length}}">
+        <view class="tk-sum">
+          <text>已订 {{tkDone}}/{{tickets.length}}</text>
+          <text wx:if="{{bookN}}" class="dim"> · 其中 {{bookN}} 项需提前预约</text>
+          <text wx:else class="dim"> · 均无需强制预约</text>
+        </view>
+        <view class="tk-est" wx:if="{{tkSum > 0}}"><image class="ic ic-sm" src="/images/icons/wallet.png"/>门票预估 <text class="gold">¥{{tkSum}}</text><text class="dim">（{{peopleN}} 人合计 · 仅供参考）</text></view>
+        <view class="tk-bar"><view class="tk-fill" style="width:{{tkPct}}%"></view></view>
+      </view>
+      <view wx:if="{{!tickets.length}}" class="dim note">行程中的景点暂无强制预约要求，出发前到官方渠道确认开放情况即可</view>
+
+      <view class="tk-item" wx:for="{{tickets}}" wx:key="name">
+        <view class="tk-row">
+          <view class="tk-dot {{item.done ? 'on' : ''}}" data-i="{{index}}" bindtap="onTkToggle">
+            <text wx:if="{{item.done}}">✓</text>
+          </view>
+          <view class="tk-main">
+            <view class="tk-name-line">
+              <text class="tk-name {{item.done ? 'done' : ''}}">{{item.name}}</text>
+              <text wx:if="{{item.seg}}" class="tk-seg">{{item.seg}}</text>
+              <text wx:if="{{item.book}}" class="tk-book">需预约</text>
+            </view>
+            <text wx:if="{{item.where}}" class="tk-where">{{item.where}}</text>
+          </view>
+          <text class="tk-price">{{item.price}}</text>
+        </view>
+        <view class="tk-ops" wx:if="{{item.book || item.note || item.date || item.url}}">
+          <picker wx:if="{{item.book}}" mode="date" value="{{item.date || ''}}" data-i="{{index}}" bindchange="onTkDate">
+            <view class="tk-op tk-op-row {{item.date ? 'set' : ''}}"><image class="ic ic-sm" src="/images/icons/calendar.png"/>{{item.date ? item.dateTx : '定预约日'}}</view>
+          </picker>
+          <view class="tk-op tk-op-row" wx:if="{{item.url}}" data-i="{{index}}" bindtap="onTkUrl">复制预约链接</view>
+          <view class="tk-op-note" wx:if="{{item.note}}">{{item.note}}</view>
+        </view>
+        <input wx:if="{{item.book}}" class="tk-note" placeholder="备注：放票时间 / 取票方式…"
+          value="{{item.note}}" data-i="{{index}}" bindblur="onTkNote" bindconfirm="onTkNote" />
+      </view>
+
+      <view class="tip-inner dim" bindtap="goToday">行前待办（证件 / 行李打包）在「今天」页按倒计时勾选，点我去 →</view>
+    </view>
+
+    <!-- 自动行李清单（按天数 / 出发季节 / 目的地气候 / 行程特色生成） -->
+    <!-- v1.7 · 证件与出行必备 -->
+    <view class="card">
+      <view class="h3 h3-row">
+        <view class="h3-l"><image class="ic" src="/images/icons/badge.png"/>证件与出行必备</view>
+        <text class="doc-n">{{docDone}}/{{docList.length}}</text>
+      </view>
+      <view class="prog">
+        <view class="bar"><view class="fill" style="width:{{docPct}}%"></view></view>
+      </view>
+      <view class="doc-item {{item.done ? 'done' : ''}}" wx:for="{{docList}}" wx:key="k"
+            data-k="{{item.k}}" bindtap="onDocTap">
+        <text class="box">{{item.done ? '✓' : ''}}</text>
+        <view class="doc-txt">
+          <text class="doc-t">{{item.t}}</text>
+          <text class="doc-x dim">{{item.x}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="card" wx:if="{{pack}}">
+      <view class="h3 h3-row"><image class="ic" src="/images/icons/backpack.png"/>自动行李清单</view>
+      <view class="pk-sum">
+        <text>已装 {{pack.done}}/{{pack.total}}</text>
+        <text class="dim"> · 按 {{pack.season}}季 · {{planDays}} 天行程生成</text>
+      </view>
+      <view class="pk-bar"><view class="pk-fill" style="width:{{pack.pct}}%"></view></view>
+      <block wx:for="{{pack.groups}}" wx:key="title" wx:for-item="g">
+        <view class="pk-gt">{{g.title}}</view>
+        <view class="pk-item {{item.done ? 'done' : ''}}" wx:for="{{g.items}}" wx:key="k"
+              data-k="{{item.k}}" bindtap="onPackTap">
+          <text class="pk-box">{{item.done ? '✓' : ''}}</text>
+          <text class="pk-tx">{{item.t}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="card">
+      <view class="h3 h3-row"><image class="ic" src="/images/icons/home.png"/>酒店预订比价建议</view>
+      <view class="tip-line" wx:for="{{hotelTips}}" wx:key="*this">{{item}}</view>
+    </view>
+
+    <view class="card">
+      <view class="h3 h3-row"><image class="ic" src="/images/icons/people.png"/>团队分工</view>
+      <view class="duty" wx:for="{{duties}}" wx:key="who">
+        <text class="duty-who">{{item.who}}</text>
+        <view class="duty-list">
+          <text class="duty-item" wx:for="{{item.list}}" wx:for-item="r" wx:key="*this">· {{r}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 应急电话（点击直接拨号） -->
+  <view class="card sos-card">
+    <view class="h3 h3-row"><image class="ic" src="/images/icons/info.png"/>应急电话 · 点按直拨</view>
+    <view class="sos-grid">
+      <view class="sos-it" wx:for="{{sosList}}" wx:key="tel" data-tel="{{item.tel}}" bindtap="onCall">
+        <text class="sos-n">{{item.tel}}</text>
+        <text class="sos-l">{{item.label}}</text>
+      </view>
+    </view>
+    <view class="sp-tip dim">境外出行请在出行前查好当地急救与使馆电话</view>
+  </view>
+</view>

@@ -1,0 +1,53 @@
+<view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <view wx:if="{{!hasPlan}}" class="empty">
+    <view class="em-ic"><image class="em-img" src="/images/icons/food.png"/></view>
+    <view class="em-t">先去生成攻略</view>
+    <view class="em-s">这里会显示目的地的必吃清单与地道名店</view>
+  </view>
+
+  <block wx:if="{{hasPlan}}">
+    <!-- 多站行程：城市切换条（默认定位今天所在站） -->
+    <scroll-view wx:if="{{segs.length > 1}}" scroll-x class="segs-scroll" show-scrollbar="{{false}}">
+      <view class="segs">
+        <view class="seg-chip {{fIdx === item.i ? 'on' : ''}}" wx:for="{{segs}}" wx:key="i"
+              data-i="{{item.i}}" bindtap="onCityTap">
+          {{item.i + 1}}. {{item.name}}
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- v1.8.4 A3：早餐 / 正餐 / 夜宵 时段切换 -->
+    <view class="card slot-bar">
+      <view class="slot-chip {{slotFilter === item.k ? 'on' : ''}}" wx:for="{{slots}}" wx:key="k"
+            data-k="{{item.k}}" bindtap="onSlot">{{item.t}}</view>
+    </view>
+
+    <view class="card">
+      <view class="h3">必吃清单 · {{cityName}}<text class="dim u-fs20" wx:if="{{slotFilter !== 'all'}}">（{{foodN}} 项）</text></view>
+      <view class="food-tags">
+        <block wx:for="{{foods}}" wx:key="n">
+          <text class="tag">{{item.n}}<text wx:if="{{item.tag}}" class="tag-sub">{{item.tag}}</text></text>
+        </block>
+      </view>
+      <view wx:if="{{slotFilter !== 'all' && !foodN}}" class="note dim">这个时段没有明确代表，看看「全部」里的其它推荐</view>
+      <view wx:if="{{note}}" class="note">{{note}}</view>
+    </view>
+
+    <view class="card">
+      <view class="h3 h3-row"><image class="ic" src="/images/icons/trophy.png"/>地道名店推荐 <text class="dim u-fs20">（点击导航 · 已按当前时段筛出 {{shopN}} 家）</text></view>
+      <view wx:if="{{budgetTxt}}" class="budget-tip"><image class="ic ic-sm" src="/images/icons/wallet.png"/>{{budgetTxt}}</view>
+      <view wx:if="{{shopSrc}}" class="budget-tip"><image class="ic ic-sm" src="/images/icons/target.png"/>{{shopSrc}}</view>
+      <view wx:if="{{!shops.length}}" class="dim note">{{emptyShopTx}}</view>
+      <view class="shop {{item.hit ? 'hit' : ''}}" wx:for="{{shops}}" wx:key="id"
+            data-lat="{{item.lat}}" data-lon="{{item.lon}}" data-shop="{{item.shop}}" data-addr="{{item.addr}}"
+            bindtap="onShopNav">
+        <view class="shop-top">
+          <text class="shop-name">{{item.shop}}</text>
+          <text wx:if="{{item.band}}" class="band-tag band-{{item.bandKey}}">{{item.band}}</text>
+          <text class="shop-price">{{item.price}}</text>
+        </view>
+        <view class="shop-sub">{{item.food}} · {{item.addr}}</view>
+      </view>
+    </view>
+  </block>
+</view>

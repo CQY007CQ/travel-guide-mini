@@ -1,0 +1,38 @@
+.page { padding: 24rpx 28rpx 60rpx; }
+.tk-head { padding: 8rpx 4rpx 20rpx; }
+.tk-title { font-size: calc(40rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #1c2433); }
+.tk-sub { margin-top: 6rpx; font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #7d8aa0); }
+.tk-hint { font-size: calc(23rpx * var(--fs, 1)); color: var(--gold, #c9a04a); padding: 0 4rpx 16rpx; }
+
+.group-title { font-size: calc(25rpx * var(--fs, 1)); font-weight: 600; color: var(--t3, #7d8aa0); margin: 26rpx 8rpx 12rpx; }
+
+.tk-item { display: flex; align-items: center; justify-content: space-between;
+  padding: 22rpx 26rpx; border-bottom: 1rpx solid rgba(var(--ln-rgb, 148,163,184), .07); }
+.tk-item:last-child { border-bottom: none; }
+.m-txt { flex: 1; min-width: 0; padding-right: 16rpx; }
+.m-t { font-size: calc(29rpx * var(--fs, 1)); font-weight: 600; color: var(--t1, #1c2433); }
+.m-d { margin-top: 4rpx; font-size: calc(23rpx * var(--fs, 1)); }
+.dim { color: var(--t3, #7d8aa0); }
+.arrow { color: var(--t3, #7d8aa0); font-size: calc(34rpx * var(--fs, 1)); }
+
+.tk-out { padding: 22rpx 26rpx; font-size: calc(27rpx * var(--fs, 1)); line-height: 1.75; color: var(--t1, #1c2433);
+  background: rgba(var(--ln-rgb, 148,163,184), .08); border-radius: 16rpx; white-space: pre-wrap; word-break: break-all; }
+/* v1.19 P2-9：结果操作行（复制 / 收藏 / 加入想玩） */
+.tk-acts { display: flex; gap: 16rpx; margin-top: 18rpx; }
+.tk-act { flex: 1; text-align: center; padding: 16rpx 0; font-size: calc(26rpx * var(--fs, 1)); font-weight: 600;
+  color: var(--t1, #1c2433); background: rgba(var(--ln-rgb, 148,163,184), .12);
+  border-radius: 999rpx; cursor: pointer; }
+.tk-act.on { color: var(--on-gold, #fff); background: var(--gold, #c9a04a); }
+
+/* v1.19 P2-9：我的收藏（可展开回看 / 删除） */
+.fav-h { display: flex; align-items: center; justify-content: space-between; }
+.fav-che { font-size: calc(22rpx * var(--fs, 1)); color: var(--t4, #9aa6b8); font-weight: 400; }
+.fav { padding: 20rpx 24rpx; }
+.fav-top { display: flex; align-items: center; justify-content: space-between; }
+.fav-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fav-t { font-size: calc(27rpx * var(--fs, 1)); font-weight: 600; color: var(--t1, #1c2433); }
+.fav-c { margin-top: 2rpx; font-size: calc(21rpx * var(--fs, 1)); }
+.fav-x { padding: 4rpx 10rpx; font-size: calc(28rpx * var(--fs, 1)); color: var(--t4, #9aa6b8); }
+.fav-txt { margin-top: 12rpx; padding-top: 12rpx; font-size: calc(25rpx * var(--fs, 1)); line-height: 1.7; color: var(--t1, #1c2433);
+  border-top: 1rpx solid rgba(var(--ln-rgb, 148,163,184), .1); white-space: pre-wrap; word-break: break-all; }
+.tk-foot { text-align: center; font-size: calc(22rpx * var(--fs, 1)); margin-top: 36rpx; color: var(--t4, #9aa6b8); }

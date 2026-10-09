@@ -1,0 +1,95 @@
+<view class="page fz{{fz}}">
+  <view class="hd">
+    <text class="hd-title">行程增强</text>
+    <text class="hd-sub">体检 / 问答 / 换景点 / 动线 / 高光</text>
+  </view>
+
+  <view class="card">
+    <view class="card-head">
+      <text class="card-title">行程体检</text>
+      <text class="badge">{{checkup.score}} 分</text>
+    </view>
+    <view wx:if="{{checkup.items.length}}" class="rows">
+      <view wx:for="{{checkup.items}}" wx:key="k" class="row">
+        <text class="dot {{item.ok ? 'ok' : 'no'}}"></text>
+        <text class="row-txt">{{item.label}} · {{item.detail}}</text>
+      </view>
+    </view>
+    <view wx:for="{{checkup.tips}}" wx:key="*this" class="tip">{{item}}</view>
+    <view wx:if="{{!hasPlan}}" class="empty">先在首页生成一份行程</view>
+  </view>
+
+  <view class="card">
+    <view class="card-head"><text class="card-title">行程问答</text></view>
+    <view class="qbar">
+      <input class="qinput" placeholder="试试：第2天去哪 / 下雨怎么办 / 改成5天" value="{{question}}" bindinput="onQInput" />
+      <button class="mini-btn" size="mini" bindtap="askQ">问</button>
+    </view>
+    <view wx:if="{{qAns}}" class="ans">{{qAns}}</view>
+  </view>
+
+  <view class="card">
+    <view class="card-head"><text class="card-title">一键换景点</text></view>
+    <view wx:for="{{alts}}" wx:key="name" class="row">
+      <text class="row-txt">{{item.name}} · {{item.tags}}</text>
+    </view>
+    <view wx:if="{{alts.length}}" class="btn-row">
+      <button size="mini" bindtap="refreshAlts">换一批</button>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-head"><text class="card-title">动线与高光</text></view>
+    <view wx:for="{{routeTips}}" wx:key="*this" class="tip">{{item}}</view>
+    <view wx:for="{{highs}}" wx:key="name" class="row">
+      <text class="row-txt">D{{item.day}} {{item.name}} · {{item.best}}</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-head"><text class="card-title">出行提醒</text></view>
+    <view class="row"><text class="row-txt">错峰：{{crowd.txt}}</text></view>
+    <view class="row"><text class="row-txt">行李加项：{{packStr || '暂无额外建议'}}</text></view>
+  </view>
+
+  <view class="card">
+    <view class="card-head"><text class="card-title">成就与年报</text></view>
+    <view class="rows">
+      <view wx:for="{{badges}}" wx:key="id" class="row">
+        <text class="dot {{item.got ? 'ok' : 'no'}}"></text>
+        <text class="row-txt">{{item.name}} · {{item.desc}}</text>
+      </view>
+    </view>
+    <view class="row"><text class="row-txt">今年：{{yearTxt}}</text></view>
+    <view class="row"><text class="row-txt">点亮：{{liteTxt}}</text></view>
+  </view>
+
+  <view class="card">
+    <view class="card-head"><text class="card-title">交通预估</text></view>
+    <view class="qbar">
+      <input class="qinput" placeholder="出发城市" value="{{cityA}}" bindinput="onAInput" />
+      <input class="qinput" placeholder="到达城市" value="{{cityB}}" bindinput="onBInput" />
+      <button class="mini-btn" size="mini" bindtap="calcTrans">估</button>
+    </view>
+    <view wx:if="{{trans}}" class="ans">{{trans}}</view>
+  </view>
+
+  <view class="card">
+    <view class="card-head"><text class="card-title">快捷记账</text></view>
+    <view class="qbar">
+      <input class="qinput" type="digit" placeholder="金额" value="{{amt}}" bindinput="onAmtInput" />
+      <button class="mini-btn" size="mini" data-cat="餐饮" bindtap="quickLedger">餐饮</button>
+      <button class="mini-btn" size="mini" data-cat="交通" bindtap="quickLedger">交通</button>
+      <button class="mini-btn" size="mini" data-cat="门票" bindtap="quickLedger">门票</button>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-head"><text class="card-title">照片与分享</text></view>
+    <view class="btn-row">
+      <button size="mini" bindtap="pickPhoto">给行程加一张照片</button>
+      <button size="mini" bindtap="copyPlan">复制攻略文本</button>
+    </view>
+    <view wx:if="{{photoN}}" class="ans">已添加 {{photoN}} 张照片</view>
+  </view>
+</view>

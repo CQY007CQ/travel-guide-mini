@@ -1,0 +1,21 @@
+<view class="sp {{out ? 'sp-out' : ''}}" catchtap="skip">
+  <view class="sp-mid">
+    <!-- 品牌徽标：外圈慢转金环 + 内圆「旅」字 + 光晕 -->
+    <view class="sp-logo-wrap">
+      <view class="ring"></view>
+      <view class="ring r2"></view>
+      <view class="logo">旅</view>
+    </view>
+    <view class="sp-name">旅行攻略生成器</view>
+  </view>
+
+  <view class="sp-bottom">
+    <view class="loading">
+      <view class="ld"></view>
+      <view class="ld ld2"></view>
+      <view class="ld ld3"></view>
+    </view>
+    <view class="sp-slogan">每一站都值得认真出发</view>
+    <view class="sp-v">v{{v}} · 轻触任意处直接进入</view>
+  </view>
+</view>
