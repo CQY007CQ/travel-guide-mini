@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.78";
+const APP_VER = "1.19.80";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -72,13 +72,21 @@ function namedCities() {
 function citiesOf(prov) {
  const names = (D.PROVINCE_CITIES && D.PROVINCE_CITIES[prov]) || [];
  const guide = new Set((Array.isArray(D.CITIES) ? D.CITIES : []).map(c => c.name));
- const out = names
-  .map(name => ({ name, province: prov, guide: guide.has(name) }));
+ // v1.19.79：同名「X市」归并 —— 选择列表只展示带数据的 canonical 名，避免用户选到零景点「X市」
+ const out = [];
+ const _seen = new Set();
+ for (const name of names) {
+  const cn = canonCityName(name);
+  if (_seen.has(cn)) continue;
+  _seen.add(cn);
+  out.push({ name: cn, province: prov, guide: guide.has(cn) });
+ }
  // v1.19.53：有限数据层——把本省带 limited 标记的城市也暴露进选择列表（不与省级纯真实名录重复）。
  // 这些城市仅有真实坐标、暂无景点库，选中后生成「抵达 + 自由活动 + 返程」框架并提示「内容收集中」。
  (Array.isArray(D.CITIES) ? D.CITIES : []).forEach(c => {
-  if (c && c.limited && c.province === prov && !names.includes(c.name)) {
-   out.push({ name: c.name, province: prov, guide: true, limited: true });
+  if (c && c.limited && c.province === prov) {
+   const cn = canonCityName(c.name);
+   if (!_seen.has(cn)) { _seen.add(cn); out.push({ name: cn, province: prov, guide: true, limited: true }); }
   }
  });
  return out.sort((a, b) => (b.guide - a.guide) || a.name.localeCompare(b.name, "zh"));
@@ -94,19 +102,36 @@ const _cityIndex = () => {
   (Array.isArray(D.CITIES) ? D.CITIES : []).forEach(c => { if (c && c.name && !_cityIdx.has(c.name)) _cityIdx.set(c.name, c); });
   return _cityIdx;
 };
+// v1.19.79：同名「X市」↔「X」归并。
+// 库里同时有「安康」(有数据) 与「安康市」(零景点) 这类重名条目，用户选/搜「安康市」会生成空白。
+// 统一把名称收敛到「带数据的那个」变体：优先原样(有数据) → 否则剥「市」 → 再否则补「市」。
+function canonCityName(name) {
+  if (!name || typeof name !== "string") return name;
+  const idx = _cityIndex();
+  const hasData = (n) => { const c = idx.get(n); return !!(c && Array.isArray(c.experiences) && c.experiences.length); };
+  if (hasData(name)) return name;
+  if (name.endsWith("市")) {
+    const s = name.slice(0, -1);
+    if (idx.has(s)) return s;
+  }
+  const withSuffix = name + "市";
+  if (idx.has(withSuffix) && hasData(withSuffix)) return withSuffix;
+  return name;
+}
 // 同一行程里 findCity 会被反复调用（每日每项都查），结果缓存避免重复解析
 const _findCache = new Map();
 function findCity(name, province) {
  if (!name) return null;
- const ck = name + "|" + (province || "");
+ const canon = canonCityName(name);
+ const ck = canon + "|" + (province || "");
  if (_findCache.has(ck)) return _findCache.get(ck);
  let res = null;
- const prov = province || (D.CITY2PROV && D.CITY2PROV[name]);
+ const prov = province || (D.CITY2PROV && D.CITY2PROV[canon]);
  try {
-  const full = P.findCity(name, prov);
+  const full = P.findCity(canon, prov);
   if (full && full.experiences && full.experiences.length) res = full;
  } catch (e) {}
- if (!res) res = _cityIndex().get(name) || null;
+ if (!res) res = _cityIndex().get(canon) || null;
  if (_findCache.size > 400) _findCache.clear();   // 防多城切换后无限增长
  _findCache.set(ck, res);
  return res;
@@ -337,9 +362,9 @@ function wishPicksFor(cityName) {
 
 // v1.17.10：就近城市（≤200km 的最近一座）—— 给新城（平遥/婺源等）在缺少独立数据时
 // 回退到所属地级市用（如平遥→晋中、阳朔→桂林）。超出 200km 视为无可回退，返回空串。
-function nearbyCityOf(cityName) {
+ function nearbyCityOf(cityName) {
  try {
-  const nm = String(cityName || "");
+  const nm = canonCityName(String(cityName || ""));
   if (!nm || !findCity(nm)) return "";
   const g = P.getCoord(nm);
   if (!g) return "";
@@ -358,7 +383,7 @@ function nearbyCityOf(cityName) {
 // 美食店铺（用于地图"美食"图层）
 function foodSpotsFor(cityName) {
  if (!cityName) return [];
- return (D.FOOD_SPOTS && D.FOOD_SPOTS[cityName]) || [];
+ return (D.FOOD_SPOTS && D.FOOD_SPOTS[canonCityName(cityName)]) || [];
 }
 
 /* ---------- v1.15 景点标签 / 多维检索 ---------- */
@@ -385,7 +410,8 @@ function spotTagOf(name, cityName) {
  const hit = _tagMemo.get(mk);
  if (hit) return hit;
  // 显式标签优先（未来 SPOT_DETAILS.tags）
- const detail = (D.SPOT_DETAILS && D.SPOT_DETAILS[cityName] && D.SPOT_DETAILS[cityName][n]);
+ const _cn = canonCityName(cityName);
+ const detail = (D.SPOT_DETAILS && D.SPOT_DETAILS[_cn] && D.SPOT_DETAILS[_cn][n]);
  if (detail && Array.isArray(detail.tags) && detail.tags.length) return detail.tags.slice();
  const tags = [];
  for (const r of SPOT_TAG_RULES) if (r.rx.test(n)) tags.push(r.tag);
@@ -5380,7 +5406,7 @@ module.exports = {
  ready, planCheckup, swapSpotFor, askTrip,
  routeAdvicePlus, highlightOf, crowdTipOf, packExtra,
  badgesOf, yearReportNew, chinaLite, transportEstimate,
- provinces, citiesOf, findCity, buildPlan, buildMultiPlan, buildProvPlan, provinceDayCap, provinceSuggestedDays, cityDayCap, provBrief, nearbyCityOf, D, P,
+ provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, provinceDayCap, provinceSuggestedDays, cityDayCap, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor,
  spotTagOf, searchSpots,
  customBudgetObj, budgetTotalObj,
