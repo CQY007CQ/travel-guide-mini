@@ -1,7 +1,13 @@
-/* 开机画面 —— 与全局 #0b1020 同底色，冷启动无闪白 */
+/* 开机画面
+   ⚠️ v1.19.82「黑屏」根治：底色改为**跟随主题**。
+   此前写死深色 #0a0f1c（注释称"与全局 #0b1020 同底色"已过时——全局主题早在 2026-09
+   改造后就换成浅色 #eaeff7）。于是 app 实际是浅色，冷启动却先糊一屏**近黑**，
+   只要开屏页稍作停留，观感就是「黑屏」——这正是反复修不掉的根因。
+   现改为跟随实际主题：默认浅色底（与全局一致，切换无闪黑也无闪白）；
+   只有用户确实处于暗色主题（.sp-dark）才保留原来的黑金高级感。 */
 page {
   height: 100%;
-  background: #0a0f1c;
+  background: #eaeff7;
 }
 
 .sp {
@@ -14,13 +20,22 @@ page {
   box-sizing: border-box;
   overflow: hidden;
   background:
+    radial-gradient(120% 50% at 50% -10%, rgba(212, 169, 78, 0.10), rgba(234, 239, 247, 0) 60%),
+    radial-gradient(80% 40% at 92% 100%, rgba(95, 185, 138, 0.05), rgba(234, 239, 247, 0) 55%),
+    #eaeff7;
+  opacity: 1;
+}
+
+/* 暗色主题专属：保留原深色开屏观感（需 themeMode()==="dark" 才挂 .sp-dark） */
+.sp.sp-dark {
+  background:
     radial-gradient(120% 50% at 50% -10%, rgba(212, 169, 78, 0.14), rgba(10, 15, 28, 0) 60%),
     radial-gradient(80% 40% at 92% 100%, rgba(95, 185, 138, 0.06), rgba(10, 15, 28, 0) 55%),
     #0a0f1c;
-  opacity: 1;
-  transition: opacity .2s ease;
 }
-.sp.sp-out { opacity: 0; }
+.sp.sp-dark .sp-name { color: #eaeff7; }
+.sp.sp-dark .sp-slogan { color: #c9d4e4; }
+.sp.sp-dark .sp-v { color: #5b6b82; }
 
 /* 氛围光斑（v1.19.1 减法：纯装饰光斑已移除，开机画面保持干净） */
 
@@ -68,16 +83,16 @@ page {
   height: 232rpx;
   border-radius: 50%;
   border: 2rpx solid transparent;
-  border-top-color: rgba(226, 182, 92, .75);
-  border-right-color: rgba(226, 182, 92, .18);
+  border-top-color: rgba(212, 169, 78, .75);
+  border-right-color: rgba(212, 169, 78, .18);
   animation: sp-spin 3.2s linear infinite;
   opacity: .9;
 }
 .ring.r2 {
   width: 200rpx;
   height: 200rpx;
-  border-top-color: rgba(95, 185, 138, .5);
-  border-right-color: rgba(95, 185, 138, .12);
+  border-top-color: rgba(21, 133, 92, .5);
+  border-right-color: rgba(21, 133, 92, .12);
   animation: sp-spin-rev 2.6s linear infinite;
 }
 
@@ -92,12 +107,13 @@ page {
   50% { transform: scale(1.035); }
 }
 
+/* 品牌名 / 标语 / 版本号 —— 默认浅色底用深色字；暗色底由 .sp-dark 覆盖为浅色字 */
 .sp-name {
   margin-top: 56rpx;
   font-size: calc(46rpx * var(--fs, 1));
   font-weight: 800;
   letter-spacing: 6rpx;
-  color: #eaeff7;
+  color: #18233a;
   opacity: 0;
   animation: sp-up .6s ease .22s both;
 }
@@ -128,7 +144,7 @@ page {
   height: 12rpx;
   margin: 0 10rpx;
   border-radius: 50%;
-  background: rgba(212, 169, 78, .5);
+  background: rgba(184, 135, 46, .55);
   animation: sp-ld 1.2s ease-in-out infinite;
 }
 .ld.ld2 { animation-delay: .18s; }
@@ -136,13 +152,13 @@ page {
 
 @keyframes sp-ld {
   0%, 100% { transform: scale(1); opacity: .45; }
-  40% { transform: scale(1.5); opacity: 1; background: #d4a94e; }
+  40% { transform: scale(1.5); opacity: 1; background: #b3872e; }
 }
 
 .sp-slogan {
   margin-top: 30rpx;
   font-size: calc(24rpx * var(--fs, 1));
-  color: #c9d4e4;
+  color: #5b6b82;
   letter-spacing: 3rpx;
   opacity: 0;
   animation: sp-up .7s ease .5s both;
@@ -151,15 +167,14 @@ page {
 .sp-v {
   margin-top: 14rpx;
   font-size: calc(20rpx * var(--fs, 1));
-  color: #5b6b82;
+  color: #7d92ab;
   opacity: 0;
   animation: sp-up .7s ease .62s both;
 }
 
 /* ⚠️ v1.19.66「黑屏」兜底：以上入场动画用 `opacity:0` + `animation … both` 起手，
    一旦动画不播放 / 渲染帧未推进（部分真机、模拟器、低性能场景），元素会永远停在"全透明"——
-   深色底上什么都没有，观感就是**纯黑屏**（审核据此判「无法加载 / 白屏 / 黑屏」）。
-   这里强制 visible 兜底：不做动画，也绝不允许看不见。 */
+   页面上什么都没有。这里强制 visible 兜底：不做动画，也绝不允许看不见。 */
 .sp-logo-wrap, .sp-name, .sp-slogan, .sp-v {
   opacity: 1 !important;
   animation: none !important;
