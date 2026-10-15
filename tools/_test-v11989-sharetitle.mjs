@@ -86,7 +86,8 @@ const grab = (file, name) => {
       const r = T.dailyInspire(1, new Date(2026, mo - 1, d));
       if (!r.length) { tOk = false; tBad.push(mo + "/" + d + " 空"); continue; }
       const t = r[0].shareTitle;
-      if (!(t && t.length <= 32 && t.indexOf("正当时：") >= 0 && t.indexOf("离线攻略") >= 0)) { tOk = false; tBad.push(mo + "/" + d + " " + t); }
+      // v1.19.90 起两种合法句式：旺季「N月的X正当时：…」/ 四季「X四季皆宜：…」
+      if (!(t && t.length <= 32 && t.indexOf("｜离线攻略") >= 0 && (t.indexOf("正当时：") >= 0 || t.indexOf("四季皆宜：") >= 0))) { tOk = false; tBad.push(mo + "/" + d + " " + t); }
     }
   }
   ok("shareTitle：12 个月 × 3 日期全格式正确且 ≤32 字", tOk, tBad.slice(0, 3).join(" ") || "全通过");

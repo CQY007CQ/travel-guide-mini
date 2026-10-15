@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.89";
+const APP_VER = "1.19.90";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -2502,10 +2502,16 @@ function dailyInspire(cnt, nowLike) {
       .slice(0, 2);
     const bestShort = String(c.best || "四季皆宜").split(/[，,；;（(]/)[0].slice(0, 18);
     const spotsText = spots.join(" · ");
-    // v1.19.89：分享标题单一逻辑源（页面直接消费）：「10月的锦州正当时：笔架山｜离线攻略」，
-    // 理由取第一个景点名（截 12 字），总长硬截 32 字（微信卡片最佳长度）
-    const why = (spotsText.split(" · ")[0] || "").slice(0, 12) || bestShort.slice(0, 12);
-    let shareTitle = month + "月的" + c.name + "正当时：" + why + "｜离线攻略";
+    // v1.19.90：四季城文案修正——best 为空/泛化（「四季皆宜」「全年宜游」）时：
+    // why 不再出现「四季皆宜 · 四季皆宜」式重复；shareTitle 不再出现「10月的X正当时：四季皆宜」语义冲突
+    const bm = bestMonths(c.best);
+    const genericBest = /^(四季皆宜|全年宜游|四季|全年|全年宜)$/.test(bestShort);
+    const why = bm ? month + "月正当时 · " + bestShort : (genericBest ? "四季皆宜" : "四季皆宜 · " + bestShort);
+    // v1.19.89：分享标题单一逻辑源（页面直接消费），总长硬截 32 字（微信卡片最佳长度）
+    let reason = (spotsText.split(" · ")[0] || "").slice(0, 12);
+    if (!reason && !genericBest) reason = bestShort.slice(0, 12);
+    let shareTitle = (bm ? month + "月的" + c.name + "正当时：" : c.name + "四季皆宜：")
+      + (reason || "说走就走") + "｜离线攻略";
     if (shareTitle.length > 32) shareTitle = shareTitle.slice(0, 31) + "…";
     out.push({
       name: c.name,
@@ -2515,7 +2521,7 @@ function dailyInspire(cnt, nowLike) {
       bestShort: bestShort,
       spotsText: spotsText,
       shareTitle: shareTitle,
-      why: (bestMonths(c.best) ? month + "月正当时 · " : "四季皆宜 · ") + bestShort
+      why: why
     });
   }
   return out;

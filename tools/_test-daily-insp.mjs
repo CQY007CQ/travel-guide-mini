@@ -66,5 +66,26 @@ const a2 = T.dailyInspire(3, new Date(2026, 9, 16));
 ok("相邻日期灵感轮换（14 日 ≠ 16 日）",
   JSON.stringify(a1.map(x => x.name)) !== JSON.stringify(a2.map(x => x.name)));
 
+// ---- 7. v1.19.90 文案缺陷防回归：四季城不出现重复/语义冲突 ----
+// 全量扫描 12 月 × 28 天的每一张卡：
+//   why 不得「四季皆宜 · 四季皆宜」式重复（拆段后相邻相等）
+//   shareTitle 不得「正当时：四季皆宜」语义冲突（有明确月份才许说"正当时"）
+{
+  let bad = []; let n = 0;
+  for (let m = 1; m <= 12; m++) {
+    for (let d = 1; d <= 28; d++) {
+      const r = T.dailyInspire(3, new Date(2026, m - 1, d));
+      r.forEach(it => {
+        n++;
+        const parts = it.why.split(" · ");
+        if (parts.length >= 2 && parts[0] === parts[1]) bad.push(m + "/" + d + " why重复:" + it.why);
+        if (/正当时：四季|四季皆宜：四季皆宜/.test(it.shareTitle)) bad.push(m + "/" + d + " 标题冲突:" + it.shareTitle);
+        if (it.why === "四季皆宜 · 全年宜游" || it.why === "全年宜游 · 全年宜游") bad.push(m + "/" + d + " 同义重复:" + it.why);
+      });
+    }
+  }
+  ok("12月×28日全量扫描：无重复/冲突文案", bad.length === 0, bad.slice(0, 3).join(" | ") || (n + " 张卡全通过"));
+}
+
 console.log(fail ? "\n❌ " + fail + " 项失败" : "\n✅ 全部通过");
 process.exit(fail ? 1 : 0);
