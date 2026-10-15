@@ -1,6 +1,6 @@
 // prep：出行准备（票价/预约渠道 可勾跟踪 / 酒店比价 / 团队分工）
 // 每个景点的「已订 / 预约日期 / 备注」按 城市·景点名 记本机，回来再看不丢
-const T = require("../../../utils/travel.js");
+const T = require("../../utils/travel.js");
 const app = getApp();
 
 const HOTEL_TIPS = [

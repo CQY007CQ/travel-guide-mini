@@ -129,6 +129,9 @@ step "单测 daily-insp (今日正当时 v1.19.87)" "$NODE" tools/_test-daily-in
 step "单测 insp-ui (灵感卡接线 v1.19.87)" "$NODE" tools/_test-v11987-insp-ui.mjs
 step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/_test-v11988-sharecard.mjs
 step "单测 sharetitle (分享即种草 v1.19.89)" "$NODE" tools/_test-v11989-sharetitle.mjs
+# v1.19.93：全页面启动冒烟——vm 模拟 17 个注册页「被打开」（Page 构造+onLoad+onShow）。
+# 抓上传工具链与静态扫描都查不到的运行时级问题（曾抓到 7 个分包页 require 路径层级错误→白屏）。
+step "全页面启动冒烟 (v1.19.93)" "$NODE" tools/_test-v11993-bootsmoke.mjs
 step "文案质量 泛化/雷同扫描 (v1.15)" "$NODE" tools/scan-generic.mjs
 step "行政区覆盖审计 (v1.15)" bash -c '
   out=$('"$NODE"' tools/cities-census.mjs 2>&1)

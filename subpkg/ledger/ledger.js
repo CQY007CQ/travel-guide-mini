@@ -1,6 +1,6 @@
 // ledger：旅行记账 · 当日与总计对比 · 日期/付款人/AA 分账/导出 CSV
-const T = require("../../../utils/travel.js");
-const S = require("../../../utils/store.js");   // v1.11：统一存储封装
+const T = require("../../utils/travel.js");
+const S = require("../../utils/store.js");   // v1.11：统一存储封装
 const app = getApp();
 
 // 分类配色（占比图例用）

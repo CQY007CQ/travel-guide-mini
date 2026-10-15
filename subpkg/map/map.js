@@ -1,5 +1,5 @@
 // map：原生地图 + 真实坐标标点 + 编号连线 + 图层（景点 / 美食 / 住宿）
-const T = require("../../../utils/travel.js");
+const T = require("../../utils/travel.js");
 const app = getApp();
 
 Page({

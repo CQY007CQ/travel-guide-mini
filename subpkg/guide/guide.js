@@ -1,8 +1,8 @@
 // guide：使用指南（首页「使用指南」胶囊进入）
 // 覆盖：一分钟上手 / 全部功能地图 / 进阶技巧 / 常见问题；样式走 var(--xxx) 双主题
-const T = require("../../../utils/travel.js");
-const S = require("../../../utils/store.js");   // v1.11：统一走存储封装（带类型守卫 + 会话缓存）
-const TOOL_GROUPS = require("../../../utils/toolkit-groups.js").ITEM_GROUPS;
+const T = require("../../utils/travel.js");
+const S = require("../../utils/store.js");   // v1.11：统一走存储封装（带类型守卫 + 会话缓存）
+const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 const app = getApp();
 
 const TABS = ["一分钟上手", "功能地图", "进阶技巧", "常见问题"];

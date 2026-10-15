@@ -1,6 +1,6 @@
 // assistant：本地攻略速查（离线 · 本地规则库 · 零网络）
-const T = require("../../../utils/travel.js");
-const S = require("../../../utils/store.js");
+const T = require("../../utils/travel.js");
+const S = require("../../utils/store.js");
 const app = getApp();
 
 // 保留旧 key 名（兼容老用户数据，不影响审核）

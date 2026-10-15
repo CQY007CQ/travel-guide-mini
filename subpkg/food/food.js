@@ -1,6 +1,6 @@
 // food：必吃清单 + 地道名店（点击名店 → wx.openLocation 导航）
 // 多站行程：顶部城市切换条，逐站看美食（默认定位到今天所在站）
-const T = require("../../../utils/travel.js");
+const T = require("../../utils/travel.js");
 const app = getApp();
 
 Page({

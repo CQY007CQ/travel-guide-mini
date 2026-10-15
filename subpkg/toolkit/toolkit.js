@@ -1,10 +1,10 @@
 // 旅行百宝箱：灵感 / 体检 / 文案 / 打包，一键生成（v1.10 功能落地页）
-const T = require("../../../utils/travel.js");
-const S = require("../../../utils/store.js");
+const T = require("../../utils/travel.js");
+const S = require("../../utils/store.js");
 const app = getApp();
 
 // 工具分组抽到 utils/toolkit-groups.js，与指南页共用（避免页面模块互相 require）
-const ITEM_GROUPS = require("../../../utils/toolkit-groups.js").ITEM_GROUPS;
+const ITEM_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 // 需要行程的工具（其输出是行程维度的，不能「加入想玩」）
 const PLAN_TOOLS = ["brief", "theme", "load", "rhythm", "tips", "book", "museum", "photo", "risk", "score", "draft", "line", "long", "moments", "daytext",
   "countdown", "burn", "highlight", "rainy", "night", "crowd", "mistake", "density", "ticket2"];
