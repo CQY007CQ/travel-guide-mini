@@ -75,6 +75,19 @@ try {
 }
 
 console.log(`\n数据分包体量：${(totalBytes / 1024 / 1024).toFixed(2)} MB / ${chunks.length} 块`);
+
+// 6. 版本号单一真源（P1-2 收口）：真源 _src-backup/travel.js 与产物 utils/travel.js 的 APP_VER 必须一致
+// （历史上靠人记同步，忘跑 build-min 就会出现「源码已改、线上还是旧版」的静默错位）
+{
+  const verOf = (p) => {
+    try { const mm = readFileSync(p, "utf8").match(/APP_VER\s*=\s*["']([\d.]+)["']/); return mm ? mm[1] : null; }
+    catch (e) { return null; }
+  };
+  const vSrc = verOf(resolve(ROOT, "tools/_src-backup/travel.js"));
+  const vOut = verOf(resolve(ROOT, "utils/travel.js"));
+  ok("APP_VER 真源与产物一致（版本单一真源）", !!(vSrc && vOut && vSrc === vOut), `src=${vSrc} out=${vOut}`);
+}
+
 if (fail) console.log("\n❌ 发布门禁失败 —— 请勿上传，先修复上面的 FAIL");
 else console.log("\n✅ 发布门禁通过：数据分包确认随包发布，可放心上传");
 process.exit(fail ? 1 : 0);

@@ -73,6 +73,8 @@ Page({
     this.__animOn = true;   // v1.19.77：进页才放错落入场动效
     this._render(plan);
     this._checkDueRemind();
+    // v1.19.88：后台惰性生成 5:4 转发卡片图（延后 900ms 不抢首屏；供 onShareAppMessage.imageUrl）
+    setTimeout(() => { try { this._ensureShareCard(); } catch (e) {} }, 900);
    } catch (e) {
     wx.showToast({ title: "行程加载异常，请重试", icon: "none" });
    }
@@ -1034,10 +1036,13 @@ Page({
     if (city) q.push("city=" + encodeURIComponent(city));
     if (days) q.push("days=" + days);
     const path = "/pages/index/index" + (q.length ? "?" + q.join("&") : "");
-    return {
+    const ret = {
       title: (plan ? "我做了份「" + plan.cityName + "·" + days + "天攻略」，景点路线美食都排好了" : "旅行攻略生成器") + "（离线可用）",
       path: path
     };
+    // v1.19.88：转发卡片换黑金分享图（_ensureShareCard 惰性生成；未生成完回退默认卡片，不阻塞分享）
+    if (this.__shareImg) ret.imageUrl = this.__shareImg;
+    return ret;
   },
 
   // v1.19.76：朋友圈/群分享长图 —— 把行程渲染成一张精美卡片，可转发图片或存相册发朋友圈
@@ -1070,6 +1075,79 @@ Page({
           fail() { wx.hideLoading(); wx.showToast({ title: "生成失败", icon: "none" }); }
         });
       } catch (e) { wx.hideLoading(); wx.showToast({ title: "生成失败", icon: "none" }); }
+    });
+  },
+
+  /* ---- v1.19.88：转发卡片（5:4 黑金卡） ----
+     好友对话里的小程序卡片此前是纯文字+默认截图；现后台惰性生成统一视觉的分享图接到
+     onShareAppMessage.imageUrl。生成失败/未完成一律静默回退（分享永不被阻塞）。 */
+  _shareCardModel() {
+    const d = this.data;
+    const plan = app.globalData.plan || {};
+    const cityName = plan.cityName || d.summary || "旅行攻略";
+    const prov = (plan.province && plan.province !== cityName) ? plan.province : "";
+    const daysN = (plan.days || []).length;
+    let spots = 0;
+    (d.view || []).forEach(day => (day.items || []).forEach(it => { if (!it.f) spots++; }));
+    const mode = d.modeTxt || "平衡舒适";
+    return { W: 750, H: 600, cityName, prov, daysN, spots, mode };
+  },
+
+  _drawShareCard(ctx, cw, m) {
+    const GOLD = "#d4a94e", GOLD_L = "#e6bb62", NAVY = "#16263f", NAVY2 = "#0e1830";
+    // 底：深蓝斜向渐变（与长图海报同视觉语言，白底聊天气泡里最突出）
+    const g = ctx.createLinearGradient(0, 0, cw, m.H);
+    g.addColorStop(0, NAVY); g.addColorStop(1, NAVY2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, m.H);
+    ctx.textAlign = "center";
+    // 顶部品牌
+    ctx.fillStyle = "rgba(255,255,255,.42)";
+    ctx.font = "500 26px sans-serif";
+    ctx.fillText("旅行攻略生成器", cw / 2, 92);
+    // 金色装饰线
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.globalAlpha = .65;
+    ctx.beginPath(); ctx.moveTo(cw / 2 - 130, 122); ctx.lineTo(cw / 2 + 130, 122); ctx.stroke();
+    ctx.globalAlpha = 1;
+    // 城市名（金渐变大字；超 4 字自动缩号防溢出）
+    const gg = ctx.createLinearGradient(0, 0, cw, 0);
+    gg.addColorStop(0, GOLD_L); gg.addColorStop(1, GOLD);
+    ctx.fillStyle = gg;
+    ctx.font = "700 " + (m.cityName.length > 4 ? 96 : 120) + "px sans-serif";
+    ctx.fillText(m.cityName, cw / 2, 300);
+    // 副行：省 · N 天 · M 个安排 · 节奏
+    const sub = (m.prov ? m.prov + " · " : "") + m.daysN + " 天" + (m.spots ? " · " + m.spots + " 个安排" : "") + " · " + m.mode;
+    ctx.fillStyle = "rgba(255,255,255,.78)";
+    ctx.font = "500 32px sans-serif";
+    ctx.fillText(sub, cw / 2, 380);
+    // 底部 slogan
+    ctx.fillStyle = "rgba(212,169,78,.85)";
+    ctx.font = "500 26px sans-serif";
+    ctx.fillText("离线攻略 · 每月正当时，说走就走", cw / 2, 500);
+  },
+
+  _ensureShareCard() {
+    const plan = app.globalData.plan;
+    if (!plan || !plan.days || !plan.days.length) return;
+    const stamp = (plan.savedAt || 0) + "|" + (plan.cityName || "") + "|" + plan.days.length;
+    if (this.__shareStamp === stamp && this.__shareImg) return;   // 行程没变不重画
+    this.__shareStamp = stamp;
+    const that = this;
+    wx.createSelectorQuery().in(this).select("#shareCanvas").fields({ node: true, size: true }).exec((res) => {
+      if (!res || !res[0] || !res[0].node) return;
+      try {
+        const canvas = res[0].node;
+        const dpr = (wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2;
+        const m = that._shareCardModel();
+        canvas.width = m.W * dpr; canvas.height = m.H * dpr;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+        that._drawShareCard(ctx, m.W, m);
+        wx.canvasToTempFilePath({
+          canvas,
+          success(r) { that.__shareImg = r.tempFilePath; },
+          fail() { that.__shareImg = null; }
+        });
+      } catch (e) { /* 静默：回退纯文字卡片 */ }
     });
   },
 
