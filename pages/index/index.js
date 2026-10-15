@@ -988,9 +988,38 @@ Page({
         // v1.8.4 B18：首页预约提醒横幅（有「需提前预约」且未勾已订的票）
         remind: T.ticketRemind(p) });
     } catch (e) { this.setData({ countdown: null, tiles: T.homeTileList(), hasOld: false, quickCollapsed: false, remind: null, guideSeen: !!(S.get("miniGuideSeenV1", 0)) }); }
+    // v1.19.87：今日正当时 —— 无行程日也有内容可逛；同一天结果稳定（日期种子确定性轮换）
+    try {
+      const ins = T.dailyInspire(3);
+      const d = new Date();
+      this.setData({ insp: ins, inspDate: (d.getMonth() + 1) + "月" + d.getDate() + "日" });
+    } catch (e) {}
     // 想玩池勾选态与 wish 实时同步：在行程页/更多页勾过或移出想玩后回首页，不残留旧高亮
     if (this.data.cityName && this.data.pool && this.data.pool.length) this._syncPoolFromWish();
     this._syncUi();
+  },
+
+  /* ---- v1.19.87：今日正当时卡片 → 预填表单（不直接生成，保留天数/日期/预算的调整权） ---- */
+  onInspTap(e) {
+    const i = e.currentTarget.dataset.i;
+    const it = (this.data.insp || [])[i];
+    if (!it) return;
+    try {
+      const provs = T.provinces() || [];
+      const pi = provs.indexOf(it.province);
+      if (pi < 0) throw new Error("prov");
+      this._fillProv(pi, it.name);   // 内部已含 _applyCity（预填城市 + 收敛天数 + 想玩池）
+      const ci = this.data.cityIdx;
+      const c0 = (this.data.cities || [])[ci];
+      if (!(ci >= 0) || !c0 || c0.name !== it.name) throw new Error("city");
+      const cap = this._capOf(it.name) || it.days || 3;
+      const d = Math.max(1, Math.min(it.days || 3, cap));
+      this.setData({ days: d, daysText: d + " 天" });
+      wx.showToast({ title: "已填好「" + it.name + "」，调整后点生成", icon: "none" });
+      if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 200 });
+    } catch (err) {
+      wx.showToast({ title: "填入失败，请在表单选择", icon: "none" });
+    }
   },
 
   /* ---- v1.8.4 A8：目的地盲盒（3 城灵感，选中直接生成） ---- */

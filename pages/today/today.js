@@ -34,7 +34,10 @@ Page({
     if (!plan || !plan.days || !plan.days.length) {
       // v1.8.5 C9：无行程时给一句旅行小话（按日期轮换，本地文案）
       const q = T.quoteOfDay();
-      this.setData({ hasPlan: false, state: null, view: {}, quote: q });
+      // v1.19.87：无行程日不只一句小话——「今日正当时」灵感卡，打开就有内容可看可种草
+      let insp = [];
+      try { insp = T.dailyInspire(3); } catch (e) {}
+      this.setData({ hasPlan: false, state: null, view: {}, quote: q, insp: insp });
       return;
     }
     const st = T.todayState(plan);
@@ -152,6 +155,36 @@ Page({
 
   goPlan() { wx.switchTab({ url: "/pages/plan/plan" }); },
   goIndex() { wx.reLaunch({ url: "/pages/index/index" }); },
+
+  /* ---- v1.19.87：今日正当时卡片 → 确认后一键生成（默认预算/节奏，出发日下周） ---- */
+  onInspTap(e) {
+    const i = e.currentTarget.dataset.i;
+    const it = (this.data.insp || [])[i];
+    if (!it) return;
+    wx.showModal({
+      title: "去 " + it.name + " 怎么样",
+      content: it.why + " · 建议 " + (it.days || 3) + " 天\n用默认预算生成一份行程？",
+      confirmText: "生成",
+      success(r) {
+        if (!r.confirm) return;
+        try {
+          const pad = n => String(n).padStart(2, "0");
+          const t = new Date(Date.now() + 7 * 86400000);
+          const depart = t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate());
+          const daysArr = T.buildPlan({ city: it.name, province: it.province, days: it.days || 3, depart: depart, budget: "mid", pace: "balance" });
+          T.resetPackChecks();   // 新行程落地前重置行李清单勾选（对齐 more._gen）
+          app.setPlan({
+            cityName: it.name, province: it.province, totalDays: daysArr.length,
+            depart: depart, days: daysArr, budget: "mid", people: 1,
+            pace: "balance", isMulti: false, savedAt: Date.now()
+          });
+          wx.switchTab({ url: "/pages/plan/plan" });
+        } catch (err) {
+          wx.showToast({ title: "生成失败：" + (err.message || ""), icon: "none" });
+        }
+      }
+    });
+  },
   // v1.8.5 C10：行程结束后的回顾入口
   goMore() { wx.switchTab({ url: "/pages/more/more" }); },
 

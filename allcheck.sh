@@ -125,6 +125,8 @@ step "单测 check-more (v1.10 扩容+36 新函数)" "$NODE" tools/check-more.mj
 step "单测 check-v111 (20 新功能+数据护栏)" "$NODE" tools/check-v111.mjs
 step "单测 check-v112 (100 城扩容+100 新功能)" "$NODE" tools/check-v112.mjs
 step "单测 check-boundary (跨年/同名)" "$NODE" tools/check-boundary.mjs
+step "单测 daily-insp (今日正当时 v1.19.87)" "$NODE" tools/_test-daily-insp.mjs
+step "单测 insp-ui (灵感卡接线 v1.19.87)" "$NODE" tools/_test-v11987-insp-ui.mjs
 step "文案质量 泛化/雷同扫描 (v1.15)" "$NODE" tools/scan-generic.mjs
 step "行政区覆盖审计 (v1.15)" bash -c '
   out=$('"$NODE"' tools/cities-census.mjs 2>&1)

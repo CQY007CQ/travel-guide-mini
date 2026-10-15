@@ -604,3 +604,31 @@
 .tpl-city { font-size: calc(27rpx * var(--fs, 1)); font-weight: 800; color: var(--tx, #18233a); letter-spacing: .5rpx; }
 .tpl-card.on .tpl-city { color: var(--gold-tx, #8f6a1f); }
 .tpl-meta { font-size: calc(19rpx * var(--fs, 1)); color: var(--dim, #5b6b82); }
+
+/* ═══ v1.19.87 · 今日正当时（本月最佳季节城市 · 日期种子确定性轮换） ═══ */
+.insp-bar { padding-bottom: 22rpx; }
+.ib-head { display: flex; align-items: baseline; gap: 12rpx; padding: 0 2rpx 14rpx; }
+.ib-h-t { font-size: calc(24rpx * var(--fs, 1)); font-weight: 800; color: var(--gold-tx, #8f6a1f); letter-spacing: 1rpx; }
+.ib-h-s { flex: 1; min-width: 0; font-size: calc(21rpx * var(--fs, 1)); color: var(--t4, #7d92ab); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ib-scroll { width: 100%; white-space: nowrap; }
+.ib-card {
+  display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center;
+  gap: 6rpx; width: 300rpx; min-height: 176rpx; padding: 22rpx 24rpx; margin-right: 14rpx;
+  border-radius: 20rpx; box-sizing: border-box; text-align: left;
+  background: rgba(var(--ln-rgb, 100, 116, 139), .07);
+  border: 1rpx solid rgba(var(--ln-rgb, 100, 116, 139), .16);
+  transition: transform .18s ease, background .18s ease, border-color .18s ease;
+}
+.ib-card:active { transform: scale(.96); }
+.ib-top { display: flex; align-items: baseline; gap: 10rpx; width: 100%; }
+.ib-city { font-size: calc(30rpx * var(--fs, 1)); font-weight: 800; color: var(--tx, #18233a); letter-spacing: .5rpx; }
+.ib-prov { font-size: calc(19rpx * var(--fs, 1)); color: var(--t4, #7d92ab); flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ib-best {
+  font-size: calc(19rpx * var(--fs, 1)); color: var(--gold-tx, #8f6a1f); font-weight: 700;
+  max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.ib-spots {
+  font-size: calc(19rpx * var(--fs, 1)); color: var(--t2, #5b6b82);
+  max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.ib-days { font-size: calc(19rpx * var(--fs, 1)); color: var(--dim, #5b6b82); margin-top: 2rpx; }

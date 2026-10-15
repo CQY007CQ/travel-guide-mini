@@ -32,6 +32,25 @@
     </view>
   </view>
 
+  <!-- v1.19.87 · 今日正当时：本月最佳季节城市（日期种子确定性轮换，同一天全国同一份；点卡片预填表单） -->
+  <view class="card insp-bar" wx:if="{{insp.length}}">
+    <view class="ib-head">
+      <text class="ib-h-t">今日正当时</text>
+      <text class="ib-h-s">{{inspDate}} · 本月值得一去</text>
+    </view>
+    <scroll-view class="ib-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+      <view class="ib-card" wx:for="{{insp}}" wx:key="name" data-i="{{index}}" bindtap="onInspTap">
+        <view class="ib-top">
+          <text class="ib-city">{{item.name}}</text>
+          <text class="ib-prov">{{item.province}}</text>
+        </view>
+        <view class="ib-best">{{item.bestShort}}</view>
+        <view class="ib-spots" wx:if="{{item.spotsText}}">{{item.spotsText}}</view>
+        <view class="ib-days">建议 {{item.days}} 天</view>
+      </view>
+    </scroll-view>
+  </view>
+
   <!-- 行程状态：出发倒计时 + 预约提醒 合并为一卡（v1.19.59 减法） -->
   <view class="card plan-status" wx:if="{{countdown || remind}}">
     <view class="ps-row" wx:if="{{countdown}}" bindtap="goPlan">

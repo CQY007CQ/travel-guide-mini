@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.82";
+const APP_VER = "1.19.87";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -2450,6 +2450,68 @@ function inspire(seed) {
       (c.name + " · " + (b.climateTxt || "") + "，适合 " + (b.days || 3) + " 天慢游"),
     text: c.name + " · 建议 " + (b.days || 3) + " 天"
   };
+}
+
+/* ---------- 每日正当时（v1.19.87 日常灵感流） ---------- */
+// 解析城市 best 字段的月份："4-5月、9-10月，春秋凉爽少雨" → [4,5,9,10]；"四季/全年/皆宜" → null（全月适宜）
+function bestMonths(best) {
+  const s = String(best || "");
+  if (!s) return null;
+  if (/四季|全年|皆宜/.test(s)) return null;
+  const t = s.replace(/次年|翌年/g, "");   // 「11月到次年2月」跨年表述归一
+  const ms = new Set();
+  let m = null;
+  const reR = /(\d{1,2})\s*月?\s*[-—~至到]\s*(\d{1,2})\s*月/g;
+  while ((m = reR.exec(t))) {
+    const a = +m[1], b = +m[2];
+    if (a < 1 || a > 12 || b < 1 || b > 12) continue;
+    if (b >= a) { for (let i = a; i <= b; i++) ms.add(i); }
+    else { for (let i = a; i <= 12; i++) ms.add(i); for (let i = 1; i <= b; i++) ms.add(i); }  // 跨年区间「12-2月」
+  }
+  const reS = /(\d{1,2})\s*月/g;
+  while ((m = reS.exec(s))) { const v = +m[1]; if (v >= 1 && v <= 12) ms.add(v); }
+  return ms.size ? [...ms].sort((x, y) => x - y) : null;
+}
+// 「今日正当时」：以日期为种子的确定性灵感流（同一天每次打开结果一致——可期待、可分享），
+// 只从数据够厚（experiences≥8、非 limited）且 best 月份命中当月的城市里按步长轮换取 3 个。
+// 点击直达表单预填，把「无行程日打开 app 也有内容可看」变成日常习惯。now 参数仅供单测注入。
+function dailyInspire(cnt, nowLike) {
+  const now = (nowLike && typeof nowLike.getMonth === "function") ? nowLike : new Date();
+  const month = now.getMonth() + 1;
+  const seed = now.getFullYear() * 10000 + month * 100 + now.getDate();
+  const pool = namedCities().filter(c => {
+    if (!c || c.limited) return false;
+    if (!Array.isArray(c.experiences) || c.experiences.length < 8) return false;
+    const bm = bestMonths(c.best);
+    if (bm && bm.indexOf(month) < 0) return false;
+    return true;
+  });
+  const n = Math.min(cnt || 3, pool.length);
+  if (!n) return [];
+  const stride = Math.max(1, Math.floor(pool.length / n));
+  const seen = {};
+  const out = [];
+  for (let k = 0; out.length < n && k < pool.length * 2; k++) {
+    const c = pool[(seed + k * stride) % pool.length];
+    if (!c || seen[c.name]) continue;
+    seen[c.name] = 1;
+    const b = cityBrief(c.name) || {};
+    const spots = (c.experiences || [])
+      .map(e => (e && e.name && !isFrameName(e.name)) ? String(e.name) : "")
+      .filter(Boolean)
+      .slice(0, 2);
+    const bestShort = String(c.best || "四季皆宜").split(/[，,；;（(]/)[0].slice(0, 18);
+    out.push({
+      name: c.name,
+      province: c.province || (D.CITY2PROV && D.CITY2PROV[c.name]) || "",
+      days: b.days || 3,
+      best: c.best || "四季皆宜",
+      bestShort: bestShort,
+      spotsText: spots.join(" · "),
+      why: (bestMonths(c.best) ? month + "月正当时 · " : "四季皆宜 · ") + bestShort
+    });
+  }
+  return out;
 }
 
 /* ---------- 10. 夜间自动深色 ---------- */
@@ -5441,7 +5503,7 @@ module.exports = {
   footHeatmap, ledgerMonthly, favRoute,
   TILES_KEY, HOME_TILES, homeTiles, setHomeTiles, homeTileList,
   spotTiming, DOC_ITEMS, docItems, docDone,
-  inspire, nightCfg, setNightCfg, isNightHour,
+  inspire, bestMonths, dailyInspire, nightCfg, setNightCfg, isNightHour,
   billImgPath, setBillImg, getBillImg, billImgMap,
   APP_VER,
   // v1.8.4 档一 / 档二
