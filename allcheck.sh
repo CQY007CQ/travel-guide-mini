@@ -163,6 +163,10 @@ step "页面结构 + 事件配对" "$NODE" tools/check-handlers.mjs
 # 累加成一个数去比对 2MB → 必然误报。改为按 app.json 主包+各分包逐包核算（tools/check-pkgsize.mjs）。
 step "分包体积体检 (每包 2MB 红线)" "$NODE" tools/check-pkgsize.mjs
 
+# 【P0-2 发布安全门禁】把「数据分包被 ignoreUploadUnusedFiles 静默剥离成 10KB 残包」这条
+# 最危险的静默灾难型 footgun 从「上传后人工盯尺寸表」升级为 fail-fast。详见 tools/verify-release.mjs。
+step "发布安全门禁 (数据必随包发布)" "$NODE" tools/verify-release.mjs
+
 echo ""
 echo "══════════════════════════════════════════════════"
 echo " allcheck 汇总"
