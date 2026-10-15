@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.88";
+const APP_VER = "1.19.89";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -2501,13 +2501,20 @@ function dailyInspire(cnt, nowLike) {
       .filter(Boolean)
       .slice(0, 2);
     const bestShort = String(c.best || "四季皆宜").split(/[，,；;（(]/)[0].slice(0, 18);
+    const spotsText = spots.join(" · ");
+    // v1.19.89：分享标题单一逻辑源（页面直接消费）：「10月的锦州正当时：笔架山｜离线攻略」，
+    // 理由取第一个景点名（截 12 字），总长硬截 32 字（微信卡片最佳长度）
+    const why = (spotsText.split(" · ")[0] || "").slice(0, 12) || bestShort.slice(0, 12);
+    let shareTitle = month + "月的" + c.name + "正当时：" + why + "｜离线攻略";
+    if (shareTitle.length > 32) shareTitle = shareTitle.slice(0, 31) + "…";
     out.push({
       name: c.name,
       province: c.province || (D.CITY2PROV && D.CITY2PROV[c.name]) || "",
       days: b.days || 3,
       best: c.best || "四季皆宜",
       bestShort: bestShort,
-      spotsText: spots.join(" · "),
+      spotsText: spotsText,
+      shareTitle: shareTitle,
       why: (bestMonths(c.best) ? month + "月正当时 · " : "四季皆宜 · ") + bestShort
     });
   }

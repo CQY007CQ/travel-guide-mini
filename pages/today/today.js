@@ -5,6 +5,17 @@ const app = getApp();
 Page({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
+    // v1.19.89：无行程（灵感卡场景）→ 分享「今日之城」（确定性：好友打开看到同一座）；
+    // 行中分享是功能场景（给同伴看安排），保留原功能文案
+    const plan = getApp().globalData.plan;
+    if (!plan || !plan.days || !plan.days.length) {
+      try {
+        const ins = T.dailyInspire(1);
+        if (ins && ins.length) {
+          return { title: ins[0].shareTitle, path: "/pages/index/index" };
+        }
+      } catch (e) {}
+    }
     return { title: "旅行途中神器：今日安排 + 待办清单 + 随手记账（离线可用）", path: "/pages/index/index" };
   },
 
@@ -123,6 +134,8 @@ Page({
       try { spots = T.P.countPlanStats(plan.days).spots; } catch (e) {}
       out.spots = spots;
       out.totalMoney = Math.round(T.totalSpent());
+      // v1.19.89：行后种草 —— 结束是情感高点，顺势给「下一程 · 今日正当时」
+      try { this.setData({ insp: T.dailyInspire(3) }); } catch (e) {}
     }
     this.setData({ hasPlan: true, state: st.phase, view: out });
   },

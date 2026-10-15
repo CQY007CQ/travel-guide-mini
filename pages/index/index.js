@@ -910,6 +910,13 @@ Page({
 
   onShareAppMessage() {
     const n = (T.D && T.D.CITIES && T.D.CITIES.length) || 0;
+    // v1.19.89：分享即种草——「今日正当时」日期种子确定性，好友点开首页看到的正是同一座城
+    try {
+      const ins = T.dailyInspire(1);
+      if (ins && ins.length) {
+        return { title: ins[0].shareTitle, path: "/pages/index/index" };
+      }
+    } catch (e) {}
     return {
       title: "旅行攻略生成器 · " + n + " 城可玩：景点路线住宿美食记账，离线免注册",
       path: "/pages/index/index"
