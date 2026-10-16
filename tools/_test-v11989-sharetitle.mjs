@@ -32,11 +32,19 @@ const grab = (file, name) => {
   const ret = vm.runInContext("(" + src + ")", ctx).call(page);
   const today = T.dailyInspire(1);
   const m = new Date().getMonth() + 1;
-  ok("index：种草标题含「N月的」+「正当时」", ret.title.indexOf(m + "月的") >= 0 && ret.title.indexOf("正当时") >= 0, ret.title);
+  // 断言不能依赖「当天恰好是旺季城」——10 月是锦州（旺季句式），11 月可能是晋城（四季句式），
+  // 曾导致每日自动任务随机红。改为：标题 == 数据层 shareTitle（口径已由第 3 段全量校验覆盖）。
+  ok("index：种草标题为合法句式（旺季「N月的X正当时：」/ 四季「X四季皆宜：」）",
+     /正当时：/.test(ret.title) || /四季皆宜：/.test(ret.title), ret.title);
   ok("index：标题含今日城市名（确定性=对方打开看到同一座）", today.length && ret.title.indexOf(today[0].name) >= 0);
   ok("index：标题 == shareTitle（单一逻辑源直连）", today.length === 1 && ret.title === today[0].shareTitle);
   ok("index：标题 ≤ 32 字（微信卡片最佳长度）", ret.title.length <= 32, "len=" + ret.title.length);
   ok("index：path 落首页（灵感卡所在地）", ret.path === "/pages/index/index");
+
+  // 旺季句式的确定性单测：固定注入 10 月（已知是旺季池），不依赖当天日期
+  const oct = T.dailyInspire(1, new Date(2026, 9, 15))[0];
+  ok("index：旺季句式为「N月的X正当时：」（10 月固定注入）",
+     /^10月的.+正当时：/.test(oct.shareTitle), oct.shareTitle);
 
   // 回退：dailyInspire 抛错 → 原功能文案
   const ctx2 = { T: { D: { CITIES: { length: 751 } }, dailyInspire() { throw new Error("not ready"); } }, Date, Math };
@@ -54,7 +62,9 @@ const grab = (file, name) => {
   const ret = vm.runInContext("(" + src + ")", ctx).call({});
   const today = T.dailyInspire(1);
   const m = new Date().getMonth() + 1;
-  ok("today 无行程：种草标题", ret.title.indexOf(m + "月的") >= 0 && (!today.length || ret.title === today[0].shareTitle), ret.title);
+  ok("today 无行程：种草标题为合法句式（旺季/四季二选一）",
+     /正当时：/.test(ret.title) || /四季皆宜：/.test(ret.title), ret.title);
+  ok("today 无行程：标题 == shareTitle（与 index 同一口径）", today.length === 1 && ret.title === today[0].shareTitle);
   ok("today 无行程：标题 ≤ 32 字", ret.title.length <= 32, "len=" + ret.title.length);
 
   // 行中（有行程）→ 原功能文案
