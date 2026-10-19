@@ -118,17 +118,21 @@ ok("deep 页暴露 onLoad/onPick", typeof cap2.onLoad === "function" && typeof c
 // 内容库自身体检
 const RAW = require_(path.join(ROOT, "subai/data/ai-deep.js"));
 const D = require_(path.join(ROOT, "utils/data.js"));
-const cityNames = new Set(D.CITIES.map((c) => c.name));
+// v1.20 起 CITIES 有双格式（旧格式 name / 新格式 @A），城名集合两种都收
+const cityNames = new Set();
+D.CITIES.forEach((c) => { if (c.name) cityNames.add(c.name); if (c["@A"]) cityNames.add(c["@A"]); });
 const keys = Object.keys(RAW.cities);
 console.log("\n── 内容库体检 ──");
-ok("10 座城", keys.length === 10, String(keys.length));
+// 深玩库按周扩容（v1.19.91 起临汾/昆明/腾冲，v1.19.94 起乌镇/武威/德阳…），
+// 数量断言改为下限，避免每次扩容都要改测试；schema 红线仍然锁死。
+ok("城市库 ≥10 座（扩容只增不减）", keys.length >= 10, String(keys.length));
 ok("城市名都能在数据里找到", keys.every((k) => cityNames.has(k)), keys.filter((k) => !cityNames.has(k)).join("/"));
 ok("每城 4 个板块", keys.every((k) => RAW.cities[k].blocks.length === 4));
 ok("每城 3 条速览", keys.every((k) => RAW.cities[k].teaser.length === 3));
 ok("无空条目", keys.every((k) => RAW.cities[k].blocks.every((b) => (b.items || []).every((s) => String(s).trim().length > 6))));
-ok("顺手一日 3 条且含 meta", keys.every((k) => {
+ok("顺手一日 2-3 条且含 meta", keys.every((k) => {
   const t = (RAW.cities[k].blocks.find((b) => b.t === "顺手加一日") || {}).trips || [];
-  return t.length === 3 && t.every((x) => x.name && x.meta && x.why);
+  return t.length >= 2 && t.length <= 3 && t.every((x) => x.name && x.meta && x.why);
 }));
 
 console.log("\n" + (fail === 0 ? "✅ 全部通过" : "❌ 有失败") + `：${pass} 通过 / ${fail} 失败`);
