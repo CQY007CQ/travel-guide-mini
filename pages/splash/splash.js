@@ -8,8 +8,16 @@
 //      此前三级都失败时既不重试也不提示，用户不点就永远停在这一屏。
 //      注意：**不要用 onHide 判定已离开**（启动瞬间微信常触发一次假 onHide，
 //      会误判成已离开从而停止重试）——只用 onUnload。
-const T = require("../../utils/travel.js");
-const app = getApp();
+//
+// ⚠️ v1.19.98 白屏根治（关键）：开屏页是「冷启动第一个被加载」的页面，
+//    顶层若直接 require / getApp 且运行期时序异常抛错，会导致本文件在
+//    Page 构造器注册之前就中断执行 → 页面从未注册 → 只显示 splash.json 的底色、
+//    内容全无（观感即「白屏」）。故此处：①删除未使用的顶层 getApp()（微信公认坑）；
+//    ②require 包 try/catch，T 取不到时用空对象兜底——**保证 Page 永远被调用**。
+let T = {};
+try { T = require("../../utils/travel.js") || {}; } catch (e) {
+  try { if (typeof console !== "undefined" && console.warn) console.warn("[splash] travel.js 加载失败，开屏页以最小化逻辑运行:", e && e.message); } catch (_) {}
+}
 const KEEP_MS = 1250;   // 入场动画 0~0.95s，留缓冲后自动进入
 const WD_MS = 700;      // 看门狗重试间隔
 
