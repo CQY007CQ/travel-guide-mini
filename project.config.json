@@ -29,6 +29,10 @@
       {
         "type": "folder",
         "value": "outputs"
+      },
+      {
+        "type": "folder",
+        "value": "docs"
       }
     ]
   },

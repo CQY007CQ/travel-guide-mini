@@ -29,7 +29,7 @@
 | 城市深度玩法（1.19.78 新增） | 10 座热门城市的本地节奏 / 避坑清单 / 取景机位 / 顺手加一日，共 121 条人工整理内容 |
 | 出发提醒（1.19.78 新增） | 一键写入手机日历（离线可用，到点响铃）；未来接上云开发后可升级为订阅消息推送 |
 
-> 网页版仍然保留在仓库外的 `outputs/旅游攻略生成器.html`（单文件，已 PWA 化，可安装到桌面/手机离线使用）。
+> 网页版仍然保留在仓库外的 `outputs/h5-pwa/旅游攻略生成器.html`（单文件，已 PWA 化，可安装到桌面/手机离线使用）。
 
 ---
 
@@ -44,7 +44,7 @@ cd miniprogram-travel
 2. AppID：用正式 AppID `wxa365d49bc3366f95`，或改成你自己的测试号
 3. 编译运行
 
-**首次修改代码前，请先看这两件事**（都是踩过线上事故的坑，见 `ARCHITECTURE.md` 第七节）：
+**首次修改代码前，请先看这两件事**（都是踩过线上事故的坑，见 `docs/design/ARCHITECTURE.md` 第七节）：
 
 - 改 `utils/data.js` 无效 —— 它是生成产物，真源在 `tools/_src-backup/data.js`
 - 增量改数据只能走 `tools/_apply-safe.mjs`，**禁用 `merge-data-patch.mjs`**
@@ -71,7 +71,10 @@ miniprogram-travel/
 │   └── rank.js / store.js / weather.js / toolkit-groups.js
 ├── tools/                            数据管道与回归链（不打包，见 project.config.json）
 ├── images/                           图标与 tabBar 图
-└── docs 层：README.md / ARCHITECTURE.md / DATA-REPORT.md / v1.xx-*.md 变更记录
+└── docs/                            研发文档归档（不参与编译）
+    ├── README.md       本目录索引
+    ├── changelog/      版本变更 / 审核描述 / 路线图 / 隐患排查
+    └── design/         架构 / 技术方案 / 优化清单（ARCHITECTURE、v1.20-* 等）
 ```
 
 代码规模：手写源码约 **2.05 万行**（其中算法/接口层 8,123 行、页面层约 1.25 万行）。
@@ -141,7 +144,7 @@ cli upload --project "$(pwd)" --port 54871 --version 1.19.78 --desc "说明"
 
 ## 八、接下来
 
-按性价比排序（详见 `v1.20-云后端与AI行程技术方案.md`）：
+按性价比排序（详见 `docs/design/v1.20-云后端与AI行程技术方案.md`）：
 
 1. **扩大深度玩法覆盖**：10 城 → 50 城（纯内容增量，零结构改动）
 2. **流量主**：UV ≥ 1000 后开通，把 `utils/ad.js` 的 `AD_UNIT_ID` 填上即可生效
@@ -152,10 +155,11 @@ cli upload --project "$(pwd)" --port 54871 --version 1.19.78 --desc "说明"
 
 ## 九、文档索引
 
+> 完整清单与分层说明见 [`docs/README.md`](docs/README.md)。
+
 | 文件 | 内容 |
 |---|---|
-| `ARCHITECTURE.md` | 分包设计、数据加载链路、生成算法、交互实现、主题系统、踩过的坑 |
-| `DATA-REPORT.md` | 数据规模、来源与清洗、去泛化规则、质量指标与已知缺口 |
-| `v1.20-云后端与AI行程技术方案.md` | 云开发 / AI 三条路线、云函数清单、防幻觉设计 |
-| `v1.19.77-审核描述.md` | 提审说明模板 |
-| `v1.xx-变更清单.md` | 各版本变更记录 |
+| `docs/design/ARCHITECTURE.md` | 分包设计、数据加载链路、生成算法、交互实现、主题系统、踩过的坑 |
+| `docs/design/v1.20-云后端与AI行程技术方案.md` | 云开发 / AI 三条路线、云函数清单、防幻觉设计 |
+| `docs/changelog/v1.19.77-审核描述.md` | 提审说明模板 |
+| `docs/changelog/v1.xx-变更清单.md` | 各版本变更记录 |

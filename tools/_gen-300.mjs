@@ -342,5 +342,5 @@ for (const [title, items] of groups) {
   lines.push("");
 }
 lines.push("---", "", "清单说明：300 项按 10 大类各 30 项编号；⏳ 项可直接进入后续迭代，💡 项先做成本/收益评估。");
-fs.writeFileSync("300项优化清单.md", lines.join("\n"), "utf8");
+fs.writeFileSync("docs/design/300项优化清单.md", lines.join("\n"), "utf8");
 console.log("已生成 300项优化清单.md，共 " + no + " 项");

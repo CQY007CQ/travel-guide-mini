@@ -1,7 +1,7 @@
 // 生成《500项优化清单.md》：保留 300 项清单内容，再追加 200 项新优化点。
 import fs from "fs";
 
-const base = fs.readFileSync("300项优化清单.md", "utf8");
+const base = fs.readFileSync("docs/design/300项优化清单.md", "utf8");
 const baseLines = base.split("\n");
 const keep = [];
 let seenHeader = false;
@@ -246,5 +246,5 @@ for (const [title, items] of NEW) {
   }
 }
 keep.push("", "---", "", "清单说明：1-300 继承《300项优化清单.md》，301-500 为本轮新增方向；⏳ 项可直接进入后续迭代，💡 项先评估成本收益。");
-fs.writeFileSync("500项优化清单.md", keep.join("\n"), "utf8");
+fs.writeFileSync("docs/design/500项优化清单.md", keep.join("\n"), "utf8");
 console.log("已生成 500项优化清单.md，共 " + no + " 项");
