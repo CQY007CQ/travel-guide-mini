@@ -54,13 +54,19 @@ App({
     // v1.19.65：**启动阶段不再预加载分包数据**。数据包近 2.5MB，若在 appLaunch 期间就触发
     // 分包下载/解析，会拖垮启动（真机/审核环境实测 `routeTo appLaunch timeout` → 黑屏/白屏）。
     // 改为由首页 onLoad 触发（那时启动已完成），启动本身保持轻量。
-    const saved = store.get("planV1");
-    if (saved && saved.days && saved.days.length) {
-      // 只恢复「尚未结束」的行程；已结束的自动归档到「我的行程」，避免过期数据幽灵
-      const last = String(saved.days[saved.days.length - 1].date || "").slice(0, 10);
-      const today = store.fmtLocalDate(new Date());
-      if (last && today <= last) this.globalData.plan = saved;
-      else this._archiveOld(saved);
+    // v1.19.97：存储读取整体包 try/catch ——  corrupted storage 曾导致 onLaunch 抛错，
+    // 极端真机/审核环境下可能表现为启动白屏；崩溃绝不该阻塞启动。
+    try {
+      const saved = store.get("planV1");
+      if (saved && saved.days && saved.days.length) {
+        // 只恢复「尚未结束」的行程；已结束的自动归档到「我的行程」，避免过期数据幽灵
+        const last = String(saved.days[saved.days.length - 1].date || "").slice(0, 10);
+        const today = store.fmtLocalDate(new Date());
+        if (last && today <= last) this.globalData.plan = saved;
+        else this._archiveOld(saved);
+      }
+    } catch (e) {
+      try { if (typeof console !== "undefined" && console.warn) console.warn("[app] onLaunch storage 恢复失败（已跳过）:", e && e.message); } catch (_) {}
     }
   },
   // C3（v1.9.1）：行程结束后首次冷启动 → 归档并清当前档；more「我的行程」可恢复回顾
