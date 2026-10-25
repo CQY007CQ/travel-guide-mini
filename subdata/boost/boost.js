@@ -1,7 +1,10 @@
 // 行程增强页：聚合新功能（体检/问答/换景点/动线/高光/错峰/行李/成就/年报/点亮/交通/记账/照片/复制）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
-const app = getApp();
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 Page({
   data: {

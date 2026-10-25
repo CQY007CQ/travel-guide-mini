@@ -3,7 +3,16 @@
 // 2026-09 首页高端化：三段玩法切换（城市/全省精华/多站）、高级设置折叠、想玩池折叠、去 slogan
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一存储封装（失败有提示，不再静默丢数据）
-const app = getApp();
+
+// v1.19.100 修复：模块顶层 `getApp()` 在 lazyCodeLoading 下可能返回 undefined（App 尚未注册完），
+// 会导致 onLoad 整段初始化被抛错跳过、且本页 10 处 handler（goPlan / generate / 回填 等）访问
+// app.globalData / app.setPlan 崩 → 首页大批按键集体失灵（表现：页面渲染但点了没反应）。
+// 改为惰性代理：每次访问属性才实时取 getApp()，onLoad / 各 handler 运行时 App 一定已就绪；
+// 模块求值期即使为 undefined 也不抛错（get 返回 undefined，由现有 `&&` 短路或 try/catch 兜底）。
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 const PACE_TXT = ["轻松", "平衡", "特种兵"];
 const MODE_TXT = ["不指定", "亲子", "情侣", "独行", "老人"];

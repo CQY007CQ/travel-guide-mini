@@ -3,7 +3,10 @@ const T = require("../../utils/travel.js");
 const W = require("../../utils/weather.js");
 const A = require("../../utils/aicontent.js");
 const R = require("../../utils/remind.js");
-const app = getApp();
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 function isFrame(n) { return T.isFrameName(n); }
 const MODE_LABEL = { family: "亲子游", couple: "情侣游", solo: "独行", elder: "带老人" };

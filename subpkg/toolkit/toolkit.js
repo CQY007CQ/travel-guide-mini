@@ -1,7 +1,10 @@
 // 旅行百宝箱：灵感 / 体检 / 文案 / 打包，一键生成（v1.10 功能落地页）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
-const app = getApp();
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 // 工具分组抽到 utils/toolkit-groups.js，与指南页共用（避免页面模块互相 require）
 const ITEM_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;

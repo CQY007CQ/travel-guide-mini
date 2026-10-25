@@ -2,7 +2,10 @@
 const T = require("../../utils/travel.js");
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 const TOOL_TOTAL = Array.isArray(TOOL_GROUPS) ? TOOL_GROUPS.reduce((s, g) => s + (g.items ? g.items.length : 0), 0) : 0;
-const app = getApp();
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 Page({
   data: {

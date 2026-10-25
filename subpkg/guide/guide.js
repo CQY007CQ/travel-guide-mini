@@ -3,7 +3,10 @@
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一走存储封装（带类型守卫 + 会话缓存）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
-const app = getApp();
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 const TABS = ["一分钟上手", "功能地图", "进阶技巧", "常见问题"];
 

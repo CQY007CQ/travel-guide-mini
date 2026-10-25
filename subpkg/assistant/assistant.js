@@ -1,7 +1,10 @@
 // assistant：本地攻略速查（离线 · 本地规则库 · 零网络）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
-const app = getApp();
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 // 保留旧 key 名（兼容老用户数据，不影响审核）
 const KEEP_KEY = "miniAIKeepV1";

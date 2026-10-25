@@ -1,7 +1,10 @@
 // prep：出行准备（票价/预约渠道 可勾跟踪 / 酒店比价 / 团队分工）
 // 每个景点的「已订 / 预约日期 / 备注」按 城市·景点名 记本机，回来再看不丢
 const T = require("../../utils/travel.js");
-const app = getApp();
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 const HOTEL_TIPS = [
   "携程 / 美团 / 飞猪 / 去哪儿四平台比价，同一酒店价差可达 10-30%",

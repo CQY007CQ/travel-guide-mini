@@ -1,7 +1,10 @@
 // ledger：旅行记账 · 当日与总计对比 · 日期/付款人/AA 分账/导出 CSV
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一存储封装
-const app = getApp();
+const app = new Proxy({}, {
+  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
+  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
+});
 
 // 分类配色（占比图例用）
 const CAT_COLORS = {
