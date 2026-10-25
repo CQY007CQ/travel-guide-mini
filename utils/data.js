@@ -99,7 +99,7 @@ function applyPacked(packed) {
 //  - 微信生产：读 subdata/data/_manifest.js（由 tools/pack-data.mjs 生成，列出全部数据分块相对路径）
 //  - 兜底：单个默认分块
 function resolveChunkPaths() {
-  if (process.env.DATA_CHUNKS) {
+  if (typeof process !== "undefined" && process.env && process.env.DATA_CHUNKS) {
     return process.env.DATA_CHUNKS.split(",").map(s => s.trim()).filter(Boolean);
   }
   try {
