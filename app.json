@@ -86,5 +86,15 @@
         "deep/deep"
       ]
     }
-  ]
+  ],
+  "preloadRule": {
+    "pages/index/index": {
+      "network": "all",
+      "packages": ["subpkg"]
+    },
+    "pages/plan/plan": {
+      "network": "wifi",
+      "packages": ["subpkg", "subdata", "subai"]
+    }
+  }
 }

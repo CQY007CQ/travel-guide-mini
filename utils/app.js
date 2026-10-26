@@ -13,6 +13,9 @@
 // 重要约束：SafePage/SafeComponent 只「改造并返回 config」，真正的 Page()/Component() 注册由调用方在自己作用域里做
 // （即 Page(SafePage({...}))）。这样共享模块不依赖 vm 测试沙盒里的 Page 全局，单测仍可正常捕获 handler 抛错。
 
+// v1.19.106：被兜住的异常同步进本地错误日志（errlog），让「按了没反应」在生产环境也可回溯，不再无声消失。
+const EL = require("./errlog.js");
+
 // 是否开发/测试环境：Node 测试环境无 __wxConfig，一律按开发处理（rethrow，便于定位 + 单测捕获）。
 function __isDev() {
   try {
@@ -62,6 +65,8 @@ function __wrapFn(orig, label) {
       if (__isDev()) throw err; // 开发/测试：原样抛出，便于定位 + 单测捕获
       // 生产：给用户一个可见反馈，而不是「按了没反应」
       try { if (typeof wx !== "undefined" && wx && wx.showToast) wx.showToast({ title: "操作失败，请重试", icon: "none" }); } catch (e) {}
+      // 同步进本地错误日志（Node 测试环境 push 自动跳过，绝不抛错）
+      try { EL.push(label, err); } catch (e2) {}
       return undefined;
     }
   };

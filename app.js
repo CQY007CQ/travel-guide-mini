@@ -1,5 +1,7 @@
 // 全局入口：行程存 storage，冷启动自动恢复（旅途中直接看到「今天」）
 const store = require("./utils/store.js");
+// v1.19.106：全局未捕获异常同步进本地错误日志，真机/审核环境也能回溯「无声失灵」
+const EL = require("./utils/errlog.js");
 
 // v1.19.40：统一导航出口防御 —— 全 app 的 navigateTo/switchTab/reLaunch 失败可见（带 toast）、
 // 子页 navigateTo 加 loading 反馈、导航栈满等极端情况退回 redirectTo 仍尽量打开。
@@ -94,6 +96,7 @@ App({
   clearPlan() { this.globalData.plan = null; store.del("planV1"); },
   // v1.19.60：全局异常捕获，避免无声白屏，便于真机/审核环境定位
   onError(err) {
+    try { EL.push("app.onError", err); } catch (e2) {}
     try { if (typeof console !== "undefined" && console.warn) console.warn("[app] onError:", err && (err.message || err)); } catch (e) {}
   },
   // v1.19.60：未知页面兜底转回首页，避免「打不开」

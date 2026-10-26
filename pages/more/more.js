@@ -1,13 +1,14 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
 // more：功能聚合（分组）+ 想玩清单（内嵌可管理）
 const T = require("../../utils/travel.js");
+const EL = require("../../utils/errlog.js"); // v1.19.106：本地错误日志（被 SafePage / app.onError 兜住的异常）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 const TOOL_TOTAL = Array.isArray(TOOL_GROUPS) ? TOOL_GROUPS.reduce((s, g) => s + (g.items ? g.items.length : 0), 0) : 0;
 const app = getAppSafe();
 
 Page(SafePage(SafePage({
   data: {
-    fz: 1, td: false, hasPlan: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null },
+    fz: 1, td: false, hasPlan: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0 },
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
@@ -169,6 +170,7 @@ Page(SafePage(SafePage({
         });
       })(),
       backupTip: bkTip,
+      errN: EL.count(), // v1.19.106：错误日志条数，随页面刷新更新
       // 减法：无行程时只留「记账(可独立用) + 通用」，地图/美食/准备/速查待生成行程后再出现，减少空转入口
       groups: hasPlan ? [
         {
@@ -258,6 +260,34 @@ Page(SafePage(SafePage({
       content: "版本 v" + T.APP_VER + "\n\n行程全部在本机生成：数据不出手机、不上传，飞行模式也能规划（天气、地图需联网）。\n\n景点与票价按通用公开资料整理，请以官方最新公告为准。\n\n祝你每次都玩得尽兴。",
       showCancel: false,
       confirmText: "好的"
+    });
+  },
+
+  /* ---- v1.19.106：本地错误日志查看（被 SafePage / app.onError 兜住的异常回溯） ---- */
+  onErrLog() {
+    const n = EL.count();
+    if (!n) { wx.showToast({ title: "暂无异常记录 ✓", icon: "none" }); return; }
+    const list = EL.recent().slice(-10).reverse();
+    const pad = (x) => String(x).padStart(2, "0");
+    const tx = list.map((x, i) => {
+      const d = new Date(x.t || Date.now());
+      const ts = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+      return (i + 1) + ". " + ts + " [" + (x.label || "") + "] " + (x.msg || "");
+    }).join("\n");
+    wx.showModal({
+      title: "运行异常日志（最近 " + n + " 条）",
+      content: tx,
+      confirmText: "复制日志",
+      cancelText: "清空记录",
+      success: (r) => {
+        if (r.confirm) {
+          wx.setClipboardData({ data: tx, success: () => wx.showToast({ title: "已复制日志", icon: "none" }) });
+        } else if (r.cancel) {
+          EL.clear();
+          this.setData({ errN: 0 });
+          wx.showToast({ title: "已清空日志", icon: "none" });
+        }
+      }
     });
   },
 
