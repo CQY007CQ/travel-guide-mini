@@ -11,7 +11,7 @@ const PLAN_TOOLS = ["brief", "theme", "load", "rhythm", "tips", "book", "museum"
   "countdown", "burn", "highlight", "rainy", "night", "crowd", "mistake", "density", "ticket2"];
 
 // kind → 需要行程？(plan 组) 还是只要有城市即可
-Page(SafePage(SafePage({
+Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "旅行百宝箱：打包清单、花费换算、同行分摊等小工具", path: "/pages/index/index" };
@@ -314,4 +314,4 @@ Page(SafePage(SafePage({
   try { S.set("miniToolFavV1", list); } catch (e2) {}
   this.setData({ favs: list, favIdx: -1 });
  }
-})));
+}));

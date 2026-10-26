@@ -4,7 +4,7 @@ const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
 const app = getAppSafe();
 
-Page(SafePage(SafePage({
+Page(SafePage({
   data: {
     fz: 1,
     td: false,
@@ -147,4 +147,4 @@ Page(SafePage(SafePage({
   onShareAppMessage() {
     return { title: "行程增强：体检、问答、一键换景点", path: "/pages/index/index" };
   }
-})));
+}));

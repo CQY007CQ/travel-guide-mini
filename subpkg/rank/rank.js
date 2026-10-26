@@ -3,7 +3,7 @@ const { getAppSafe, SafePage } = require("../../utils/app.js");
 // 数据全部来自 utils/rank.js（从记账/足迹/行程/笔记的真实记录算出）
 const R = require("../../utils/rank.js");
 
-Page(SafePage(SafePage({
+Page(SafePage({
   // v1.17.12 同款：定义转发才显示右上角「转发」
   onShareAppMessage() {
     return { title: "旅行排行榜 · 看看谁走得最远", path: "/subpkg/rank/rank" };
@@ -155,4 +155,4 @@ Page(SafePage(SafePage({
     this.reloadMine();
     setTimeout(() => { try { wx.stopPullDownRefresh(); } catch (e) {} }, 300);
   },
-})));
+}));

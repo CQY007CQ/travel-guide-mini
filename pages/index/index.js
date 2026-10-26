@@ -19,7 +19,7 @@ function iso(t) {
   return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
 }
 
-Page(SafePage(SafePage({
+Page(SafePage({
   data: {
     fz: 1,
     td: false,
@@ -1231,4 +1231,4 @@ Page(SafePage(SafePage({
     const c = this.data.cities[this.data.cityIdx];
     if (c && !cfg.provMode && !cfg.multiMode) this._refreshPool(c);
   }
-})));
+}));

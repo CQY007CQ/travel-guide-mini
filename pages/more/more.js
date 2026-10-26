@@ -6,7 +6,7 @@ const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 const TOOL_TOTAL = Array.isArray(TOOL_GROUPS) ? TOOL_GROUPS.reduce((s, g) => s + (g.items ? g.items.length : 0), 0) : 0;
 const app = getAppSafe();
 
-Page(SafePage(SafePage({
+Page(SafePage({
   data: {
     fz: 1, td: false, hasPlan: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0 },
 
@@ -489,4 +489,4 @@ Page(SafePage(SafePage({
     this.setData({ fz: T.fontScale() });
     wx.showToast({ title: (v === 1 ? "标准字号" : (v === 2 ? "大字号" : "特大字号")), icon: "none" });
   }
-})));
+}));

@@ -22,7 +22,7 @@ try { T = require("../../utils/travel.js") || {}; } catch (e) {
 const KEEP_MS = 1250;   // 入场动画 0~0.95s，留缓冲后自动进入
 const WD_MS = 700;      // 看门狗重试间隔
 
-Page(SafePage(SafePage({
+Page(SafePage({
   onShareAppMessage() {
     const n = (T.D && T.D.CITIES && T.D.CITIES.length) || 0;
     return { title: n + " 城旅行攻略生成，离线免注册", path: "/pages/index/index" };
@@ -109,4 +109,4 @@ Page(SafePage(SafePage({
 
   // 点按任意处：重置 _gone 让"跳页失败后"也能再试一次，绝不点了没反应
   skip() { this._gone = false; this._clear(); this.enter(); }
-})));
+}));

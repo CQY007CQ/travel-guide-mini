@@ -4,7 +4,7 @@ const { getAppSafe, SafePage } = require("../../utils/app.js");
 const T = require("../../utils/travel.js");
 const app = getAppSafe();
 
-Page(SafePage(SafePage({
+Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "到一个城市吃什么？必吃清单 + 地道名店一键导航", path: "/pages/index/index" };
@@ -123,4 +123,4 @@ Page(SafePage(SafePage({
       wx.showToast({ title: "该店暂无坐标，用地图搜店名吧", icon: "none" });
     }
   }
-})));
+}));

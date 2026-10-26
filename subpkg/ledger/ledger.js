@@ -10,7 +10,7 @@ const CAT_COLORS = {
   "住宿": "#c4b5fd", "购物": "#f9a8d4", "其他": "#94a3b8"
 };
 
-Page(SafePage(SafePage({
+Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "旅行花了多少？分类记账，每日明细一目了然", path: "/pages/index/index" };
@@ -486,4 +486,4 @@ Page(SafePage(SafePage({
       })
     });
   }
-})));
+}));

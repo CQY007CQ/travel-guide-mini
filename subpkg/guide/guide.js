@@ -8,7 +8,7 @@ const app = getAppSafe();
 
 const TABS = ["一分钟上手", "功能地图", "进阶技巧", "常见问题"];
 
-Page(SafePage(SafePage({
+Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "3 分钟学会用它生成专属旅行攻略", path: "/pages/index/index" };
@@ -82,4 +82,4 @@ Page(SafePage(SafePage({
       });
     }
   }
-})));
+}));

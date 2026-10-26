@@ -20,7 +20,7 @@ function ymdLocal() {
  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
-Page(SafePage(SafePage({
+Page(SafePage({
  data: {
     fz: 1,
   td: false,
@@ -1229,4 +1229,4 @@ Page(SafePage(SafePage({
     while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
     return t + "…";
   },
-})));
+}));

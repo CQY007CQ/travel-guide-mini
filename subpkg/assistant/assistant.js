@@ -20,7 +20,7 @@ const TILES = [
   { k: "today", t: "今天安排", q: "今天干什么", ic: "calendar.png" }
 ];
 
-Page(SafePage(SafePage({
+Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "旅行小助手：天气、预算、避坑提示随手查", path: "/pages/index/index" };
@@ -171,4 +171,4 @@ Page(SafePage(SafePage({
   },
 
   goIndex() { wx.switchTab({ url: "/pages/index/index" }); }
-})));
+}));

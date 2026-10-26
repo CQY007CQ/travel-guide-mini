@@ -8,7 +8,7 @@ const app = getAppSafe();
 // 抛 ReferenceError: MARKER_CAP is not defined → 地图页「下一页 / 图层」两个按钮失灵。取值 20 兼顾正常天数的全标号与超长列表可读性。
 const MARKER_CAP = 20;
 
-Page(SafePage(SafePage({
+Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "行程景点全标地图，点一下直接导航（离线可用）", path: "/pages/index/index" };
@@ -292,4 +292,4 @@ Page(SafePage(SafePage({
     if (!h) { wx.showToast({ title: "暂无酒店坐标", icon: "none" }); return; }
     wx.openLocation({ latitude: h.lat, longitude: h.lon, name: h.name, scale: 16 });
   }
-})));
+}));

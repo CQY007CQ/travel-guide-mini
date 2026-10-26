@@ -3,7 +3,7 @@ const { getAppSafe, SafePage } = require("../../utils/app.js");
 const T = require("../../utils/travel.js");
 const app = getAppSafe();
 
-Page(SafePage(SafePage({
+Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     // v1.19.89：无行程（灵感卡场景）→ 分享「今日之城」（确定性：好友打开看到同一座）；
@@ -212,4 +212,4 @@ Page(SafePage(SafePage({
     this.setData({ noteSaved: txt, noteInput: "" });
     wx.showToast({ title: "已记下", icon: "success" });
   }
-})));
+}));
