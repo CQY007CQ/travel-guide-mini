@@ -5,6 +5,9 @@
 // stamp 短路 + 失败静默、onShareAppMessage 有图接 imageUrl / 无图回退。
 import { readFileSync } from "fs";
 import vm from "vm";
+// v1.19.109：行程页分享绘制已抽到 utils/plan-poster.js，本测试沙盒需注入该模块（否则 PP 未定义）
+import planPoster from "../utils/plan-poster.js";
+const PP = planPoster;
 
 let fail = 0;
 const ok = (name, cond, extra = "") => {
@@ -29,7 +32,7 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
 // ---------- 1. _shareCardModel ----------
 {
   const src = grab("pages/plan/plan.js", "_shareCardModel");
-  const ctx = { app: { globalData: { plan: PLAN } } };
+  const ctx = { app: { globalData: { plan: PLAN } }, PP };
   vm.createContext(ctx);
   const page = { data: { summary: "兜底", modeTxt: "", view: [{ items: [{ n: "晋祠" }] }, { items: [{ n: "蒙山" }, { n: "x", f: 1 }] }] } };
   const m = vm.runInContext("(" + src + ")", ctx).call(page);
@@ -40,7 +43,7 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
   ok("model：mode 空时兜底「平衡舒适」", m.mode === "平衡舒适");
 
   // 省与市同名（直辖市）不带省
-  const ctx2 = { app: { globalData: { plan: { cityName: "北京", province: "北京", days: PLAN.days } } } };
+  const ctx2 = { app: { globalData: { plan: { cityName: "北京", province: "北京", days: PLAN.days } } }, PP };
   vm.createContext(ctx2);
   const m2 = vm.runInContext("(" + src + ")", ctx2).call({ data: { view: [] } });
   ok("model：直辖市不重复带省名", m2.prov === "");
@@ -57,7 +60,7 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
     beginPath() {}, moveTo() {}, lineTo() {}, stroke: () => calls.stroke++,
     scale() {}, set globalAlpha(v) {}, set fillStyle(v) {}, set font(v) {}, set lineWidth(v) {}, set strokeStyle(v) {}, set textAlign(v) {},
   };
-  const sandbox = { ctx };
+  const sandbox = { ctx, PP };
   vm.createContext(sandbox);
   vm.runInContext("(" + src.replace(/ctx/g, "ctx") + ")", sandbox).call(null, ctx, 750, { W: 750, H: 600, cityName: "太原", prov: "山西", daysN: 3, spots: 9, mode: "平衡舒适" });
   ok("draw：全屏底色 fillRect", calls.fillRect >= 1);
