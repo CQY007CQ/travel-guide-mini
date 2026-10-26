@@ -1,10 +1,8 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // ledger：旅行记账 · 当日与总计对比 · 日期/付款人/AA 分账/导出 CSV
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一存储封装
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
 // 分类配色（占比图例用）
 const CAT_COLORS = {
@@ -12,7 +10,7 @@ const CAT_COLORS = {
   "住宿": "#c4b5fd", "购物": "#f9a8d4", "其他": "#94a3b8"
 };
 
-Page({
+Page(SafePage(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "旅行花了多少？分类记账，每日明细一目了然", path: "/pages/index/index" };
@@ -488,4 +486,4 @@ Page({
       })
     });
   }
-});
+})));

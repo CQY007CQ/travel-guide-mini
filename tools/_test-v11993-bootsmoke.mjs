@@ -41,6 +41,10 @@ const wxMock = new Proxy({}, {
   has() { return true; },
 });
 const appMock = { globalData: { plan: null }, setPlan(p) { this.globalData.plan = p; } };
+// v1.19.105：页面模块现在 require 共享模块 utils/app.js（getAppSafe/currentPlan），该模块在真实 Node 作用域里
+// 解析 getApp（而非 vm 沙盒全局）。把 getApp/wx 也挂到 Node 全局，使共享模块与页面在测试中一致可见。
+globalThis.getApp = () => appMock;
+globalThis.wx = wxMock;
 
 for (const p of pagePaths) {
   const jsFile = ROOT + "/" + p + ".js";

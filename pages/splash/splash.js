@@ -1,3 +1,4 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // splash：冷启动开机画面（品牌仪式感 + 短时长自动进入首页，点按可跳过）
 // 仅冷启动出现（微信热启动回到上次页面，不会走到这里），时长 ~1.3s 内完成，
 // 避免拖慢「打开」。onHide 取消定时器，防止 E2E/切后台时意外抢跳转。
@@ -21,7 +22,7 @@ try { T = require("../../utils/travel.js") || {}; } catch (e) {
 const KEEP_MS = 1250;   // 入场动画 0~0.95s，留缓冲后自动进入
 const WD_MS = 700;      // 看门狗重试间隔
 
-Page({
+Page(SafePage(SafePage({
   onShareAppMessage() {
     const n = (T.D && T.D.CITIES && T.D.CITIES.length) || 0;
     return { title: n + " 城旅行攻略生成，离线免注册", path: "/pages/index/index" };
@@ -108,4 +109,4 @@ Page({
 
   // 点按任意处：重置 _gone 让"跳页失败后"也能再试一次，绝不点了没反应
   skip() { this._gone = false; this._clear(); this.enter(); }
-});
+})));

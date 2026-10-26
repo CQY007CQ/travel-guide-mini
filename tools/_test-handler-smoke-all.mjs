@@ -64,6 +64,10 @@ function runPage(pagePath, getAppImpl) {
   const src = readFileSync(jsFile, "utf8");
   let config = null;
   const pr = createRequire(jsFile);
+  // v1.19.105：页面模块 require 共享模块 utils/app.js（getAppSafe/currentPlan），该模块在真实 Node 作用域里
+  // 解析 getApp（而非 vm 沙盒全局）。把当前场景的 getApp 挂到 Node 全局，使共享模块与页面一致可见。
+  globalThis.getApp = getAppImpl;
+  globalThis.wx = mkWx(getAppImpl);
   const sandbox = {
     wx: mkWx(getAppImpl), Page: (c) => { config = c; }, Component: (c) => { config = c; },
     getApp: getAppImpl, App: () => {}, getCurrentPages: () => [],

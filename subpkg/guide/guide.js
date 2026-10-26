@@ -1,16 +1,14 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // guide：使用指南（首页「使用指南」胶囊进入）
 // 覆盖：一分钟上手 / 全部功能地图 / 进阶技巧 / 常见问题；样式走 var(--xxx) 双主题
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一走存储封装（带类型守卫 + 会话缓存）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
 const TABS = ["一分钟上手", "功能地图", "进阶技巧", "常见问题"];
 
-Page({
+Page(SafePage(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "3 分钟学会用它生成专属旅行攻略", path: "/pages/index/index" };
@@ -84,4 +82,4 @@ Page({
       });
     }
   }
-});
+})));

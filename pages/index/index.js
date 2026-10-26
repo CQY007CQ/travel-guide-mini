@@ -1,3 +1,4 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // index：目的地选择 → 生成攻略
 // 对齐网页版：城市搜索选择器 / 出行模式 / 想玩景点池自选 / 收藏目的地 / 总预算语义
 // 2026-09 首页高端化：三段玩法切换（城市/全省精华/多站）、高级设置折叠、想玩池折叠、去 slogan
@@ -9,10 +10,7 @@ const S = require("../../utils/store.js");   // v1.11：统一存储封装（失
 // app.globalData / app.setPlan 崩 → 首页大批按键集体失灵（表现：页面渲染但点了没反应）。
 // 改为惰性代理：每次访问属性才实时取 getApp()，onLoad / 各 handler 运行时 App 一定已就绪；
 // 模块求值期即使为 undefined 也不抛错（get 返回 undefined，由现有 `&&` 短路或 try/catch 兜底）。
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
 const PACE_TXT = ["轻松", "平衡", "特种兵"];
 const MODE_TXT = ["不指定", "亲子", "情侣", "独行", "老人"];
@@ -21,7 +19,7 @@ function iso(t) {
   return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
 }
 
-Page({
+Page(SafePage(SafePage({
   data: {
     fz: 1,
     td: false,
@@ -1233,4 +1231,4 @@ Page({
     const c = this.data.cities[this.data.cityIdx];
     if (c && !cfg.provMode && !cfg.multiMode) this._refreshPool(c);
   }
-});
+})));

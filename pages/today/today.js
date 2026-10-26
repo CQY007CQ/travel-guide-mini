@@ -1,11 +1,9 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // today：「今天」行程态卡片（行前待办 / 途中速览+快捷记账 / 结束回顾）
 const T = require("../../utils/travel.js");
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
-Page({
+Page(SafePage(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     // v1.19.89：无行程（灵感卡场景）→ 分享「今日之城」（确定性：好友打开看到同一座）；
@@ -214,4 +212,4 @@ Page({
     this.setData({ noteSaved: txt, noteInput: "" });
     wx.showToast({ title: "已记下", icon: "success" });
   }
-});
+})));

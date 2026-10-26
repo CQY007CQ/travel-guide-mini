@@ -1,10 +1,8 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // prep：出行准备（票价/预约渠道 可勾跟踪 / 酒店比价 / 团队分工）
 // 每个景点的「已订 / 预约日期 / 备注」按 城市·景点名 记本机，回来再看不丢
 const T = require("../../utils/travel.js");
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
 const HOTEL_TIPS = [
   "携程 / 美团 / 飞猪 / 去哪儿四平台比价，同一酒店价差可达 10-30%",
@@ -19,7 +17,7 @@ const DUTY_POOL = [
   "交通票务 / 值机选座", "查美食 / 排餐厅", "背包物资 / 充电宝", "证件 / 紧急联系人"
 ];
 
-Page({
+Page(SafePage(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "出发前该带什么？行李清单 + 证件票据提醒", path: "/pages/index/index" };
@@ -210,4 +208,4 @@ Page({
     if (!tel) return;
     wx.makePhoneCall({ phoneNumber: tel, fail: () => {} });
   }
-});
+})));

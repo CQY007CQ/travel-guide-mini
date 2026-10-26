@@ -1,10 +1,8 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // 旅行百宝箱：灵感 / 体检 / 文案 / 打包，一键生成（v1.10 功能落地页）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
 // 工具分组抽到 utils/toolkit-groups.js，与指南页共用（避免页面模块互相 require）
 const ITEM_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
@@ -13,7 +11,7 @@ const PLAN_TOOLS = ["brief", "theme", "load", "rhythm", "tips", "book", "museum"
   "countdown", "burn", "highlight", "rainy", "night", "crowd", "mistake", "density", "ticket2"];
 
 // kind → 需要行程？(plan 组) 还是只要有城市即可
-Page({
+Page(SafePage(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "旅行百宝箱：打包清单、花费换算、同行分摊等小工具", path: "/pages/index/index" };
@@ -316,4 +314,4 @@ Page({
   try { S.set("miniToolFavV1", list); } catch (e2) {}
   this.setData({ favs: list, favIdx: -1 });
  }
-});
+})));

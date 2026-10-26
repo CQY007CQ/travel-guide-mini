@@ -1,16 +1,14 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // map：原生地图 + 真实坐标标点 + 编号连线 + 图层（景点 / 美食 / 住宿）
 const T = require("../../utils/travel.js");
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
 // v1.19.100：MARKER_CAP = 带数字标注的地图标点数量上限（超过只显示小圆点不标号）。
 // 此前该常量被 134 行引用却从未声明（基线 v1.19.77 以来一直缺失），导致 onNext/onLayer 走到该分支时
 // 抛 ReferenceError: MARKER_CAP is not defined → 地图页「下一页 / 图层」两个按钮失灵。取值 20 兼顾正常天数的全标号与超长列表可读性。
 const MARKER_CAP = 20;
 
-Page({
+Page(SafePage(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "行程景点全标地图，点一下直接导航（离线可用）", path: "/pages/index/index" };
@@ -294,4 +292,4 @@ Page({
     if (!h) { wx.showToast({ title: "暂无酒店坐标", icon: "none" }); return; }
     wx.openLocation({ latitude: h.lat, longitude: h.lon, name: h.name, scale: 16 });
   }
-});
+})));

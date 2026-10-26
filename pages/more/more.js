@@ -1,13 +1,11 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // more：功能聚合（分组）+ 想玩清单（内嵌可管理）
 const T = require("../../utils/travel.js");
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 const TOOL_TOTAL = Array.isArray(TOOL_GROUPS) ? TOOL_GROUPS.reduce((s, g) => s + (g.items ? g.items.length : 0), 0) : 0;
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
-Page({
+Page(SafePage(SafePage({
   data: {
     fz: 1, td: false, hasPlan: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null },
 
@@ -461,4 +459,4 @@ Page({
     this.setData({ fz: T.fontScale() });
     wx.showToast({ title: (v === 1 ? "标准字号" : (v === 2 ? "大字号" : "特大字号")), icon: "none" });
   }
-});
+})));

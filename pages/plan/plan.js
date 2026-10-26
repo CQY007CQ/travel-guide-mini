@@ -1,12 +1,10 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // plan：每日行程浏览 + 详情 + 导航/百科/想玩 + 手动调整 + 按想玩重新生成
 const T = require("../../utils/travel.js");
 const W = require("../../utils/weather.js");
 const A = require("../../utils/aicontent.js");
 const R = require("../../utils/remind.js");
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
 function isFrame(n) { return T.isFrameName(n); }
 const MODE_LABEL = { family: "亲子游", couple: "情侣游", solo: "独行", elder: "带老人" };
@@ -22,7 +20,7 @@ function ymdLocal() {
  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
-Page({
+Page(SafePage(SafePage({
  data: {
     fz: 1,
   td: false,
@@ -802,8 +800,8 @@ Page({
   if (!n) return;
   T.toggleWish(n, plan && plan.cityName);
   wx.showToast({ title: "已移出想玩", icon: "none" });
-  this._render(plan);
- },
+  if (plan) this._render(plan); // 防御：plan 未加载时不渲染，避免空引用（生产环境 plan 必存在）
+},
 
  /* ---- 手动调整 ---- */
  _firstReal(di) {
@@ -1231,4 +1229,4 @@ Page({
     while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
     return t + "…";
   },
-});
+})));

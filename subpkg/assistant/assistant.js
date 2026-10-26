@@ -1,10 +1,8 @@
+const { getAppSafe, SafePage } = require("../../utils/app.js");
 // assistant：本地攻略速查（离线 · 本地规则库 · 零网络）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
-const app = new Proxy({}, {
-  get(_t, k) { const a = (typeof getApp === "function") ? getApp() : null; return a ? a[k] : undefined; },
-  set(_t, k, v) { const a = (typeof getApp === "function") ? getApp() : null; if (a) a[k] = v; return true; }
-});
+const app = getAppSafe();
 
 // 保留旧 key 名（兼容老用户数据，不影响审核）
 const KEEP_KEY = "miniAIKeepV1";
@@ -22,7 +20,7 @@ const TILES = [
   { k: "today", t: "今天安排", q: "今天干什么", ic: "calendar.png" }
 ];
 
-Page({
+Page(SafePage(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "旅行小助手：天气、预算、避坑提示随手查", path: "/pages/index/index" };
@@ -173,4 +171,4 @@ Page({
   },
 
   goIndex() { wx.switchTab({ url: "/pages/index/index" }); }
-});
+})));
