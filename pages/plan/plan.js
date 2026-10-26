@@ -756,7 +756,8 @@ Page({
  // v1.8.4 B15：旅行拼图（canvas 每日卡片拼贴墙 → 保存相册）
  onBaike(e) {
   const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
-  const plan = app.globalData.plan;
+  const plan = app.globalData && app.globalData.plan;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items || !plan.days[di].items[ix]) return;
   const url = T.baikeUrl(plan.days[di].items[ix].name);
   if (!url) return;
   wx.setClipboardData({ data: url, success: () => wx.showToast({ title: "百科链接已复制，到浏览器打开", icon: "none" }) });
@@ -811,7 +812,8 @@ Page({
  },
  onDel(e) {
   const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
-  const plan = app.globalData.plan;
+  const plan = app.globalData && app.globalData.plan;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items) return;
   const items = plan.days[di].items;
   const it = items[ix];
   if (!it) return;
