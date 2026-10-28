@@ -356,7 +356,10 @@ function scoreCity(city, prefs, month) {
 function recommend(text, opts) {
   const o = opts || {};
   const prefs = extractPrefs(text, o);
-  const topN = Math.max(1, Math.min(20, parseInt(o.topN, 10) || 5));
+  // 注意：不能用 `parseInt(o.topN,10) || 5` —— 传 topN:0 时 0 是 falsy，会被当成"没传"而
+  // 回退到默认 5，与"夹到 [1,20]"的意图不符。改为先判 NaN 再夹取（_fuzz-recommend 抓到此 bug）。
+  const _rawTop = parseInt(o.topN, 10);
+  const topN = isFinite(_rawTop) ? Math.max(1, Math.min(20, _rawTop)) : 5;
   const minScore = typeof o.minScore === "number" ? o.minScore : 0;
   const includeLimited = !!o.includeLimited;
 

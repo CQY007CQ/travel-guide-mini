@@ -213,7 +213,7 @@ check("C 计划书", "C1", "计划书存在且体积正常（>20KB）", 2, docSi
 {
   const need = ["背景", "技术路线", "方案", "预期成果", "分工"];
   const miss = need.filter(k => docText.indexOf(k) < 0);
-  check("C 计划书", "C2", "覆盖考核要求的五要素", 6, miss.length === 0, miss.length ? "缺：" + miss.join("、") : "齐全");
+  check("C 计划书", "C2", "覆盖考核要求的五要素", 4, miss.length === 0, miss.length ? "缺：" + miss.join("、") : "齐全");
 }
 // C3 章节与表格规模
 {
@@ -236,7 +236,24 @@ check("C 计划书", "C1", "计划书存在且体积正常（>20KB）", 2, docSi
 // C6 实测榜单
 {
   const probe = ["平遥", "敦煌", "秦皇岛"].filter(n => docText.indexOf(n) >= 0);
-  check("C 计划书", "C6", "写入引擎实测榜单（可验证数据，非空话）", 3, probe.length >= 2, probe.join("、") || "缺");
+  check("C 计划书", "C6", "写入引擎实测榜单（可验证数据，非空话）", 2, probe.length >= 2, probe.join("、") || "缺");
+}
+// C7 数字一致性：材料里的「N 条断言」必须与单测实测一致。
+// 起因：测试从 27 → 32 → 35 一路扩，材料里的数字跟着改了三遍还改漏过。
+// 与其靠人记，不如让评分器对不上就红。
+{
+  const out = sh("node tools/_test-recommend.mjs");
+  const actual = (out.match(/✓ /g) || []).length;
+  const nums = [];
+  let m;
+  const re1 = /(\d+)\s*条断言/g;
+  while ((m = re1.exec(docText))) nums.push(parseInt(m[1], 10));
+  const re2 = /(\d+)\s*条断言/g;
+  while ((m = re2.exec(slideText))) nums.push(parseInt(m[1], 10));
+  const uniq = Array.from(new Set(nums));
+  const consistent = nums.length > 0 && uniq.length === 1 && uniq[0] === actual;
+  check("C 计划书", "C7", "材料中的断言数量与实测一致（防数字漂移）", 3, consistent,
+    "材料写 " + (uniq.join("/") || "无") + " 条，实测 " + actual + " 条");
 }
 
 /* ═════════════ D. PPT（15） ═════════════ */

@@ -59,6 +59,14 @@ console.log("【硬性质】");
 
   const w = R.recommend(q, { month: 10, topN: 8, includeLimited: true });
   ok("includeLimited 可放开", w.list.length >= a.list.length, w.list.length + " vs " + a.list.length);
+
+  // topN 边界：曾被 `parseInt(topN) || 5` 坑过 —— 传 0 时 0 是 falsy，会回退默认 5，
+  // 与"夹到 [1,20]"的意图不符（由 _fuzz-recommend 发现）。这里锁住边界行为。
+  ok("topN=0 夹到 1 条", R.recommend(q, { month: 10, topN: 0 }).list.length === 1,
+    "实际 " + R.recommend(q, { month: 10, topN: 0 }).list.length + " 条");
+  ok("topN=999 夹到 ≤20 条", R.recommend(q, { month: 10, topN: 999 }).list.length <= 20,
+    "实际 " + R.recommend(q, { month: 10, topN: 999 }).list.length + " 条");
+  ok("topN 非数字时回落默认", R.recommend(q, { month: 10, topN: "abc" }).list.length > 0);
 }
 
 /* ── ③ 垂类底线（改 W 权重时必须复核这三组）── */

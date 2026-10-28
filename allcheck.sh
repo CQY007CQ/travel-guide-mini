@@ -51,7 +51,7 @@ step "JS 语法检查" bash -c '
   while IFS= read -r f; do
     if ! '"$NODE"' --check "$f" 2>/dev/null; then echo "语法错误: $f"; err=1; fi
   done < <(find app.js utils pages -name "*.js" -o -name "*.mjs" | sort)
-  for f in tools/*.mjs tools/*.js; do
+  for f in tools/*.mjs tools/*.js tools/*.cjs; do
     if ! '"$NODE"' --check "$f" 2>/dev/null; then echo "语法错误: $f"; err=1; fi
   done
   [ $err -eq 0 ] && echo "全部 JS 语法通过"
@@ -127,6 +127,8 @@ step "单测 check-v112 (100 城扩容+100 新功能)" "$NODE" tools/check-v112.
 step "单测 check-boundary (跨年/同名)" "$NODE" tools/check-boundary.mjs
 step "单测 daily-insp (今日正当时 v1.19.87)" "$NODE" tools/_test-daily-insp.mjs
 step "单测 recommend (个性推荐引擎)" "$NODE" tools/_test-recommend.mjs
+# 模糊测试：171 组标签组合 + 极端输入 + 全量城市不变量。曾借此抓到 topN=0 未被夹取的 bug。
+step "模糊测试 recommend (标签组合/极端输入)" "$NODE" tools/_fuzz-recommend.mjs
 step "单测 insp-ui (灵感卡接线 v1.19.87)" "$NODE" tools/_test-v11987-insp-ui.mjs
 step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/_test-v11988-sharecard.mjs
 step "单测 sharetitle (分享即种草 v1.19.89)" "$NODE" tools/_test-v11989-sharetitle.mjs
