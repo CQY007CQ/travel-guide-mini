@@ -4,6 +4,7 @@ const { getAppSafe, SafePage } = require("../../utils/app.js");
 // 2026-09 首页高端化：三段玩法切换（城市/全省精华/多站）、高级设置折叠、想玩池折叠、去 slogan
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一存储封装（失败有提示，不再静默丢数据）
+const R = require("../../utils/recommend.js");   // 智能推荐引擎（端侧计算，纯本地，不联网）
 
 // v1.19.100 修复：模块顶层 `getApp()` 在 lazyCodeLoading 下可能返回 undefined（App 尚未注册完），
 // 会导致 onLoad 整段初始化被抛错跳过、且本页 10 处 handler（goPlan / generate / 回填 等）访问
@@ -27,6 +28,9 @@ Page(SafePage({
     provinces: [], provIdx: 0, provName: "",
     cities: [], cityIdx: 0, cityName: "", isGuide: false,
     tiles: [],   // v1.7：首页快捷入口
+    // 智能推荐：一句话需求 → 候选城市（端侧推荐引擎计算，不发起任何网络请求）
+    recText: "", recBusy: false, recTried: false, recList: [],
+    recExamples: ["人少的古镇 三天", "海边亲子 五天", "沙漠摄影 四天", "温泉放松 周末两天"],
     destLabel: "",
     // 城市搜索选择器（目的地/出发地 共用弹层）
     showPicker: false, pickMode: "", pickTitle: "", pickList: [], pickKw: "", pickProv: "",
@@ -1033,6 +1037,63 @@ Page(SafePage({
       if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 200 });
     } catch (err) {
       wx.showToast({ title: "填入失败，请在表单选择", icon: "none" });
+    }
+  },
+
+
+  /* ---- 智能推荐：一句话需求 → 候选城市 ----
+   * 引擎在端侧完成标签解析与加权排序，不联网、无随机数：同一句话永远同一结果。
+   * 只把 name/province/score/summary 四个字段下发到视图，避免把内部字段带进 setData。 ---- */
+  onRecInput(e) {
+    this.setData({ recText: (e.detail && e.detail.value) || "" });
+  },
+  onRecExample(e) {
+    const t = e.currentTarget.dataset.t || "";
+    if (!t) return;
+    this.setData({ recText: t });
+    this.onRecRun();
+  },
+  onRecRun() {
+    if (this.data.recBusy) return;
+    const text = (this.data.recText || "").trim();
+    if (!text) { wx.showToast({ title: "先说一句想怎么玩", icon: "none" }); return; }
+    this.setData({ recBusy: true, recTried: true });
+    try {
+      const res = R.recommend(text, { topN: 5 });
+      if (res && res.pending) {
+        this.setData({ recBusy: false, recList: [] });
+        wx.showToast({ title: "数据加载中，稍后再试", icon: "none" });
+        return;
+      }
+      const list = (res.list || []).map((x) => ({
+        name: x.name,
+        province: x.province || "",
+        score: x.score,
+        summary: x.summary || "",
+      }));
+      this.setData({ recBusy: false, recList: list });
+    } catch (err) {
+      this.setData({ recBusy: false, recList: [] });
+      wx.showToast({ title: "推荐失败，请重试", icon: "none" });
+    }
+  },
+  onRecPick(e) {
+    const name = e.currentTarget.dataset.name;
+    if (!name) return;
+    try {
+      const provs = T.provinces() || [];
+      for (let p = 0; p < provs.length; p++) {
+        const cs = T.citiesOf(provs[p]) || [];
+        if (cs.some((c) => c.name === name)) {
+          this._fillProv(p, name);   // 内部已含 _applyCity：预填城市 + 收敛天数 + 想玩池
+          wx.showToast({ title: "已填好「" + name + "」", icon: "none" });
+          if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 200 });
+          return;
+        }
+      }
+      wx.showToast({ title: "该城可在目的地里搜索", icon: "none" });
+    } catch (err) {
+      wx.showToast({ title: "填入失败，请手动选择", icon: "none" });
     }
   },
 

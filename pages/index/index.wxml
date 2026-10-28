@@ -51,6 +51,34 @@
     </scroll-view>
   </view>
 
+
+  <!-- 智能推荐：一句话描述需求 → 端侧推荐引擎给候选城市；点城市名预填表单 -->
+  <view class="card rec-bar">
+    <view class="rb-head">
+      <text class="rb-t">智能推荐</text>
+      <text class="rb-s">说说你想怎么玩，帮你挑城市</text>
+    </view>
+    <view class="rb-input-row">
+      <input class="rb-input" value="{{recText}}" placeholder="例：人少的古镇，三天，预算省一点"
+             confirm-type="search" bindinput="onRecInput" bindconfirm="onRecRun"/>
+      <view class="rb-go {{recBusy ? 'rb-busy' : ''}}" bindtap="onRecRun">{{recBusy ? '推荐中' : '推荐'}}</view>
+    </view>
+    <view class="rb-chips" wx:if="{{recExamples.length && !recList.length}}">
+      <view class="rb-chip" wx:for="{{recExamples}}" wx:key="*this" data-t="{{item}}" bindtap="onRecExample">{{item}}</view>
+    </view>
+    <view class="rb-list" wx:if="{{recList.length}}">
+      <view class="rb-item" wx:for="{{recList}}" wx:key="name" data-name="{{item.name}}" bindtap="onRecPick">
+        <view class="rb-l">
+          <text class="rb-city">{{item.name}}</text>
+          <text class="rb-prov">{{item.province}}</text>
+        </view>
+        <text class="rb-score">{{item.score}}分</text>
+        <text class="rb-why">{{item.summary}}</text>
+      </view>
+      <view class="rb-foot">点城市名填入表单</view>
+    </view>
+    <view class="rb-empty" wx:if="{{recTried && !recList.length}}">没找到合适的，换个说法试试</view>
+  </view>
   <!-- 行程状态：出发倒计时 + 预约提醒 合并为一卡（v1.19.59 减法） -->
   <view class="card plan-status" wx:if="{{countdown || remind}}">
     <view class="ps-row" wx:if="{{countdown}}" bindtap="goPlan">
