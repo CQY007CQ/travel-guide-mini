@@ -128,7 +128,7 @@ if (!SKIP_SLOW) {
 } else {
   allcheckOK = true;
 }
-check("B 代码实现", "B1", "全量回归 allcheck 全部通过", 6, allcheckOK, SKIP_SLOW ? "本次跳过" : allcheckSteps + " 项通过");
+check("B 代码实现", "B1", "全量回归 allcheck 全部通过", 5, allcheckOK, SKIP_SLOW ? "本次跳过" : allcheckSteps + " 项通过");
 
 // B2 推荐引擎单测断言数
 let recAssert = 0;
@@ -190,13 +190,21 @@ check("B 代码实现", "B5", "数据分包随包发布（非残包）门禁通�
     const m = fs.readFileSync(p, "utf8").match(/APP_VER\s*=\s*["']([\d.]+)["']/);
     return m ? m[1] : "";
   })();
-  check("B 代码实现", "B7", "版本号单一真源且与产物一致", 2, !!src && src === APP_VER, `src=${src || "-"} 产物=${APP_VER || "-"}`);
+  check("B 代码实现", "B7", "版本号单一真源且与产物一致", 1, !!src && src === APP_VER, `src=${src || "-"} 产物=${APP_VER || "-"}`);
 }
 // B8 一键演示脚本
 {
   const cand = ["tools/demo.sh", "demo.sh"];
   const hit = cand.filter(f => fs.existsSync(path.join(PROJ, f)));
   check("B 代码实现", "B8", "提供一键演示脚本（答辩/验收现场可用）", 2, hit.length > 0, hit.join(",") || "缺");
+}
+// B9 真机截图流程可复现：脚本在仓库 + 已有产物，评委可据此自行复核界面
+{
+  const sPath = path.join(PROJ, "tools/capture-shots.cjs");
+  const hasScript = fs.existsSync(sPath);
+  const hasShot = fs.existsSync(path.join(OUT, "screenshots/01-home.png"));
+  check("B 代码实现", "B9", "真机截图流程可复现（脚本 + 既有产物）", 3, hasScript && hasShot,
+    (hasScript ? "脚本✓" : "缺脚本") + " / " + (hasShot ? "产物✓" : "缺产物"));
 }
 
 /* ═════════════ C. 计划书（20） ═════════════ */
@@ -232,14 +240,24 @@ check("C 计划书", "C1", "计划书存在且体积正常（>20KB）", 2, docSi
 }
 
 /* ═════════════ D. PPT（15） ═════════════ */
-check("D PPT", "D1", "页数达到可演示规模（≥16 页）", 3, slideCount >= 16, slideCount + " 页 / " + pptSizeKB + "KB");
+check("D PPT", "D1", "页数达到可演示规模（≥16 页）", 2, slideCount >= 16, slideCount + " 页 / " + pptSizeKB + "KB");
 {
   const ok = /目录|CONTENTS/.test(slideText) && /致谢|谢谢|恳请/.test(slideText);
-  check("D PPT", "D2", "含目录页与结尾致谢页", 3, ok);
+  check("D PPT", "D2", "含目录页与结尾致谢页", 2, ok);
 }
 check("D PPT", "D3", "含技术选型与合规取舍页", 3, /技术选型/.test(slideText) && /(合规|取舍)/.test(slideText));
 check("D PPT", "D4", "含推荐引擎算法页", 3, /推荐引擎/.test(slideText));
-check("D PPT", "D5", "含已知局限与后续路线页", 3, /(局限|限制|后续|路线图)/.test(slideText));
+check("D PPT", "D5", "含已知局限与后续路线页", 2, /(局限|限制|后续|路线图)/.test(slideText));
+// D6 演示文稿须含真实产品界面截图：路演不给人看真实界面，是评委最常追问的点
+{
+  let media = 0;
+  try {
+    media = (execSync(`unzip -Z1 "${PPTX}"`, { maxBuffer: 1 << 26 }).toString().match(/^ppt\/media\/.+\.(png|jpe?g)$/gm) || []).length;
+  } catch (e) {}
+  const labelOk = /真机|界面截图/.test(slideText);
+  check("D PPT", "D6", "含真实产品界面截图（可对照 App 复核）", 3, media >= 2 && labelOk,
+    media + " 张图片" + (labelOk ? " / 有来源说明" : " / 缺来源说明"));
+}
 
 /* ═════════════ E. 团队协作（15） ═════════════ */
 {

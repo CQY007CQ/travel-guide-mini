@@ -82,6 +82,27 @@ console.log("【垂类底线】");
   ok("沙漠：敦煌进前 3", dNames.slice(0, 3).indexOf("敦煌") >= 0, dNames.join(","));
 }
 
+/* ── ③b 标签覆盖（不看具体城名，只看"Top5 是否真的命中该标签"）──
+ * 目的：调权重后排序可能整体漂走却不报错；这一组用结构断言兜住。
+ * 5 个类目覆盖数据厚薄差异较大的场景（滑雪仅 36 城有内容，沙漠/温泉数据较厚）。 */
+console.log("【标签覆盖】");
+{
+  const CASES = [
+    ["温泉 放松 两天", "hotspring"],
+    ["草原 骑马 五天", "grass"],
+    ["滑雪 四天", "ski"],
+    ["博物馆 看展 三天", "museum"],
+    ["沙漠 三天", "desert"],
+  ];
+  for (const pair of CASES) {
+    const r = R.recommend(pair[0], { month: 10, topN: 5 });
+    const hitN = r.list.filter(function (x) {
+      return (x.tagHits || []).some(function (t) { return t.key === pair[1]; });
+    }).length;
+    ok("「" + pair[1] + "」Top5 命中 ≥3", hitN >= 3, hitN + "/5");
+  }
+}
+
 /* ── ④ 单城解释 ── */
 console.log("【单城解释】");
 {
