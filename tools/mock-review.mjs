@@ -179,7 +179,7 @@ check("B 代码实现", "B5", "数据分包随包发布（非残包）门禁通�
   const cities = D && Array.isArray(D.CITIES) ? D.CITIES.length : 0;
   const exp = D && D.CITIES ? D.CITIES.reduce((s, c) => s + ((c.experiences || []).length), 0) : 0;
   const rated = D && D.SPOT_INFO ? Object.keys(D.SPOT_INFO).length : 0;
-  check("B 代码实现", "B6", "数据规模达标（≥232 城 / ≥1300 体验 / ≥5000 评级） ", 2,
+  check("B 代码实现", "B6", "数据规模达标（≥232 城 / ≥1300 体验 / ≥5000 评级） ", 1,
     cities >= 232 && exp >= 1300 && rated >= 5000, `${cities} 城 / ${exp} 体验 / ${rated} 评级`);
 }
 // B7 版本单一真源
@@ -319,6 +319,13 @@ for (const r of results) md.push(`| ${r.id} | ${r.desc} | ${r.pass ? "通过" : 
 md.push("", "## 待补项", "");
 if (fails.length) fails.forEach(r => md.push(`- **${r.id}** ${r.desc}（可加 ${r.weight} 分）`));
 else md.push("- 无");
+md.push("");
+md.push("## 评分器不覆盖的部分（不计分，但评委仍可能关注）", "");
+md.push("- 现场答辩的表达与临场应答：本器只评材料与代码，评不了讲述。");
+md.push("- 数据真实性：26357 条体验的来源与准确度，需评委抽样核验，本器只查数量与结构。");
+md.push("- 实际分工：只能看提交记录与分工表，无法核实是否单人 + AI 辅助。");
+md.push("- 推荐质量的广度：只做了 8 类查询的结构断言，未做大规模人工评测。");
+md.push("- 真实用户数据：留存、转化、复访均无，产品价值仍属推断。");
 md.push("");
 
 const rep = path.join(OUT, "模拟考核评分报告.md");
