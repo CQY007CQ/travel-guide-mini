@@ -124,7 +124,14 @@ let allcheckOK = false, allcheckSteps = 0;
 if (!SKIP_SLOW) {
   const out = sh("./allcheck.sh");
   allcheckOK = out.indexOf("全部通过") >= 0 && out.indexOf("存在失败步骤") < 0;
-  allcheckSteps = (out.match(/^\s+✓ /gm) || []).length;
+  // 只数「汇总区」的步骤行：整份输出里的 ✓ 包含了各步骤内部的子断言（1900+ 个），
+  // 直接全量计数会把"检查项数"算成子断言总数（C8 校验时暴露过这个错）。
+  // 汇总行带 ANSI 颜色转义（"\x1b[32m✓\x1b[0m"），必须先剥控制码再匹配，
+  // 否则 \s+ 后面直接遇到 \x1b，永远匹配不到。
+  const plainOut = out.replace(/\x1b\[[0-9;]*m/g, "");
+  const sumIdx = plainOut.indexOf("allcheck 汇总");
+  const sumBlock = sumIdx >= 0 ? plainOut.slice(sumIdx) : plainOut;
+  allcheckSteps = (sumBlock.match(/^\s+[✓✗] /gm) || []).length;
 } else {
   allcheckOK = true;
 }
@@ -219,7 +226,7 @@ check("C 计划书", "C1", "计划书存在且体积正常（>20KB）", 2, docSi
 {
   const headings = (docXml.match(/w:val="Heading1"|w:val="Heading2"|w:val="1"|w:val="2"/g) || []).length;
   const tables = (docXml.match(/<w:tbl>/g) || []).length;
-  check("C 计划书", "C3", "章节与表格达到可交付密度（≥9 标题 / ≥10 表）", 3,
+  check("C 计划书", "C3", "章节与表格达到可交付密度（≥9 标题 / ≥10 表）", 2,
     headings >= 9 && tables >= 10, `标题标记 ${headings} / 表格 ${tables}`);
 }
 // C4 禁用词
@@ -227,7 +234,7 @@ check("C 计划书", "C1", "计划书存在且体积正常（>20KB）", 2, docSi
   const bans = ["第一版", "第二版", "本版", "初版", "旧版", "修订", "变更记录", "终稿", "定稿", "V1", "V2",
     "伪", "赋能", "抓手", "闭环", "务必", "加分项", "反杀", "拆雷", "含金量", "底层逻辑", "生态", "矩阵", "一站式", "护城河"];
   const hit = bans.filter(b => docText.indexOf(b) >= 0);
-  check("C 计划书", "C4", "无版本词 / 自评式 / AI 味套话", 4, hit.length === 0, hit.length ? "命中：" + hit.join("、") : "0 命中");
+  check("C 计划书", "C4", "无版本词 / 自评式 / AI 味套话", 3, hit.length === 0, hit.length ? "命中：" + hit.join("、") : "0 命中");
 }
 {
   const nChar = docText.replace(/\s/g, "").length;   // 非空白字符 = 读者感知的字数
@@ -254,6 +261,37 @@ check("C 计划书", "C1", "计划书存在且体积正常（>20KB）", 2, docSi
   const consistent = nums.length > 0 && uniq.length === 1 && uniq[0] === actual;
   check("C 计划书", "C7", "材料中的断言数量与实测一致（防数字漂移）", 3, consistent,
     "材料写 " + (uniq.join("/") || "无") + " 条，实测 " + actual + " 条");
+}
+// C8 回归项数一致性：材料写「N 项（全量）回归」或「二十X项检查」必须等于 allcheck 实际步骤数。
+// 起因：回归链从 24 → 25 → 26 一路加，材料里的「25/25」和「二十五项检查」各漏改过一轮。
+{
+  if (SKIP_SLOW) {
+    check("C 计划书", "C8", "材料中的回归项数与实测一致（防口径漂移）", 2, true, "本次跳过");
+  } else {
+    const norm = (t) => String(t || "").replace(/\s+/g, "");
+    const nums = [];
+    const collect = (t) => {
+      const s2 = norm(t);
+      let m;
+      const reC = /(\d+)\/(\d+)项全量回归/g;
+      while ((m = reC.exec(s2))) { nums.push(parseInt(m[1], 10), parseInt(m[2], 10)); }
+      const reA = /(\d+)项全量回归/g;
+      while ((m = reA.exec(s2))) nums.push(parseInt(m[1], 10));
+      const reB = /(\d+)项回归/g;
+      while ((m = reB.exec(s2))) nums.push(parseInt(m[1], 10));
+    };
+    collect(docText);
+    collect(slideText);
+    // 计划书正文用的是中文数字（「二十六项检查」）
+    const CN = { 二十一: 21, 二十二: 22, 二十三: 23, 二十四: 24, 二十五: 25, 二十六: 26, 二十七: 27, 二十八: 28, 二十九: 29, 三十: 30 };
+    const cnHits = norm(docText).match(/[一二三四五六七八九十]{2,3}项检查/g) || [];
+    cnHits.forEach((x) => { const k = x.replace("项检查", ""); if (CN[k]) nums.push(CN[k]); });
+
+    const uniq = Array.from(new Set(nums));
+    const okC8 = uniq.length === 1 && uniq[0] === allcheckSteps;
+    check("C 计划书", "C8", "材料中的回归项数与实测一致（防口径漂移）", 2, okC8,
+      "材料写 " + (uniq.join("/") || "无") + "，实测 " + allcheckSteps + " 项");
+  }
 }
 
 /* ═════════════ D. PPT（15） ═════════════ */
