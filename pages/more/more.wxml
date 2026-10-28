@@ -299,6 +299,11 @@
     <text class="ver dim">旅行攻略生成器 · v{{ver}}</text>
     <text class="arrow dim">›</text>
   </view>
+  <!-- 数据说明与免责声明：对外披露数据来源、时效与使用边界 -->
+  <view class="ver-row" bindtap="onDataNote">
+    <text class="ver dim">数据说明与免责声明</text>
+    <text class="arrow dim">›</text>
+  </view>
   <!-- v1.19.106：本地错误日志（被 SafePage / app.onError 兜住的异常回溯入口） -->
   <view class="ver-row" bindtap="onErrLog">
     <text class="ver dim">运行异常日志<text wx:if="{{errN}}">（{{errN}}）</text></text>

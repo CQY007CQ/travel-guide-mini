@@ -102,14 +102,21 @@ check("A 项目设计", "A2", "计划书设有「技术选型与合规取舍」�
   check("A 项目设计", "A3", "技术路线含算法实质（三层尺度/双因子/权重表）", 5, miss.length === 0, miss.length ? "缺：" + miss.join("、") : "齐全");
 }
 // A4 已知局限如实披露
-check("A 项目设计", "A4", "计划书含「已知局限」并给出后续工作", 4,
+check("A 项目设计", "A4", "计划书含「已知局限」并给出后续工作", 3,
   docText.indexOf("已知局限") >= 0 && /后续/.test(docText));
 // A5 可行性：主体资质与类目限制有交代
-check("A 项目设计", "A5", "交代个人主体与类目限制（可行性关键）", 4,
+check("A 项目设计", "A5", "交代个人主体与类目限制（可行性关键）", 3,
   /深度合成/.test(docText) && /(个人主体|个体工商|企业主体|类目)/.test(docText));
 // A6 目标用户与竞品差异
 check("A 项目设计", "A6", "说明目标用户与竞品差异化", 3,
   /目标用户/.test(docText) && /(竞争|竞品|差异|对比)/.test(docText));
+// A7 数据来源与免责声明落到产品内：材料承诺必须在产品里看得见，否则属于口径不一致
+{
+  const w = fs.readFileSync(path.join(PROJ, "pages/more/more.wxml"), "utf8");
+  const j = fs.readFileSync(path.join(PROJ, "pages/more/more.js"), "utf8");
+  const ok = /数据说明/.test(w) && /(免责|不构成出行建议)/.test(j);
+  check("A 项目设计", "A7", "App 内提供数据说明与免责声明（材料与产品一致）", 2, ok);
+}
 
 /* ═════════════ B. 代码实现（25） ═════════════ */
 // B1 allcheck 全绿
