@@ -14,7 +14,6 @@ Page(SafePage({
     res: [],
     city: "",
     hos: [],
-    cityN: 0,
   },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
@@ -37,7 +36,7 @@ Page(SafePage({
     if (!c) { try { c = wx.getStorageSync("lastCityName") || ""; } catch (e) {} }
     const list = E.cities();
     if (!c || !E.hasCity(c)) c = list[0] || "";
-    this.setData({ city: c, hos: E.hospitalsOf(c), cityN: list.length });
+    this.setData({ city: c, hos: E.hospitalsOf(c) });
   },
 
   onInput(e) { this.setData({ text: (e.detail && e.detail.value) || "" }); },
