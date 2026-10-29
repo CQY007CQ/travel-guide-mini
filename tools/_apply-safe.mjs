@@ -7,6 +7,7 @@ import fs from "fs";
 import zlib from "zlib";
 import path from "path";
 import { createRequire } from "module";
+import { isNearDup } from "./lib-near-dup.mjs";
 const req = createRequire(process.cwd() + "/");
 
 // 1) base = 数据分块解压合并（已知好状态）
@@ -131,23 +132,6 @@ let addedCoord = 0, skippedNearDup = 0;
 // 近似重复：同城内已有名称互相包含（「劳动公园」vs「大连劳动公园」）且坐标相距 <3km 的条目时，
 // 新条目是冗余的。而且它会在「全省游」的省域扫描里排在前面，把同名景点指到错误的城市
 // （实测：辽宁·劳动公园 从朝阳市被改指到大连，跨城重名护栏挂）。
-const _km = (a, b) => {
-  const R = 6371, dLa = (b[1] - a[1]) * Math.PI / 180, dLo = (b[2] - a[2]) * Math.PI / 180;
-  const la1 = a[1] * Math.PI / 180, la2 = b[1] * Math.PI / 180;
-  const h = Math.sin(dLa / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLo / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-};
-const _nearDup = (list, x) => {
-  const n = String(x[0]);
-  return list.some(y => {
-    if (!y || !y[0]) return false;
-    const m = String(y[0]);
-    if (m === n) return false;                       // 同名交给调用方的新旧去重
-    const [short, long] = m.length <= n.length ? [m, n] : [n, m];
-    if (short.length < 3 || long.indexOf(short) < 0) return false;
-    return _km(y, x) < 3;
-  });
-};
 const _addCoords = (src) => {
   for (const cn in (src || {})) {
     if (!base.SPOT_COORDS[cn]) base.SPOT_COORDS[cn] = [];
@@ -155,7 +139,7 @@ const _addCoords = (src) => {
     const s = new Set(list.map(x => x[0]));
     for (const x of src[cn]) {
       if (!x || !x[0] || s.has(x[0])) continue;
-      if (_nearDup(list, x)) { skippedNearDup++; continue; }
+      if (isNearDup(list, x)) { skippedNearDup++; continue; }
       list.push(x); s.add(x[0]); addedCoord++;
     }
   }
@@ -171,7 +155,7 @@ for (const cn in base.SPOT_COORDS) {
   if (!Array.isArray(list) || list.length < 2) continue;
   const out = [];
   for (const x of list) {
-    if (!x || !x[0] || _nearDup(out, x)) { if (x && x[0]) cleanedNearDup++; continue; }
+    if (!x || !x[0] || isNearDup(out, x)) { if (x && x[0]) cleanedNearDup++; continue; }
     out.push(x);
   }
   if (out.length !== list.length) base.SPOT_COORDS[cn] = out;
