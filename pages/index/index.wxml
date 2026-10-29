@@ -169,7 +169,7 @@
         <view class="tpl-row">
           <view class="tpl-hd">
             <text class="tpl-t">热门路线</text>
-            <text class="tpl-s">点一下，城市与天数自动填好</text>
+            <text class="tpl-s">点一下直接生成，可再改天数</text>
           </view>
           <scroll-view class="tpl-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
             <view class="tpl-card {{cityName === item.city ? 'on' : ''}}" wx:for="{{tpls}}" wx:key="city" data-i="{{index}}" bindtap="onTplPick">

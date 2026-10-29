@@ -457,7 +457,10 @@ Page(SafePage({
       this._fillProv(pIdx, t.city);
       const d = this.data.days;
       this._syncAdv();
-      wx.showToast({ title: "「" + t.city + "」" + d + " 天已填好", icon: "none" });
+      // 2026-10-29：模板路线改为「填好 + 直接生成」。
+      // 起因：新用户必须先填完整张表才能看到任何内容，首页/行程/美食全是空态，是最大流失点。
+      // 安全性：generate() 会先把已有行程存进存档槽（T.savePlanSlot），在「更多」页可恢复，不会丢。
+      this.generate();
     } catch (err) { wx.showToast({ title: "套用失败，请手动选择", icon: "none" }); }
   },
 
