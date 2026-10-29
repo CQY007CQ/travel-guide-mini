@@ -411,33 +411,7 @@
     </view>
   </view>
 
-  <!-- v1.19.x：首次进入自动弹出的「使用指南」引导浮层（一次性） -->
-  <view wx:if="{{showGuideModal}}" class="gm-mask" bindtap="closeGuideModal">
-    <view class="gm-card" catchtap="noop">
-      <view class="gm-head">
-        <image class="gm-ic" src="/images/icons/book.png"/>
-        <text class="gm-title">欢迎使用 旅行攻略生成器</text>
-      </view>
-      <text class="gm-sub">选目的地 → 生成 → 出发照着走</text>
-      <view class="gm-points">
-        <view class="gm-p">
-          <view class="gm-pi"><image class="gm-pi-img" src="/images/icons/compass.png"/></view>
-          <view class="gm-pt"><text class="gm-pt-t">一键出逐日攻略</text></view>
-        </view>
-        <view class="gm-p">
-          <view class="gm-pi"><image class="gm-pi-img" src="/images/icons/pin.png"/></view>
-          <view class="gm-pt"><text class="gm-pt-t">点景点直接导航</text></view>
-        </view>
-        <view class="gm-p">
-          <view class="gm-pi"><image class="gm-pi-img" src="/images/icons/shield.png"/></view>
-          <view class="gm-pt"><text class="gm-pt-t">免注册 · 数据只存本机</text></view>
-        </view>
-      </view>
-      <view class="gm-actions">
-        <button class="gm-btn gm-btn-gold" bindtap="closeGuideModal">开始规划</button>
-      </view>
-    </view>
-  </view>
+  <!-- v1.19.132：首次进入改为直接打开「使用指南」页（见 index.js maybeShowGuideModal → goGuide），不再用此浮层 -->
 
   <!-- v1.19.58：草稿箱（保存 / 恢复首页配置） -->
   <view wx:if="{{showDraft}}" class="mask" bindtap="closeDrafts">

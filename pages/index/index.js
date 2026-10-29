@@ -95,8 +95,7 @@ Page(SafePage({
     // ---- 2026-09 v1.8.4 ----
     blindOpen: false, blind3: [],   // A8 目的地盲盒
     remind: null,                  // B18 预约横幅
-    guideSeen: false,              // v1.18：首访引导看过即不再常驻（一次性轻提示）
-    showGuideModal: false          // v1.19.x：首次进入自动弹出的「使用指南」引导浮层
+    guideSeen: false              // v1.18：首访引导看过即不再常驻（一次性轻提示）
   },
 
   onLoad(options) {
@@ -980,22 +979,15 @@ Page(SafePage({
       .catch(() => { self.setData({ loadingData: false, dataFailed: true }); });
   },
 
-  // v1.19.x：首次进入（从未弹过）自动弹出「使用指南」引导浮层
-  // 仅此一次：显示即写入标记，之后即便未点「查看」也不再弹；随时可点右上角「使用指南」重看。
+  // v1.19.132：首次进入（从未打开过）自动打开「使用指南」页（真正的 18 条速查条）
+  // 仅此一次：触发即写入标记，之后即便未细看也不再弹；随时可点「更多 / 使用指南」重看。
   maybeShowGuideModal() {
     if (this._guideModalShown) return;
     try { if (S.get("firstGuidePopupV1", 0)) { this._guideModalShown = true; return; } } catch (e) {}
     this._guideModalShown = true;
     try { S.set("firstGuidePopupV1", 1); } catch (e) {}
-    this.setData({ showGuideModal: true });
+    this.goGuide();
   },
-  // v1.19.59 减法：关闭首访浮层即视为已引导（与一次性浮层二选一，不再常驻横幅）
-  closeGuideModal() {
-    try { S.set("miniGuideSeenV1", 1); } catch (e) {}
-    this.setData({ showGuideModal: false, guideSeen: true });
-  },
-  // 从浮层进入完整使用指南：关浮层 + 标记已看 + 跳转（goGuide 同步处理 miniGuideSeenV1）
-  openGuideFromModal() { this.setData({ showGuideModal: false }); this.goGuide(); },
   _renderShow() {
     this._theme();
     // v1.6：已有行程时在顶部显示出发倒计时；hasOld 同步刷新（影响首访引导横幅显隐）
