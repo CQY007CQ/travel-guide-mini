@@ -10,6 +10,7 @@ global.wx = {
 import { createRequire } from "module";
 const req = createRequire(process.cwd() + "/");
 const T = req("./utils/travel.js");
+const INS = req("./utils/insights.js");
 const D = T.D;
 
 let pass = 0, fail = 0;
@@ -820,6 +821,21 @@ assert("F10 通用随身项保留", afterPrep.p_id === true && afterPrep.p_money
 T.togglePrepCheck("pg_0");
 T.resetTripPrep();
 assert("F10 行李清单勾选已重置", !T.getPrepChecks().pg_0, JSON.stringify(T.getPrepChecks()));
+
+// v1.19.137 本机数据洞察（真实记录聚合）
+mem["miniLedgerV1"] = [];
+T.addLedger(300, "餐饮", "午餐", "", false, "2026-09-10", "");
+T.addLedger(500, "住宿", "酒店", "", false, "2026-09-11", "");
+T.addLedger(200, "餐饮", "晚餐", "", false, "2026-10-01", "");
+assert("洞察 花费合计 = 1000", INS.spendByCategory().total === 1000, INS.spendByCategory().total);
+assert("洞察 餐饮为最高占比分类", INS.spendByCategory().rows[0].cat === "餐饮", JSON.stringify(INS.spendByCategory().rows));
+assert("洞察 月度趋势 = 2 个月", INS.monthlySpend().rows.length === 2, JSON.stringify(INS.monthlySpend().rows));
+assert("洞察 月度峰值 pct = 100", INS.monthlySpend().rows[0].pct === 100, JSON.stringify(INS.monthlySpend().rows));
+const insAll = INS.insights();
+assert("洞察 汇总 noData = false", insAll.noData === false, JSON.stringify(insAll));
+assert("洞察 一句话小结非空", insAll.summary.length > 0, insAll.summary);
+assert("洞察 个性化倾向含 topCat", insAll.tendency.topCat === "餐饮", JSON.stringify(insAll.tendency));
+mem["miniLedgerV1"] = [];   // 清理，避免污染后续
 
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

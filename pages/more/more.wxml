@@ -104,6 +104,51 @@
     </view>
   </view>
 
+  <!-- v1.19.137 · 本机数据洞察（真实记录聚合，离线 / 隐私优先） -->
+  <view class="group" wx:if="{{insights}}">
+    <view class="group-title">本机数据洞察</view>
+    <view class="card group-card">
+      <view class="dim ins-sub">基于你本机的真实记录聚合，不联网、不上传</view>
+      <block wx:if="{{insights.noData}}">
+        <view class="dim ins-empty">还没有足够数据。多用几次记账、打卡和存档，这里会给出你的旅行画像。</view>
+      </block>
+      <block wx:else>
+        <view class="ins-sum">{{insights.summary}}</view>
+        <view class="ins-sec" wx:if="{{insights.spend.rows.length}}">
+          <view class="ins-h">花费结构</view>
+          <view class="ins-row" wx:for="{{insights.spend.rows}}" wx:key="cat">
+            <view class="ins-lab">{{item.cat}}<text class="ins-amt"> ¥{{item.amt}}</text></view>
+            <view class="ins-bar"><view class="ins-fill" style="width:{{item.pct}}%"></view></view>
+            <view class="ins-pct">{{item.pct}}%</view>
+          </view>
+        </view>
+        <view class="ins-sec" wx:if="{{insights.month.rows.length}}">
+          <view class="ins-h">月度花费趋势</view>
+          <view class="ins-months">
+            <view class="ins-m" wx:for="{{insights.month.rows}}" wx:key="ym">
+              <view class="ins-mb"><view class="ins-mf" style="height:{{item.pct}}%"></view></view>
+              <view class="ins-my">{{item.ym}}</view>
+            </view>
+          </view>
+        </view>
+        <view class="ins-sec" wx:if="{{insights.fp.rows.length}}">
+          <view class="ins-h">足迹省份（Top）</view>
+          <view class="ins-chips">
+            <text class="ins-chip" wx:for="{{insights.fp.rows}}" wx:key="prov">{{item.prov}} {{item.n}}</text>
+          </view>
+        </view>
+        <view class="ins-sec" wx:if="{{insights.rhythm.tripN}}">
+          <view class="ins-h">出行节奏</view>
+          <view class="ins-chips">
+            <text class="ins-chip" wx:if="{{insights.rhythm.avgDays}}">平均一趟 {{insights.rhythm.avgDays}} 天</text>
+            <text class="ins-chip" wx:if="{{insights.rhythm.season}}">{{insights.rhythm.season}}季最多</text>
+            <text class="ins-chip" wx:if="{{insights.tendency.topCat}}">偏好 {{insights.tendency.topCat}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
   <!-- v1.7 · 旅行灵感（随机目的地） -->
   <view class="group" wx:if="{{insp}}">
     <view class="group-title">去哪儿好呢</view>

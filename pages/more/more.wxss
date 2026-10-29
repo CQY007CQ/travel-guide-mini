@@ -329,3 +329,23 @@
 .stamp-t { font-size: calc(20rpx * var(--fs, 1)); flex-shrink: 0; }
 
 .persona-line { display: flex; align-items: flex-start; gap: 8rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--tx-2, #46536b); margin: 12rpx 26rpx 0; line-height: 1.5; }
+
+/* v1.19.137 本机数据洞察 */
+.ins-sub { margin: -2rpx 8rpx 14rpx; }
+.ins-empty { padding: 6rpx 8rpx 2rpx; }
+.ins-sum { font-size: calc(25rpx * var(--fs, 1)); color: var(--t1, #1b2330); line-height: 1.6; margin: 0 8rpx 18rpx; padding: 14rpx 16rpx; background: rgba(212,169,78,.10); border-left: 4rpx solid #d4a94e; border-radius: 8rpx; }
+.ins-sec { margin: 16rpx 8rpx 0; }
+.ins-h { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-bottom: 10rpx; }
+.ins-row { display: flex; align-items: center; gap: 12rpx; margin-bottom: 10rpx; }
+.ins-lab { width: 210rpx; flex-shrink: 0; font-size: calc(23rpx * var(--fs, 1)); color: var(--t2, #3a4759); }
+.ins-amt { color: var(--t3, #8fa3bc); font-size: calc(20rpx * var(--fs, 1)); }
+.ins-bar { flex: 1; height: 16rpx; background: rgba(var(--ln-rgb, 148,163,184), .12); border-radius: 8rpx; overflow: hidden; }
+.ins-fill { height: 100%; background: linear-gradient(90deg, #e2b65c, #b8892f); border-radius: 8rpx; }
+.ins-pct { width: 66rpx; text-align: right; font-size: calc(21rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); }
+.ins-months { display: flex; align-items: flex-end; gap: 14rpx; height: 180rpx; }
+.ins-m { width: 60rpx; height: 180rpx; display: flex; flex-direction: column; align-items: center; }
+.ins-mb { width: 38rpx; flex: 1; display: flex; align-items: flex-end; background: rgba(var(--ln-rgb, 148,163,184), .12); border-radius: 6rpx; overflow: hidden; }
+.ins-mf { width: 100%; background: linear-gradient(180deg, #e2b65c, #b8892f); border-radius: 6rpx; min-height: 4rpx; }
+.ins-my { font-size: calc(18rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 6rpx; line-height: 1; }
+.ins-chips { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.ins-chip { font-size: calc(22rpx * var(--fs, 1)); color: var(--t2, #3a4759); background: rgba(var(--ln-rgb, 148,163,184), .10); border-radius: 999rpx; padding: 8rpx 18rpx; }

@@ -4,6 +4,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const EL = require("../../utils/errlog.js"); // v1.19.106：本地错误日志（被 SafePage / app.onError 兜住的异常）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
+const INS = require("../../utils/insights.js");   // v1.19.137：本机旅行数据洞察（真实记录聚合）
 const TOOL_TOTAL = Array.isArray(TOOL_GROUPS) ? TOOL_GROUPS.reduce((s, g) => s + (g.items ? g.items.length : 0), 0) : 0;
 const app = getAppSafe();
 
@@ -172,6 +173,7 @@ Page(SafePage({
         });
       })(),
       backupTip: bkTip,
+      insights: INS.insights(),   // v1.19.137：本机数据洞察（花费结构 / 月度趋势 / 出行节奏 / 省份分布）
       errN: EL.count(), // v1.19.106：错误日志条数，随页面刷新更新
       // 减法：无行程时只留「记账(可独立用) + 通用」，地图/美食/准备/速查待生成行程后再出现，减少空转入口
       groups: hasPlan ? [
@@ -190,8 +192,7 @@ Page(SafePage({
           menus: [
             { key: "prep", icon: "ticket", t: "出行准备", d: "票价预约 / 酒店比价 / 团队分工" },
             { key: "boost", icon: "sparkle", t: "行程增强", d: "体检 / 问答 / 一键换景点 / 成就" },
-            { key: "ledger", icon: "wallet", t: "记账 · AA", d: "随手记一笔，对比预算" },
-            { key: "rank", icon: "medal", t: "旅行排行榜", d: "多档位排名 · 同行互相比较" }
+            { key: "ledger", icon: "wallet", t: "记账 · AA", d: "随手记一笔，对比预算" }
           ]
         },
         {
@@ -321,7 +322,7 @@ Page(SafePage({
     // 本地速查/记账/百宝箱无需行程也可用；其余行程页需要先生成攻略
     if (!this.data.hasPlan && k !== "ledger" && k !== "assistant" && k !== "toolkit" && k !== "boost" && k !== "deep") { wx.showToast({ title: "先回「出发」页生成攻略", icon: "none" }); return; }
     // v1.19.31 修复：工具页都在分包 subpkg 下，必须用 /subpkg/ 前缀（此前误用 /pages/ 导致全部点不动，同 HOME_TILES 旧 bug）
-    const PKG = { map: "/subpkg/map/map", food: "/subpkg/food/food", ledger: "/subpkg/ledger/ledger", rank: "/subpkg/rank/rank", prep: "/subpkg/prep/prep", assistant: "/subpkg/assistant/assistant", toolkit: "/subpkg/toolkit/toolkit", boost: "/subdata/boost/boost", deep: "/subai/deep/deep" };
+    const PKG = { map: "/subpkg/map/map", food: "/subpkg/food/food", ledger: "/subpkg/ledger/ledger", prep: "/subpkg/prep/prep", assistant: "/subpkg/assistant/assistant", toolkit: "/subpkg/toolkit/toolkit", boost: "/subdata/boost/boost", deep: "/subai/deep/deep" };
     if (PKG[k]) { wx.navigateTo({ url: PKG[k] }); return; }
     // 防御：未知 key 不再跳转到非法拼接路径（避免死链/白屏），明确提示
     wx.showToast({ title: "该功能暂未开放", icon: "none" });

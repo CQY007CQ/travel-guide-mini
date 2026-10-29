@@ -45,7 +45,7 @@
 subdata  1.7 MB    ★ 城市数据块（deflate + base64）+ boost 占位页
 subdata2 257.9 KB  数据第 2 块（体积超单块阈值时自动启用）
 subdata3  91 B     占位（cleanStale 会清空，随时可能被自动启用）
-subpkg  150.8 KB   map / food / ledger / prep / assistant / guide / toolkit / rank
+subpkg  127.6 KB   map / food / ledger / prep / assistant / guide / toolkit
 subai      ~60 KB  1.19.78 新增：深玩内容 + deep 页
 ────────────────
 合计      2.7 MB
