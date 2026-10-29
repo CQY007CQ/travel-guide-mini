@@ -1,32 +1,34 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
 
-  <!-- 阅读字号调节（保留：老年人/强光下行走时需要） -->
+  <!-- 阅读字号调节（强光下走路看、老人使用都需要） -->
   <view class="fz-bar">
     <text class="fz-btn {{fz === 1 ? 'on' : ''}}" bindtap="fzMinus">A⁻ 标准</text>
     <view class="fz-nums"><text class="fz-dot {{fz >= 1 ? 'on' : ''}}"></text><text class="fz-dot {{fz >= 2 ? 'on' : ''}}"></text><text class="fz-dot {{fz >= 3 ? 'on' : ''}}"></text></view>
     <text class="fz-btn {{fz === 3 ? 'on' : ''}}" bindtap="fzPlus">A⁺ 放大</text>
   </view>
 
-  <!-- 一句话讲清它能干什么（原来这里是两句，删掉重复的部分） -->
   <view class="g-hero card">
     <view class="gh-t">选目的地 → 生成 → 出发照着走</view>
   </view>
 
-  <!-- 速查条：默认全收起，点标题展开；一次只开一条 -->
-  <view class="g-list card">
-    <view class="g-row {{open === index ? 'on' : ''}}" wx:for="{{topics}}" wx:key="t"
-          data-i="{{index}}" bindtap="onTopic">
-      <view class="g-row-h">
-        <text class="g-row-t">{{item.t}}</text>
-        <text class="g-row-ar">{{open === index ? '−' : '+'}}</text>
-      </view>
-      <view class="g-row-d" wx:if="{{open === index}}">
-        <text class="g-row-x">{{item.d}}</text>
-        <text class="g-row-go" wx:if="{{item.url}}" data-url="{{item.url}}" catchtap="go">去看看 ›</text>
+  <!-- 分组速查条：默认全收起，一次只展开一条 -->
+  <block wx:for="{{groups}}" wx:key="g" wx:for-item="grp" wx:for-index="gi">
+    <view class="g-group-t">{{grp.g}}</view>
+    <view class="g-list card">
+      <view class="g-row {{open === it.k ? 'on' : ''}}" wx:for="{{grp.items}}" wx:key="k" wx:for-item="it"
+            data-k="{{it.k}}" bindtap="onTopic">
+        <view class="g-row-h">
+          <text class="g-row-t">{{it.t}}</text>
+          <text class="g-row-ar">{{open === it.k ? '−' : '+'}}</text>
+        </view>
+        <view class="g-row-d" wx:if="{{open === it.k}}">
+          <text class="g-row-x">{{it.d}}</text>
+          <text class="g-row-go" wx:if="{{it.url}}" data-url="{{it.url}}" catchtap="go">去看看 ›</text>
+        </view>
       </view>
     </view>
-  </view>
+  </block>
 
-  <view class="g-foot">点标题展开 · 随时可从「更多」页重新打开本页</view>
+  <view class="g-foot">{{total}} 条 · 点标题展开 · 随时可从「更多」页打开本页</view>
 
 </view>
