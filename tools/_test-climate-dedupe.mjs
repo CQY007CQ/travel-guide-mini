@@ -76,6 +76,21 @@ const planOf = (city, depart, spotNames) => ({
   ok("温带无补充项", T.climateAddOnsFiltered("temperate", []).length === 0);
 }
 
+// ---------- 6. extraText（穿衣卡文本）也参与去重 ----------
+{
+  const pk = T.packSmart(planOf("西安", "2026-11-05", ["兵马俑", "大雁塔"]));
+  const dress = "上衣：长袖+薄外套 下装：长裤 配件：润唇膏+保湿霜 秋燥明显，多喝水";
+  const withDress = T.climateAddOnsFiltered("dry", pk.groups, dress);
+  const noDress = T.climateAddOnsFiltered("dry", pk.groups);
+  ok("extraText：润唇膏被穿衣卡覆盖后剔除", withDress.indexOf("润唇膏") < 0, withDress.join("/"));
+  ok("extraText：保湿护肤品被「保湿霜」覆盖后剔除", withDress.indexOf("保湿护肤品") < 0);
+  ok("extraText：结果不多于不传时", withDress.length <= noDress.length, noDress.length + "→" + withDress.length);
+  ok("extraText 为空串时行为不变", T.climateAddOnsFiltered("dry", pk.groups, "").join("/") === noDress.join("/"));
+  // 只覆盖一项时应只剔除一项
+  const onlyLip = T.climateAddOnsFiltered("dry", pk.groups, "润唇膏");
+  ok("extraText 只命中一项 → 只剔除一项", onlyLip.indexOf("润唇膏") < 0 && onlyLip.indexOf("保湿护肤品") >= 0, onlyLip.join("/"));
+}
+
 console.log("");
 if (fail) { console.log("气候去重回归失败：" + fail + " / " + n); process.exit(1); }
 console.log("气候去重回归通过：" + n + " 项");

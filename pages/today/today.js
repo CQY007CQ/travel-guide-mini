@@ -74,7 +74,11 @@ Page(SafePage({
       try {
         const co = T.findCity(cityName);
         // 2026-10-29：与主清单去重（墨镜 / 防晒 / 雨具 / 饮用水 等两边都会出现）
-        out.cliAdd = co ? T.climateAddOnsFiltered(co.climate, out.packGroups) : [];
+        // 第三参：穿衣卡文本也参与去重（润唇膏 / 保湿霜 在主清单与穿衣卡里都可能出现）
+        const _dressTxt = out.dress
+          ? [].concat(out.dress.lines || [], [out.dress.weather || ""]).join(" ")
+          : "";
+        out.cliAdd = co ? T.climateAddOnsFiltered(co.climate, out.packGroups, _dressTxt) : [];
       } catch (e) { out.cliAdd = []; }
       // 行前预告：本次行程已把几个想玩排进去了（对齐网页版 ★ 想玩高亮；合并条目/别名也命中）
       const wishPlanNames = [];

@@ -131,7 +131,25 @@ Page(SafePage({
    ? (T.P.buildProvinceCity ? T.P.buildProvinceCity(plan.cityName) : null) // 全省游：以省为对象的伪城市（气候/美食/住宿取省会基调）
    : (T.findCity(plan.cityName) || null);
   let clothText = "", stayText = "", goText = "";
-  if (city) { clothText = T.clothAdvice(city); stayText = T.stayAdvice(city); goText = T.goAdvice(city); }
+  if (city) {
+    // 2026-10-29 去重：clothAdvice 里混进了「适宜时节」和天气整句，
+  // 而这两项在顶部 chips 与下方「城市速览」已经各说一次（共三处重复）。
+  // 这里只保留「怎么穿」，气候与最佳季节交给城市速览。
+  const _bf = (T.cityBrief ? T.cityBrief(plan.cityName) : null) || {};
+  const _dupLines = [String(_bf.climateTxt || "").trim(), String(_bf.best || "").trim()].filter(Boolean);
+  clothText = String(T.clothAdvice(city) || "")
+    .split("\n")
+    .filter(line => {
+      const t = line.trim();
+      if (!t) return false;
+      if (t.indexOf("适宜时节") === 0) return false;              // 与城市速览「最佳季节」重复
+      for (const d of _dupLines) { if (t === d) return false; }   // 与城市速览气候句完全相同
+      return true;
+    })
+    .join("\n");
+    stayText = T.stayAdvice(city);   // 变量保留（其余位置可能引用），仅不再在 guide 展示
+    goText = T.goAdvice(city);
+  }
 
   /* ---- 头部元信息（对齐网页 banner） ---- */
   const chips = [];

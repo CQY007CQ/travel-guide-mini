@@ -67,15 +67,15 @@
     <!-- 只玩勾选提示条 -->
     <view class="pickonly-strip" wx:if="{{pickTxt}}"><image class="ic" src="/images/icons/target.png"/>{{pickTxt}}</view>
 
-    <view class="guide" wx:if="{{clothText || stayText || goText || budgetLine}}">
+    <!-- 2026-10-29 去重：原「攻略速览」里的花费/住宿/适宜时节与下方「城市速览」和顶部 chips 重复，
+         这里只保留两块独有的：怎么穿、怎么去。花费归 chips+城市速览，住宿归城市速览。 -->
+    <view class="guide" wx:if="{{clothText || goText}}">
       <view class="guide-head" bindtap="toggleGuide">
-        <text class="guide-title guide-title-row"><image class="ic" src="/images/icons/compass.png"/>攻略速览</text>
+        <text class="guide-title guide-title-row"><image class="ic" src="/images/icons/compass.png"/>穿衣与交通</text>
         <text class="guide-toggle">{{guideOpen ? '收起 ▴' : '展开 ▾'}}</text>
       </view>
       <view class="guide-body" wx:if="{{guideOpen}}">
-        <text wx:if="{{budgetLine}}" class="gb pre">{{budgetLine}}</text>
         <text wx:if="{{clothText}}" class="gb pre">{{clothText}}</text>
-        <text wx:if="{{stayText}}" class="gb pre">{{stayText}}</text>
         <text wx:if="{{goText}}" class="gb pre">{{goText}}</text>
       </view>
     </view>

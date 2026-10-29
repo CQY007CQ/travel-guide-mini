@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.122";
+const APP_VER = "1.19.123";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -3510,15 +3510,17 @@ const CLIMATE_SYN = {
 };
 
 // 返回气候补充项，剔除主清单已覆盖的（packGroups 传 packSmart().groups）
-function climateAddOnsFiltered(climate, packGroups) {
+function climateAddOnsFiltered(climate, packGroups, extraText) {
  const raw = climateAddOns(climate);
  if (!raw.length) return [];
  // 注意：packSmart 的 items 是对象数组 { k, t, done }，不是字符串数组。
  // 初版直接用 join(" ") 得到一串 "[object Object]"，导致去重永远失效（静默无效比报错更糟）。
  const txtOf = x => (typeof x === "string" ? x : (x && (x.t || x.name || "")) || "");
- const hay = (Array.isArray(packGroups) ? packGroups : [])
+ let hay = (Array.isArray(packGroups) ? packGroups : [])
   .map(g => (g && Array.isArray(g.items) ? g.items.map(txtOf).join(" ") : ""))
   .join(" ");
+ // 第三参：额外参与比对的文本（如今天页穿衣卡），同样算「已提到」
+ if (extraText) hay += " " + String(extraText);
  if (!hay) return raw;
  const out = [];
  for (const it of raw) {
