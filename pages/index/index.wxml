@@ -309,7 +309,6 @@
       <view class="pk-only" wx:if="{{poolOn}}">
         <view class="sw-col">
           <text class="field-label">只玩勾选的</text>
-          <text class="field-sub">{{pickOnly ? '只按勾选的生成' : '只按勾选的生成，其余自动补'}}</text>
         </view>
         <switch checked="{{pickOnly}}" color="#d4a94e" bindchange="onPickOnly"/>
       </view>
@@ -357,7 +356,6 @@
       <image class="ic ic-sm" src="/images/icons/copy.png"/>
       <text>草稿箱（{{draftCount}}）</text>
     </view>
-    <view class="note">勾选的优先安排</view>
   </view>
 
   <!-- 城市搜索选择器（目的地 / 出发地 / 多站 共用） -->
