@@ -608,6 +608,29 @@ const c12f = T.footStoryText();
 assert("C12 足迹含两市", c12f.indexOf("北京") >= 0 && c12f.indexOf("西安") >= 0, c12f);
 const c20d = T.footCityDetail("北京");
 assert("C20 北京 1 个", c20d.count === 1 && c20d.list[0].name === "故宫", JSON.stringify(c20d));
+// v1.19.135 景点个人评价（方便下次选择）
+T.markVisited("天坛", "北京", true);
+assert("写评价前 getFootNote 空", T.getFootNote("天坛") === "", T.getFootNote("天坛"));
+T.setFootNote("天坛", "二刷必去，夜景绝了");
+assert("setFootNote 后可读", T.getFootNote("天坛") === "二刷必去，夜景绝了", T.getFootNote("天坛"));
+// 重复打卡不能清掉已写评价（markVisited 合并写入）
+T.markVisited("天坛", "北京", true);
+assert("重复打卡保留评价", T.getFootNote("天坛") === "二刷必去，夜景绝了", T.getFootNote("天坛"));
+// footCityDetail 列表带 note
+const c20f = T.footCityDetail("北京");
+const tiantanE = c20f.list.find(x => T.cleanSpotName(x.name) === "天坛");
+assert("C20 列表含评价", tiantanE && tiantanE.note === "二刷必去，夜景绝了", JSON.stringify(tiantanE));
+// 清空评价
+T.setFootNote("天坛", "");
+assert("清空评价生效", T.getFootNote("天坛") === "", T.getFootNote("天坛"));
+// 未打卡景点不能单独写评价
+assert("未打卡景点写评价返回 null", T.setFootNote("不存在的景点xyz", "测试") === null);
+// 评价超长截断 200
+T.setFootNote("天坛", "x".repeat(500));
+assert("评价超长截断 200", T.getFootNote("天坛").length === 200, T.getFootNote("天坛").length);
+T.setFootNote("天坛", "");
+// 还原足迹状态（否则会污染下方 C13 对「天坛未打卡」的预期）
+T.markVisited("天坛", "北京", false);
 // C13 想玩状态
 const c13s = T.wishStateMark([{ name: "故宫博物院", city: "北京" }, { name: "天坛", city: "北京" }], { cityName: "北京", days });
 assert("C13 故宫 planned", c13s[0].planned === true, JSON.stringify(c13s[0]));

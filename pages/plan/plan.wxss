@@ -88,6 +88,8 @@
 .eff-sep { color: var(--t3, #8fa3bc); font-weight: 500; margin: 0 1rpx; }
 
 .tl-note { font-size: calc(21rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin: 8rpx 0 0 2rpx; line-height: 1.55; }
+/* v1.19.135：已打卡景点的个人评价，金边浅底区别于行程建议备注 */
+.tl-fnote { font-size: calc(21rpx * var(--fs, 1)); color: var(--t1, #1b2330); margin: 8rpx 0 0 2rpx; line-height: 1.55; padding: 8rpx 12rpx; border-left: 4rpx solid #d4a94e; background: rgba(212,169,78,.10); border-radius: 6rpx; }
 
 /* 详情面板：原地展开（对齐网页 .spot-detail，淡入） */
 .spot-detail {

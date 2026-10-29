@@ -247,11 +247,12 @@ Page(SafePage({
     if (!c) return;
     const d = T.footCityDetail(c);
     if (!d || !d.list.length) return;
-    const names = d.list.map(x => x.name);
-    const more = names.length > 10 ? ("…等 " + names.length + " 个") : "";
+    // v1.19.135：带个人评价（有评价的行附「景点：评价」）
+    const lines = d.list.slice(0, 12).map(x => x.note ? (x.name + "：" + x.note) : x.name);
+    const more = d.list.length > 12 ? ("\n…等共 " + d.list.length + " 个") : "";
     wx.showModal({
-      title: "在 " + c + " 打过卡",
-      content: names.slice(0, 10).join("、") + more,
+      title: "在 " + c + " 打过卡（" + d.list.length + "）",
+      content: lines.join("\n") + more,
       showCancel: false,
       confirmText: "好的"
     });

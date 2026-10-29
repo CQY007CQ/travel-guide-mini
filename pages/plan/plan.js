@@ -119,6 +119,7 @@ Page(SafePage({
     f: isFrame(it.name),
     wished: T.wishHit(it.name),
     visited: T.isVisited(it.name),
+    fnote: T.getFootNote(it.name),
     effort: T.P.spotEffort ? T.P.spotEffort(it.name) : 0,
     // v1.11：体力档位文案预计算（WXML 里原本是两层嵌套三元，每个条目渲染都要判一遍）
     effortTx: ["轻走", "徒步", "费腿"][T.P.spotEffort ? T.P.spotEffort(it.name) : 0] || "轻走",
@@ -812,6 +813,33 @@ Page(SafePage({
   const st = T.markVisited(it.name, cityName, on);
   wx.showToast({ title: on ? "已打卡 · 点亮 " + cityName : "已取消打卡", icon: "none" });
   this._render(plan);
+ },
+
+ /* ---- v1.19.135：已打卡景点写个人评价（方便下次选择） ---- */
+ onFootNote(e) {
+  const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
+  const plan = app.globalData.plan;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items) return;
+  const it = plan.days[di].items[ix];
+  if (!it || isFrame(it.name)) return;
+  const cityName = T.segCityOfDay(plan, di) || plan.cityName || "";
+  // 评价依附于足迹：未打卡先打卡，保证 city 与时间齐全
+  if (!T.isVisited(it.name)) T.markVisited(it.name, cityName, true);
+  const cur = T.getFootNote(it.name) || "";
+  wx.showModal({
+   title: "对「" + (T.cleanSpotName(it.name) || it.name) + "」的评价",
+   editable: true,
+   placeholderText: "比如：二刷必去，夜景绝了",
+   content: cur,
+   confirmText: cur ? "保存" : "记下",
+   success: (r) => {
+    if (!r || !r.confirm) return;
+    const v = (r.content || "").trim();
+    T.setFootNote(it.name, v);
+    wx.showToast({ title: v ? "已保存评价" : "已清除评价", icon: "none" });
+    this._render(plan);
+   }
+  });
  },
 
  /* ---- 想玩面板：移除某条未排上的想玩（点 ）---- */

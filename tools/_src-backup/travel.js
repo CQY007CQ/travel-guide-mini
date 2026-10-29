@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.134";
+const APP_VER = "1.19.135";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -1295,7 +1295,9 @@ function markVisited(name, city, on) {
  const k = cleanSpotName(name) || name;
  if (on === false) { delete f.spots[k]; }
  else {
-  f.spots[k] = { name: name, city: city || "", ts: Date.now() };
+  // v1.19.135：合并写入，保留已写的个人评价（note），不被打卡动作覆盖
+  const prev = f.spots[k] || {};
+  f.spots[k] = Object.assign({}, prev, { name: name, city: (city || prev.city || ""), ts: Date.now() });
   if (city) {
    if (!f.cities) f.cities = {};
    if (!f.cities[city]) f.cities[city] = Date.now();
@@ -1314,6 +1316,21 @@ function footStats() {
  const f = _footRaw();
  const cityList = Object.keys(f.cities || {});
  return { spots: Object.keys(f.spots || {}).length, cities: cityList.length, cityList };
+}
+// v1.19.135：已打卡景点的个人评价（方便下次选择时一眼看到）
+function getFootNote(name) {
+ const k = cleanSpotName(name) || name;
+ const s = _footRaw().spots[k];
+ return (s && s.note) ? s.note : "";
+}
+function setFootNote(name, note) {
+ const f = _footRaw();
+ const k = cleanSpotName(name) || name;
+ if (!f.spots[k]) return null; // 未打卡的景点不能单独写评价（评价依附于足迹）
+ const v = (note || "").toString().slice(0, 200);
+ if (v) f.spots[k].note = v; else delete f.spots[k].note;
+ store.set(FOOT_KEY, f);
+ return f.spots[k];
 }
 
 /* ---------- 多站：某天归属城市（plan/prep/map 共用，避免各自用 plan.cityName 串） ---------- */
@@ -3113,7 +3130,7 @@ function footCityDetail(city) {
  const arr = Object.keys(sp).map(k => sp[k])
   .filter(s => (s.city === city) || ((s.name || "").indexOf(city) >= 0))
   .sort((a, b) => (b.ts || 0) - (a.ts || 0));
- return { city, list: arr.map(s => ({ name: s.name || "", ts: s.ts || 0 })), count: arr.length };
+ return { city, list: arr.map(s => ({ name: s.name || "", ts: s.ts || 0, note: s.note || "" })), count: arr.length };
 }
 
 /* ================================================================
@@ -5561,7 +5578,7 @@ module.exports = {
  RECENT_KEY, getRecent, pushRecent, delRecent,
  PLANS_KEY, listSavedPlans, savePlanSlot, restorePlanSlot, delPlanSlot,
  exportCollabPlan, mergeCollabPlan,
- FOOT_KEY, isVisited, markVisited, footStats, tripFoot,
+ FOOT_KEY, isVisited, markVisited, footStats, tripFoot, setFootNote, getFootNote,
   segCityOfDay, settleUp, swapCandidates, swapSpot, swapCandidatesByTag, swapSpotByTag,
   spendByDay, NOTES_KEY, getNotes, noteOf, addNote, delNote,
   budgetGauge,

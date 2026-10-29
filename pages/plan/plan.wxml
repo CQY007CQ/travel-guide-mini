@@ -296,6 +296,7 @@
               <text wx:if="{{!it.f && it.effort !== undefined}}" class="badge eff e{{it.effort}}">{{it.effortTx}}<text wx:if="{{it.hour}}" class="eff-sep"> · {{it.hour}}</text></text>
             </view>
             <view wx:if="{{it.note && !it.f}}" class="tl-note">{{it.note}}</view>
+            <view wx:if="{{it.fnote && !it.f}}" class="tl-fnote">我评：{{it.fnote}}</view>
             <view wx:if="{{open === i + di * 100 && detailText}}" class="spot-detail">
               <view class="detail-acts">
                 <text wx:if="{{!it.f}}" class="d-btn d-btn-main" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onSwap">换一个</text>
@@ -303,6 +304,7 @@
                 <text class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onBaike">百科</text>
                 <text class="d-btn {{it.wished ? 'd-wish-on' : ''}}" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onWish">{{it.wished ? '已在想玩' : '加想玩'}}</text>
                 <text wx:if="{{!it.f}}" class="d-btn {{it.visited ? 'd-visit-on' : ''}}" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onVisited">{{it.visited ? '已打卡' : '打卡'}}</text>
+                <text wx:if="{{!it.f && it.visited}}" class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onFootNote">{{it.fnote ? '改评价' : '写评价'}}</text>
                 <text wx:if="{{!it.f && i > 0}}" class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" data-dir="-1" catchtap="onMove">↑ 上移</text>
                 <text wx:if="{{!it.f && i < day.items.length - 1}}" class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" data-dir="1" catchtap="onMove">↓ 下移</text>
               </view>
