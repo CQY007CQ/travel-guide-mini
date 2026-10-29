@@ -26,12 +26,12 @@ page {
   opacity: 1;
 }
 
-/* 暗色主题专属：保留原深色开屏观感（需 themeMode()==="dark" 才挂 .sp-dark） */
+/* 暗色主题专属：保留原深色开屏观感（需 themeMode()==="dark" 才挂 .sp-dark）；中性黑不偏蓝 */
 .sp.sp-dark {
   background:
-    radial-gradient(120% 50% at 50% -10%, rgba(212, 169, 78, 0.14), rgba(10, 15, 28, 0) 60%),
-    radial-gradient(80% 40% at 92% 100%, rgba(95, 185, 138, 0.06), rgba(10, 15, 28, 0) 55%),
-    #0a0f1c;
+    radial-gradient(120% 50% at 50% -10%, rgba(212, 169, 78, 0.14), rgba(13, 13, 13, 0) 60%),
+    radial-gradient(80% 40% at 92% 100%, rgba(95, 185, 138, 0.06), rgba(13, 13, 13, 0) 55%),
+    #0d0d0d;
 }
 .sp.sp-dark .sp-name { color: #eaeff7; }
 .sp.sp-dark .sp-slogan { color: #c9d4e4; }

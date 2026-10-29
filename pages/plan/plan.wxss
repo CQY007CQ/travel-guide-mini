@@ -680,7 +680,7 @@
 /* v1.8.5 C5：天数快速导航（sticky 顶条） */
 .day-strip { position: sticky; top: 0; z-index: 60; margin: 0 22rpx; padding: 10rpx 0 14rpx; background: var(--bg-solid, #eaeff7); }
 
-.td .day-strip { background: var(--bg-solid, #0a0f1c); }
+.td .day-strip { background: var(--bg-solid, #0d0d0d); }
 
 .ds-scroll { width: 100%; white-space: nowrap; }
 

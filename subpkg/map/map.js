@@ -139,7 +139,7 @@ Page(SafePage({
           id: mk.length,
           latitude: coord.lat, longitude: coord.lon,
           width: numbered ? 32 : 20, height: numbered ? 32 : 20,
-          callout: numbered ? { content: "" + seq, fontSize: 16, color: "#131d31",
+          callout: numbered ? { content: "" + seq, fontSize: 16, color: "#1a1a1a",
             bgColor: "#d4a94e", borderRadius: 16, padding: 4, display: "ALWAYS" } : undefined,
           markerType: "spots", seq: 0, name: n
         });

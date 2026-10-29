@@ -37,10 +37,12 @@ page {
   /* 浅色主题：卡片阴影更轻，避免白底上黑色阴影过于突兀 */
   --card-shadow: 0 6rpx 22rpx rgba(19, 29, 49, 0.06), 0 1rpx 3rpx rgba(19, 29, 49, 0.04);
   --card-inset: inset 0 1rpx 0 rgba(255, 255, 255, 0.6);
-  /* 2026-10-29：page 根保持透明，由窗口底色（wx.setBackgroundColor 跟随主题）兜住；
-     真正的"白线"根因是 --bg-img 渐变最顶端带暖光、与导航栏纯色交界处形成一条横向亮带，
-     已通过把渐变顶端改为透明（与导航栏同色 base）修复，浅色/深色模式一并消除。 */
-  background: transparent;
+  /* 2026-10-29（v1.19.126 修正）：page 根【必须不透明】。
+     真·白线根因 = 原生 page 元素透明，导航栏与 webview 接缝处露出微信 webview 默认白底；
+     wx.setBackgroundColor 只管下拉 overscroll 视口，兜不住常规页面顶部接缝。
+     现把 page 根底色设为中性黑 #0d0d0d：深色模式下接缝显示黑（不再是白线）；
+     浅色模式接缝由下方不透明的 .page/.td 主题视图盖住（见 .page 负 margin 兜底）。 */
+  background: #0d0d0d;
   color: var(--t1, #18233a);
   /* 全局字号缩放因子：--fs 由 .fz1/.fz2/.fz3 覆盖，所有 font-size 经 calc(* var(--fs,1)) 统一缩放 */
   --fs: 1;
@@ -50,12 +52,12 @@ page {
 }
 
 .td {
-  /* 深色同款：顶端透明（与导航栏 #0b1020 同色 base），暖光在导航栏下淡入 */
-  --bg-img: radial-gradient(120% 46% at 50% -8%, rgba(212, 169, 78, 0) 0%, rgba(212, 169, 78, 0.10) 16%, rgba(10, 15, 28, 0) 60%), radial-gradient(90% 40% at 88% 0%, rgba(95, 185, 138, 0.05), rgba(10, 15, 28, 0) 55%), #0a0f1c;
-  --bg-solid: #0a0f1c;
-  --card: #131d31;
-  --well: #101a2c;
-  --panel: #18233a;
+  /* 深色同款：顶端透明（与导航栏 #0d0d0d 同色 base），暖光在导航栏下淡入；中性黑不再偏蓝 */
+  --bg-img: radial-gradient(120% 46% at 50% -8%, rgba(212, 169, 78, 0) 0%, rgba(212, 169, 78, 0.10) 16%, rgba(13, 13, 13, 0) 60%), radial-gradient(90% 40% at 88% 0%, rgba(95, 185, 138, 0.05), rgba(13, 13, 13, 0) 55%), #0d0d0d;
+  --bg-solid: #0d0d0d;
+  --card: #1a1a1a;
+  --well: #161616;
+  --panel: #222222;
   --t1: #eaeff7;
   --t2: #c9d4e4;
   --t3: #8fa3bc;
@@ -78,12 +80,12 @@ page {
   --dim: #8fa3bc;
   --acc: #d4a94e;
   --acc-soft: rgba(212, 169, 78, 0.16);
-  --dock-rgb: 10, 15, 28;
-  --strip-sheen: rgba(19, 29, 49, 0.46);
-  /* 深色主题：行程卡"今天干什么"渐变（金色高光 + 海军蓝深色） */
-  --strip-bg: linear-gradient(135deg, rgba(212, 169, 78, .13) 0%, rgba(19, 29, 49, .46) 55%, #131d31 100%);
-  /* 深色主题：卡片阴影（重一点，对应深底） */
-  --card-shadow: 0 12rpx 36rpx rgba(3, 7, 18, 0.32), inset 0 1rpx 0 rgba(255, 255, 255, 0.035);
+  --dock-rgb: 13, 13, 13;
+  --strip-sheen: rgba(26, 26, 26, 0.46);
+  /* 深色主题：行程卡"今天干什么"渐变（金色高光 + 中性黑） */
+  --strip-bg: linear-gradient(135deg, rgba(212, 169, 78, .13) 0%, rgba(26, 26, 26, .46) 55%, #1a1a1a 100%);
+  /* 深色主题：卡片阴影（重一点，对应深底；中性黑不再是蓝黑） */
+  --card-shadow: 0 12rpx 36rpx rgba(0, 0, 0, 0.32), inset 0 1rpx 0 rgba(255, 255, 255, 0.035);
   --card-inset: inset 0 1rpx 0 rgba(255, 255, 255, 0.035);
   min-height: 100vh;
   box-sizing: border-box;
@@ -101,6 +103,9 @@ page {
   min-height: 100vh;
   box-sizing: border-box;
   background: var(--bg-img);
+  /* v1.19.126：向上探 4rpx，盖住导航栏与 webview 接缝（防浅色模式露出深色 page 根形成暗线） */
+  margin-top: -4rpx;
+  padding-top: 4rpx;
 }
 .fz1 { --fs: 1; }
 .fz2 { --fs: 1.15; }

@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.125";
+const APP_VER = "1.19.126";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -2130,14 +2130,15 @@ function applyNav(mode) {
  try {
   wx.setNavigationBarColor({
    frontColor: dark ? "#ffffff" : "#000000",
-   backgroundColor: dark ? "#0b1020" : "#eaeff7"
+   backgroundColor: dark ? "#0d0d0d" : "#eaeff7"
   });
-  // 2026-10-29：窗口底色也要跟随主题，否则导航栏与内容之间的缝隙会露出浅色（深色模式下的"白线"）
+  // 2026-10-29（v1.19.126 修正）：窗口底色跟随主题 + 中性黑；app.wxss 的 page 根已改为不透明 #0d0d0d，
+  // 双保险根除"导航栏与内容之间的缝隙白线"（setBackgroundColor 仅管下拉 overscroll 视口，page 根才是常规接缝底色）
   if (wx.setBackgroundColor) {
    wx.setBackgroundColor({
-    backgroundColor: dark ? "#0a0f1c" : "#eaeff7",
-    backgroundColorTop: dark ? "#0a0f1c" : "#eaeff7",
-    backgroundColorBottom: dark ? "#0a0f1c" : "#eaeff7"
+    backgroundColor: dark ? "#0d0d0d" : "#eaeff7",
+    backgroundColorTop: dark ? "#0d0d0d" : "#eaeff7",
+    backgroundColorBottom: dark ? "#0d0d0d" : "#eaeff7"
    });
   }
  } catch (e) {}
@@ -2149,7 +2150,7 @@ function applyTabBar(mode) {
   wx.setTabBarStyle({
    color: dark ? "#8495ad" : "#5b6b82",
    selectedColor: "#d4a94e",
-   backgroundColor: dark ? "#0d1424" : "#ffffff",
+   backgroundColor: dark ? "#0d0d0d" : "#ffffff",
    borderStyle: dark ? "black" : "white"
   });
   // 浅色 tabBar 用深灰图标（images/tab-light-*.png），深色切回原白线条（images/tab-*.png）保证可读
