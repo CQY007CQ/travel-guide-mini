@@ -1,0 +1,59 @@
+<view class="page {{td ? 'td' : ''}} fz{{fz}}">
+
+  <!-- 第一屏：120 优先。急症场景下"叫救护车"永远排在"查信息"之前 -->
+  <view class="eh-hero">
+    <text class="eh-t">旅途受伤 / 突发不适</text>
+    <text class="eh-s">急危重症请先拨打 120，说清位置与伤情；不要先查攻略，也不要自己开车</text>
+    <view class="eh-call" bindtap="onCall120">拨打 120</view>
+  </view>
+
+  <!-- 第二步：分诊 -->
+  <view class="card er-card">
+    <view class="er-h">第一步 · 是什么情况</view>
+    <view class="er-chips">
+      <view class="er-chip" wx:for="{{quick}}" wx:key="*this" data-t="{{item}}" bindtap="onQuick">{{item}}</view>
+    </view>
+    <input class="er-input" value="{{text}}" placeholder="也可以直接描述：腿摔了站不起来 / 开水烫到手"
+           confirm-type="search" bindinput="onInput" bindconfirm="onAsk"/>
+    <view class="er-go" bindtap="onAsk">看该挂什么科</view>
+  </view>
+
+  <!-- 结果：科室建议 -->
+  <view class="card er-res" wx:if="{{res.length}}">
+    <view class="er-h">第二步 · 该挂的科室</view>
+    <view class="er-item" wx:for="{{res}}" wx:key="dept">
+      <view class="er-line">
+        <text class="er-dept">{{item.dept}}</text>
+        <text class="er-badge {{item.er ? 'er-er' : ''}}">{{item.er ? '急症 · 尽快就医' : '非急症'}}</text>
+      </view>
+      <view class="er-tip">{{item.tip}}</view>
+    </view>
+  </view>
+
+  <!-- 第三步：就近医院 -->
+  <view class="card er-hos" wx:if="{{city && hos.length}}">
+    <view class="er-h">第三步 · 就近医院（{{city}}）</view>
+    <view class="er-hrow" wx:for="{{hos}}" wx:key="n" data-i="{{index}}" bindtap="onNav">
+      <view class="er-hl">
+        <text class="er-hn">{{item.n}}</text>
+        <text class="er-hm">{{item.lv}} · 距城中心约 {{item.kmc}} km</text>
+      </view>
+      <text class="er-nav">导航 ›</text>
+    </view>
+    <view class="er-pick" bindtap="onPickCity">切换城市（已收录 {{cityN}} 座）</view>
+  </view>
+
+  <view class="card er-none" wx:if="{{city && !hos.length}}">
+    <text class="er-nt">该城市暂未收录医院坐标</text>
+    <text class="er-ns">请用地图 App 搜索「医院 急诊」就近前往，或直接拨打 120。</text>
+  </view>
+
+  <view class="card er-pick-only" wx:if="{{!city}}">
+    <view class="er-pick" bindtap="onPickCity">选择城市（已收录 {{cityN}} 座）</view>
+  </view>
+
+  <view class="er-disclaim">
+    以上为应急分诊常识与医疗机构位置，仅供参考，不构成诊疗建议，也不替代专业医疗判断。急危重症请直接拨打 120。医院坐标由地理编码获得，等级信息以卫生健康部门公示为准。
+  </view>
+
+</view>

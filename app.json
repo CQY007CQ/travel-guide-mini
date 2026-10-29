@@ -4,7 +4,8 @@
     "pages/index/index",
     "pages/today/today",
     "pages/plan/plan",
-    "pages/more/more"
+    "pages/more/more",
+    "pages/help/help"
   ],
   "window": {
     "navigationBarTitleText": "旅行攻略",

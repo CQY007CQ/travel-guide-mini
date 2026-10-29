@@ -299,6 +299,11 @@
     <text class="ver dim">旅行攻略生成器 · v{{ver}}</text>
     <text class="arrow dim">›</text>
   </view>
+  <!-- 旅途应急入口：受伤 / 突发不适时的分诊常识与就近医疗机构 -->
+  <view class="ver-row" bindtap="onHelp">
+    <text class="ver dim">旅途应急：受伤 / 不适怎么办</text>
+    <text class="arrow dim">›</text>
+  </view>
   <!-- 数据说明与免责声明：对外披露数据来源、时效与使用边界 -->
   <view class="ver-row" bindtap="onDataNote">
     <text class="ver dim">数据说明与免责声明</text>

@@ -278,6 +278,11 @@ Page(SafePage({
     });
   },
 
+  /* 旅途应急：跳转应急页（分诊常识 + 就近医院，只做信息展示，不给诊疗建议） */
+  onHelp() {
+    wx.navigateTo({ url: "/pages/help/help", fail: () => wx.showToast({ title: "打开失败，请重试", icon: "none" }) });
+  },
+
   /* ---- v1.19.106：本地错误日志查看（被 SafePage / app.onError 兜住的异常回溯） ---- */
   onErrLog() {
     const n = EL.count();
