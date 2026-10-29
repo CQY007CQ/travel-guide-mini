@@ -38,3 +38,7 @@
 
 /* v1.9.0：口味小标签 */
 .tag-sub { opacity: .6; font-size: calc(18rpx * var(--fs, 1)); margin-left: 6rpx; }
+
+/* 菜名可点：选中态高亮（特异性高于全局 .tag） */
+.food-tags .tag.on { color: #14100a; background: linear-gradient(135deg, #e2b65c, #b8892f); border-color: transparent; font-weight: 800; }
+.dish-hint { font-size: calc(21rpx * var(--fs, 1)); color: var(--t4, #7d92ab); margin-top: 12rpx; }

@@ -26,17 +26,19 @@
       <view class="h3">必吃清单 · {{cityName}}<text class="dim u-fs20" wx:if="{{slotFilter !== 'all'}}">（{{foodN}} 项）</text></view>
       <view class="food-tags">
         <block wx:for="{{foods}}" wx:key="n">
-          <text class="tag">{{item.n}}<text wx:if="{{item.tag}}" class="tag-sub">{{item.tag}}</text></text>
+          <text class="tag {{item.on ? 'on' : ''}}" data-n="{{item.n}}" bindtap="onDish">{{item.n}}<text wx:if="{{item.tag}}" class="tag-sub">{{item.tag}}</text></text>
         </block>
       </view>
       <view wx:if="{{slotFilter !== 'all' && !foodN}}" class="note dim">这个时段没有明确代表，看看「全部」里的其它推荐</view>
       <view wx:if="{{note}}" class="note">{{note}}</view>
+      <view class="dish-hint">点菜名，看看有哪些店做这道菜</view>
     </view>
 
     <view class="card">
-      <view class="h3 h3-row"><image class="ic" src="/images/icons/trophy.png"/>地道名店推荐 <text class="dim u-fs20">（点击导航 · 已按当前时段筛出 {{shopN}} 家）</text></view>
+      <view class="h3 h3-row"><image class="ic" src="/images/icons/trophy.png"/>地道名店推荐 <text class="dim u-fs20">（{{shopHead}}）</text></view>
       <view wx:if="{{budgetTxt}}" class="budget-tip"><image class="ic ic-sm" src="/images/icons/wallet.png"/>{{budgetTxt}}</view>
       <view wx:if="{{shopSrc}}" class="budget-tip"><image class="ic ic-sm" src="/images/icons/target.png"/>{{shopSrc}}</view>
+      <view wx:if="{{dishNote}}" class="budget-tip"><image class="ic ic-sm" src="/images/icons/search.png"/>{{dishNote}}</view>
       <view wx:if="{{!shops.length}}" class="dim note">{{emptyShopTx}}</view>
       <view class="shop {{item.hit ? 'hit' : ''}}" wx:for="{{shops}}" wx:key="id"
             data-lat="{{item.lat}}" data-lon="{{item.lon}}" data-shop="{{item.shop}}" data-addr="{{item.addr}}"
@@ -46,7 +48,7 @@
           <text wx:if="{{item.band}}" class="band-tag band-{{item.bandKey}}">{{item.band}}</text>
           <text class="shop-price">{{item.price}}</text>
         </view>
-        <view class="shop-sub">{{item.food}} · {{item.addr}}</view>
+        <view class="shop-sub">{{item.sub}}</view>
       </view>
     </view>
   </block>

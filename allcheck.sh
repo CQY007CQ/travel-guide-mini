@@ -131,6 +131,8 @@ step "单测 recommend (个性推荐引擎)" "$NODE" tools/_test-recommend.mjs
 step "模糊测试 recommend (标签组合/极端输入)" "$NODE" tools/_fuzz-recommend.mjs
 # 旅途应急：分诊正确性 + 医院数据完整性 + 「不得出现医疗断言」红线
 step "单测 emergency (旅途应急分诊)" "$NODE" tools/_test-emergency.mjs
+# 菜名→店铺匹配：命中正确性 + 无命中不瞎给 + 品牌联想不被词根覆盖
+step "单测 foodmap (菜名→店铺)" "$NODE" tools/_test-foodmap.mjs
 step "单测 insp-ui (灵感卡接线 v1.19.87)" "$NODE" tools/_test-v11987-insp-ui.mjs
 step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/_test-v11988-sharecard.mjs
 step "单测 sharetitle (分享即种草 v1.19.89)" "$NODE" tools/_test-v11989-sharetitle.mjs
