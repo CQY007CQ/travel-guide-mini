@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.129";
+const APP_VER = "1.19.130";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -1695,7 +1695,7 @@ function packSmart(plan) {
   if (climate === "plateau" || climate === "alpine") cloth.push("防风冲锋衣 · 高原防晒");
   if (climate === "cold" || climate === "temperate_continental") cloth.push("保暖中层 · 手套");
   G.push({ title: "衣物", items: cloth });
-  G.push({ title: "电子", items: ["充电宝（≤20000mAh 随身）", "数据线 + 充电头", "耳机", "相机 + 备用电池", "插线板（一人带一个就够）"] });
+  G.push({ title: "电子", items: ["充电宝（≤20000mAh 随身）", "数据线 + 充电头", "耳机", "相机 + 备用电池"] });
   const care = ["牙刷牙膏 · 洗面奶", "防晒霜（SPF30+）· 墨镜", "常用药（肠胃 / 感冒 / 晕车）", "创可贴 · 纸巾湿巾"];
   if (hasMountain) care.push("护膝 / 登山杖（可当地租）", "驱蚊液");
   if (hasSea) care.push("拖鞋 · 防水袋", "泳衣 / 速干毛巾");
