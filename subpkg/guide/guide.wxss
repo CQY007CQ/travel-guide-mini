@@ -96,3 +96,36 @@
 
 /* 字号档位覆盖已改为全局机制（app.wxss 的 .fz2/.fz3 设置 --fs，所有 font-size 经 calc 统一缩放），
    此处不再写死覆盖值，避免与全局缩放打架；fz-bar / fz-btn / fz-dot 控件样式保留在上方。 */
+
+/* ── 速查条（改版：默认收起，点开一条） ── */
+.g-list { padding: 6rpx 26rpx; }
+.g-row { border-bottom: 1rpx solid rgba(var(--ln-rgb, 19, 29, 49), .1); }
+.g-row:last-child { border-bottom: none; }
+.g-row-h { display: flex; align-items: center; gap: 12rpx; padding: 26rpx 2rpx; }
+.g-row-t {
+  flex: 1; min-width: 0;
+  font-size: calc(29rpx * var(--fs, 1)); font-weight: 800;
+  color: var(--tx, #18233a);
+}
+.g-row-ar {
+  flex: none; width: 44rpx; text-align: center;
+  font-size: calc(32rpx * var(--fs, 1)); font-weight: 700; line-height: 1;
+  color: var(--t3, #64748b);
+}
+.g-row.on .g-row-t { color: var(--gold-tx, #8f6a1f); }
+.g-row.on .g-row-ar { color: var(--gold-tx, #8f6a1f); }
+.g-row-d { padding: 0 2rpx 24rpx; }
+.g-row-x {
+  display: block;
+  font-size: calc(24rpx * var(--fs, 1)); line-height: 1.7;
+  color: var(--t2, #5b6b82);
+}
+.g-row-go {
+  display: inline-block; margin-top: 12rpx;
+  font-size: calc(23rpx * var(--fs, 1)); font-weight: 700;
+  color: var(--gold-tx, #8f6a1f);
+}
+.g-foot {
+  margin: 22rpx 30rpx 0; text-align: center;
+  font-size: calc(20rpx * var(--fs, 1)); color: var(--t4, #7d92ab);
+}

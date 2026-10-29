@@ -439,24 +439,23 @@
         <image class="gm-ic" src="/images/icons/book.png"/>
         <text class="gm-title">欢迎使用 旅行攻略生成器</text>
       </view>
-      <text class="gm-sub">一份能直接照着走的行程，从出发前到旅途结束都能用</text>
+      <text class="gm-sub">选目的地 → 生成 → 出发照着走</text>
       <view class="gm-points">
         <view class="gm-p">
           <view class="gm-pi"><image class="gm-pi-img" src="/images/icons/compass.png"/></view>
-          <view class="gm-pt"><text class="gm-pt-t">一键生成逐日攻略</text><text class="gm-pt-s">选目的地、玩几天，立刻出可照着走的行程</text></view>
+          <view class="gm-pt"><text class="gm-pt-t">一键出逐日攻略</text></view>
         </view>
         <view class="gm-p">
           <view class="gm-pi"><image class="gm-pi-img" src="/images/icons/pin.png"/></view>
-          <view class="gm-pt"><text class="gm-pt-t">覆盖全国 300+ 城</text><text class="gm-pt-s">每城有景点 / 美食 / 住宿 / 真实坐标，可直接导航</text></view>
+          <view class="gm-pt"><text class="gm-pt-t">751 城 · 点景点直接导航</text></view>
         </view>
         <view class="gm-p">
           <view class="gm-pi"><image class="gm-pi-img" src="/images/icons/shield.png"/></view>
-          <view class="gm-pt"><text class="gm-pt-t">数据只存本机</text><text class="gm-pt-s">免注册登录，全程离线可用，不上传任何信息</text></view>
+          <view class="gm-pt"><text class="gm-pt-t">免注册 · 数据只存本机</text></view>
         </view>
       </view>
       <view class="gm-actions">
-        <button class="gm-btn gm-btn-ghost" bindtap="closeGuideModal">开始体验</button>
-        <button class="gm-btn gm-btn-gold" bindtap="openGuideFromModal">查看完整使用指南 ›</button>
+        <button class="gm-btn gm-btn-gold" bindtap="closeGuideModal">开始规划</button>
       </view>
     </view>
   </view>
