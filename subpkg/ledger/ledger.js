@@ -36,20 +36,21 @@ Page(SafePage({
     tripStart: "", tripEnd: "",
     catSums: [],   // 分类占比统计（占比图）
     budTxt: "", over: false, budPct: 0,   // 预算参考 gauge
-    // v1.7：月度汇总 + 汇率换算 + 凭证图片
+    // v1.7：月度汇总 + 凭证图片
     monthly: null,
-    fxList: T.FX_LIST || ["CNY", "USD", "JPY"],
-    fxAmt: "100", fxFrom: "CNY", fxTo: "JPY", fxOut: "",
     // v1.6：每日额度 / 花费预测 / 同行人 / 搜索筛选
     dbud: null, forecast: null, mates: [], mateInput: "",
     kw: "", catFilter: "", filteredN: 0,
-    // v1.8.4：多行程账本 / 外币 / 人情 / 凭证 / 速记短语
+    // v1.8.4：多行程账本 / 人情 / 凭证 / 速记短语
+    // 2026-10-29：移除外币选择与汇率换算，只记人民币（用户反馈：不需要他国货币）
     tripFilter: "__all", curSig: "", curLabel: "",   // v1.11：删除未使用的 trips
-    fxCur: "CNY", fxCurList: ["CNY", "USD", "JPY", "THB", "EUR"],
     iou: [], iouMate: "", iouWhat: "", iouAmt: "", iouDir: "lend", iouSt: null,
     vouchN: 0, phrases: [],
-    // v1.8.5：本周统计 / 删除撤销胶囊 / 汇率折叠
-    week: null, undoRow: null, fxOpen: false, week7: null, mstory: null
+    // v1.8.5：本周统计 / 删除撤销胶囊
+    week: null, undoRow: null, week7: null, mstory: null,
+    // 2026-10-29：三组折叠 —— 记账页原本 20 个区块平铺，核心操作被图表夹在中间；
+    // 改为「核心在前、分析/分账/详细表单折叠」，默认只留统计+一句话记账+明细。
+    secDetail: false, secStats: false, secSocial: false
   },
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
@@ -251,7 +252,6 @@ Page(SafePage({
     const cny = this._toCny(p.amt);
     if (!(cny > 0)) { wx.showToast({ title: "金额无法换算", icon: "none" }); return; }
     let name = p.name;
-    if (this.data.fxCur !== "CNY" && !name) name = "外币消费(" + this.data.fxCur + " " + p.amt + ")";
     T.addLedger(cny, p.cat, name, this.data.payer, this.data.share, this.data.date, this.data.curSig);
     // v1.8.5 C7：记忆本次分类
     S.set("miniLedgerLastCatV1", p.cat || "餐饮");
@@ -260,20 +260,8 @@ Page(SafePage({
     this._sync();
   },
 
-  // v1.8.4 A5：币种选择 / 金额折算（非 CNY 按本地汇率快照折人民币入账）
-  onFxCur(e) {
-    const c = e.currentTarget.dataset.c;
-    if (!c) return;
-    this.setData({ fxCur: c });
-    const raw = parseFloat(this.data.amt || this.data.quick || "");
-    if (c !== "CNY" && raw > 0) wx.showToast({ title: "将折 ¥" + this._toCny(raw), icon: "none", duration: 1400 });
-  },
-  _toCny(v) {
-    const cur = this.data.fxCur || "CNY";
-    if (cur === "CNY") return Math.round(Number(v) * 100) / 100;
-    const r = T.fxConvert(Number(v), cur, "CNY");
-    return isFinite(r) && r > 0 ? Math.round(r * 100) / 100 : 0;
-  },
+  // 金额归一：只支持人民币，保留两位取整防浮点尾巴（外币与汇率换算已于 2026-10-29 移除）
+  _toCny(v) { return Math.round(Number(v) * 100) / 100; },
 
   // v1.8.4 A10：速记短语 chips（一句话记账）
   onPhrase(e) {
@@ -356,9 +344,6 @@ Page(SafePage({
     const cny = this._toCny(amt);
     if (!(cny > 0)) { wx.showToast({ title: "金额无法换算", icon: "none" }); return; }
     let name = this.data.name.trim();
-    if (this.data.fxCur !== "CNY") {
-      name = name ? name + "（" + this.data.fxCur + " " + amt + "）" : "外币消费(" + this.data.fxCur + " " + amt + ")";
-    }
     T.addLedger(cny, this.data.cat, name, this.data.payer, this.data.share, this.data.date, this.data.curSig);
     // v1.8.5 C7：记忆本次分类
     S.set("miniLedgerLastCatV1", this.data.cat || "餐饮");
@@ -409,14 +394,12 @@ Page(SafePage({
   },
 
   // P2：导出 CSV
-  /* ---------- v1.7：汇率换算（v1.8.5 起默认折叠） ---------- */
-  toggleFx() { this.setData({ fxOpen: !this.data.fxOpen }); },
-  onFxInput(e) { this.setData({ fxAmt: e.detail.value }); this._calcFx(); },
-  onFxFrom(e) { const i = Number(e.detail.value); if (i >= 0 && i < this.data.fxList.length) { this.setData({ fxFrom: this.data.fxList[i] }); this._calcFx(); } },
-  onFxTo(e) { const i = Number(e.detail.value); if (i >= 0 && i < this.data.fxList.length) { this.setData({ fxTo: this.data.fxList[i] }); this._calcFx(); } },
-  _calcFx() {
-    const v = T.fxConvert(this.data.fxAmt, this.data.fxFrom, this.data.fxTo);
-    this.setData({ fxOut: isNaN(v) ? "" : String(v) });
+  /* ---------- 2026-10-29：记账页分组折叠（详细记账 / 看数据 / 同行分账） ---------- */
+  toggleSec(e) {
+    const s = String(e.currentTarget.dataset.s || "");
+    if (s === "detail") this.setData({ secDetail: !this.data.secDetail });
+    else if (s === "stats") this.setData({ secStats: !this.data.secStats });
+    else if (s === "social") this.setData({ secSocial: !this.data.secSocial });
   },
 
   /* ---------- v1.7：消费凭证图片 ---------- */

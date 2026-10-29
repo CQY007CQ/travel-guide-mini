@@ -1,4 +1,6 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
+
+  <!-- ① 一眼看清：总计 / 今日 / 本周 -->
   <view class="card stat-card">
     <view class="stat"><text class="s-label">总计</text><text class="s-val">¥{{total}}</text></view>
     <view class="stat"><text class="s-label">今日</text><text class="s-val gold2">¥{{today}}</text></view>
@@ -12,19 +14,7 @@
     </view>
   </view>
 
-  <!-- v1.9：近 7 日花销柱 + 本月一句话复盘 -->
-  <view class="card w7-card" wx:if="{{week7 && week7.sum > 0}}">
-    <view class="w7-head"><image class="ic ic-sm" src="/images/icons/trend.png"/>近 7 日 · ¥{{week7.sum}}</view>
-    <view class="w7-row">
-      <view class="w7-col" wx:for="{{week7.days}}" wx:key="key">
-        <view class="w7-bar"><view class="w7-fill {{item.amt === week7.max && item.amt > 0 ? 'w7-max' : ''}}" style="height:{{item.amt > 0 ? (item.amt / week7.max * 88) : 4}}%"></view></view>
-        <text class="w7-l dim">{{item.label}}</text>
-      </view>
-    </view>
-    <view class="w7-t dim" wx:if="{{mstory}}">{{mstory.txt}}</view>
-  </view>
-
-  <!-- v1.8.4 A4：行程账本切换 -->
+  <!-- ② 账本范围（多行程时才有） -->
   <view class="card trip-bar" wx:if="{{tripOptions.length > 1}}">
     <scroll-view scroll-x class="trip-scroll" enhanced show-scrollbar="{{false}}">
       <view class="trip-row">
@@ -34,7 +24,7 @@
     <view class="trip-hint dim" wx:if="{{tripFilter!=='__all'}}">当前只看 {{tripFilter==='__other' ? '旧账' : curLabel}} 的花销，切「全部账本」看完整</view>
   </view>
 
-  <!-- 预算参考（独立成条：无账目时也能看到行程预算对照） -->
+  <!-- ③ 预算对照（无账目时也能看到行程预算） -->
   <view class="card bud-card" wx:if="{{budTxt}}">
     <view class="bud-line {{over ? 'over' : 'ok'}}">
       <view class="bud-txt">{{budTxt}}</view>
@@ -42,50 +32,7 @@
     </view>
   </view>
 
-  <!-- v1.6：花费预测（按已花日均推全程总额） -->
-  <view class="card fc-card" wx:if="{{forecast && forecast.budget > 0}}">
-    <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/trend.png"/>花费预测</view>
-      <text class="fc-lv {{forecast.over ? 'over' : 'ok'}}">{{forecast.over ? '可能超支' : '预计可控'}}</text>
-    </view>
-    <view class="fc-nums">
-      <view class="fc-n"><text class="fc-v">¥{{forecast.forecast}}</text><text class="fc-l">预计全程</text></view>
-      <view class="fc-n"><text class="fc-v">¥{{forecast.perDay}}</text><text class="fc-l">已花日均</text></view>
-      <view class="fc-n"><text class="fc-v">¥{{forecast.budget}}</text><text class="fc-l">预算参考</text></view>
-    </view>
-    <view class="bud-bar u-mt14">
-      <view class="bud-fill {{forecast.over ? 'over' : ''}}" style="width:{{forecast.pct > 100 ? 100 : forecast.pct}}%"></view>
-    </view>
-    <view class="fc-tx {{forecast.over ? 'fc-over' : ''}}">{{forecast.txt}}</view>
-  </view>
-
-  <!-- v1.6：每日预算额度 -->
-  <view class="card db-card" wx:if="{{dbud && dbud.perDay > 0}}">
-    <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/coin.png"/>每日额度</view>
-      <text class="dim u-fs20">¥{{dbud.perDay}} / 天</text>
-    </view>
-    <view class="db-row {{item.over ? 'db-over' : ''}} {{item.isToday ? 'db-today' : ''}}" wx:for="{{dbud.rows}}" wx:key="date">
-      <text class="db-d">D{{item.no}}<text class="db-md dim">{{item.md}}</text></text>
-      <view class="db-track"><view class="db-fill {{item.over ? 'over' : ''}}" style="width:{{item.pct}}%"></view></view>
-      <text class="db-a {{item.over ? 'db-a-over' : ''}}">¥{{item.spent}}</text>
-    </view>
-    <view class="db-foot dim" wx:if="{{dbud.overDays}}">有 {{dbud.overDays}} 天超出日额度，后面几天匀一匀就好</view>
-    <view class="db-foot dim" wx:else>每天都在额度内，节奏很稳</view>
-  </view>
-
-  <!-- 过滤 -->
-  <view class="card filter-bar">
-    <view class="f-chip {{dateFilter==='all'?'on':''}}" data-f="all" bindtap="onFilter">全部</view>
-    <view class="f-chip {{dateFilter==='today'?'on':''}}" data-f="today" bindtap="onFilter">今天</view>
-    <view class="f-chip {{dateFilter==='trip'?'on':''}}" data-f="trip" bindtap="onFilter" wx:if="{{tripStart}}">行程内</view>
-  </view>
-  <view class="card filter-bar fbar2">
-    <view class="f-chip sm {{catFilter===''?'on':''}}" data-c="" bindtap="onCatFilter">全部分类</view>
-    <view class="f-chip sm {{catFilter===item?'on':''}}" wx:for="{{cats}}" wx:key="*this" data-c="{{item}}" bindtap="onCatFilter">{{item}}</view>
-  </view>
-
-  <!-- 一句话记账：输入「打车 32」「午饭128」自动识别金额与分类 -->
+  <!-- ④ 主操作：一句话记账 -->
   <view class="card quick-card">
     <view class="h3 row-between">
       <view class="h3-l"><image class="ic" src="/images/icons/bill.png"/>一句话记账</view>
@@ -102,200 +49,23 @@
     <view class="qk-cats">
       <view class="qk-cat {{cat === item ? 'on' : ''}}" wx:for="{{cats}}" wx:key="*this" data-c="{{item}}" bindtap="onCatPick">{{item}}</view>
     </view>
-    <!-- v1.8.4 A5 / A10：记账币种 + 速记短语 -->
-    <view class="qk-fx" wx:if="{{fxCurList.length}}">
-      <text class="qk-lbl">币种</text>
-      <view class="cur-chip {{fxCur===item?'on':''}}" wx:for="{{fxCurList}}" wx:key="*this" data-c="{{item}}" bindtap="onFxCur">{{item}}</view>
-      <text class="qk-lbl u-ml22">速记</text>
-    </view>
     <view class="qk-phr" wx:if="{{phrases.length}}">
       <view class="phr-chip" wx:for="{{phrases}}" wx:key="*this" data-p="{{item}}" bindtap="onPhrase">{{item}}</view>
     </view>
   </view>
 
-  <!-- 预算分配对照（建议 45/22/20/13 vs 实际） -->
-  <view class="card split-card" wx:if="{{split}}">
-    <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/pie.png"/>预算分配对照</view>
-      <text class="dim u-fs20">建议 vs 实际</text>
-    </view>
-    <view class="sp-row" wx:for="{{split.rows}}" wx:key="cat">
-      <text class="sp-cat">{{item.cat}}</text>
-      <view class="sp-bars">
-        <view class="sp-bar"><view class="sp-fill sug" style="width:{{item.sugW}}%"></view></view>
-        <view class="sp-bar"><view class="sp-fill real {{item.over ? 'over' : ''}}" style="width:{{item.realW}}%"></view></view>
-      </view>
-      <text class="sp-amt {{item.over ? 'sp-over' : ''}}">¥{{item.sug}}<text class="sp-slash">/</text>{{item.real}}</text>
-    </view>
-    <view class="sp-foot dim">上＝建议额度　下＝已花</view>
+  <!-- ⑤ 过滤 -->
+  <view class="card filter-bar">
+    <view class="f-chip {{dateFilter==='all'?'on':''}}" data-f="all" bindtap="onFilter">全部</view>
+    <view class="f-chip {{dateFilter==='today'?'on':''}}" data-f="today" bindtap="onFilter">今天</view>
+    <view class="f-chip {{dateFilter==='trip'?'on':''}}" data-f="trip" bindtap="onFilter" wx:if="{{tripStart}}">行程内</view>
+  </view>
+  <view class="card filter-bar fbar2">
+    <view class="f-chip sm {{catFilter===''?'on':''}}" data-c="" bindtap="onCatFilter">全部分类</view>
+    <view class="f-chip sm {{catFilter===item?'on':''}}" wx:for="{{cats}}" wx:key="*this" data-c="{{item}}" bindtap="onCatFilter">{{item}}</view>
   </view>
 
-  <!-- AA 结算（多人同行：谁付了多少、谁该给谁） -->
-  <view class="card settle-card" wx:if="{{settle && settle.people > 1}}">
-    <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>AA 结算</view>
-      <text class="btn-export" bindtap="copySettle">复制方案</text>
-    </view>
-    <view class="st-sum">共 ¥{{settle.total}} · {{settle.people}} 人 · 人均 ¥{{settle.per}}</view>
-    <view class="st-row" wx:for="{{settle.rows}}" wx:key="payer">
-      <text class="st-payer">{{item.payer}}</text>
-      <text class="st-paid">实付 ¥{{item.paid}}</text>
-      <!-- v1.11：cls/文案由 T.settleUp() 预计算（netCls / netTx） -->
-      <text class="st-net {{item.netCls}}">{{item.netTx}}</text>
-    </view>
-    <view class="st-trans" wx:if="{{settle.transfers.length}}">
-      <view class="st-trans-t">结清方式</view>
-      <view class="st-trans-l" wx:for="{{settle.transfers}}" wx:key="to">{{item.from}} → {{item.to}} <text class="gold">¥{{item.amt}}</text></view>
-    </view>
-    <view class="st-trans-l dim" wx:else>账目已平，无需转账</view>
-  </view>
-
-  <!-- v1.8.4 A6：人情往来（同行人借还明细，AA 之外的零散垫付） -->
-  <view class="card iou-card">
-    <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/people.png"/>人情往来</view>
-      <text class="dim u-fs20" wx:if="{{iouSt}}">净应收 ¥{{iouSt.pending}}</text>
-    </view>
-    <view class="iou-add">
-      <view class="iou-dir">
-        <view class="qk-cat {{iouDir==='lend'?'on':''}}" data-d="lend" bindtap="onIouDir">我借出</view>
-        <view class="qk-cat {{iouDir==='borrow'?'on':''}}" data-d="borrow" bindtap="onIouDir">我借入</view>
-      </view>
-      <input class="iou-inp" placeholder="谁（如 小明）" value="{{iouMate}}" bindinput="onIouMate"/>
-      <input class="iou-inp" placeholder="因为什么（可选）" value="{{iouWhat}}" bindinput="onIouWhat"/>
-      <view class="iou-row2">
-        <input class="iou-inp" type="digit" placeholder="金额 ¥" value="{{iouAmt}}" bindinput="onIouAmt"/>
-        <view class="qk-go" bindtap="addIou">记一笔</view>
-      </view>
-    </view>
-    <view class="iou-list" wx:if="{{iou.length}}">
-      <view class="iou-it {{item.done ? 'iou-done' : ''}}" wx:for="{{iou}}" wx:key="date">
-        <view class="iou-main" data-i="{{index}}" bindtap="onIouDone">
-          <text class="iou-who">{{item.dir==='lend' ? '借出 →' : '← 借入'}} {{item.mate}}</text>
-          <text class="iou-what dim">{{item.what || '垫付'}} · {{item.date}}</text>
-        </view>
-        <text class="iou-amt">{{item.dir==='lend' ? '借出 ' : '借入 '}}¥{{item.amt}}</text>
-        <text class="iou-ok" wx:if="{{item.done}}">已清</text>
-        <text class="iou-del" data-i="{{index}}" catchtap="onIouDel">✕</text>
-      </view>
-    </view>
-    <view class="dim iou-none" wx:else>同行垫付记这里，回来对账</view>
-  </view>
-
-  <!-- 每日花费柱状图（最近 10 个记账日） -->
-  <view class="card" wx:if="{{dayBars.length > 1}}">
-    <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/clock.png"/>每日花费</view>
-      <text class="dim u-fs20">最近 {{dayBars.length}} 个记账日</text>
-    </view>
-    <view class="day-bars">
-      <view class="db-it" wx:for="{{dayBars}}" wx:key="label">
-        <text class="db-amt">{{item.amt}}</text>
-        <view class="db-col"><view class="db-bar" style="height:{{item.h}}%"></view></view>
-        <text class="db-lb">{{item.label}}</text>
-      </view>
-    </view>
-  </view>
-
-  <!-- 分类占比（按全部账目） -->
-  <view class="card cat-card" wx:if="{{catSums.length}}">
-    <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>花费分类占比</view>
-      <text class="dim u-fs20">按全部账目 · 点标签分类记账</text>
-    </view>
-    <view class="stack">
-      <view wx:for="{{catSums}}" wx:key="cat" class="seg" style="width:{{item.pct}}%;background:{{item.color}}"></view>
-    </view>
-    <view class="legend">
-      <view class="lgd" wx:for="{{catSums}}" wx:key="cat">
-        <text class="dot" style="background:{{item.color}}"></text>
-        <text class="lgd-cat">{{item.cat}}</text>
-        <text class="lgd-amt">¥{{item.amt}} · {{item.pct}}%</text>
-      </view>
-    </view>
-  </view>
-
-  <view class="card">
-    <view class="h3 row-between"><view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>详细记账</view><text class="dim u-fs20">可指定日期 / 付款人</text></view>
-    <view class="row">
-      <input class="inp-amt" type="digit" placeholder="金额 ¥" value="{{amt}}" bindinput="onAmt"/>
-      <picker mode="selector" range="{{cats}}" bindchange="onCatChange">
-        <view class="cat">{{cat}} ›</view>
-      </picker>
-    </view>
-    <input class="inp-name" placeholder="项目（如 高铁票 / 打车 / 门票）" value="{{name}}" bindinput="onName"/>
-    <view class="row mt">
-      <picker mode="date" value="{{date}}" bindchange="onDatePick">
-        <view class="date-pick"><image class="ic ic-sm" src="/images/icons/calendar.png"/>{{date}} ›</view>
-      </picker>
-      <input class="inp-payer" placeholder="付款人" value="{{payer}}" bindinput="onPayerChange"/>
-    </view>
-    <view class="row mt">
-      <text class="aa-lbl">AA 人数</text>
-      <view class="stepper">
-        <text class="step-btn" bindtap="onShareMinus">－</text>
-        <text class="step-num">{{share}} 人</text>
-        <text class="step-btn" bindtap="onSharePlus">＋</text>
-      </view>
-      <text class="aa-hint">人均 ¥{{perHint}}</text>
-    </view>
-    <view class="btn-primary u-mt20" bindtap="add">记一笔</view>
-  </view>
-
-  <!-- v1.6：同行人（AA 与付款人共用） -->
-  <!-- v1.7 · 月度汇总 -->
-  <view class="card mon-card" wx:if="{{monthly}}">
-    <view class="h3 h3-row"><image class="ic" src="/images/icons/calendar2.png"/>月度汇总</view>
-    <view class="mon-row" wx:for="{{monthly.months}}" wx:key="ym">
-      <text class="mon-lb">{{item.label}}</text>
-      <view class="mon-track"><view class="mon-fill" style="width:{{item.pct}}%"></view></view>
-      <text class="mon-amt">¥{{item.total}}</text>
-      <text class="mon-cnt dim">{{item.count}} 笔</text>
-    </view>
-    <view class="mon-foot dim" wx:if="{{monthly.worst}}">
-      花得最多的月份：{{monthly.worst.label}} · ¥{{monthly.worst.total}}（主要花在 {{monthly.worst.top}}）
-    </view>
-  </view>
-
-  <!-- v1.7 · 汇率换算（低频：默认折叠，出境前展开） -->
-  <view class="card fx-card">
-    <view class="h3 h3-row fx-head" bindtap="toggleFx">
-      <view class="h3-l"><image class="ic" src="/images/icons/coin.png"/>汇率换算</view>
-      <text class="fx-tog dim">{{fxOpen ? '收起 ▴' : '展开 ▾'}}</text>
-    </view>
-    <view wx:if="{{fxOpen}}" class="fx-body">
-      <view class="fx-row">
-        <input class="fx-inp" type="digit" value="{{fxAmt}}" bindinput="onFxInput" placeholder="金额"/>
-        <picker mode="selector" range="{{fxList}}" bindchange="onFxFrom">
-          <view class="fx-pick">{{fxFrom}} ▾</view>
-        </picker>
-        <text class="fx-eq">=</text>
-        <text class="fx-out">{{fxOut || '0'}}</text>
-        <picker mode="selector" range="{{fxList}}" bindchange="onFxTo">
-          <view class="fx-pick">{{fxTo}} ▾</view>
-        </picker>
-      </view>
-      <view class="fx-tip dim">参考汇率，离线可用</view>
-    </view>
-  </view>
-
-  <view class="card mate-card">
-    <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/people.png"/>同行人</view>
-      <text class="dim u-fs20">点一下设为当前付款人</text>
-    </view>
-    <view class="mate-chips">
-      <view class="mate {{payer === '我' ? 'on' : ''}}" data-n="我" bindtap="pickPayer">我</view>
-      <view class="mate {{payer === item ? 'on' : ''}}" wx:for="{{mates}}" wx:key="*this" data-n="{{item}}" bindtap="pickPayer">
-        {{item}}<text class="mate-x" data-i="{{index}}" catchtap="delMate">✕</text>
-      </view>
-    </view>
-    <view class="mate-add">
-      <input class="mate-inp" placeholder="加个同行人，如 小明" value="{{mateInput}}" bindinput="onMateInput" bindconfirm="addMate"/>
-      <view class="mate-btn" bindtap="addMate">加入</view>
-    </view>
-  </view>
-
+  <!-- ⑥ 账单明细 -->
   <view class="card">
     <view class="h3 row-between">
       <text>账单明细 <text class="dim u-fs20">（点 ✕ 删除，可撤销）</text></text>
@@ -324,7 +94,237 @@
     </view>
   </view>
 
-  <!-- v1.8.5 C8：删除撤销浮条 -->
+  <!-- ⑦ 折叠：详细记账（需指定日期 / 付款人 / AA 人数时才用） -->
+  <view class="card fold-hd" bindtap="toggleSec" data-s="detail">
+    <view class="h3 row-between">
+      <view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>详细记账</view>
+      <text class="dim u-fs20">{{secDetail ? '收起 ▴' : '指定日期 / 付款人 / AA ▾'}}</text>
+    </view>
+  </view>
+  <block wx:if="{{secDetail}}">
+    <view class="card">
+      <view class="row">
+        <input class="inp-amt" type="digit" placeholder="金额 ¥" value="{{amt}}" bindinput="onAmt"/>
+        <picker mode="selector" range="{{cats}}" bindchange="onCatChange">
+          <view class="cat">{{cat}} ›</view>
+        </picker>
+      </view>
+      <input class="inp-name" placeholder="项目（如 高铁票 / 打车 / 门票）" value="{{name}}" bindinput="onName"/>
+      <view class="row mt">
+        <picker mode="date" value="{{date}}" bindchange="onDatePick">
+          <view class="date-pick"><image class="ic ic-sm" src="/images/icons/calendar.png"/>{{date}} ›</view>
+        </picker>
+        <input class="inp-payer" placeholder="付款人" value="{{payer}}" bindinput="onPayerChange"/>
+      </view>
+      <view class="row mt">
+        <text class="aa-lbl">AA 人数</text>
+        <view class="stepper">
+          <text class="step-btn" bindtap="onShareMinus">－</text>
+          <text class="step-num">{{share}} 人</text>
+          <text class="step-btn" bindtap="onSharePlus">＋</text>
+        </view>
+        <text class="aa-hint">人均 ¥{{perHint}}</text>
+      </view>
+      <view class="btn-primary u-mt20" bindtap="add">记一笔</view>
+    </view>
+  </block>
+
+  <!-- ⑧ 折叠：看数据（7 块分析，默认收起） -->
+  <view class="card fold-hd" bindtap="toggleSec" data-s="stats">
+    <view class="h3 row-between">
+      <view class="h3-l"><image class="ic" src="/images/icons/trend.png"/>看数据</view>
+      <text class="dim u-fs20">{{secStats ? '收起 ▴' : '趋势 / 预测 / 分类 ▾'}}</text>
+    </view>
+  </view>
+  <block wx:if="{{secStats}}">
+    <!-- 近 7 日花销柱 + 本月一句话复盘 -->
+    <view class="card w7-card" wx:if="{{week7 && week7.sum > 0}}">
+      <view class="w7-head"><image class="ic ic-sm" src="/images/icons/trend.png"/>近 7 日 · ¥{{week7.sum}}</view>
+      <view class="w7-row">
+        <view class="w7-col" wx:for="{{week7.days}}" wx:key="key">
+          <view class="w7-bar"><view class="w7-fill {{item.amt === week7.max && item.amt > 0 ? 'w7-max' : ''}}" style="height:{{item.amt > 0 ? (item.amt / week7.max * 88) : 4}}%"></view></view>
+          <text class="w7-l dim">{{item.label}}</text>
+        </view>
+      </view>
+      <view class="w7-t dim" wx:if="{{mstory}}">{{mstory.txt}}</view>
+    </view>
+
+    <!-- 花费预测 -->
+    <view class="card fc-card" wx:if="{{forecast && forecast.budget > 0}}">
+      <view class="h3 row-between">
+        <view class="h3-l"><image class="ic" src="/images/icons/trend.png"/>花费预测</view>
+        <text class="fc-lv {{forecast.over ? 'over' : 'ok'}}">{{forecast.over ? '可能超支' : '预计可控'}}</text>
+      </view>
+      <view class="fc-nums">
+        <view class="fc-n"><text class="fc-v">¥{{forecast.forecast}}</text><text class="fc-l">预计全程</text></view>
+        <view class="fc-n"><text class="fc-v">¥{{forecast.perDay}}</text><text class="fc-l">已花日均</text></view>
+        <view class="fc-n"><text class="fc-v">¥{{forecast.budget}}</text><text class="fc-l">预算参考</text></view>
+      </view>
+      <view class="bud-bar u-mt14">
+        <view class="bud-fill {{forecast.over ? 'over' : ''}}" style="width:{{forecast.pct > 100 ? 100 : forecast.pct}}%"></view>
+      </view>
+      <view class="fc-tx {{forecast.over ? 'fc-over' : ''}}">{{forecast.txt}}</view>
+    </view>
+
+    <!-- 每日预算额度 -->
+    <view class="card db-card" wx:if="{{dbud && dbud.perDay > 0}}">
+      <view class="h3 row-between">
+        <view class="h3-l"><image class="ic" src="/images/icons/coin.png"/>每日额度</view>
+        <text class="dim u-fs20">¥{{dbud.perDay}} / 天</text>
+      </view>
+      <view class="db-row {{item.over ? 'db-over' : ''}} {{item.isToday ? 'db-today' : ''}}" wx:for="{{dbud.rows}}" wx:key="date">
+        <text class="db-d">D{{item.no}}<text class="db-md dim">{{item.md}}</text></text>
+        <view class="db-track"><view class="db-fill {{item.over ? 'over' : ''}}" style="width:{{item.pct}}%"></view></view>
+        <text class="db-a {{item.over ? 'db-a-over' : ''}}">¥{{item.spent}}</text>
+      </view>
+      <view class="db-foot dim" wx:if="{{dbud.overDays}}">有 {{dbud.overDays}} 天超出日额度，后面几天匀一匀就好</view>
+      <view class="db-foot dim" wx:else>每天都在额度内，节奏很稳</view>
+    </view>
+
+    <!-- 每日花费柱 -->
+    <view class="card" wx:if="{{dayBars.length > 1}}">
+      <view class="h3 row-between">
+        <view class="h3-l"><image class="ic" src="/images/icons/clock.png"/>每日花费</view>
+        <text class="dim u-fs20">最近 {{dayBars.length}} 个记账日</text>
+      </view>
+      <view class="day-bars">
+        <view class="db-it" wx:for="{{dayBars}}" wx:key="label">
+          <text class="db-amt">{{item.amt}}</text>
+          <view class="db-col"><view class="db-bar" style="height:{{item.h}}%"></view></view>
+          <text class="db-lb">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 分类占比 -->
+    <view class="card cat-card" wx:if="{{catSums.length}}">
+      <view class="h3 row-between">
+        <view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>花费分类占比</view>
+        <text class="dim u-fs20">按全部账目 · 点标签分类记账</text>
+      </view>
+      <view class="stack">
+        <view wx:for="{{catSums}}" wx:key="cat" class="seg" style="width:{{item.pct}}%;background:{{item.color}}"></view>
+      </view>
+      <view class="legend">
+        <view class="lgd" wx:for="{{catSums}}" wx:key="cat">
+          <text class="dot" style="background:{{item.color}}"></text>
+          <text class="lgd-cat">{{item.cat}}</text>
+          <text class="lgd-amt">¥{{item.amt}} · {{item.pct}}%</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 预算分配对照 -->
+    <view class="card split-card" wx:if="{{split}}">
+      <view class="h3 row-between">
+        <view class="h3-l"><image class="ic" src="/images/icons/pie.png"/>预算分配对照</view>
+        <text class="dim u-fs20">建议 vs 实际</text>
+      </view>
+      <view class="sp-row" wx:for="{{split.rows}}" wx:key="cat">
+        <text class="sp-cat">{{item.cat}}</text>
+        <view class="sp-bars">
+          <view class="sp-bar"><view class="sp-fill sug" style="width:{{item.sugW}}%"></view></view>
+          <view class="sp-bar"><view class="sp-fill real {{item.over ? 'over' : ''}}" style="width:{{item.realW}}%"></view></view>
+        </view>
+        <text class="sp-amt {{item.over ? 'sp-over' : ''}}">¥{{item.sug}}<text class="sp-slash">/</text>{{item.real}}</text>
+      </view>
+      <view class="sp-foot dim">上＝建议额度　下＝已花</view>
+    </view>
+
+    <!-- 月度汇总 -->
+    <view class="card mon-card" wx:if="{{monthly}}">
+      <view class="h3 h3-row"><image class="ic" src="/images/icons/calendar2.png"/>月度汇总</view>
+      <view class="mon-row" wx:for="{{monthly.months}}" wx:key="ym">
+        <text class="mon-lb">{{item.label}}</text>
+        <view class="mon-track"><view class="mon-fill" style="width:{{item.pct}}%"></view></view>
+        <text class="mon-amt">¥{{item.total}}</text>
+        <text class="mon-cnt dim">{{item.count}} 笔</text>
+      </view>
+      <view class="mon-foot dim" wx:if="{{monthly.worst}}">
+        花得最多的月份：{{monthly.worst.label}} · ¥{{monthly.worst.total}}（主要花在 {{monthly.worst.top}}）
+      </view>
+    </view>
+  </block>
+
+  <!-- ⑨ 折叠：同行分账（AA / 人情 / 同行人） -->
+  <view class="card fold-hd" bindtap="toggleSec" data-s="social">
+    <view class="h3 row-between">
+      <view class="h3-l"><image class="ic" src="/images/icons/people.png"/>同行分账</view>
+      <text class="dim u-fs20">{{secSocial ? '收起 ▴' : 'AA / 垫付 / 同行人 ▾'}}</text>
+    </view>
+  </view>
+  <block wx:if="{{secSocial}}">
+    <!-- AA 结算 -->
+    <view class="card settle-card" wx:if="{{settle && settle.people > 1}}">
+      <view class="h3 row-between">
+        <view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>AA 结算</view>
+        <text class="btn-export" bindtap="copySettle">复制方案</text>
+      </view>
+      <view class="st-sum">共 ¥{{settle.total}} · {{settle.people}} 人 · 人均 ¥{{settle.per}}</view>
+      <view class="st-row" wx:for="{{settle.rows}}" wx:key="payer">
+        <text class="st-payer">{{item.payer}}</text>
+        <text class="st-paid">实付 ¥{{item.paid}}</text>
+        <text class="st-net {{item.netCls}}">{{item.netTx}}</text>
+      </view>
+      <view class="st-trans" wx:if="{{settle.transfers.length}}">
+        <view class="st-trans-t">结清方式</view>
+        <view class="st-trans-l" wx:for="{{settle.transfers}}" wx:key="to">{{item.from}} → {{item.to}} <text class="gold">¥{{item.amt}}</text></view>
+      </view>
+      <view class="st-trans-l dim" wx:else>账目已平，无需转账</view>
+    </view>
+
+    <!-- 人情往来 -->
+    <view class="card iou-card">
+      <view class="h3 row-between">
+        <view class="h3-l"><image class="ic" src="/images/icons/people.png"/>人情往来</view>
+        <text class="dim u-fs20" wx:if="{{iouSt}}">净应收 ¥{{iouSt.pending}}</text>
+      </view>
+      <view class="iou-add">
+        <view class="iou-dir">
+          <view class="qk-cat {{iouDir==='lend'?'on':''}}" data-d="lend" bindtap="onIouDir">我借出</view>
+          <view class="qk-cat {{iouDir==='borrow'?'on':''}}" data-d="borrow" bindtap="onIouDir">我借入</view>
+        </view>
+        <input class="iou-inp" placeholder="谁（如 小明）" value="{{iouMate}}" bindinput="onIouMate"/>
+        <input class="iou-inp" placeholder="因为什么（可选）" value="{{iouWhat}}" bindinput="onIouWhat"/>
+        <view class="iou-row2">
+          <input class="iou-inp" type="digit" placeholder="金额 ¥" value="{{iouAmt}}" bindinput="onIouAmt"/>
+          <view class="qk-go" bindtap="addIou">记一笔</view>
+        </view>
+      </view>
+      <view class="iou-list" wx:if="{{iou.length}}">
+        <view class="iou-it {{item.done ? 'iou-done' : ''}}" wx:for="{{iou}}" wx:key="date">
+          <view class="iou-main" data-i="{{index}}" bindtap="onIouDone">
+            <text class="iou-who">{{item.dir==='lend' ? '借出 →' : '← 借入'}} {{item.mate}}</text>
+            <text class="iou-what dim">{{item.what || '垫付'}} · {{item.date}}</text>
+          </view>
+          <text class="iou-amt">{{item.dir==='lend' ? '借出 ' : '借入 '}}¥{{item.amt}}</text>
+          <text class="iou-ok" wx:if="{{item.done}}">已清</text>
+          <text class="iou-del" data-i="{{index}}" catchtap="onIouDel">✕</text>
+        </view>
+      </view>
+      <view class="dim iou-none" wx:else>同行垫付记这里，回来对账</view>
+    </view>
+
+    <!-- 同行人 -->
+    <view class="card mate-card">
+      <view class="h3 row-between">
+        <view class="h3-l"><image class="ic" src="/images/icons/people.png"/>同行人</view>
+        <text class="dim u-fs20">点一下设为当前付款人</text>
+      </view>
+      <view class="mate-chips">
+        <view class="mate {{payer === '我' ? 'on' : ''}}" data-n="我" bindtap="pickPayer">我</view>
+        <view class="mate {{payer === item ? 'on' : ''}}" wx:for="{{mates}}" wx:key="*this" data-n="{{item}}" bindtap="pickPayer">
+          {{item}}<text class="mate-x" data-i="{{index}}" catchtap="delMate">✕</text>
+        </view>
+      </view>
+      <view class="mate-add">
+        <input class="mate-inp" placeholder="加个同行人，如 小明" value="{{mateInput}}" bindinput="onMateInput" bindconfirm="addMate"/>
+        <view class="mate-btn" bindtap="addMate">加入</view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 删除撤销浮条 -->
   <view class="undo-tip" wx:if="{{undoRow}}" bindtap="undoDel">
     <text class="ut-tx">已删除「{{undoRow.name}} · ¥{{undoRow.amt}}」</text>
     <text class="ut-btn">撤销</text>
