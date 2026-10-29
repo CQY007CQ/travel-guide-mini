@@ -73,7 +73,8 @@ Page(SafePage({
       // v1.9：目的地气候补充提醒（高原防晒 / 热带驱蚊…）
       try {
         const co = T.findCity(cityName);
-        out.cliAdd = co ? T.climateAddOns(co.climate) : [];
+        // 2026-10-29：与主清单去重（墨镜 / 防晒 / 雨具 / 饮用水 等两边都会出现）
+        out.cliAdd = co ? T.climateAddOnsFiltered(co.climate, out.packGroups) : [];
       } catch (e) { out.cliAdd = []; }
       // 行前预告：本次行程已把几个想玩排进去了（对齐网页版 ★ 想玩高亮；合并条目/别名也命中）
       const wishPlanNames = [];

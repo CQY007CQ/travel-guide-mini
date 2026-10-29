@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.121";
+const APP_VER = "1.19.122";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -3484,6 +3484,51 @@ function climateAddOns(climate) {
  };
  return map[climate] || [];
 }
+
+/* 2026-10-29：气候补充项与主清单会重复（墨镜 / 防晒 / 雨具 / 羽绒服 两边都有）。
+   按「关键词」判重，不整串比对 —— 主清单条目常是组合式，如「防晒霜（SPF30+）· 墨镜」。 */
+const CLIMATE_SYN = {
+ "高反常备药": ["高反", "红景天"],
+ "防晒霜+墨镜": ["防晒"],
+ "保湿润唇": ["润唇", "护唇"],
+ "轻便保暖外套": ["保暖", "冲锋衣", "羽绒"],
+ "羽绒服": ["羽绒"],
+ "保暖内衣": ["保暖内衣"],
+ "手套围巾": ["手套", "围巾"],
+ "保温杯": ["保温杯", "水杯"],
+ "防晒霜": ["防晒"],
+ "遮阳帽": ["遮阳帽", "帽子"],
+ "便携风扇": ["风扇"],
+ "藿香正气": ["藿香", "正气"],
+ "驱蚊液": ["驱蚊"],
+ "速干衣": ["速干"],
+ "雨具": ["雨具", "雨衣", "折叠伞", "伞"],
+ "保湿护肤品": ["保湿"],
+ "润唇膏": ["润唇", "护唇"],
+ "墨镜": ["墨镜"],
+ "多带饮用水": ["水杯", "饮用水"],
+};
+
+// 返回气候补充项，剔除主清单已覆盖的（packGroups 传 packSmart().groups）
+function climateAddOnsFiltered(climate, packGroups) {
+ const raw = climateAddOns(climate);
+ if (!raw.length) return [];
+ // 注意：packSmart 的 items 是对象数组 { k, t, done }，不是字符串数组。
+ // 初版直接用 join(" ") 得到一串 "[object Object]"，导致去重永远失效（静默无效比报错更糟）。
+ const txtOf = x => (typeof x === "string" ? x : (x && (x.t || x.name || "")) || "");
+ const hay = (Array.isArray(packGroups) ? packGroups : [])
+  .map(g => (g && Array.isArray(g.items) ? g.items.map(txtOf).join(" ") : ""))
+  .join(" ");
+ if (!hay) return raw;
+ const out = [];
+ for (const it of raw) {
+  const keys = CLIMATE_SYN[it] || [it];
+  let dup = false;
+  for (const k of keys) { if (k && hay.indexOf(k) >= 0) { dup = true; break; } }
+  if (!dup) out.push(it);
+ }
+ return out;
+}
 // —— 近 7 日花费柱（账本 stat 用） ——
 function weekBars(list) {
  const now = new Date();
@@ -5550,7 +5595,7 @@ module.exports = {
  mondayClashOf, bookRemindOf, bestSeasonHit, mixStat, themeTagOf, dayMove,
  spotLookup, bookingTipOf,
  endTripTip, wishMissOf, packHintOf, siblingCities, routeDaysBar, nowSlotPick,
- tomorrowPeek, todayGear, todayOverHint, tasteTagOf, tasteFilter, climateAddOns,
+ tomorrowPeek, todayGear, todayOverHint, tasteTagOf, tasteFilter, climateAddOns, climateAddOnsFiltered,
  weekBars, monthStory, wishDice, provStamp, travelPersona, dayCityTag,
  routeKmOf, wishPins, holidayHint,
  fmtLocalDate: store.fmtLocalDate,
