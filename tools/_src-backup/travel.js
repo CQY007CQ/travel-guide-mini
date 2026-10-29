@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.120";
+const APP_VER = "1.19.121";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -2132,6 +2132,14 @@ function applyNav(mode) {
    frontColor: dark ? "#ffffff" : "#000000",
    backgroundColor: dark ? "#0b1020" : "#eaeff7"
   });
+  // 2026-10-29：窗口底色也要跟随主题，否则导航栏与内容之间的缝隙会露出浅色（深色模式下的"白线"）
+  if (wx.setBackgroundColor) {
+   wx.setBackgroundColor({
+    backgroundColor: dark ? "#0a0f1c" : "#eaeff7",
+    backgroundColorTop: dark ? "#0a0f1c" : "#eaeff7",
+    backgroundColorBottom: dark ? "#0a0f1c" : "#eaeff7"
+   });
+  }
  } catch (e) {}
 }
 // tabBar（底部原生频道条）配色跟随主题：默认壳已配置为浅色 + 深灰图标；切到深色时动态覆盖配色与图标

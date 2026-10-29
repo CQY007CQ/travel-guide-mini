@@ -35,7 +35,10 @@ page {
   /* 浅色主题：卡片阴影更轻，避免白底上黑色阴影过于突兀 */
   --card-shadow: 0 6rpx 22rpx rgba(19, 29, 49, 0.06), 0 1rpx 3rpx rgba(19, 29, 49, 0.04);
   --card-inset: inset 0 1rpx 0 rgba(255, 255, 255, 0.6);
-  background: var(--bg-img);
+  /* 2026-10-29：page 不再自己画背景 —— 它拿到的是 page 作用域的浅色变量，
+     深色模式下会从导航栏与内容的缝隙里露出浅色（用户看到的"白线"）。
+     改为透明，让窗口底色（wx.setBackgroundColor 跟随主题）兜住，渐变交给下面的 .page。 */
+  background: transparent;
   color: var(--t1, #18233a);
   /* 全局字号缩放因子：--fs 由 .fz1/.fz2/.fz3 覆盖，所有 font-size 经 calc(* var(--fs,1)) 统一缩放 */
   --fs: 1;
@@ -88,7 +91,14 @@ page {
 /* ═══ 全局字号（长辈友好）：三档缩放作用于所有页面根 view ═══
    .page 根持有 --fs；每个 font-size 都写成 calc(Nrpx * var(--fs,1)) 才会被统一缩放。
    .fz2 / .fz3 挂在根 view 上覆盖 --fs（与 .page 同特异性，靠后声明胜出）。 */
-.page { --fs: 1; font-size: calc(28rpx * var(--fs, 1)); }
+.page {
+  --fs: 1;
+  font-size: calc(28rpx * var(--fs, 1));
+  /* 背景跟随主题：与 .td 同元素时 --bg-img 解析为深色值，否则浅色值 */
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--bg-img);
+}
 .fz1 { --fs: 1; }
 .fz2 { --fs: 1.15; }
 .fz3 { --fs: 1.35; }

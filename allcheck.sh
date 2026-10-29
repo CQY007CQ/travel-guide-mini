@@ -62,6 +62,8 @@ step "JS 语法检查" bash -c '
 step "依赖完整性 (相对引用可解析)" "$NODE" tools/check-deps.mjs
 # 凭据泄露：随包目录不得出现明文 key / 高德接口 / 未登记外链（自检发现该检查只存在于手工脚本，故固化）
 step "凭据泄露 (随包无明文 key)" "$NODE" tools/check-secrets.mjs
+# 图片引用：缺失不会编译报错，只会在特定主题下显示破图（深色 tabBar 图标曾整组缺失）
+step "图片引用 (无缺失图标)" "$NODE" tools/check-assets.mjs
 step "JSON 合法性" bash -c '
   err=0
   for f in app.json project.config.json sitemap.json pages/*/*.json; do
