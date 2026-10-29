@@ -58,6 +58,8 @@ step "JS 语法检查" bash -c '
   exit $err
 '
 
+# 依赖完整性：任何相对 require/import 都必须可解析（防"移文件移断管线"，见 check-v112 事故）
+step "依赖完整性 (相对引用可解析)" "$NODE" tools/check-deps.mjs
 step "JSON 合法性" bash -c '
   err=0
   for f in app.json project.config.json sitemap.json pages/*/*.json; do

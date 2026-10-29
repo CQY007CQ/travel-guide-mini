@@ -6,10 +6,10 @@
 交通动线与步行量、能直接导航的真实坐标、预算拆解、打包清单、逐日天气（联网时才有，
 断网自动降级）。城市数据与坐标随分包下发，**装机后完全不需要网络**。
 
-- 版本：`1.19.107`
+- 版本：`1.19.112`
 - AppID：`wxa365d49bc3366f95`（个人主体）
 - 基础库：`3.8.12`
-- 页面：主包 5 页（含 4 个 tabBar）+ 分包 12 页（功能 8 / 数据 3 / 内容 1）
+- 页面：主包 6 页（含 4 个 tabBar）+ 分包 12 页（功能 8 / 数据 3 / 内容 1）
 
 ---
 
@@ -23,7 +23,9 @@
 | 真实坐标导航 | 绝大多数景点条目带真实 GCJ-02 坐标，点「导航」直接调起 `wx.openLocation`；没有精确坐标的自动退到城市锚点，不出现"假点" |
 | 手动调整 | 上下移动、**按住手柄拖拽调序**、删除、换同类景点、加自定义景点、标记想玩、打卡打钩 |
 | 行程体检 | 超出建议天数、务必预约未订、周一闭馆冲突、转场日无留白、预算偏紧 —— 一次列清，可一键减负 |
-| 地图 / 美食 / 账本 | 按天切换的动线地图；404 城的真实名店清单；随手记账 + AA 分账 + CSV 导出 |
+| 地图 / 美食 / 账本 | 按天切换的动线地图；404 城 6880 家真实名店，**点菜名可筛出做这道菜的店**；随手记账 + AA 分账 + CSV 导出 |
+| 个性推荐（v1.19.111） | 一句话说需求（「人少的古镇 三天」），端侧加权打分给候选城市并附理由；纯本地计算，不联网 |
+| 旅途应急 | 受伤/突发不适时先给 120，再给「该挂什么科」，并按距离列就近医院（43 城 62 家，坐标经质量闸门校验） |
 | 旅行档案 | 足迹（已去城市 / 打卡景点 / 成就徽章）、多行程存档、城市评分与避坑贴士、旅行排行榜 |
 | 今日正当时灵感（v1.19.87） | 首页与「今天」页按当月时令推荐城市，点卡片即预填好目的地与天数，调完预算再一键生成 |
 | 分享即种草（v1.19.88/89） | 行程页右上角转发生成一张黑金攻略卡，好友点开看到的正好是你这座城 |
@@ -63,7 +65,7 @@ cd miniprogram-travel
 miniprogram-travel/
 ├── app.js / app.json / app.wxss      全局入口 / 页面注册 / 双主题变量基座
 ├── pages/                            主包（5 页，其中 4 个 tabBar）
-│   ├── splash/  index/  today/  plan/  more/
+│   ├── splash/  index/  today/  plan/  more/  help/
 ├── subpkg/                           功能分包：map food ledger prep assistant guide toolkit rank
 ├── subdata/ subdata2/ subdata3/      数据分包：deflate+base64 编码的城市数据块 + 占位页
 ├── subai/                            内容分包：10 城深度玩法（ai-deep.js）+ deep 页
@@ -74,6 +76,9 @@ miniprogram-travel/
 │   ├── aicontent.js     深玩内容 holder
 │   ├── ad.js            激励视频封装（未开通 = 全解锁）
 │   ├── remind.js        提醒队列 + 日历 / 订阅双通道
+│   ├── emergency.js / emergency-data.js   旅途应急：分诊规则 + 已核验医院坐标（独立模块，不进数据块）
+│   ├── food-map.js                     菜名 → 店铺匹配（品牌联想 + 词根 + 尾词三层）
+│   ├── recommend.js                    个性推荐打分引擎
 │   └── rank.js / store.js / weather.js / toolkit-groups.js
 ├── tools/                            数据管道与回归链（不打包，见 project.config.json）
 ├── images/                           图标与 tabBar 图
@@ -100,30 +105,33 @@ node tools/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data
 | 规则 | 为什么 |
 |---|---|
 | 补丁文件名必须匹配 `/^v19\d-.*\.js$/` | 管道按此识别增量，避免误把一次性脚本当数据补丁 |
-| **`tools/merge-data-patch.mjs` 已禁用** | 它做整体替换，曾把 `CITIES_ADD` 覆盖导致 experiences 塌回 8655 条 |
+| **禁用「整体替换」式合并**（原 `merge-data-patch.mjs` 已移出仓库） | 它做整体替换，曾把 `CITIES_ADD` 覆盖导致 experiences 塌回 8655 条 |
 | 打包器内置"脏键清理" | 自动剔除 `SPOT_COORDS` / `CITY2PROV` 里的非直辖市省名键，否则跨省解析会串城 |
 | `require.async()` 实参必须是静态字符串字面量 | 传变量会导致微信解析不到分包 → 数据永不加载 → **首页白屏**（线上事故根因） |
 | 键别名压缩已停用 | 与 `_apply-safe` 的读写不同源，会互相污染导致键损坏 |
+| 坐标与美食去重走 `tools/lib-near-dup.mjs` | 「同一景点」的判定只有一处真源，避免扫描器与写入端规则漂移（曾导致每日任务连续多天空转） |
+| 美食增量批次 `v202-food-shops2.js` | 店名来自公开资料、坐标由 `geocode/geo` 取得并经质量闸门（地址含预期街道 / 非公交站 / 距城中心 ≤25km） |
 
 ---
 
 ## 五、回归链
 
 ```bash
-./allcheck.sh        # 25 项：语法/JSON/数据健康/重名/7+ 组单测/泛词扫描/行政区审计/全省生成/压测/WXML 结构/包体/发布门禁
+./allcheck.sh        # 29 项：语法/依赖完整性/JSON/数据健康/重名/11 组单测/模糊测试/启动冒烟/泛词扫描/行政区审计/全省生成/压测/WXML 结构/事件配对/包体/发布门禁
 ```
 
 专项回归（新增，`v1.19.78` 起常态化，已覆盖 deep / ad / remind / 今日正当时 / 转发卡 / 分享种草 等）：
 
 ```bash
-node tools/_test-v11978-deep.mjs       # 深玩内容加载与 page 逻辑
-node tools/_test-v11978-ad.mjs         # 激励视频 fail-open 与半程退出不给奖励
-node tools/_test-v11978-remind.mjs     # 提醒队列 / 日历兜底 / 云端降级
+node tools/_test-recommend.mjs         # 推荐引擎（35 条断言）
+node tools/_fuzz-recommend.mjs         # 推荐引擎模糊测试（171 组标签组合 + 极端输入）
+node tools/_test-emergency.mjs         # 旅途应急（288 条断言：分诊正确性 / 数据完整性 / 禁词红线）
+node tools/_test-foodmap.mjs           # 菜名→店铺匹配（16 条断言）
 node tools/_test-v11987-insp-ui.mjs    # 今日正当时 灵感卡接线
 node tools/_test-v11988-sharecard.mjs  # 转发黑金卡生成
 node tools/_test-v11989-sharetitle.mjs # 分享即种草
-node tools/_test-wx-async.mjs          # 模拟微信 require.async 分支（Node 默认走不到）
-node tools/_test-multichunk.mjs        # 多数据分块合并
+node tools/_test-plan-handlers.mjs     # 行程页 14 个交互 handler
+node tools/_test-v11993-bootsmoke.mjs  # 17 页启动冒烟（抓分包 require 层级错误）
 ```
 
 写回归脚本的约定：**从源码里 `indexOf` 抽出真实 handler 文本，塞进 vm 沙盒跑**，而不是照着逻辑另抄一份 —— 否则源码改了测试照样是绿的，等于没测。
