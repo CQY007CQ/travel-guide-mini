@@ -56,6 +56,14 @@ let officialCoords = {};
 try { officialCoords = req("./tools/v201-official-coords.js"); } catch (e) { /* 无坐标批次时跳过 */ }
 let foodShops = {};
 try { foodShops = (req("./tools/v199-food-shops.js") || {}).FOOD_SPOTS_ADD || {}; } catch (e) { /* 无美食批次时跳过 */ }
+// v202 美食增量批次 2：公开资料提店名 + geocode 精确地址取坐标 + 闸门校验（洛阳试点）
+try {
+  const _f2 = (req("./tools/v202-food-shops2.js") || {}).FOOD_SPOTS_ADD || {};
+  for (const _cn in _f2) {
+    if (!foodShops[_cn]) foodShops[_cn] = [];
+    foodShops[_cn] = foodShops[_cn].concat(_f2[_cn]);
+  }
+} catch (e) { /* 无第二批时跳过 */ }
 
 // 内联 cleanSpotName（避免 require utils/travel.js 触发 wx/微信全局，node 下崩溃）
 function cleanSpotName(name) {
