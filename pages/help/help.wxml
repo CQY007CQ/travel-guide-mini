@@ -4,7 +4,18 @@
   <view class="eh-hero">
     <text class="eh-t">旅途受伤 / 突发不适</text>
     <text class="eh-s">急危重症请先拨打 120，说清位置与伤情；不要先查攻略，也不要自己开车</text>
-    <view class="eh-call" bindtap="onCall120">拨打 120</view>
+    <view class="eh-call" bindtap="onCall120">
+      <view class="eh-call-left">
+        <text class="eh-call-l">急救电话</text>
+        <text class="eh-num">120</text>
+      </view>
+      <text class="eh-call-r">点击拨打 ›</text>
+    </view>
+    <view class="eh-others">
+      <view class="eh-o" bindtap="onCallNum" data-num="110"><text class="eh-o-n">110</text><text class="eh-o-l">报警</text></view>
+      <view class="eh-o" bindtap="onCallNum" data-num="119"><text class="eh-o-n">119</text><text class="eh-o-l">火警</text></view>
+      <view class="eh-o" bindtap="onCallNum" data-num="122"><text class="eh-o-n">122</text><text class="eh-o-l">交通事故</text></view>
+    </view>
   </view>
 
   <!-- 第二步：分诊 -->

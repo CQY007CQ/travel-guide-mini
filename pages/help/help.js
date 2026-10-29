@@ -69,6 +69,21 @@ Page(SafePage({
     });
   },
 
+  // 通用紧急号码拨打（110 报警 / 119 火警 / 122 交通事故）
+  onCallNum(e) {
+    const num = (e.currentTarget.dataset.num || "").toString().trim();
+    if (!num) return;
+    wx.showModal({
+      title: "拨打 " + num,
+      content: "需要现在拨号吗？",
+      confirmText: "拨打",
+      success: (r) => {
+        if (!r.confirm) return;
+        wx.makePhoneCall({ phoneNumber: num, fail: () => wx.showToast({ title: "请手动拨打 " + num, icon: "none" }) });
+      },
+    });
+  },
+
   onNav(e) {
     const i = Number(e.currentTarget.dataset.i);
     const h = (this.data.hos || [])[i];
