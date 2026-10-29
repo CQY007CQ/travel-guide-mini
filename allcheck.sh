@@ -129,7 +129,7 @@ step "单测 check-more (v1.10 扩容+36 新函数)" "$NODE" tools/check-more.mj
 step "单测 check-v111 (20 新功能+数据护栏)" "$NODE" tools/check-v111.mjs
 step "单测 check-v112 (100 城扩容+100 新功能)" "$NODE" tools/check-v112.mjs
 step "单测 check-boundary (跨年/同名)" "$NODE" tools/check-boundary.mjs
-step "单测 daily-insp (今日正当时 v1.19.87)" "$NODE" tools/_test-daily-insp.mjs
+step "单测 daily-insp (函数保留·UI 已下线)" "$NODE" tools/_test-daily-insp.mjs
 step "单测 recommend (个性推荐引擎)" "$NODE" tools/_test-recommend.mjs
 # 模糊测试：171 组标签组合 + 极端输入 + 全量城市不变量。曾借此抓到 topN=0 未被夹取的 bug。
 step "模糊测试 recommend (标签组合/极端输入)" "$NODE" tools/_fuzz-recommend.mjs
@@ -137,9 +137,9 @@ step "模糊测试 recommend (标签组合/极端输入)" "$NODE" tools/_fuzz-re
 step "单测 emergency (旅途应急分诊)" "$NODE" tools/_test-emergency.mjs
 # 菜名→店铺匹配：命中正确性 + 无命中不瞎给 + 品牌联想不被词根覆盖
 step "单测 foodmap (菜名→店铺)" "$NODE" tools/_test-foodmap.mjs
-step "单测 insp-ui (灵感卡接线 v1.19.87)" "$NODE" tools/_test-v11987-insp-ui.mjs
+# 「今日正当时」已于 2026-10-29 按用户要求下线，原接线测试改为「下线守卫」（防被无意加回）
+step "单测 insp 下线守卫" "$NODE" tools/_test-insp-removed.mjs
 step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/_test-v11988-sharecard.mjs
-step "单测 sharetitle (分享即种草 v1.19.89)" "$NODE" tools/_test-v11989-sharetitle.mjs
 step "单测 plan-handlers (行程页交互回归 v1.19.109)" "$NODE" tools/_test-plan-handlers.mjs
 # v1.19.93：全页面启动冒烟——vm 模拟 17 个注册页「被打开」（Page 构造+onLoad+onShow）。
 # 抓上传工具链与静态扫描都查不到的运行时级问题（曾抓到 7 个分包页 require 路径层级错误→白屏）。

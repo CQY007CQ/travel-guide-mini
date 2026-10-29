@@ -7,20 +7,6 @@
     <view class="em-t">还没有行程</view>
     <view class="em-s">先去「出发」页生成一份攻略<br/>这里会自动告诉你「今天该干嘛」</view>
     <button class="btn-primary em-btn" bindtap="goIndex">去生成攻略</button>
-
-    <!-- v1.19.87：今日正当时（本月最佳季节城市，日期种子确定性轮换；点卡片确认后一键生成） -->
-    <view class="em-insp" wx:if="{{insp.length}}">
-      <view class="ei-head">今日正当时 · 本月值得一去</view>
-      <view class="ei-card" wx:for="{{insp}}" wx:key="name" data-i="{{index}}" bindtap="onInspTap">
-        <view class="ei-top">
-          <text class="ei-city">{{item.name}}</text>
-          <text class="ei-prov">{{item.province}}</text>
-        </view>
-        <view class="ei-best">{{item.bestShort}}</view>
-        <view class="ei-spots" wx:if="{{item.spotsText}}">{{item.spotsText}}</view>
-        <view class="ei-days">建议 {{item.days}} 天 · 点我生成</view>
-      </view>
-    </view>
   </view>
 
   <block wx:if="{{hasPlan}}">
@@ -156,20 +142,7 @@
         </view>
       </view>
 
-      <!-- v1.19.89：行后种草 —— 情感高点顺势给下一程（同无行程态灵感卡结构） -->
-      <view class="em-insp" wx:if="{{insp.length}}">
-        <view class="ei-head">下一程 · 今日正当时</view>
-        <view class="ei-card" wx:for="{{insp}}" wx:key="name" data-i="{{index}}" bindtap="onInspTap">
-          <view class="ei-top">
-            <text class="ei-city">{{item.name}}</text>
-            <text class="ei-prov">{{item.province}}</text>
-          </view>
-          <view class="ei-best">{{item.bestShort}}</view>
-          <view class="ei-spots" wx:if="{{item.spotsText}}">{{item.spotsText}}</view>
-          <view class="ei-days">建议 {{item.days}} 天 · 点我生成</view>
-        </view>
-      </view>
-    </block>
+</block>
 
     <!-- 减法：行程入口已在底部 tabBar，不再重复提示 -->
   </block>

@@ -7,17 +7,7 @@ const app = getAppSafe();
 Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
-    // v1.19.89：无行程（灵感卡场景）→ 分享「今日之城」（确定性：好友打开看到同一座）；
-    // 行中分享是功能场景（给同伴看安排），保留原功能文案
-    const plan = getApp().globalData.plan;
-    if (!plan || !plan.days || !plan.days.length) {
-      try {
-        const ins = T.dailyInspire(1);
-        if (ins && ins.length) {
-          return { title: ins[0].shareTitle, path: "/pages/index/index" };
-        }
-      } catch (e) {}
-    }
+    // 2026-10-29：「今日正当时」已下线，分享文案回到通用版本
     return { title: "旅行途中神器：今日安排 + 待办清单 + 随手记账（离线可用）", path: "/pages/index/index" };
   },
 
@@ -48,10 +38,7 @@ Page(SafePage({
     if (!plan || !plan.days || !plan.days.length) {
       // v1.8.5 C9：无行程时给一句旅行小话（按日期轮换，本地文案）
       const q = T.quoteOfDay();
-      // v1.19.87：无行程日不只一句小话——「今日正当时」灵感卡，打开就有内容可看可种草
-      let insp = [];
-      try { insp = T.dailyInspire(3); } catch (e) {}
-      this.setData({ hasPlan: false, state: null, view: {}, quote: q, insp: insp });
+      this.setData({ hasPlan: false, state: null, view: {}, quote: q });
       return;
     }
     const st = T.todayState(plan);
@@ -137,8 +124,6 @@ Page(SafePage({
       try { spots = T.P.countPlanStats(plan.days).spots; } catch (e) {}
       out.spots = spots;
       out.totalMoney = Math.round(T.totalSpent());
-      // v1.19.89：行后种草 —— 结束是情感高点，顺势给「下一程 · 今日正当时」
-      try { this.setData({ insp: T.dailyInspire(3) }); } catch (e) {}
     }
     this.setData({ hasPlan: true, state: st.phase, view: out });
   },
@@ -172,35 +157,6 @@ Page(SafePage({
   goPlan() { wx.switchTab({ url: "/pages/plan/plan" }); },
   goIndex() { wx.reLaunch({ url: "/pages/index/index" }); },
 
-  /* ---- v1.19.87：今日正当时卡片 → 确认后一键生成（默认预算/节奏，出发日下周） ---- */
-  onInspTap(e) {
-    const i = e.currentTarget.dataset.i;
-    const it = (this.data.insp || [])[i];
-    if (!it) return;
-    wx.showModal({
-      title: "去 " + it.name + " 怎么样",
-      content: it.why + " · 建议 " + (it.days || 3) + " 天\n用默认预算生成一份行程？",
-      confirmText: "生成",
-      success(r) {
-        if (!r.confirm) return;
-        try {
-          const pad = n => String(n).padStart(2, "0");
-          const t = new Date(Date.now() + 7 * 86400000);
-          const depart = t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate());
-          const daysArr = T.buildPlan({ city: it.name, province: it.province, days: it.days || 3, depart: depart, budget: "mid", pace: "balance" });
-          T.resetPackChecks();   // 新行程落地前重置行李清单勾选（对齐 more._gen）
-          app.setPlan({
-            cityName: it.name, province: it.province, totalDays: daysArr.length,
-            depart: depart, days: daysArr, budget: "mid", people: 1,
-            pace: "balance", isMulti: false, savedAt: Date.now()
-          });
-          wx.switchTab({ url: "/pages/plan/plan" });
-        } catch (err) {
-          wx.showToast({ title: "生成失败：" + (err.message || ""), icon: "none" });
-        }
-      }
-    });
-  },
   // v1.8.5 C10：行程结束后的回顾入口
   goMore() { wx.switchTab({ url: "/pages/more/more" }); },
 
