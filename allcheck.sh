@@ -60,6 +60,8 @@ step "JS 语法检查" bash -c '
 
 # 依赖完整性：任何相对 require/import 都必须可解析（防"移文件移断管线"，见 check-v112 事故）
 step "依赖完整性 (相对引用可解析)" "$NODE" tools/check-deps.mjs
+# 凭据泄露：随包目录不得出现明文 key / 高德接口 / 未登记外链（自检发现该检查只存在于手工脚本，故固化）
+step "凭据泄露 (随包无明文 key)" "$NODE" tools/check-secrets.mjs
 step "JSON 合法性" bash -c '
   err=0
   for f in app.json project.config.json sitemap.json pages/*/*.json; do
