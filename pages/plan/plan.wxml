@@ -7,7 +7,7 @@
         <view class="sum-sub">{{stats}}</view>
       </view>
       <!-- 有限数据层：诚实提示内容收集中 -->
-      <view class="limited-notice" wx:if="{{limitedNotice}}"><text class="ln-ic">✦</text><text>内容收集中：该城市景点攻略正在采集，已为你生成「抵达 + 自由活动 + 返程」框架；真实景点与路线将随数据更新补齐。</text></view>
+      <view class="limited-notice" wx:if="{{limitedNotice}}"><text class="ln-ic">✦</text><text>该城攻略采集中，先给你框架，补齐后自动更新</text></view>
       <view class="sum-ops">
         <view class="sop {{isFav ? 'sop-fav-on' : ''}}" wx:if="{{!segs.length && !isProv}}" catchtap="onFav">
           <image class="sop-ic" src="/images/icons/{{isFav ? 'heart-on' : 'heart'}}.png"/>
@@ -118,7 +118,7 @@
       <textarea class="cn-ta" placeholder="写点避坑小贴士，下次再来这座城市会提醒你（每行一条）" value="{{cnTips}}" bindinput="onCnTips" maxlength="300"/>
       <view class="cn-save" bindtap="onCnSave">保存经验</view>
     </view>
-    <view wx:if="{{!cityNote && !cnOpen}}" class="dim cn-hint">回来之后给这座城打个分、记两句坑，下次见它会有「老朋友提示」</view>
+    <view wx:if="{{!cityNote && !cnOpen}}" class="dim cn-hint">回来后给这座城打分、记两句</view>
   </view>
 
   <!-- 城市速览（最佳季节 / 建议天数 / 气候 / 必吃 / 住宿交通） -->
@@ -161,7 +161,7 @@
     <image class="ic ic-sm" src="/images/icons/cloud.png"/>
     <view class="wx-off-t">
       <view class="wx-off-h">天气暂不可用</view>
-      <view class="wx-off-d dim">未联网或超出预报窗口 · 攻略 / 地图 / 清单不受影响</view>
+      <view class="wx-off-d dim">离线或超预报期 · 其他功能不受影响</view>
     </view>
     <view class="wx-off-acts">
       <view class="wx-retry" catchtap="onWxRetry">重试</view>
@@ -243,7 +243,7 @@
       </view>
     </view>
     <view class="wish-miss" wx:if="{{wishOpen && wishMiss.length}}">
-      <view class="wm-tx">这次没排上的（点 ✕ 移出后可重排得更紧凑）：</view>
+      <view class="wm-tx">未排上的（✕ 移出后可重排）：</view>
       <view class="miss-chips">
         <view class="miss-chip" wx:for="{{wishMiss}}" wx:key="name">
           <text class="mc-n">{{item.name}}</text>
@@ -381,7 +381,7 @@
     <view class="dpp-more" bindtap="onDeep">看全部 {{deep.total}} 条本地玩法 ›</view>
   </view>
 
-  <view class="tip">点行展开可换景点 / 百科 / 打卡 / 调序 · 按住右侧手柄可直接拖动</view>
+  <view class="tip">点行展开可换景点/调序 · 按住右侧拖动</view>
 
   <!-- v1.19.76：分享长图离屏画布（不参与布局，仅用于生成分享图片） -->
   <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>

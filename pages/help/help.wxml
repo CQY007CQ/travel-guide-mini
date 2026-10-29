@@ -40,7 +40,7 @@
       </view>
       <text class="er-nav">导航 ›</text>
     </view>
-    <view class="er-pick" bindtap="onPickCity">切换城市（已收录 {{cityN}} 座）</view>
+    <view class="er-pick" bindtap="onPickCity">切换城市</view>
   </view>
 
   <view class="card er-none" wx:if="{{city && !hos.length}}">
@@ -49,11 +49,11 @@
   </view>
 
   <view class="card er-pick-only" wx:if="{{!city}}">
-    <view class="er-pick" bindtap="onPickCity">选择城市（已收录 {{cityN}} 座）</view>
+    <view class="er-pick" bindtap="onPickCity">选择城市</view>
   </view>
 
   <view class="er-disclaim">
-    以上为应急分诊常识与医疗机构位置，仅供参考，不构成诊疗建议，也不替代专业医疗判断。急危重症请直接拨打 120。医院坐标由地理编码获得，等级信息以卫生健康部门公示为准。
+    以上为分诊常识与医院位置，仅供参考，不构成诊疗建议。急危重症请拨打 120。
   </view>
 
 </view>

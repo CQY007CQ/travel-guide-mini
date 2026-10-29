@@ -520,7 +520,7 @@ Page(SafePage({
     const paceHint = PACE_HINT[d.paceIdx] || "";
     // v1.19.2：出发地默认是太原，外地新手未必注意到可以改，而它直接影响「怎么去」的交通建议
     const fromHint = (d.fromIdx === d.defFromIdx && d.fromIdx >= 0)
-      ? "当前为默认出发地（太原），点一下可改成你的城市 —— 会影响「怎么去」的交通建议"
+      ? "默认太原，点一下可改"
       : "";
     this.setData({ advChips: chips, budgetHint, paceHint, fromHint });
     this._syncUi();

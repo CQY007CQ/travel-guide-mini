@@ -127,7 +127,7 @@
       </view>
       <text class="sp-amt {{item.over ? 'sp-over' : ''}}">¥{{item.sug}}<text class="sp-slash">/</text>{{item.real}}</text>
     </view>
-    <view class="sp-foot dim">上排＝建议额度（住宿45% · 餐饮22% · 交通20% · 门票13%）　下排＝实际已花</view>
+    <view class="sp-foot dim">上＝建议额度　下＝已花</view>
   </view>
 
   <!-- AA 结算（多人同行：谁付了多少、谁该给谁） -->
@@ -179,7 +179,7 @@
         <text class="iou-del" data-i="{{index}}" catchtap="onIouDel">✕</text>
       </view>
     </view>
-    <view class="dim iou-none" wx:else>零散垫付先记在这：谁帮我垫了打车费、谁还没还我，回来对账不吵架</view>
+    <view class="dim iou-none" wx:else>同行垫付记这里，回来对账</view>
   </view>
 
   <!-- 每日花费柱状图（最近 10 个记账日） -->
@@ -275,7 +275,7 @@
           <view class="fx-pick">{{fxTo}} ▾</view>
         </picker>
       </view>
-      <view class="fx-tip dim">内置参考汇率，离线可用；出境前记得再核对实时汇率</view>
+      <view class="fx-tip dim">参考汇率，离线可用</view>
     </view>
   </view>
 

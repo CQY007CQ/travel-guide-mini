@@ -83,7 +83,7 @@
         </view>
         <view class="ps-del" data-date="{{item.date}}" catchtap="onDelNote">✕</view>
       </view>
-      <view class="sp-tip dim">在「今天」页旅行途中写一句，就会出现在这里</view>
+      <view class="sp-tip dim">旅途中在「今天」页写一句</view>
     </view>
   </view>
 
@@ -135,7 +135,7 @@
         <image class="m-ic" src="/images/icons/export.png"/>
         <view class="m-txt">
           <view class="m-t">把我的行程 + 想玩发给同行人</view>
-          <view class="m-d dim">复制协作包：TA 粘贴后想玩直接并入、行程存入 TA 的「我的行程」</view>
+          <view class="m-d dim">复制给同行者</view>
         </view>
         <text class="arrow">›</text>
       </view>
@@ -143,7 +143,7 @@
         <image class="m-ic" src="/images/icons/import.png"/>
         <view class="m-txt">
           <view class="m-t">粘贴 TA 的协作包并合并</view>
-          <view class="m-d dim">TA 想玩并入我的清单，TA 的行程变成一份存档</view>
+          <view class="m-d dim">导入后：想玩并入、行程存档</view>
         </view>
         <text class="arrow">›</text>
       </view>
@@ -286,14 +286,14 @@
         <image class="m-ic" src="/images/icons/close.png"/>
         <view class="m-txt">
           <view class="m-t">清空全部本地数据</view>
-          <view class="m-d dim">行程 / 账本 / 想玩 / 足迹 全部重置，不可恢复</view>
+          <view class="m-d dim">全部重置，不可恢复</view>
         </view>
         <text class="arrow">›</text>
       </view>
     </view>
   </view>
 
-  <view class="foot dim">数据均存本机 · 旅途中离线可用（地图需联网）</view>
+  <view class="foot dim">数据存本机 · 离线可用（地图需联网）</view>
   <!-- v1.8.5 C13：关于与版本 -->
   <view class="ver-row" bindtap="onAbout">
     <text class="ver dim">旅行攻略生成器 · v{{ver}}</text>

@@ -13,7 +13,7 @@
     <view class="df-badge">!</view>
     <view class="df-main">
       <text class="df-t">城市数据加载失败</text>
-      <text class="df-s">可能是网络波动，点击下方按钮重试即可恢复</text>
+      <text class="df-s">网络不稳，点下方重试</text>
     </view>
     <view class="df-btn {{loadingData ? 'df-loading' : ''}}" bindtap="retryData">{{loadingData ? '重试中…' : '重试加载'}}</view>
   </view>
@@ -109,7 +109,7 @@
 
     <!-- ── 多站路线编辑态 ── -->
     <block wx:if="{{multiMode}}">
-      <view wx:if="{{!multiRoute.length}}" class="multi-hint">点下方「添加城市」开始多站行程（≤4 城）</view>
+      <view wx:if="{{!multiRoute.length}}" class="multi-hint">点下方「添加城市」（最多 4 城）</view>
       <view class="multi-list">
         <view wx:for="{{multiRoute}}" wx:key="name" class="multi-row">
           <text class="mr-no">{{index + 1}}</text>
@@ -182,13 +182,12 @@
         <view class="disc-bar" bindtap="toggleDiscover">
           <image class="ic ic-sm" src="/images/icons/sparkle.png"/>
           <text class="disc-t">发现灵感</text>
-          <text class="disc-hint">盲盒 / 同省顺路 / 行前提示</text>
-          <text class="disc-che">{{discoverOpen ? '▴' : '▾'}}</text>
+              <text class="disc-che">{{discoverOpen ? '▴' : '▾'}}</text>
         </view>
         <block wx:if="{{discoverOpen}}">
           <!-- v1.8.4 A8：目的地盲盒 -->
           <view class="blind-row" bindtap="onBlindRoll">
-            <image class="ic ic-sm" src="/images/icons/shuffle.png"/><text>不知道去哪儿？摇一摇给 3 个灵感</text>
+            <image class="ic ic-sm" src="/images/icons/shuffle.png"/><text>摇一摇，给 3 个灵感</text>
           </view>
           <!-- v1.9：同省也值得去的精选城 -->
           <view class="sib-row" wx:if="{{sibs.length}}">
@@ -280,7 +279,7 @@
       <view class="field-row">
         <view class="sw-col">
           <text class="field-label">名山过夜</text>
-          <text class="field-sub">观日出名山住山顶，次日清晨看日出</text>
+          <text class="field-sub">住山顶，次日看日出</text>
         </view>
         <switch checked="{{stayMtn}}" color="#d4a94e" bindchange="onStayMtn"/>
       </view>
@@ -328,7 +327,7 @@
       <view class="pk-only" wx:if="{{poolOn}}">
         <view class="sw-col">
           <text class="field-label">只玩勾选的</text>
-          <text class="field-sub">{{pickOnly ? '当前：勾选的必去，剩余时间自动补充推荐' : '点击开启 → 只按上面勾选的生成，其余时间自动补充推荐'}}</text>
+          <text class="field-sub">{{pickOnly ? '只按勾选的生成' : '只按勾选的生成，其余自动补'}}</text>
         </view>
         <switch checked="{{pickOnly}}" color="#d4a94e" bindchange="onPickOnly"/>
       </view>
@@ -363,7 +362,7 @@
     </view>
   </view>
 
-  <view wx:if="{{hasOld}}" class="tip" bindtap="resumeOld">上次的行程还在，点此继续</view>
+  <view wx:if="{{hasOld}}" class="tip" bindtap="resumeOld">继续上次行程</view>
 
   <view class="action-area">
     <view class="action-row">
@@ -376,7 +375,7 @@
       <image class="ic ic-sm" src="/images/icons/copy.png"/>
       <text>草稿箱（{{draftCount}}）</text>
     </view>
-    <view class="note">勾选的景点优先安排 · 生成后可在「行程」页逐条换景点、调顺序</view>
+    <view class="note">勾选的优先安排</view>
   </view>
 
   <!-- 城市搜索选择器（目的地 / 出发地 / 多站 共用） -->
@@ -404,7 +403,7 @@
     </view>
   </view>
 
-  <view class="ver dim">旅行攻略生成器 v{{ver}}</view>
+  <view class="ver dim">旅行攻略生成器</view>
 
   <!-- v1.8.4 A8：目的地盲盒 -->
   <view wx:if="{{blindOpen}}" class="mask" bindtap="closeBlind">
@@ -413,7 +412,7 @@
         <text class="ps-title">🎲 这次去哪儿？摇到哪算哪</text>
         <image class="ps-close" src="/images/icons/close.png" bindtap="closeBlind"/>
       </view>
-      <view class="blind-note">三个随机目的地，选一个直接生成（也可一直换到满意）</view>
+      <view class="blind-note">3 个随机目的地，选一个生成</view>
       <view class="blind-list">
         <view class="blind-card" wx:for="{{blind3}}" wx:key="name" data-i="{{index}}" bindtap="useBlind">
           <view class="bc-top">
@@ -447,7 +446,7 @@
         </view>
         <view class="gm-p">
           <view class="gm-pi"><image class="gm-pi-img" src="/images/icons/pin.png"/></view>
-          <view class="gm-pt"><text class="gm-pt-t">751 城 · 点景点直接导航</text></view>
+          <view class="gm-pt"><text class="gm-pt-t">点景点直接导航</text></view>
         </view>
         <view class="gm-p">
           <view class="gm-pi"><image class="gm-pi-img" src="/images/icons/shield.png"/></view>
@@ -467,7 +466,7 @@
         <text class="ps-title">草稿箱</text>
         <image class="ps-close" src="/images/icons/close.png" bindtap="closeDrafts"/>
       </view>
-      <view wx:if="{{!drafts.length}}" class="draft-empty">还没有草稿，去首页填好目的地后点「存草稿」即可保存当前配置</view>
+      <view wx:if="{{!drafts.length}}" class="draft-empty">暂无草稿</view>
       <scroll-view scroll-y class="draft-list">
         <view wx:for="{{drafts}}" wx:key="id" class="draft-item">
           <view class="di-main">

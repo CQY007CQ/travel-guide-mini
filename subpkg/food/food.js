@@ -74,7 +74,7 @@ Page(SafePage({
       const parent = T.nearbyCityOf(cityName);
       if (parent) {
         spots = (T.D.FOOD_SPOTS && T.D.FOOD_SPOTS[parent]) || [];
-        if (spots.length) shopSrc = "本城名店待补充，以下为就近「" + parent + "」收录的名店";
+        if (spots.length) shopSrc = "以下为就近「" + parent + "」的名店";
       }
     }
     // 预算贴合排序（与网页版同规则：经济→平价主推 / 舒适→平价+中档 / 高端→中档+高档）
@@ -99,7 +99,8 @@ Page(SafePage({
       cityName,
       note: (city && city.foodNote) || "",
       shopSrc,
-      budgetTxt: allShops.length ? `已按「${T.budgetLabel(budgetKey)}」把贴合价位的店排在前面` : ""
+      // 内部排序机制不展示（用户不需要知道我们怎么排的，看结果即可）
+      budgetTxt: ""
     });
     this._apply();
   },
@@ -123,14 +124,14 @@ Page(SafePage({
       const hit = FM.shopsForDish(base, dish);
       if (hit.length) {
         shops = hit;
-        dishNote = "「" + dish + "」相关店铺 " + hit.length + " 家（按店名与地址匹配，可能不全）";
+        dishNote = "「" + dish + "」相关 " + hit.length + " 家（按店名匹配）";
       } else {
         dishNote = "暂无店名带「" + dish + "」的店，先看本城推荐；也可点该菜名取消筛选";
       }
     }
 
     // v1.12 UI 减法：名店空态文案预计算，避免 WXML 内三元拼接
-    const emptyShopTx = sf !== "all" ? "该时段暂无已收录名店，看必吃清单或切「全部」" : this.data.cityName + " 暂无具体店铺数据，可参考必吃清单";
+    const emptyShopTx = sf !== "all" ? "该时段无名店，切「全部」看看" : "本城暂无店铺数据";
     const shopHead = (dish ? "「" + dish + "」· " : "") + "点击导航 · 已按当前时段筛出 " + shops.length + " 家";
     this.setData({ foods: tagFoods, shops, foodN: tagFoods.length, shopN: shops.length, emptyShopTx, dishNote, shopHead });
   },
