@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // ledger：旅行记账 · 当日与总计对比 · 日期/付款人/AA 分账/导出 CSV
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一存储封装
@@ -56,6 +57,7 @@ Page(SafePage({
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
   onLoad() { this.__boot = T.ready().catch(() => null); },
   onShow() {
+    try { AN.pageView("ledger"); } catch (e) {}
     this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
   _renderShow() {
     try { this._theme(); } catch (e) {}

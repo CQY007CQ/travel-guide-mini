@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // index：目的地选择 → 生成攻略
 // 对齐网页版：城市搜索选择器 / 出行模式 / 想玩景点池自选 / 收藏目的地 / 总预算语义
 // 2026-09 首页高端化：三段玩法切换（城市/全省精华/多站）、高级设置折叠、想玩池折叠、去 slogan
@@ -909,8 +910,12 @@ Page(SafePage({
       // v1.13.1：新行程落地前重置行李清单勾选（上一程的打包进度不带进新程）
       // v1.15.3：换目的地后，订往返票/订酒店/过流程/请假 等「绑定本次行程」的准备项一并重置
       T.resetTripPrep();
+      // 埋点：生成成功（含类型维度，区分单城/多站/全省）
+      try { AN.track("plan_generate", { ok: 1, mode: this.data.multiMode ? "multi" : (this.data.isGuide ? "prov" : "city"), days: this.data.days }); } catch (e) {}
       wx.switchTab({ url: "/pages/plan/plan" });
     } catch (err) {
+      // 埋点：生成失败（这是最该盯的指标——主路径走不通，其他优化都是白费）
+      try { AN.track("plan_generate", { ok: 0 }); } catch (e) {}
        // v1.11：生产包不留 console.log（错误已通过 toast 告知用户）
        // v1.19.49：单城生成失败多为瞬时异常，提示「稍后重试」比「换个路线」更准确，避免误以为目的地有问题
        wx.showToast({ title: "生成失败，请稍后重试", icon: "none" });
@@ -940,6 +945,7 @@ Page(SafePage({
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
 
   onShow() {
+    try { AN.pageView("index"); } catch (e) {}
     this.setData({ fz: T.fontScale() });
     (this.__boot || Promise.resolve()).then(() => {
       try { this._ensureForm(); } catch (e) {}

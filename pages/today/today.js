@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // today：「今天」行程态卡片（行前待办 / 途中速览+快捷记账 / 结束回顾）
 const T = require("../../utils/travel.js");
 const app = getAppSafe();
@@ -38,6 +39,7 @@ Page(SafePage({
   // v1.11：主题或刷新任一环节抛错都不该白屏
   onLoad() { this.__boot = T.ready().catch(() => null); },
   onShow() {
+    try { AN.pageView("today"); } catch (e) {}
     this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
   _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
 

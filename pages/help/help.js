@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // help：旅途应急（受伤 / 突发不适）—— 分诊常识 + 就近医疗机构
 // 边界：只给「该挂什么科」与「就近有哪些医院」，不给诊疗结论、不评价医院优劣
 const T = require("../../utils/travel.js");
@@ -21,6 +22,7 @@ Page(SafePage({
   onLoad() { this.__boot = T.ready().catch(() => null); },
 
   onShow() {
+    try { AN.pageView("help"); } catch (e) {}
     try { this.setData({ fz: T.fontScale() }); } catch (e) {}
     this._theme();
     this._pickDefaultCity();

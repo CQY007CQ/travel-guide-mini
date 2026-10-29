@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // 旅行百宝箱：灵感 / 体检 / 文案 / 打包，一键生成（v1.10 功能落地页）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
@@ -20,6 +21,9 @@ Page(SafePage({
  data: {
     fz: 1, td: false, hasPlan: false, cityName: "", groups: ITEM_GROUPS, out: null,
   toolTotal: ITEM_GROUPS.reduce((s, g) => s + (g.items ? g.items.length : 0), 0),
+  // 2026-10-29：33 个工具平铺等于没有重点（问卷反馈"字太多看得累"）。
+  // 改为分组折叠、默认只展开第一组：首屏从 33 行降到 6 行，功能一个没少。
+  openMap: ITEM_GROUPS.map((g, i) => i === 0),
   // v1.19 P2-9：工具结果闭环 —— 收藏 + 加入想玩
   favs: [], favOpen: false, favIdx: -1, outAddable: false },
 
@@ -33,6 +37,7 @@ Page(SafePage({
  },
  _theme() { try { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); } catch (e) {} },
  onShow() {
+    try { AN.pageView("toolkit"); } catch (e) {}
     this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
  _renderShow() {
    try {
@@ -72,7 +77,17 @@ Page(SafePage({
   return arr;
  },
 
+ toggleGroup(e) {
+   const gi = Number(e.currentTarget.dataset.gi);
+   if (isNaN(gi)) return;
+   const m = (this.data.openMap || []).slice();
+   m[gi] = !m[gi];
+   this.setData({ openMap: m });
+ },
+
  run(e) {
+  // 埋点：哪个工具真被点（33 项里多数可能一辈子没人点，靠这个决定砍哪些）
+  try { AN.track("tool_click", { k: (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.k) || "?" }); } catch (err) {}
   const k = e.currentTarget.dataset.k;
   const city = this._city;
   const plan = this._plan;

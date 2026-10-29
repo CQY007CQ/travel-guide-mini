@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // food：必吃清单 + 地道名店（点击名店 → wx.openLocation 导航）
 // 多站行程：顶部城市切换条，逐站看美食（默认定位到今天所在站）
 // v1.20.x：必吃清单的每个菜名可点 —— 点「北京烤鸭」直接筛出做这道菜的店（utils/food-map.js）
@@ -23,6 +24,7 @@ Page(SafePage({
   // v1.11：美食页依赖 FOOD_SPOTS 表，城市未收录时也要给出空态而不是崩掉
   onLoad() { this.__boot = T.ready().catch(() => null); },
   onShow() {
+    try { AN.pageView("food"); } catch (e) {}
     this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } });
   },
   _renderShow() {

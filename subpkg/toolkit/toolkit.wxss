@@ -36,3 +36,15 @@
 .fav-txt { margin-top: 12rpx; padding-top: 12rpx; font-size: calc(25rpx * var(--fs, 1)); line-height: 1.7; color: var(--t1, #1c2433);
   border-top: 1rpx solid rgba(var(--ln-rgb, 148,163,184), .1); white-space: pre-wrap; word-break: break-all; }
 .tk-foot { text-align: center; font-size: calc(22rpx * var(--fs, 1)); margin-top: 36rpx; color: var(--t4, #9aa6b8); }
+
+/* ── 分组折叠标题（2026-10-29：33 个工具平铺太重，改成按组展开） ── */
+.g-tap { display: flex; align-items: center; gap: 10rpx; }
+.g-tap:active { opacity: .7; }
+.g-name { flex: 1; min-width: 0; }
+.g-cnt {
+  font-size: calc(20rpx * var(--fs, 1));
+  color: var(--t4, #7d92ab);
+  background: rgba(var(--ln-rgb, 19, 29, 49), .06);
+  padding: 2rpx 12rpx; border-radius: 99rpx;
+}
+.g-chev { flex: none; font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #64748b); }
