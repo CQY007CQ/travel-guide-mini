@@ -44,7 +44,7 @@
       </view>
       <!-- v1.9：目的地气候补充提醒 -->
       <view class="card" wx:if="{{view.cliAdd.length}}">
-        <view class="tc-head2"><image class="ic" src="/images/icons/sun.png"/>去 {{view.cityName}} 还要带</view>
+        <view class="tc-head2"><image class="ic" src="/images/icons/backpack.png"/>去 {{view.cityName}} 还要带这些</view>
         <view class="cli-row">
           <text class="cli-chip" wx:for="{{view.cliAdd}}" wx:key="*this">{{item}}</text>
         </view>
