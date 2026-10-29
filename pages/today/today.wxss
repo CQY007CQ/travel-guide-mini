@@ -38,7 +38,7 @@
 .prep-item.done .txt { text-decoration: line-through; }
 
 .box {
-  width: 40rpx; height: 40rpx; flex-shrink: 0; margin-top: 2rpx;
+  width: 40rpx; height: 40rpx; flex-shrink: 0; margin-top: 2rpx; margin-right: 18rpx;
   border: 2rpx solid rgba(var(--ln-rgb, 148, 163, 184), .45);
   border-radius: 10rpx; box-sizing: border-box;
   display: flex; align-items: center; justify-content: center;
