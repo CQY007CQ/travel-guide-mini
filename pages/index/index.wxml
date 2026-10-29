@@ -187,7 +187,7 @@
         <block wx:if="{{discoverOpen}}">
           <!-- v1.8.4 A8：目的地盲盒 -->
           <view class="blind-row" bindtap="onBlindRoll">
-            <image class="ic ic-sm" src="/images/icons/shuffle.png"/><text>摇一摇，给 3 个灵感</text>
+            <image class="ic ic-sm" src="/images/icons/shuffle.png"/><text>随机挑 3 个目的地</text>
           </view>
           <!-- v1.9：同省也值得去的精选城 -->
           <view class="sib-row" wx:if="{{sibs.length}}">
@@ -409,7 +409,7 @@
   <view wx:if="{{blindOpen}}" class="mask" bindtap="closeBlind">
     <view class="picker-sheet blind-sheet" catchtap="noop">
       <view class="ps-head">
-        <text class="ps-title">🎲 这次去哪儿？摇到哪算哪</text>
+        <text class="ps-title">🎲 这次去哪儿？随机挑三座</text>
         <image class="ps-close" src="/images/icons/close.png" bindtap="closeBlind"/>
       </view>
       <view class="blind-note">3 个随机目的地，选一个生成</view>

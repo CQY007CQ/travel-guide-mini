@@ -264,7 +264,7 @@
         </view>
         <view class="wish-ops">
           <view class="op-btn" catchtap="goGen">去添加</view>
-          <view class="op-btn" catchtap="onWishDice"><image class="ic ic-sm" src="/images/icons/dice.png"/>摇一个</view>
+          <view class="op-btn" catchtap="onWishDice"><image class="ic ic-sm" src="/images/icons/dice.png"/>随机抽一条</view>
           <view class="op-btn danger" catchtap="clearAll">清空</view>
         </view>
       </block>

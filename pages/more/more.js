@@ -224,7 +224,7 @@ Page(SafePage({
     const d = T.wishDice();
     if (!d) { wx.showToast({ title: "想玩清单还空着，先加几个", icon: "none" }); return; }
     wx.showModal({
-      title: "摇一摇 · 抽中「" + d.name + "」",
+      title: "随机抽中「" + d.name + "」",
       content: (d.city ? "在 " + d.city + (d.days ? " · 建议 " + d.days + " 天" : "") + "\n" : "") + (d.best ? "最佳时节 " + d.best : "") + "\n\n重新生成攻略时会优先安排它",
       showCancel: false,
       confirmText: "记住它了"
