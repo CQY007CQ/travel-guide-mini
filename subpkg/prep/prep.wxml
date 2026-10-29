@@ -60,7 +60,7 @@
       </view>
       <view class="doc-item {{item.done ? 'done' : ''}}" wx:for="{{docList}}" wx:key="k"
             data-k="{{item.k}}" bindtap="onDocTap">
-        <text class="box">{{item.done ? '✓' : ''}}</text>
+        <view class="box {{item.done ? 'on' : ''}}">{{item.done ? '✓' : ''}}</view>
         <view class="doc-txt">
           <text class="doc-t">{{item.t}}</text>
           <text class="doc-x dim">{{item.x}}</text>

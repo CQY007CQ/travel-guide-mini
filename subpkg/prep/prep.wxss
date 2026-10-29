@@ -76,7 +76,17 @@
 
 
 /* ===== v1.8.3 · 证件段进度条与勾选（此前缺定义，进度条不可见） ===== */
-.box { width: 40rpx; color: var(--chip-tx, #d4a94e); font-size: calc(30rpx * var(--fs, 1)); flex-shrink: 0; }
+.box {
+  width: 40rpx; height: 40rpx; flex-shrink: 0; margin-top: 2rpx;
+  border: 2rpx solid rgba(var(--ln-rgb, 148, 163, 184), .45);
+  border-radius: 10rpx; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  color: #14100a; font-size: calc(28rpx * var(--fs, 1)); font-weight: 800; line-height: 1;
+}
+.box.on {
+  background: linear-gradient(135deg, #e2b65c, #b8892f);
+  border-color: transparent;
+}
 .prog { display: flex; align-items: center; gap: 18rpx; margin-top: 16rpx; }
 .bar { flex: 1; height: 10rpx; border-radius: 10rpx; background: rgba(var(--ln-rgb, 148, 163, 184),.14); overflow: hidden; }
 .fill { height: 100%; border-radius: 10rpx;

@@ -20,7 +20,7 @@
         </view>
         <view class="prep-item {{item.done ? 'done' : ''}}" wx:for="{{view.prepItems}}" wx:key="k"
               data-k="{{item.k}}" bindtap="onPrepTap">
-          <text class="box">{{item.done ? '✓' : ''}}</text>
+          <view class="box {{item.done ? 'on' : ''}}">{{item.done ? '✓' : ''}}</view>
           <text class="txt">{{item.t}}</text>
         </view>
         <view class="prog">已完成 {{view.prepDone}}/{{view.prepItems.length}}</view>
@@ -33,7 +33,7 @@
           <view class="pk-gt">{{g.title}}</view>
           <view class="prep-item {{item.done ? 'done' : ''}}" wx:for="{{g.items}}" wx:key="k"
                 data-k="{{item.k}}" bindtap="onPrepTap">
-            <text class="box">{{item.done ? '✓' : ''}}</text>
+            <view class="box {{item.done ? 'on' : ''}}">{{item.done ? '✓' : ''}}</view>
             <text class="txt">{{item.t}}</text>
           </view>
         </block>

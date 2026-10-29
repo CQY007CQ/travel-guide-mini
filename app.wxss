@@ -2,7 +2,9 @@
    2026-09 主题化改造：CSS 变量双主题（默认浅色 #eaeff7 冷灰蓝；.td 切回暗色原值）
    所有 var 均带原值兜底；rgba(148,163,184)/rgba(138,165,192) 由 --ln-rgb 统一接管 */
 page {
-  --bg-img: radial-gradient(120% 46% at 50% -8%, rgba(212, 169, 78, 0.06), rgba(234, 239, 247, 0) 62%), #eaeff7;
+  /* 渐变最顶端改为透明金（0% 处与导航栏同色 base），只在导航栏下方约 16% 处淡入一点暖光，
+     彻底消除"导航栏与内容交界处那条白线"（浅色/深色模式都存在）。 */
+  --bg-img: radial-gradient(120% 46% at 50% -8%, rgba(212, 169, 78, 0) 0%, rgba(212, 169, 78, 0.06) 16%, rgba(234, 239, 247, 0) 60%), #eaeff7;
   --bg-solid: #eaeff7;
   --card: #ffffff;
   --well: #ffffff;
@@ -35,9 +37,9 @@ page {
   /* 浅色主题：卡片阴影更轻，避免白底上黑色阴影过于突兀 */
   --card-shadow: 0 6rpx 22rpx rgba(19, 29, 49, 0.06), 0 1rpx 3rpx rgba(19, 29, 49, 0.04);
   --card-inset: inset 0 1rpx 0 rgba(255, 255, 255, 0.6);
-  /* 2026-10-29：page 不再自己画背景 —— 它拿到的是 page 作用域的浅色变量，
-     深色模式下会从导航栏与内容的缝隙里露出浅色（用户看到的"白线"）。
-     改为透明，让窗口底色（wx.setBackgroundColor 跟随主题）兜住，渐变交给下面的 .page。 */
+  /* 2026-10-29：page 根保持透明，由窗口底色（wx.setBackgroundColor 跟随主题）兜住；
+     真正的"白线"根因是 --bg-img 渐变最顶端带暖光、与导航栏纯色交界处形成一条横向亮带，
+     已通过把渐变顶端改为透明（与导航栏同色 base）修复，浅色/深色模式一并消除。 */
   background: transparent;
   color: var(--t1, #18233a);
   /* 全局字号缩放因子：--fs 由 .fz1/.fz2/.fz3 覆盖，所有 font-size 经 calc(* var(--fs,1)) 统一缩放 */
@@ -48,7 +50,8 @@ page {
 }
 
 .td {
-  --bg-img: radial-gradient(120% 46% at 50% -8%, rgba(212, 169, 78, 0.10), rgba(10, 15, 28, 0) 62%), radial-gradient(90% 40% at 88% 0%, rgba(95, 185, 138, 0.05), rgba(10, 15, 28, 0) 55%), #0a0f1c;
+  /* 深色同款：顶端透明（与导航栏 #0b1020 同色 base），暖光在导航栏下淡入 */
+  --bg-img: radial-gradient(120% 46% at 50% -8%, rgba(212, 169, 78, 0) 0%, rgba(212, 169, 78, 0.10) 16%, rgba(10, 15, 28, 0) 60%), radial-gradient(90% 40% at 88% 0%, rgba(95, 185, 138, 0.05), rgba(10, 15, 28, 0) 55%), #0a0f1c;
   --bg-solid: #0a0f1c;
   --card: #131d31;
   --well: #101a2c;
