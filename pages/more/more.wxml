@@ -149,6 +149,21 @@
     </view>
   </view>
 
+  <!-- v1.19.138 · 个性化目的地推荐（真实画像驱动，每条带理由） -->
+  <view class="group" wx:if="{{personalized && personalized.list.length}}">
+    <view class="group-title">为你推荐 · 你的旅行画像</view>
+    <view class="card group-card">
+      <view class="dim ins-sub">{{personalized.summary}}</view>
+      <view class="pz-item" wx:for="{{personalized.list}}" wx:key="name">
+        <view class="pz-main">
+          <text class="pz-name">{{item.name}}</text>
+          <text class="pz-prov dim" wx:if="{{item.province}}">{{item.province}}</text>
+        </view>
+        <view class="pz-why">{{item.whyMeTx}}</view>
+      </view>
+    </view>
+  </view>
+
   <!-- v1.7 · 旅行灵感（随机目的地） -->
   <view class="group" wx:if="{{insp}}">
     <view class="group-title">去哪儿好呢</view>

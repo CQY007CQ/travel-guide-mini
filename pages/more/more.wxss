@@ -349,3 +349,11 @@
 .ins-my { font-size: calc(18rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 6rpx; line-height: 1; }
 .ins-chips { display: flex; flex-wrap: wrap; gap: 12rpx; }
 .ins-chip { font-size: calc(22rpx * var(--fs, 1)); color: var(--t2, #3a4759); background: rgba(var(--ln-rgb, 148,163,184), .10); border-radius: 999rpx; padding: 8rpx 18rpx; }
+
+/* v1.19.138 个性化目的地推荐 */
+.pz-item { padding: 14rpx 8rpx; border-bottom: 1rpx solid rgba(var(--ln-rgb, 148,163,184), .06); }
+.pz-item:last-child { border-bottom: none; }
+.pz-main { display: flex; align-items: baseline; gap: 12rpx; }
+.pz-name { font-size: calc(27rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #1b2330); }
+.pz-prov { font-size: calc(21rpx * var(--fs, 1)); }
+.pz-why { font-size: calc(21rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 6rpx; line-height: 1.5; }

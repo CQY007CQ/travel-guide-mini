@@ -11,6 +11,7 @@ import { createRequire } from "module";
 const req = createRequire(process.cwd() + "/");
 const T = req("./utils/travel.js");
 const INS = req("./utils/insights.js");
+const PZ = req("./utils/personalize.js");
 const D = T.D;
 
 let pass = 0, fail = 0;
@@ -836,6 +837,23 @@ assert("洞察 汇总 noData = false", insAll.noData === false, JSON.stringify(i
 assert("洞察 一句话小结非空", insAll.summary.length > 0, insAll.summary);
 assert("洞察 个性化倾向含 topCat", insAll.tendency.topCat === "餐饮", JSON.stringify(insAll.tendency));
 mem["miniLedgerV1"] = [];   // 清理，避免污染后续
+
+// v1.19.138 个性化目的地推荐（真实画像驱动）
+mem["miniLedgerV1"] = [];
+mem["miniFootV1"] = undefined;
+mem["miniPlansV1"] = undefined;
+const pz0 = PZ.personalized(5);
+assert("个性化 无数据→列表空且非画像模式", pz0.list.length === 0 && pz0.fromMe === false, JSON.stringify({ l: pz0.list.length, f: pz0.fromMe }));
+// 构造真实画像：北京足迹 + 餐饮为主花费
+mem["miniFootV1"] = { spots: { "故宫": { name: "故宫", city: "北京", ts: 1 } }, cities: { "北京": 1 } };
+T.addLedger(300, "餐饮", "午", "", false, "2026-09-10", "");
+T.addLedger(500, "餐饮", "晚", "", false, "2026-10-01", "");
+const pz1 = PZ.personalized(5);
+assert("个性化 有数据→返回列表", pz1.list.length > 0 && pz1.fromMe === true, JSON.stringify(pz1.list.map(x => x.name)));
+assert("个性化 每条带 whyMe 理由", pz1.list.every(x => Array.isArray(x.whyMe) && x.whyMe.length > 0), JSON.stringify(pz1.list.map(x => x.whyMeTx)));
+assert("个性化 加分非负(total≥score)", pz1.list.every(x => x.total >= (x.score || 0)), JSON.stringify(pz1.list.map(x => x.total + "/" + x.score)));
+mem["miniLedgerV1"] = [];
+mem["miniFootV1"] = undefined;
 
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
