@@ -62,5 +62,9 @@ const bj = W.rainyDaySpots("北京", ["rain"]);
 ok("北京雨天有室内备选（如故宫/博物院）", Array.isArray(bj) && bj.length > 0 && bj.some(x => /室内/.test(x.reason)));
 ok("雨雪备选元素含 name + reason", Array.isArray(bj) && bj.every(x => x && typeof x.name === "string" && typeof x.reason === "string"));
 
+// 精度回归：楼/塔/阁 多为露天地标（黄鹤楼/大雁塔/滕王阁），下雨天不得误标「室内」
+const wh = W.rainyDaySpots("武汉", ["rain", "snow"]);
+ok("雨雪备选：含楼/塔/阁的露天地标不被误标室内", Array.isArray(wh) && wh.every(x => !(x.reason === "室内" && /[楼塔阁]/.test(x.name))));
+
 console.log(fail ? ("\n✗ weather151 单测失败 " + fail + " 项") : "\n✓ weather151 单测全部通过");
 process.exit(fail ? 1 : 0);
