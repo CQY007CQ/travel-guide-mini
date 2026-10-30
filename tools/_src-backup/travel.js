@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.143";
+const APP_VER = "1.19.144";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -1723,7 +1723,7 @@ function packSmart(plan) {
   if (outdoor.length) G.push({ title: "户外装备", items: outdoor });
   const other = [];
   if (isMulti) other.push("分装袋 · 行李牌（多站转场好找）");
-  if (hasOld) other.push("少量零钱（网络不好时使用）");
+  // 注：小额现金已在「证件与钱」组的「银行卡 + 少量现金」覆盖，此处不再重复（避免同屏两处现金）
   other.push("折叠伞（晴雨两用）", "水杯", "备用口罩 / 雨衣（轻便款）");
   G.push({ title: "其他", items: other });
   // 勾选状态（复用 miniPrepV1，pg_ 前缀，自动纳入备份）
