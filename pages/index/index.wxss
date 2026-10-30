@@ -619,10 +619,14 @@
 .rb-city { font-size: calc(26rpx * var(--fs, 1)); font-weight: 800; color: var(--tx, #18233a); }
 .rb-prov { font-size: calc(19rpx * var(--fs, 1)); color: var(--t4, #7d92ab); }
 .rb-score { flex: none; font-size: calc(21rpx * var(--fs, 1)); font-weight: 800; color: var(--gold-tx, #8f6a1f); }
+.rb-r { flex: none; display: flex; align-items: baseline; gap: 6rpx; max-width: 240rpx; }
+.rb-tag { font-size: calc(18rpx * var(--fs, 1)); color: var(--t4, #7d92ab); white-space: nowrap; }
 .rb-why {
   flex: 1; text-align: right; font-size: calc(20rpx * var(--fs, 1)); color: var(--t3, #64748b);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.rb-score-cap { display: block; margin-top: 8rpx; font-size: calc(19rpx * var(--fs, 1)); color: var(--t4, #7d92ab); line-height: 1.6; }
+.rb-note { margin-top: 8rpx; padding: 12rpx 14rpx; border-radius: 12rpx; background: rgba(var(--ln-rgb, 19, 29, 49), .06); font-size: calc(20rpx * var(--fs, 1)); color: var(--t3, #64748b); line-height: 1.6; }
 .rb-foot { margin-top: 12rpx; text-align: center; font-size: calc(20rpx * var(--fs, 1)); color: var(--t4, #7d92ab); }
 .rb-empty { margin-top: 14rpx; font-size: calc(21rpx * var(--fs, 1)); color: var(--t4, #7d92ab); }
 

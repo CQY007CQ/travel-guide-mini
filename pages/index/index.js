@@ -31,6 +31,7 @@ Page(SafePage({
     tiles: [],   // v1.7：首页快捷入口
     // 智能推荐：一句话需求 → 候选城市（端侧推荐引擎计算，不发起任何网络请求）
     recText: "", recBusy: false, recTried: false, recList: [],
+    recMode: "intent", recNoIntent: false, recExtremeNote: "",
     recExamples: ["人少的古镇 三天", "海边亲子 五天", "沙漠摄影 四天", "温泉放松 周末两天"],
     destLabel: "",
     // 城市搜索选择器（目的地/出发地 共用弹层）
@@ -1036,8 +1037,19 @@ Page(SafePage({
         province: x.province || "",
         score: x.score,
         summary: x.summary || "",
+        reasonTag: x.reasonTag || "",
       }));
-      this.setData({ recBusy: false, recList: list });
+      // 透明度：把「匹配度 / 综合热度 / 你提到的城市」模式与无意图提示透传给视图
+      const mode = res.mode || "intent";
+      const noIntent = !!res.noIntent;
+      const extremeNote = res.extreme ? "（「最…」类诉求项目暂无年代数据，已按契合度排序，具体可实地考证）" : "";
+      this.setData({
+        recBusy: false,
+        recList: list,
+        recMode: mode,
+        recNoIntent: noIntent,
+        recExtremeNote: extremeNote,
+      });
     } catch (err) {
       this.setData({ recBusy: false, recList: [] });
       wx.showToast({ title: "推荐失败，请重试", icon: "none" });

@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.147";
+const APP_VER = "1.19.148";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -1396,7 +1396,10 @@ function segCityOfDay(plan, di) {
   for (let k = 0; k < segs.length; k++) {
    if (di >= segs[k].startDay && di <= segs[k].endDay) return segs[k].cityName || "";
   }
-  return segs[0].cityName || "";
+  // v1.19.148：越界兜底——di 小于首段起点→首段（出发地）；大于末段终点→末段（目的地）。
+  // 旧实现越界一律返回首段城市，会静默给出错误的归属城市（如 di 远超末段却显示第一站）。
+  if (di < segs[0].startDay) return segs[0].cityName || "";
+  return segs[segs.length - 1].cityName || "";
  }
  return plan.cityName || "";
 }

@@ -48,13 +48,18 @@
     <view class="rb-chips" wx:if="{{recExamples.length && !recList.length}}">
       <view class="rb-chip" wx:for="{{recExamples}}" wx:key="*this" data-t="{{item}}" bindtap="onRecExample">{{item}}</view>
     </view>
+    <view class="rb-note" wx:if="{{recNoIntent}}">未识别到具体偏好，已按「综合热度」推荐。试试：人少的古镇 / 想看海带娃 / 美食之城</view>
+    <view class="rb-score-cap" wx:if="{{recList.length}}">分数为综合匹配度（0–99），越契合你的描述越高；无明确偏好时按综合热度排序{{recExtremeNote}}</view>
     <view class="rb-list" wx:if="{{recList.length}}">
       <view class="rb-item" wx:for="{{recList}}" wx:key="name" data-name="{{item.name}}" bindtap="onRecPick">
         <view class="rb-l">
           <text class="rb-city">{{item.name}}</text>
           <text class="rb-prov">{{item.province}}</text>
         </view>
-        <text class="rb-score">{{item.score}}分</text>
+        <view class="rb-r">
+          <text class="rb-score">{{item.score}}</text>
+          <text class="rb-tag">{{item.reasonTag || '综合'}}</text>
+        </view>
         <text class="rb-why">{{item.summary}}</text>
       </view>
       <view class="rb-foot">点城市名填入表单</view>

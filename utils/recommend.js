@@ -71,7 +71,7 @@ const W = {
  *        也避免「艺术」这类过于宽泛、会把大量普通景点算进"博物馆"的词。
  * w    ：命中权重（经验值，可调） */
 const TAGS = [
-  { key: "oldtown",   label: "古镇古城",   w: 8, words: ["古镇", "古城", "老街", "水乡", "古街", "老城", "古建"], re: /古镇|古城|古街|老街|水乡|古城墙|古建筑|古村落|西栅|东栅/g },
+  { key: "oldtown",   label: "古镇古城",   w: 8, words: ["古镇", "古城", "老街", "水乡", "古街", "老城", "古建", "古村镇", "老城厢", "古县城", "千年古镇"], re: /古镇|古城|古街|老街|水乡|古城墙|古建筑|古村落|西栅|东栅/g },
   { key: "nature",    label: "山水自然",   w: 6, words: ["山水", "自然", "风景", "爬山", "登山", "徒步", "峡谷", "瀑布", "森林", "湿地"], re: /山|峰|峡谷|瀑布|森林|湿地|溪|溶洞/g },
   { key: "sea",       label: "海滨海岛",   w: 8, words: ["海", "海边", "海岛", "沙滩", "看海", "赶海"], re: /海滨|海边|海滩|沙滩|海岛|岛屿|海岸|滨海|赶海|看海|浴场|岛|湾/g },
   { key: "lake",      label: "江湖游船",   w: 5, words: ["湖", "江", "游船", "漂流", "泛舟"], re: /湖|江|游船|漂流|泛舟|竹筏/g },
@@ -80,12 +80,12 @@ const TAGS = [
   { key: "desert",    label: "沙漠戈壁",   w: 9, words: ["沙漠", "戈壁", "荒漠", "沙丘"], re: /沙漠|戈壁|荒漠|沙丘|鸣沙|雅丹|沙山/g },
   { key: "hotspring", label: "温泉泡汤",   w: 9, words: ["温泉", "泡汤", "汤泉"], re: /温泉/g },
   { key: "ski",       label: "滑雪冰雪",   w: 9, words: ["滑雪", "冰雪", "看雪", "雪场"], re: /滑雪|冰雪|雪场|冰雕|雪乡|亚布力/g },
-  { key: "food",      label: "美食小吃",   w: 5, words: ["美食", "吃", "小吃", "吃货", "觅食"], re: null, foodsMin: 5 },
-  { key: "history",   label: "历史人文",   w: 6, words: ["历史", "文化", "古迹", "人文", "古都", "遗址"], re: /博物|遗址|寺|塔|纪念|故居|石窟|陵|庙|城墙|古建|碑/g },
+  { key: "food",      label: "美食小吃",   w: 5, words: ["美食", "吃", "小吃", "吃货", "觅食", "火锅", "烧烤", "串串", "串", "面", "粉", "小吃街", "苍蝇馆子", "地道", "老字号", "早点", "夜宵", "特色菜", "苍蝇馆"], re: null, foodsMin: 5 },
+  { key: "history",   label: "历史人文",   w: 6, words: ["历史", "文化", "古迹", "人文", "古都", "遗址", "古建", "古建筑", "木构", "木结构", "唐代", "宋代", "明代", "明清", "宫殿", "皇家", "帝王陵", "地上古建筑", "斗拱", "榫卯", "古塔", "古寺", "古城墙", "古建筑群"], re: /博物|遗址|寺|塔|纪念|故居|石窟|陵|庙|城墙|古建|碑/g },
   { key: "museum",    label: "博物馆艺术", w: 8, words: ["博物馆", "展览", "艺术", "美术馆", "看展", "文艺"], re: /博物|美术馆|展览馆|画廊|故宫/g },
   { key: "family",    label: "亲子带娃",   w: 8, words: ["亲子", "带娃", "孩子", "小朋友", "儿童"], re: /乐园|动物园|海洋馆|海洋世界|科技馆|亲子|水族|欢乐谷|游乐园/g },
   { key: "night",     label: "夜生活",     w: 6, words: ["夜", "夜市", "夜景", "酒吧", "夜游"], re: /夜市|夜景|夜游|酒吧|灯光秀/g },
-  { key: "photo",     label: "摄影出片",   w: 5, words: ["拍照", "出片", "摄影", "网红", "打卡"], re: /观景|全景|日落|日出|夜景|风光|花海|观景台/g },
+  { key: "photo",     label: "摄影出片",   w: 5, words: ["拍照", "出片", "摄影", "网红", "打卡", "花", "赏花", "花海", "樱花", "油菜花", "桃花", "花市", "花卉", "拍花"], re: /观景|全景|日落|日出|夜景|风光|花海|观景台/g },
   { key: "folk",      label: "民俗风情",   w: 6, words: ["民俗", "少数民族", "红色", "风情"], re: /民俗|民族|红色|革命|纪念|非遗/g },
   { key: "slow",      label: "休闲慢游",   w: 4, words: ["慢", "休闲", "躺平", "度假", "放松"], re: /度假|休闲|温泉|海滨|康养/g },
   { key: "quiet",     label: "人少小众",   w: 5, words: ["人少", "小众", "冷门", "不挤", "安静"], re: null, special: "quiet" },
@@ -197,7 +197,28 @@ function extractPrefs(text, opts) {
   let month = 0;
   if (o.month) month = Math.max(1, Math.min(12, parseInt(o.month, 10) || 0));
   if (!month) { try { month = new Date().getMonth() + 1; } catch (e) { month = 0; } }
-  return { text: s, tags: tags, days: days, budget: budget, pace: pace, month: month };
+
+  /* 最高级词：最老/最大/最高…——项目无"建成年代"数据，无法据此真排序，
+   * 但记下意图，前端提示「具体排序需实地考证」，并强化已命中标签的权重感。 */
+  const EXT = [
+    ["最古老", "oldest"], ["最老", "oldest"], ["最早", "oldest"],
+    ["最大", "biggest"], ["最高", "highest"], ["最小", "smallest"], ["最低", "lowest"],
+    ["最美", "mostbeautiful"], ["最有名", "famous"], ["最出名", "famous"],
+  ];
+  let extreme = "";
+  for (let i = 0; i < EXT.length; i++) { if (s.indexOf(EXT[i][0]) >= 0) { extreme = EXT[i][1]; break; } }
+
+  /* 城市名提取：query 显式含某已知城市 → 该城作锚点（用户想要它或「像它」的城）。
+   * 取最长匹配，避免短名误命中；这是内容推荐的"硬意图"，优先级高于软标签。 */
+  let namedCity = "";
+  const _cities = (D && D.CITIES) || [];
+  let _bestLen = 0;
+  for (let i = 0; i < _cities.length; i++) {
+    const nm = (_cities[i] && _cities[i].name) || "";
+    if (nm && nm.length > 1 && s.indexOf(nm) >= 0 && nm.length > _bestLen) { namedCity = nm; _bestLen = nm.length; }
+  }
+
+  return { text: s, tags: tags, days: days, budget: budget, pace: pace, month: month, extreme: extreme, namedCity: namedCity };
 }
 
 /* ── 相关性：绝对量 + 密度 双因子 ──
@@ -330,10 +351,29 @@ function scoreCity(city, prefs, month) {
     push("核心条件不全", pen, "缺少 " + missingReq + " 项你明确要的要素");
   }
 
+  /* 城市名锚点：query 显式提到该城 → 强提权（用户想要它或「像它」的城）。
+   * 用 +50 确保压过同类软标签排序；理由显式标注，避免黑箱。 */
+  let isNamed = false;
+  if (p.namedCity && p.namedCity === city.name) {
+    raw += 50;
+    isNamed = true;
+    push("你提到的城市", 50, "已按你点名的目的地优先");
+  }
+
   const score = Math.max(1, Math.min(99, Math.round(raw)));
 
   reasons.sort(function (a, b) { return Math.abs(b.delta) - Math.abs(a.delta); });
   const top = reasons.slice(0, 5);
+
+  /* 主因标签（透明化）：点名 > 命中标签 > 综合热度 */
+  let reasonTag = "";
+  if (isNamed) reasonTag = "你提到的城市";
+  else if (rel.sum > 0 && rel.detail.length) reasonTag = rel.detail[0].label;
+  else reasonTag = "综合热度";
+
+  /* 无明确意图时，summary 不再伪装成「命中理由」，直接说明是综合热度推荐 */
+  const hasIntent = (rel.sum > 0) || isNamed;
+  const summary = hasIntent ? summarize(top) : "综合热度推荐（未识别到具体偏好，已按成熟度·季节·性价比排序）";
 
   return {
     name: city.name,
@@ -345,9 +385,10 @@ function scoreCity(city, prefs, month) {
     expCount: expCount,
     seasonNote: seasonNote,
     relevance: Math.round(rel.sum * 100) / 100,
+    reasonTag: reasonTag,
     tagHits: rel.detail,
     reasons: top,
-    summary: summarize(top),
+    summary: summary,
   };
 }
 
@@ -388,6 +429,11 @@ function recommend(text, opts) {
     total: D.CITIES.length,
     matched: scored.length,
     pending: false,
+    // 透明度字段：前端据此切换「匹配度 / 综合热度 / 你提到的城市」文案与提示
+    mode: prefs.namedCity ? "city" : (prefs.tags.length ? "intent" : "overall"),
+    noIntent: !prefs.tags.length && !prefs.namedCity,
+    extreme: !!prefs.extreme,
+    namedCity: prefs.namedCity || "",
   };
 }
 

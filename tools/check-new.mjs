@@ -861,10 +861,21 @@ assert("个性化 查询词含常去省", PZ.queryFromTendency({ favProv: "山�
 mem["miniWishV1"] = [{ name: "北京", city: "北京" }];
 const pzW = PZ.personalized(5);
 const bj = pzW.list.filter(x => x.name === "北京")[0];
-if (bj) assert("个性化 想去清单加权→北京带理由", bj.whyMe.indexOf("想去清单") >= 0, bj.whyMeTx);
+if (bj) assert("个性化 想去清单加权→北京带理由", bj.whyMeTx.indexOf("想去清单") >= 0, bj.whyMeTx);
 mem["miniWishV1"] = undefined;
 mem["miniLedgerV1"] = [];
 mem["miniFootV1"] = undefined;
+
+console.log("== 34. v1.19.148 · segCityOfDay 越界兜底 ==");
+const mUlt = T.buildMultiPlan({
+  route: [{ name: "北京", province: "北京市", days: 2 }, { name: "西安", province: "陕西省", days: 2 }],
+  depart: DEP, budget: "mid", pace: "balance", people: 2
+});
+assert("范围内 di=0 → 北京（不变）", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, 0) === "北京");
+assert("范围内 di=3 → 西安（不变）", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, 3) === "西安");
+assert("越界 di=99 → 末段西安", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, 99) === "西安", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, 99));
+assert("越界 di=-1 → 首段北京", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, -1) === "北京", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, -1));
+assert("无 segments 回退 cityName", T.segCityOfDay({ cityName: "成都" }, 99) === "成都");
 
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

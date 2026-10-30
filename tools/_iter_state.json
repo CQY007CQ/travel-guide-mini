@@ -1,0 +1,7 @@
+{
+  "count": 1,
+  "runs": 1,
+  "log": [
+    "v1.19.148: 修复 segCityOfDay 越界兜底（di 越界静默返回首段错误城市→按首/末段钳制）+ 修正 check-new 中个性化断言误用数组.indexOf 致偶发误报（改用 whyMeTx）。allcheck 全绿。"
+  ]
+}
