@@ -460,6 +460,7 @@ Page(SafePage({
     if (w.sunset) meta.push("日落" + w.sunset);
     return Object.assign({}, w, {
      di: wi,
+     cityTx: w.city || "",
      dateText: p.length === 3 ? p[1] + "/" + p[2] : w.date,
      isToday: w.date === today,
      metaLine: meta.join(" · "),
@@ -469,18 +470,21 @@ Page(SafePage({
      tminTx: w.tmin != null ? "/" + w.tmin + "°" : ""
     });
    });
-   // v1.19.150：目的地有雨/雪时，离线推荐室内或雨/雪景友好的景点
+   // v1.19.151：多城行程按各天所在城市预报；雨/雪天备选推「正在下雨/下雪的那座城」的室内/雨雪景
    const rainy = list.some(function (w) { return w.isRain || w.isSnow; });
-   let rainySpots = [], rainyKinds = [], rainyKindsTx = "";
+   let rainySpots = [], rainyKinds = [], rainyKindsTx = "", rainyCity = "";
    if (rainy) {
      if (list.some(function (w) { return w.isSnow; })) rainyKinds.push("snow");
      if (list.some(function (w) { return w.isRain; })) rainyKinds.push("rain");
-     rainySpots = W.rainyDaySpots(segCity || plan.cityName, rainyKinds);
+     for (let i = 0; i < list.length; i++) { if (list[i].isRain || list[i].isSnow) { rainyCity = list[i].city || ""; break; } }
+     rainySpots = W.rainyDaySpots(rainyCity || segCity || plan.cityName, rainyKinds);
      if (rainyKinds.indexOf("snow") >= 0 && rainyKinds.indexOf("rain") >= 0) rainyKindsTx = "部分日期有雨 / 雪";
      else if (rainyKinds.indexOf("snow") >= 0) rainyKindsTx = "有降雪";
      else rainyKindsTx = "有降雨";
    }
-   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: !!segs, wxLoading: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx });
+   // 多城/全省游：分段 >1 或同一份预报里出现不止一座城市 → 卡片标「各站按所在城市预报」并逐日显示城市
+   const multi = !!segs || (wxList.length > 1 && wxList.some(function (w, i) { return i > 0 && w.city && wxList[0].city && w.city !== wxList[0].city; }));
+   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: multi, wxLoading: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx });
   });
  },
 

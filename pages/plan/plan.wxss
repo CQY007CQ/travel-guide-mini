@@ -330,6 +330,8 @@
 
 .wxd-date { font-size: calc(21rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-bottom: 8rpx; }
 
+.wxd-city { color: var(--acc, #7fa8d9); font-weight: 600; }
+
 .wxd-main { display: flex; align-items: center; gap: 6rpx; margin-bottom: 4rpx; }
 
 .wxd-desc { font-size: calc(22rpx * var(--fs, 1)); color: var(--t1, #eaeff7); font-weight: 600; }

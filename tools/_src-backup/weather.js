@@ -69,59 +69,121 @@ function coordOf(cityName) {
 // 反复生成 / 切回行程页会重复请求；加进程内缓存（默认 10 分钟）既省请求又避免弱网下天气卡闪烁。
 const _WX_CACHE = {};
 const _WX_TTL = 10 * 60 * 1000;
-// 拉取整份 plan 期间的自然日天气；对齐 plan.days[i].date。
-// 成功 → cb(list)，每项 {date, code, icon, desc, tmax, tmin, feels, pop, hum, uv, wind, sunrise, sunset, isRain, isSnow, isThunder, risk, riskTx, idx}
+
+// 多城行程：每天归属的城市（day.cityName 优先，缺失时按 segments 区间回退，再回退 plan.cityName）。
+// byCity 作为「该候选是否真有数据」的二次校验，避免 day.cityName 与分段城市名不一致导致整天天气丢失。
+function dayCityOf(plan, k, byCity) {
+  const d = plan.days && plan.days[k];
+  const cands = [];
+  if (d && d.cityName) cands.push(d.cityName);
+  if (Array.isArray(plan.segments)) {
+    for (let i = 0; i < plan.segments.length; i++) {
+      const s = plan.segments[i];
+      if (k >= (s.startDay || 0) && k <= (s.endDay || 0) && s.cityName) cands.push(s.cityName);
+    }
+  }
+  if (plan.cityName) cands.push(plan.cityName);
+  for (let i = 0; i < cands.length; i++) {
+    const e = byCity[cands[i]];
+    if (e && e.byDate && Object.keys(e.byDate).length) return cands[i];
+  }
+  return cands[0] || "";
+}
+
+// 纯函数：把「每城 7 天预报」合并成与 plan.days 对齐的列表。
+// byCity: { cityName: { byDate: {fxDate: normItem}, city } }；缺数据的天（超窗口/无坐标）直接跳过。
+// 每项附 city（当天真实城市），供 UI 多城时显示「各站按所在城市预报」。
+function mergeWeatherByDay(plan, byCity) {
+  const out = [];
+  if (!plan || !plan.days) return out;
+  for (let k = 0; k < plan.days.length; k++) {
+    const ds = String(plan.days[k].date).slice(0, 10);
+    const city = dayCityOf(plan, k, byCity);
+    const ent = byCity[city];
+    const r = ent && ent.byDate && ent.byDate[ds];
+    if (!r) continue; // 该天无数据（超出预报窗口 / 城市无坐标）→ 不显示
+    const w = Object.assign({}, r, { city: city });
+    w.risk = riskOf(w);
+    w.riskTx = w.risk ? w.risk.label : "";
+    w.idx = outfitIndex(w);
+    out.push(w);
+  }
+  return out;
+}
+
+// 拉取整份 plan 期间的自然日天气；多城行程按各天所在城市分别拉取
+// （v1.19.151 修复：旧版只用首站城市，导致后续城市的天也显示首站天气）。对齐 plan.days[i].date。
+// 成功 → cb(list)，每项 {...isRain, isSnow, isThunder, risk, riskTx, idx, city}
 // 失败 / 不可用 / Key 未配置 / 超预报窗口 → cb([])
 function fetchPlanWeather(plan, cb) {
   if (!plan || !plan.days || !plan.days.length) { cb([]); return; }
   if (typeof wx === "undefined" || !wx.request) { cb([]); return; }
   if (!QW_KEY || QW_KEY.indexOf("在此填写") >= 0) { cb([]); return; } // Key 未配置 → 静默降级
-  const segCity = plan.segments && plan.segments[0] && plan.segments[0].cityName;
-  const c = coordOf(segCity || plan.cityName);
-  if (!c) { cb([]); return; }
+  // 行程涉及的城市（去重保序）：有分段用分段城市，否则用 plan.cityName
+  const rawCities = (Array.isArray(plan.segments) && plan.segments.length)
+    ? plan.segments.map(function (s) { return s.cityName; })
+    : [plan.cityName];
+  const seen = {}; const cities = [];
+  rawCities.forEach(function (c) { if (c && !seen[c]) { seen[c] = 1; cities.push(c); } });
+  if (!cities.length) { cb([]); return; }
+
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const first = new Date(String(plan.days[0].date).slice(0, 10).replace(/-/g, "/"));
   first.setHours(0, 0, 0, 0);
   let gap = Math.round((first - today) / 86400000);
   if (gap < 0) gap = 0;
-  // 和风免费档至多 7 天预报；缓存键含 host + 出发偏移
-  const _wkey = (segCity || plan.cityName) + "|" + gap + "|" + QW_API_HOST;
-  const _wh = _WX_CACHE[_wkey];
-  if (_wh && (Date.now() - _wh.t) < _WX_TTL) { cb(_wh.v); return; }
-  const lat = Number(c.lat).toFixed(2), lon = Number(c.lon).toFixed(2);
-  wx.request({
-    url: QW_API_HOST + "/v7/weather/7d",
-    data: { location: lon + "," + lat, key: QW_KEY },
-    header: { "X-QW-Api-Key": QW_KEY },
-    success(res) {
-      try {
-        const d = res && res.data;
-        if (!d || d.code !== "200" || !Array.isArray(d.daily)) { cb([]); return; }
-        const byDate = {};
-        for (let i = 0; i < d.daily.length; i++) byDate[d.daily[i].fxDate] = d.daily[i];
-        const out = [];
-        const num = function (s) { return s == null ? null : parseInt(s, 10); };
-        for (let k = 0; k < plan.days.length; k++) {
-          const ds = String(plan.days[k].date).slice(0, 10);
-          const r = byDate[ds]; if (!r) continue; // 超出预报窗口/无数据 → 该天不显示
-          const norm = normText(r.textDay);
-          const w = {
-            date: ds, code: norm.code, icon: norm.icon, desc: r.textDay || "",
-            tmax: num(r.tempMax), tmin: num(r.tempMin), feels: null, pop: null,
-            hum: num(r.humidity), uv: num(r.uvIndex), wind: num(r.windSpeedDay),
-            sunrise: r.sunrise || "", sunset: r.sunset || "",
-            isRain: norm.isRain, isSnow: norm.isSnow, isThunder: norm.isThunder
-          };
-          w.risk = riskOf(w);          // null 或 {label, icon}
-          w.riskTx = w.risk ? w.risk.label : "";
-          w.idx = outfitIndex(w);     // [{t, icon}]
-          out.push(w);
-        }
-        cb(out);
-      } catch (e) { cb([]); }
-    },
-    fail() { cb([]); }
+
+  const byCity = {};
+  let pending = 0, finished = false;
+  const finish = function () {
+    if (finished) return;
+    if (pending > 0) return;
+    finished = true;
+    cb(mergeWeatherByDay(plan, byCity));
+  };
+  const normDaily = function (daily) {
+    const byDate = {};
+    if (!Array.isArray(daily)) return byDate;
+    const num = function (s) { return s == null ? null : parseInt(s, 10); };
+    for (let i = 0; i < daily.length; i++) {
+      const r = daily[i]; if (!r || !r.fxDate) continue;
+      const norm = normText(r.textDay);
+      byDate[r.fxDate] = {
+        date: r.fxDate, code: norm.code, icon: norm.icon, desc: r.textDay || "",
+        tmax: num(r.tempMax), tmin: num(r.tempMin), feels: null, pop: null,
+        hum: num(r.humidity), uv: num(r.uvIndex), wind: num(r.windSpeedDay),
+        sunrise: r.sunrise || "", sunset: r.sunset || "",
+        isRain: norm.isRain, isSnow: norm.isSnow, isThunder: norm.isThunder
+      };
+    }
+    return byDate;
+  };
+  cities.forEach(function (city) {
+    const c = coordOf(city);
+    if (!c) { byCity[city] = { byDate: {}, city: city }; return; } // 无坐标：占位，避免 dayCityOf 误判
+    const wkey = city + "|" + gap + "|" + QW_API_HOST;
+    const cached = _WX_CACHE[wkey];
+    if (cached && (Date.now() - cached.t) < _WX_TTL) { byCity[city] = { byDate: cached.v, city: city }; return; }
+    pending++;
+    const lat = Number(c.lat).toFixed(2), lon = Number(c.lon).toFixed(2);
+    wx.request({
+      url: QW_API_HOST + "/v7/weather/7d",
+      data: { location: lon + "," + lat, key: QW_KEY },
+      header: { "X-QW-Api-Key": QW_KEY },
+      success(res) {
+        try {
+          const d = res && res.data;
+          let byDate = {};
+          if (d && d.code === "200" && Array.isArray(d.daily)) byDate = normDaily(d.daily);
+          _WX_CACHE[wkey] = { t: Date.now(), v: byDate };
+          byCity[city] = { byDate: byDate, city: city };
+        } catch (e) { byCity[city] = { byDate: {}, city: city }; }
+        pending--; finish();
+      },
+      fail() { byCity[city] = { byDate: {}, city: city }; pending--; finish(); }
+    });
   });
+  finish(); // 全部命中缓存 / 无坐标时立即结算
 }
 
 // ── 雨雪天备选：目的地下雨/下雪时，推荐室内或雨/雪景友好的景点 ──
@@ -153,4 +215,4 @@ function rainyDaySpots(cityName, kinds) {
   return out.slice(0, 6);
 }
 
-module.exports = { fetchPlanWeather, rainyDaySpots, normText, riskOf, outfitIndex };
+module.exports = { fetchPlanWeather, mergeWeatherByDay, dayCityOf, rainyDaySpots, normText, riskOf, outfitIndex };
