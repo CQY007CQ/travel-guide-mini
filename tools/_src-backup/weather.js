@@ -111,21 +111,31 @@ function mergeWeatherByDay(plan, byCity) {
   return out;
 }
 
+// 和风错误码 → 可辨识的错误类型/文案（让用户看到「为什么没天气」，而非一律「暂不可用」）
+function classifyApiError(d) {
+  const code = d && d.code;
+  const status = (d && d.status) ? String(d.status).toLowerCase() : "";
+  if (code === "401" || /invalid key|unauthorized/.test(status)) return { type: "auth", msg: "天气服务未授权（Key 无效）" };
+  if (code === "402" || code === "429" || /quota|too many requests|frequency|exceeded/.test(status)) return { type: "quota", msg: "天气接口受限（免费额度或频次）" };
+  if (code === "403" || /permission denied|forbidden/.test(status)) return { type: "auth", msg: "天气服务未授权" };
+  if (code === "404" || /invalid parameter/.test(status)) return { type: "param", msg: "天气请求参数有误" };
+  return { type: "api", msg: "天气服务暂时异常" };
+}
+
 // 拉取整份 plan 期间的自然日天气；多城行程按各天所在城市分别拉取
 // （v1.19.151 修复：旧版只用首站城市，导致后续城市的天也显示首站天气）。对齐 plan.days[i].date。
-// 成功 → cb(list)，每项 {...isRain, isSnow, isThunder, risk, riskTx, idx, city}
-// 失败 / 不可用 / Key 未配置 / 超预报窗口 → cb([])
+// 回调 cb(list, err)：成功 err=null；失败 err={type,msg}（type∈ empty/env/no_key/nocity/quota/auth/param/api/net/window）。
 function fetchPlanWeather(plan, cb) {
-  if (!plan || !plan.days || !plan.days.length) { cb([]); return; }
-  if (typeof wx === "undefined" || !wx.request) { cb([]); return; }
-  if (!QW_KEY || QW_KEY.indexOf("在此填写") >= 0) { cb([]); return; } // Key 未配置 → 静默降级
+  if (!plan || !plan.days || !plan.days.length) { cb([], { type: "empty" }); return; }
+  if (typeof wx === "undefined" || !wx.request) { cb([], { type: "env" }); return; }
+  if (!QW_KEY || QW_KEY.indexOf("在此填写") >= 0) { cb([], { type: "no_key", msg: "天气服务未启用（需在和风后台配置 Key）" }); return; } // Key 未配置 → 明确提示
   // 行程涉及的城市（去重保序）：有分段用分段城市，否则用 plan.cityName
   const rawCities = (Array.isArray(plan.segments) && plan.segments.length)
     ? plan.segments.map(function (s) { return s.cityName; })
     : [plan.cityName];
   const seen = {}; const cities = [];
   rawCities.forEach(function (c) { if (c && !seen[c]) { seen[c] = 1; cities.push(c); } });
-  if (!cities.length) { cb([]); return; }
+  if (!cities.length) { cb([], { type: "nocity" }); return; }
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const first = new Date(String(plan.days[0].date).slice(0, 10).replace(/-/g, "/"));
@@ -134,12 +144,15 @@ function fetchPlanWeather(plan, cb) {
   if (gap < 0) gap = 0;
 
   const byCity = {};
-  let pending = 0, finished = false;
+  let pending = 0, finished = false, aggErr = null;
+  const setErr = function (e) { if (!aggErr) aggErr = e; };
   const finish = function () {
     if (finished) return;
     if (pending > 0) return;
     finished = true;
-    cb(mergeWeatherByDay(plan, byCity));
+    const out = mergeWeatherByDay(plan, byCity);
+    if (out.length) cb(out, null);
+    else cb([], aggErr || { type: "window", msg: "行程超出天气预报范围（仅支持未来 7 天）" });
   };
   const normDaily = function (daily) {
     const byDate = {};
@@ -173,14 +186,18 @@ function fetchPlanWeather(plan, cb) {
       success(res) {
         try {
           const d = res && res.data;
-          let byDate = {};
-          if (d && d.code === "200" && Array.isArray(d.daily)) byDate = normDaily(d.daily);
-          _WX_CACHE[wkey] = { t: Date.now(), v: byDate };
-          byCity[city] = { byDate: byDate, city: city };
+          if (!d || d.code !== "200" || !Array.isArray(d.daily)) {
+            if (d) setErr(classifyApiError(d)); // API 返回错误码（Key 无效/超额度/参数等）
+            byCity[city] = { byDate: {}, city: city };
+          } else {
+            const byDate = normDaily(d.daily);
+            _WX_CACHE[wkey] = { t: Date.now(), v: byDate };
+            byCity[city] = { byDate: byDate, city: city };
+          }
         } catch (e) { byCity[city] = { byDate: {}, city: city }; }
         pending--; finish();
       },
-      fail() { byCity[city] = { byDate: {}, city: city }; pending--; finish(); }
+      fail() { setErr({ type: "net", msg: "天气加载失败，请重试" }); byCity[city] = { byDate: {}, city: city }; pending--; finish(); }
     });
   });
   finish(); // 全部命中缓存 / 无坐标时立即结算
@@ -217,4 +234,4 @@ function rainyDaySpots(cityName, kinds) {
   return out.slice(0, 6);
 }
 
-module.exports = { fetchPlanWeather, mergeWeatherByDay, dayCityOf, rainyDaySpots, normText, riskOf, outfitIndex };
+module.exports = { fetchPlanWeather, mergeWeatherByDay, dayCityOf, classifyApiError, rainyDaySpots, normText, riskOf, outfitIndex };

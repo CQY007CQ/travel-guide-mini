@@ -66,5 +66,24 @@ ok("雨雪备选元素含 name + reason", Array.isArray(bj) && bj.every(x => x &
 const wh = W.rainyDaySpots("武汉", ["rain", "snow"]);
 ok("雨雪备选：含楼/塔/阁的露天地标不被误标室内", Array.isArray(wh) && wh.every(x => !(x.reason === "室内" && /[楼塔阁]/.test(x.name))));
 
+// v1.19.153：错误码可辨识（classifyApiError 把和风错误码映射到 type/msg）
+const c401 = W.classifyApiError({ code: "401" });
+ok("401 → auth（Key 无效）", c401.type === "auth" && /Key/.test(c401.msg));
+const c429 = W.classifyApiError({ code: "429" });
+ok("429 → quota（额度/频次）", c429.type === "quota" && /额度|频次/.test(c429.msg));
+const c403 = W.classifyApiError({ code: "403", status: "permission denied" });
+ok("403 → auth", c403.type === "auth");
+const c404 = W.classifyApiError({ code: "404" });
+ok("404 → param", c404.type === "param");
+const c500 = W.classifyApiError({ code: "500" });
+ok("未知码 → api（兜底）", c500.type === "api");
+const cStatus = W.classifyApiError({ status: "INVALID KEY" });
+ok("status 含 invalid key → auth", cStatus.type === "auth");
+
+// v1.19.153：fetchPlanWeather 回调签名改为 cb(list, err)；node 下无 wx → err.type=env
+let envErr = null, envList = null;
+W.fetchPlanWeather(plan, (list, err) => { envList = list; envErr = err; });
+ok("无 wx 环境 → 回调 err.type=env（list 为空）", envErr && envErr.type === "env" && Array.isArray(envList) && envList.length === 0);
+
 console.log(fail ? ("\n✗ weather151 单测失败 " + fail + " 项") : "\n✓ weather151 单测全部通过");
 process.exit(fail ? 1 : 0);

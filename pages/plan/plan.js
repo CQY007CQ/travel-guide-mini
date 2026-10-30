@@ -40,7 +40,9 @@ Page(SafePage({
   // 全省 · 省内精华游（isProv 时隐藏单城专属控件）
   isProv: false,
   // 行程天气卡（和风天气；失败静默隐藏）
-  wxShow: false, wxList: [], wxOff: false, wxIsMulti: false,
+  wxShow: false, wxList: [], wxOff: false, wxIsMulti: false, wxLoading: false,
+  // v1.19.153：天气失败态可辨识（不再一律「天气暂不可用」）
+  wxErrType: "", wxErrMsg: "", wxErrRetry: false,
   // 雨雪天备选：目的地有雨/雪时推荐室内或雨/雪景友好景点
   rainyShow: false, rainySpots: [], rainyKinds: [], rainyKindsTx: "",
   // v1.6：城市速览 / 倒计时
@@ -445,8 +447,24 @@ Page(SafePage({
   if (this._wxSig === sig && (this.data.wxShow || this.data.wxOff)) return;
   this._wxSig = sig;
   if (this.data.wxShow) this.setData({ wxShow: false });
-  W.fetchPlanWeather(plan, list => {
-   if (!list || !list.length) { this.setData({ wxOff: true, wxShow: false, wxList: [], rainyShow: false, rainySpots: [] }); return; }
+  this.setData({ wxLoading: true });
+  // v1.19.153：回调改为 cb(list, err)；失败时按 err.type 给出可辨识文案，不再一律「天气暂不可用」
+  W.fetchPlanWeather(plan, (list, err) => {
+   if (err) {
+     // type ∈ empty/env/no_key/nocity/quota/auth/param/api/net/window
+     let msg = err.msg || "";
+     if (!msg) {
+       if (err.type === "empty") msg = "暂无行程，先生成一份攻略";
+       else if (err.type === "env") msg = "当前环境不支持天气加载";
+       else if (err.type === "nocity") msg = "未识别到行程城市";
+       else msg = "天气服务暂时异常";
+     }
+     // 仅「可能恢复」的失败（网络/额度/授权/服务异常/参数）才给重试；no_key/window/env/empty/nocity 重试无意义
+     const recover = (err.type === "net" || err.type === "quota" || err.type === "auth" || err.type === "api" || err.type === "param");
+     this.setData({ wxOff: true, wxShow: false, wxList: [], rainyShow: false, rainySpots: [], wxErrType: err.type || "api", wxErrMsg: msg, wxErrRetry: !!recover, wxLoading: false });
+     return;
+   }
+   if (!list || !list.length) { this.setData({ wxOff: true, wxShow: false, wxList: [], rainyShow: false, rainySpots: [], wxErrType: "", wxErrMsg: "天气暂不可用", wxErrRetry: false, wxLoading: false }); return; }
    const today = T.fmtLocalDate(new Date());
    const wxList = list.map((w, wi) => {
     const p = String(w.date).split("-");
@@ -484,7 +502,7 @@ Page(SafePage({
    }
    // 多城/全省游：分段 >1 或同一份预报里出现不止一座城市 → 卡片标「各站按所在城市预报」并逐日显示城市
    const multi = !!segs || (wxList.length > 1 && wxList.some(function (w, i) { return i > 0 && w.city && wxList[0].city && w.city !== wxList[0].city; }));
-   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: multi, wxLoading: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx });
+   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: multi, wxLoading: false, wxErrType: "", wxErrMsg: "", wxErrRetry: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx });
   });
  },
 
