@@ -39,8 +39,10 @@ Page(SafePage({
   altPaces: ["leisure", "balance", "speed"],
   // 全省 · 省内精华游（isProv 时隐藏单城专属控件）
   isProv: false,
-  // 行程天气卡（open-meteo；失败静默隐藏）
+  // 行程天气卡（和风天气；失败静默隐藏）
   wxShow: false, wxList: [], wxOff: false, wxIsMulti: false,
+  // 雨雪天备选：目的地有雨/雪时推荐室内或雨/雪景友好景点
+  rainyShow: false, rainySpots: [], rainyKinds: [], rainyKindsTx: "",
   // v1.6：城市速览 / 倒计时
   brief: null, briefOpen: false, countdown: null,
   // v1.18：天气卡 / 想玩未排上列表默认收起（减法：首屏更轻）
@@ -434,16 +436,17 @@ Page(SafePage({
   });
  },
 
- // 行程天气（open-meteo；同行程只拉一次，失败静默隐藏天气卡）
+ // 行程天气（和风天气 QWeather；首站城市预报，失败静默隐藏天气卡）
  _maybeLoadWx(plan) {
   const segs = Array.isArray(plan.segments) && plan.segments.length > 1;
+  const segCity = plan.segments && plan.segments[0] && plan.segments[0].cityName;
   const d0 = plan.days && plan.days[0] ? String(plan.days[0].date) : "";
   const sig = (plan.cityName || "") + "|" + (plan.days ? plan.days.length : 0) + "|" + d0;
   if (this._wxSig === sig && (this.data.wxShow || this.data.wxOff)) return;
   this._wxSig = sig;
   if (this.data.wxShow) this.setData({ wxShow: false });
   W.fetchPlanWeather(plan, list => {
-   if (!list || !list.length) { this.setData({ wxOff: true, wxShow: false, wxList: [] }); return; }
+   if (!list || !list.length) { this.setData({ wxOff: true, wxShow: false, wxList: [], rainyShow: false, rainySpots: [] }); return; }
    const today = T.fmtLocalDate(new Date());
    const wxList = list.map((w, wi) => {
     const p = String(w.date).split("-");
@@ -466,7 +469,18 @@ Page(SafePage({
      tminTx: w.tmin != null ? "/" + w.tmin + "°" : ""
     });
    });
-   this.setData({ wxShow: true, wxOff: false, wxList, wxIsMulti: !!segs, wxLoading: false });
+   // v1.19.150：目的地有雨/雪时，离线推荐室内或雨/雪景友好的景点
+   const rainy = list.some(function (w) { return w.isRain || w.isSnow; });
+   let rainySpots = [], rainyKinds = [], rainyKindsTx = "";
+   if (rainy) {
+     if (list.some(function (w) { return w.isSnow; })) rainyKinds.push("snow");
+     if (list.some(function (w) { return w.isRain; })) rainyKinds.push("rain");
+     rainySpots = W.rainyDaySpots(segCity || plan.cityName, rainyKinds);
+     if (rainyKinds.indexOf("snow") >= 0 && rainyKinds.indexOf("rain") >= 0) rainyKindsTx = "部分日期有雨 / 雪";
+     else if (rainyKinds.indexOf("snow") >= 0) rainyKindsTx = "有降雪";
+     else rainyKindsTx = "有降雨";
+   }
+   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: !!segs, wxLoading: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx });
   });
  },
 

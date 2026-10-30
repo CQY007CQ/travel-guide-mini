@@ -157,7 +157,7 @@
     </view>
   </view>
 
-  <!-- 行程天气（open-meteo 实时） -->
+  <!-- 行程天气（和风天气 QWeather 实时） -->
   <!-- C2：拉取失败时显式提示（可点 ✕ 关闭，换行程后重新提示） -->
   <view class="wx-off" wx:if="{{wxOff}}">
     <image class="ic ic-sm" src="/images/icons/cloud.png"/>
@@ -175,7 +175,7 @@
     <view class="wx-head" bindtap="toggleWx">
       <text class="wx-h wx-h-row"><image class="ic" src="/images/icons/sun.png"/>行程天气</text>
       <view class="wx-head-r">
-        <text class="wx-m dim">{{wxIsMulti ? '多站 · 首站城市预报，仅供参考' : 'open-meteo 实时预报'}}</text>
+        <text class="wx-m dim">{{wxIsMulti ? '多站 · 首站城市预报，仅供参考' : '和风天气实时预报'}}</text>
         <text class="guide-toggle">{{wxOpen ? '收起 ▴' : '展开 ▾'}}</text>
       </view>
     </view>
@@ -205,6 +205,18 @@
         </view>
       </view>
     </scroll-view>
+  </view>
+
+  <!-- 雨雪天备选：目的地有雨/雪时，推荐室内或雨/雪景友好的景点（离线，不依赖天气请求） -->
+  <view class="card rainy-card" wx:if="{{rainyShow}}">
+    <view class="h3 rainy-hd"><image class="ic" src="/images/icons/umbrella.png"/>雨雪天备选</view>
+    <view class="rainy-sub dim">{{rainyKindsTx}} · 这些景点受天气影响小，或在雨/雪中更有味道</view>
+    <view class="rainy-list">
+      <view class="rainy-item" wx:for="{{rainySpots}}" wx:key="name">
+        <text class="rainy-n">{{item.name}}</text>
+        <text class="rainy-r chip">{{item.reason}}</text>
+      </view>
+    </view>
   </view>
 
   <!-- 行程体检：排得太满 / 需预约未订 / 无留白 / 转场日 等提醒（无问题项时整体收起） -->

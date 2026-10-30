@@ -11,17 +11,18 @@
  * 判定规则：
  *   1. 32 位十六进制串 —— 高德、腾讯等云服务的 key 都是这个形状
  *   2. `key=` / `apikey` / `token` / `secret` 后跟长串的赋值式
- *   3. 高德接口域名 restapi.amap.com —— 运行时应当零依赖（坐标随包、天气走 open-meteo）
+ *   3. 高德接口域名 restapi.amap.com —— 运行时应当零依赖（坐标随包、天气走和风 qweather）
  *   4. 明文 http://（微信小程序要求 https）
  *
- * 允许清单：静态资源域名、已知合法的公开接口（open-meteo、百科跳转）。
+ * 允许清单：静态资源域名、已知合法的公开接口（和风 qweather、百科跳转）。
  */
 import fs from "fs";
 import path from "path";
 
 const SHIPPED = ["app.js", "app.json", "utils", "pages", "subpkg", "subai", "subdata", "subdata2", "subdata3"];
 const ALLOW_URL = [
-  "https://api.open-meteo.com",   // 天气
+  "https://devapi.qweather.com",  // 和风天气（已备案，request 合法域名可过审）
+  "qweatherapi.com",              // 和风自定义域名（部分账号分配 xxx.qweatherapi.com）
   "https://baike.baidu.com",      // 景点百科外链
 ];
 

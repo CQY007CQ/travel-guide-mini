@@ -278,7 +278,7 @@
   color: var(--gold-tx, #e8c877); background: rgba(212,169,78,.16); border-color: rgba(212,169,78,.5);
 }
 
-/* 行程天气卡（open-meteo 实时 · 首站城市） */
+/* 行程天气卡（和风天气 QWeather 实时 · 首站城市） */
 .wx-card { border-color: rgba(var(--ln-rgb, 148,163,184),.16); }
 
 /* C2：天气降级显式提示条（拉取失败时替代天气卡出现） */
@@ -350,6 +350,23 @@
 .wxd-risk.r-ok { background: rgba(125,211,168,.1); color: var(--green, #7dd3a8); border: 1rpx solid rgba(125,211,168,.22); }
 
 .wxd-risk.r-bad { background: rgba(229,106,106,.16); color: var(--red, #f39b9b); border: 1rpx solid rgba(229,106,106,.35); }
+
+/* v1.19.150：雨雪天备选卡（目的地有雨/雪时，离线推荐室内 / 雨·雪景友好景点） */
+.rainy-card { border-color: rgba(var(--ln-rgb, 148,163,184),.16); }
+
+.rainy-hd { display: flex; align-items: center; margin-bottom: 12rpx; }
+
+.rainy-sub { font-size: calc(20rpx * var(--fs, 1)); line-height: 1.5; margin: -4rpx 0 14rpx; }
+
+.rainy-list { display: flex; flex-direction: column; gap: 12rpx; }
+
+.rainy-item { display: flex; align-items: center; justify-content: space-between; gap: 16rpx;
+  padding: 12rpx 16rpx; border-radius: 16rpx; background: rgba(var(--ln-rgb, 148,163,184),.045);
+  border: 1rpx solid rgba(var(--ln-rgb, 148,163,184),.14); }
+
+.rainy-n { font-size: calc(23rpx * var(--fs, 1)); color: var(--t2, #c3cfe0); font-weight: 600; flex: 1; min-width: 0; }
+
+.rainy-r.chip { color: var(--blue, #7fa8d9); background: rgba(127,168,217,.12); border: 1rpx solid rgba(127,168,217,.3); flex-shrink: 0; }
 
 /* 打卡进度条（绿色系，与金色预算条区分） */
 .bud-fill.foot-fill { background: linear-gradient(90deg, #5fb98a, #7dd3a8); }
