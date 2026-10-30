@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.145";
+const APP_VER = "1.19.146";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -1840,6 +1840,21 @@ function tripOverview(plan) {
   };
 }
 
+/* v1.19.146：plan 页 stats 精简 —— 标题已含「N天M晚」、foot 已含景点总数，
+   去掉重复的「N 天」与「X 个景点」，只留 城数·日均·节奏，强化主次层级 */
+function tripStatsText(ov, spots) {
+  if (!ov) return spots + " 个具体景点";
+  let t = (ov.text || "")
+    .replace(/^\s*\d+\s*天\s*[·・]\s*/, "")
+    .replace(/\d+\s*个景点/g, "")
+    .replace(/\s*[·・]\s*[·・]\s*/g, " · ")
+    .replace(/^\s*[·・]\s*/, "")
+    .replace(/\s*[·・]\s*$/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return t + " · " + (ov.level || "");
+}
+
 /* ================= v1.6.0 新功能 ================= */
 
 /* ---------- ① 单日「加 / 删」一个景点（行程加减法） ---------- */
@@ -2076,23 +2091,23 @@ function tripCountdown(plan) {
   if (st.phase === "before") {
     const n = st.daysLeft;
     return {
-      phase: "before", big: String(n), unit: "天", sub: "后出发 · " + city,
+      phase: "before", big: String(n), unit: "天", sub: "后出发 · " + city, label: "后出发",
+      // v1.19.146：tip 不再重复大数字（big 已显示 N 天），只给可执行的提醒
       tip: n <= 1 ? "明天就走：证件、车票、充电宝再过一遍" :
-           n <= 3 ? "倒计时 " + n + " 天：该收拾行李、确认门票预约了" :
-           n <= 10 ? "还有 " + n + " 天：先把要预约的门票订好" :
-           "还有 " + n + " 天：行程已就绪，出发前一周再确认一次"
+           n <= 3 ? "该收拾行李、确认门票预约了" :
+           n <= 10 ? "先把要预约的门票订好" :
+           "行程已就绪，出发前一周再确认一次"
     };
   }
   if (st.phase === "during") {
     return {
       phase: "during", big: "D" + st.dayNo, unit: "/" + st.total,
-      sub: "旅途中 · " + city,
-      tip: st.dayNo === st.total ? "最后一天：留点时间买伴手礼" :
-           "第 " + st.dayNo + " 天 / 共 " + st.total + " 天，玩得开心"
+      sub: "旅途中 · " + city, label: "旅途中",
+      tip: st.dayNo === st.total ? "最后一天：留点时间买伴手礼" : "旅途愉快，注意安全"
     };
   }
   return {
-    phase: "after", big: String(st.daysSince), unit: "天", sub: "前结束 · 已归来",
+    phase: "after", big: String(st.daysSince), unit: "天", sub: "前结束 · 已归来", label: "已归来",
     tip: "去「更多」看看旅行小结和成就徽章"
   };
 }
@@ -5639,7 +5654,7 @@ module.exports = {
   segCityOfDay, settleUp, swapCandidates, swapSpot, swapCandidatesByTag, swapSpotByTag,
   spendByDay, NOTES_KEY, getNotes, noteOf, addNote, delNote,
   budgetGauge,
-  parseQuickBill, guessCat, budgetSplit, SPLIT_BASE, tripCheck, tripHealth, packSmart, achievements, tripOverview,
+  parseQuickBill, guessCat, budgetSplit, SPLIT_BASE, tripCheck, tripHealth, packSmart, achievements, tripOverview, tripStatsText,
   // v1.6.0
   dayAddCandidates, dayAddSpot, dayRemoveSpot,
   dailyBudget, spendForecast, tripReview,

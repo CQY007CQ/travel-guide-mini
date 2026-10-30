@@ -489,7 +489,7 @@
 
 /* ===== v1.6 · 出发倒计时 D-day ===== */
 .cd-strip {
-  display: flex; align-items: center; gap: 22rpx;
+  display: flex; align-items: center; gap: 18rpx;
   margin-top: 20rpx; padding: 18rpx 24rpx;
   background: linear-gradient(100deg, rgba(212, 169, 78, .16), rgba(212, 169, 78, .04));
   border: 1rpx solid rgba(212, 169, 78, .22);
@@ -497,6 +497,7 @@
 }
 
 .cd-big {
+  display: flex; align-items: baseline;
   font-size: calc(52rpx * var(--fs, 1)); font-weight: 800; line-height: 1;
   color: var(--gold-tx, #d4a94e); letter-spacing: -1rpx; flex-shrink: 0;
 }
@@ -507,11 +508,10 @@
 
 .cd-unit { font-size: calc(22rpx * var(--fs, 1)); font-weight: 600; margin-left: 6rpx; color: var(--t2, #c3cfe0); }
 
-.cd-r { flex: 1; min-width: 0; }
+/* v1.19.146：倒计时标签（不含城市名，城市已在标题），与大数字同组 */
+.cd-label { font-size: calc(24rpx * var(--fs, 1)); font-weight: 700; margin-left: 10rpx; color: var(--t2, #c3cfe0); }
 
-.cd-sub { font-size: calc(26rpx * var(--fs, 1)); font-weight: 600; color: var(--t1, #eaeff7); }
-
-.cd-tip { font-size: calc(21rpx * var(--fs, 1)); line-height: 1.55; margin-top: 4rpx; }
+.cd-tip { flex: 1; min-width: 0; font-size: calc(21rpx * var(--fs, 1)); line-height: 1.5; }
 
 /* ===== v1.6 · 城市速览 ===== */
 .brief-card { padding-bottom: 18rpx; }

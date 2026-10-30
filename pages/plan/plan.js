@@ -215,7 +215,9 @@ Page(SafePage({
   this.setData({
    view,
    summary: summaryText,
-   stats: ((ov ? ov.text + " · " + ov.level : spots + " 个具体景点") + " · 出发 " + (plan.depart || "")),
+   // v1.19.146：精简 stats —— 标题已含「N天M晚」、foot 已含景点总数，
+   // 只留 城数·日均·节奏（逻辑抽到 T.tripStatsText，可单测）
+   stats: T.tripStatsText(ov, spots),
    // v1.11：体检卡标题文案预计算（WXML 里原本是两层嵌套三元）
    tripCheck: (() => {
     const c = this._checkMerge(plan);

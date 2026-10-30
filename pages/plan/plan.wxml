@@ -5,6 +5,8 @@
       <view class="sum-main">
         <view class="sum-title"><image class="ic ic-title" src="/images/icons/pin.png"/> {{summary}}</view>
         <view class="sum-sub">{{stats}}</view>
+        <!-- 构成统计作为次指标紧邻 stats，与标题同组，弱化层级 -->
+        <view class="mix-line dim" wx:if="{{mixTxt}}"><image class="ic ic-sm" src="/images/icons/pie.png"/>{{mixTxt}}</view>
       </view>
       <!-- 有限数据层：诚实提示内容收集中 -->
       <view class="limited-notice" wx:if="{{limitedNotice}}"><text class="ln-ic">✦</text><text>该城攻略采集中，先给你框架，补齐后自动更新</text></view>
@@ -22,8 +24,6 @@
     <view class="chips" wx:if="{{metaChips.length}}">
       <text class="chip" wx:for="{{metaChips}}" wx:key="*this">{{item}}</text>
     </view>
-    <!-- v1.9：构成统计（山水×N · 人文×N…） -->
-    <view class="mix-line dim" wx:if="{{mixTxt}}"><image class="ic ic-sm" src="/images/icons/pie.png"/>{{mixTxt}}</view>
 
     <!-- v1.8.4 A1：人流提示（公假 / 暑假 / 周末） -->
     <view class="hint-strip {{hint.lv}}" wx:for="{{hints}}" wx:key="date">
@@ -31,13 +31,10 @@
       <text class="hint-t">{{hint.txt}}</text>
     </view>
 
-    <!-- 出发倒计时 D-day -->
+    <!-- 出发倒计时 D-day（label 不含城市名，城市已在标题；tip 不再重复大数字） -->
     <view class="cd-strip" wx:if="{{countdown}}">
-      <view class="cd-big {{countdown.phase}}">{{countdown.big}}<text class="cd-unit">{{countdown.unit}}</text></view>
-      <view class="cd-r">
-        <view class="cd-sub">{{countdown.sub}}</view>
-        <view class="cd-tip dim">{{countdown.tip}}</view>
-      </view>
+      <view class="cd-big {{countdown.phase}}">{{countdown.big}}<text class="cd-unit">{{countdown.unit}}</text><text class="cd-label">{{countdown.label}}</text></view>
+      <view class="cd-tip dim">{{countdown.tip}}</view>
     </view>
 
     <!-- 打卡进度（与旅行足迹联动） -->
@@ -45,7 +42,7 @@
       <view class="bud-track">
         <view class="bud-fill foot-fill" style="width:{{foot.pct}}%;"/>
       </view>
-      <view class="bud-tx-row"><image class="ic" src="/images/icons/foot.png"/><text class="bud-tx">已打卡 {{foot.done}}/{{foot.total}} 个景点{{foot.done ? ' · 继续点亮这趟行程' : ' · 点开景点详情即可打卡'}}</text></view>
+      <view class="bud-tx-row"><image class="ic" src="/images/icons/foot.png"/><text class="bud-tx">已打卡 {{foot.done}}/{{foot.total}}{{foot.done ? ' · 继续点亮' : ' · 点开景点详情打卡'}}</text></view>
     </view>
 
     <!-- 预算 gauge：账本实际花费 vs 行程总预算参考 -->

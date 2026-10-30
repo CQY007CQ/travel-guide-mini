@@ -143,6 +143,8 @@ step "单测 foodmap (菜名→店铺)" "$NODE" tools/_test-foodmap.mjs
 step "单测 food-menu (菜单·口碑·点评 试点)" "$NODE" tools/_test-food-menu.mjs
 # 酒店住宿多片区推荐 + 平台门户（v1.19.145）：精选城/退化/地图多点/门户搜索词
 step "单测 hotel (多片区·门户 v1.19.145)" "$NODE" tools/_test-hotel.mjs
+# plan 页 summary 卡精简（v1.19.146）：stats 去重 + 倒计时 label/tip
+step "单测 plan146 (summary 精简)" "$NODE" tools/_test-plan146.mjs
 # 「今日正当时」已于 2026-10-29 按用户要求下线，原接线测试改为「下线守卫」（防被无意加回）
 step "单测 insp 下线守卫" "$NODE" tools/_test-insp-removed.mjs
 step "单测 气候补充去重" "$NODE" tools/_test-climate-dedupe.mjs
