@@ -108,7 +108,6 @@
   <view class="group" wx:if="{{insights}}">
     <view class="group-title">本机数据洞察</view>
     <view class="card group-card">
-      <view class="dim ins-sub">基于你本机的真实记录聚合，不联网、不上传</view>
       <block wx:if="{{insights.noData}}">
         <view class="dim ins-empty">还没有足够数据。多用几次记账、打卡和存档，这里会给出你的旅行画像。</view>
       </block>
@@ -353,7 +352,7 @@
     </view>
   </view>
 
-  <view class="foot dim">数据存本机 · 离线可用（地图需联网）</view>
+  <view class="foot dim">天气与地图功能需联网</view>
   <!-- v1.8.5 C13：关于与版本 -->
   <view class="ver-row" bindtap="onAbout">
     <text class="ver dim">旅行攻略生成器 · v{{ver}}</text>

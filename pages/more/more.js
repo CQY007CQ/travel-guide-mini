@@ -263,7 +263,7 @@ Page(SafePage({
   onAbout() {
     wx.showModal({
       title: "关于 旅行攻略生成器",
-      content: "版本 v" + T.APP_VER + "\n\n行程全部在本机生成：数据不出手机、不上传，飞行模式也能规划（天气、地图需联网）。\n\n景点与票价按通用公开资料整理，请以官方最新公告为准。\n\n祝你每次都玩得尽兴。",
+      content: "版本 v" + T.APP_VER + "\n\n天气与地图功能需联网，其余功能随时可用。\n\n景点与票价按通用公开资料整理，请以官方最新公告为准。\n\n祝你每次都玩得尽兴。",
       showCancel: false,
       confirmText: "好的"
     });

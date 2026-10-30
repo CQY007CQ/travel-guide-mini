@@ -77,7 +77,7 @@ function drawPoster(ctx, cw, m) {
   const fy = m.H - 96;
   ctx.strokeStyle = LINE; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(PAD, fy); ctx.lineTo(cw - PAD, fy); ctx.stroke();
   ctx.fillStyle = GOLD; ctx.font = "bold 24px sans-serif"; ctx.textAlign = "left"; ctx.fillText("旅行攻略生成器", PAD, fy + 42);
-  ctx.fillStyle = SUB; ctx.font = "18px sans-serif"; ctx.fillText("微信搜索同名小程序 · 离线可用 · 数据只存你手机", PAD, fy + 70);
+  ctx.fillStyle = SUB; ctx.font = "18px sans-serif"; ctx.fillText("微信搜索同名小程序 · 离线可用", PAD, fy + 70);
 }
 
 // 转发卡片（5:4 黑金卡）模型（对齐原 _shareCardModel）
