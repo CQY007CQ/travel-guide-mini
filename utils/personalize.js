@@ -32,6 +32,9 @@ function _bonus(city, td) {
   let b = 0; const why = [];
   if (td.favProv && city.province === td.favProv) { b += 1.5; why.push("同你常去的" + td.favProv); }
   if (T.isVisited && T.isVisited(city.name)) why.push("你打卡过，可二刷");
+  // v1.19.139：想去清单加权——用户在首页/行程页勾过的想玩城市，额外加分并给理由
+  const wish = (T.getWish && T.getWish()) || [];
+  if (wish.some(w => w && w.name === city.name)) { b += 1.2; why.push("就在你的想去清单里"); }
   return { b, why };
 }
 

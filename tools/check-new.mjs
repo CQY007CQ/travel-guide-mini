@@ -836,6 +836,9 @@ const insAll = INS.insights();
 assert("洞察 汇总 noData = false", insAll.noData === false, JSON.stringify(insAll));
 assert("洞察 一句话小结非空", insAll.summary.length > 0, insAll.summary);
 assert("洞察 个性化倾向含 topCat", insAll.tendency.topCat === "餐饮", JSON.stringify(insAll.tendency));
+assert("洞察 倾向含点亮省份数(litProvs)", typeof insAll.tendency.litProvs === "number", JSON.stringify(insAll.tendency));
+const insRefA = INS.insights(); const insRefB = INS.insights();
+assert("洞察 记忆化：相同数据返回同一引用", insRefA === insRefB, "ref-diff");
 mem["miniLedgerV1"] = [];   // 清理，避免污染后续
 
 // v1.19.138 个性化目的地推荐（真实画像驱动）
@@ -852,6 +855,14 @@ const pz1 = PZ.personalized(5);
 assert("个性化 有数据→返回列表", pz1.list.length > 0 && pz1.fromMe === true, JSON.stringify(pz1.list.map(x => x.name)));
 assert("个性化 每条带 whyMe 理由", pz1.list.every(x => Array.isArray(x.whyMe) && x.whyMe.length > 0), JSON.stringify(pz1.list.map(x => x.whyMeTx)));
 assert("个性化 加分非负(total≥score)", pz1.list.every(x => x.total >= (x.score || 0)), JSON.stringify(pz1.list.map(x => x.total + "/" + x.score)));
+assert("个性化 超界 n=99 收敛到 ≤20", PZ.personalized(99).list.length <= 20, PZ.personalized(99).list.length);
+assert("个性化 查询词含常去省", PZ.queryFromTendency({ favProv: "山西", season: "秋", topCat: "餐饮" }).indexOf("山西") >= 0, PZ.queryFromTendency({ favProv: "山西" }));
+// 想去清单加权：北京在足迹 + 加入想去清单 → 若出现在结果应带“想去清单”理由
+mem["miniWishV1"] = [{ name: "北京", city: "北京" }];
+const pzW = PZ.personalized(5);
+const bj = pzW.list.filter(x => x.name === "北京")[0];
+if (bj) assert("个性化 想去清单加权→北京带理由", bj.whyMe.indexOf("想去清单") >= 0, bj.whyMeTx);
+mem["miniWishV1"] = undefined;
 mem["miniLedgerV1"] = [];
 mem["miniFootV1"] = undefined;
 

@@ -5,6 +5,17 @@
 // 而非静态模板。所有函数纯计算、可被 check-insights 单测覆盖。
 const T = require("./travel.js");
 
+// v1.19.139：记忆化。insights() 会被 more 页与 personalized() 多次调用，
+// 真实记录未变时直接返回同一份聚合结果（避免重复计算 + 跨调用读数不一致）。
+let _cache = { sig: "", val: null };
+function _sig() {
+  const L = (T.getLedger && T.getLedger()) || [];
+  const P = (T.listSavedPlans && T.listSavedPlans()) || [];
+  const f = (T.footHeatmap && T.footHeatmap()) || {};
+  let amt = 0; for (let i = 0; i < L.length; i++) amt += _num(L[i] && L[i].amt);
+  return [L.length, P.length, f.cities || 0, (L[0] && L[0].date) || "", Math.round(amt)].join("|");
+}
+
 function _num(v) { const n = Number(v); return isFinite(n) ? n : 0; }
 
 // 1) 记账按分类聚合（金额 + 占比）
@@ -70,11 +81,13 @@ function footProvinces() {
     .map(p => ({ prov: p.name, n: p.n }))
     .sort((a, b) => b.n - a.n)
     .slice(0, 6);
-  return { cities: h.cities || 0, rows };
+  return { cities: h.cities || 0, visited: h.visited || 0, rows };
 }
 
 // 5) 汇总：派生「个性化倾向」+ 一句话智能小结（纯数据驱动，无虚构）
 function insights() {
+  const sig = _sig();
+  if (_cache.sig === sig && _cache.val) return _cache.val;
   const spend = spendByCategory();
   const month = monthlySpend();
   const rhythm = travelRhythm();
@@ -85,18 +98,21 @@ function insights() {
   const tendency = {
     topCat, topCatPct: spend.rows[0] ? spend.rows[0].pct : 0,
     avgDaily: (spend.total && rhythm.totalDays) ? Math.round(spend.total / rhythm.totalDays) : 0,
-    favProv, season: rhythm.season
+    favProv, season: rhythm.season, litProvs: fp.visited
   };
   let summary = "还没有积累足够的本地数据，多用几次记账、打卡和存档，这里会给出你的旅行画像。";
   if (!noData) {
     const parts = [];
     if (favProv) parts.push("最常去" + favProv);
+    if (fp.visited) parts.push("已点亮" + fp.visited + "个省份");
     if (rhythm.season) parts.push(rhythm.season + "季出行最多");
     if (topCat) parts.push("花费大头是" + topCat);
     if (rhythm.avgDays) parts.push("平均一趟" + rhythm.avgDays + "天");
     summary = parts.length ? ("你" + parts.join("、") + "。") : "已积累一些本地记录，继续用会更准。";
   }
-  return { noData, spend, month, rhythm, fp, tendency, summary };
+  const val = { noData, spend, month, rhythm, fp, tendency, summary };
+  _cache = { sig, val };
+  return val;
 }
 
 module.exports = { spendByCategory, monthlySpend, travelRhythm, footProvinces, insights };
