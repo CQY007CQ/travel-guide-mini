@@ -6,7 +6,6 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一存储封装（失败有提示，不再静默丢数据）
 const R = require("../../utils/recommend.js");   // 智能推荐引擎（端侧计算，纯本地，不联网）
-const P = require("../../utils/personalize.js"); // v1.19.138：数据驱动的个性化推荐
 
 // v1.19.100 修复：模块顶层 `getApp()` 在 lazyCodeLoading 下可能返回 undefined（App 尚未注册完），
 // 会导致 onLoad 整段初始化被抛错跳过、且本页 10 处 handler（goPlan / generate / 回填 等）访问
@@ -33,8 +32,6 @@ Page(SafePage({
     // 智能推荐：一句话需求 → 候选城市（端侧推荐引擎计算，不发起任何网络请求）
     recText: "", recBusy: false, recTried: false, recList: [],
     recExamples: ["人少的古镇 三天", "海边亲子 五天", "沙漠摄影 四天", "温泉放松 周末两天"],
-    // v1.19.139：为你推荐（基于本机真实数据的个性化，冷启动即在首页可见）
-    forYou: { show: false, list: [], summary: "", tendency: {} },
     destLabel: "",
     // 城市搜索选择器（目的地/出发地 共用弹层）
     showPicker: false, pickMode: "", pickTitle: "", pickList: [], pickKw: "", pickProv: "",
@@ -947,7 +944,6 @@ Page(SafePage({
       try { this._ensureForm(); } catch (e) {}
       try { this._renderShow(); } catch (e) {}
       try { this.maybeShowGuideModal(); } catch (e) {}
-      try { this.refreshForYou(); } catch (e) {}   // v1.19.139：首页冷启动即刷新个性化推荐
     });
   },
 
@@ -1066,43 +1062,6 @@ Page(SafePage({
       wx.showToast({ title: "填入失败，请手动选择", icon: "none" });
     }
   },
-  // v1.19.139：为你推荐（数据驱动个性化）。无真实数据则静默不显示，避免空卡。
-  refreshForYou() {
-    try {
-      const r = P.personalized(3);
-      const list = (r.list || []).map((x) => ({
-        name: x.name,
-        province: x.province || "",
-        why: x.whyMeTx || "",
-        score: Math.round(x.total)
-      }));
-      this.setData({
-        forYou: { show: !!list.length, list, summary: r.summary || "", tendency: r.tendency || {} }
-      });
-    } catch (e) {
-      this.setData({ forYou: { show: false, list: [], summary: "", tendency: {} } });
-    }
-  },
-  onForYouTap(e) {
-    const name = e.currentTarget.dataset.name;
-    if (!name) return;
-    try {
-      const provs = T.provinces() || [];
-      for (let p = 0; p < provs.length; p++) {
-        const cs = T.citiesOf(provs[p]) || [];
-        if (cs.some((c) => c.name === name)) {
-          this._fillProv(p, name);   // 内部已含 _applyCity：预填城市 + 收敛天数 + 想玩池
-          wx.showToast({ title: "已填好「" + name + "」", icon: "none" });
-          if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: 0, duration: 200 });
-          return;
-        }
-      }
-      wx.showToast({ title: "该城可在目的地里搜索", icon: "none" });
-    } catch (err) {
-      wx.showToast({ title: "填入失败，请手动选择", icon: "none" });
-    }
-  },
-
   /* ---- v1.8.4 A8：目的地盲盒（3 城灵感，选中直接生成） ---- */
   onBlindRoll() {
     wx.vibrateShort && wx.vibrateShort({ type: "light" });

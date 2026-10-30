@@ -61,23 +61,6 @@
     </view>
     <view class="rb-empty" wx:if="{{recTried && !recList.length}}">没找到合适的，换个说法试试</view>
   </view>
-  <!-- v1.19.139：为你推荐（基于本机真实数据的个性化，冷启动可见，无数据不显示） -->
-  <view class="card foryou" wx:if="{{forYou.show}}">
-    <view class="fy-head">
-      <text class="fy-t">为你推荐</text>
-      <text class="fy-s">{{forYou.summary}}</text>
-    </view>
-    <view class="fy-list">
-      <view class="fy-item" wx:for="{{forYou.list}}" wx:key="name" data-name="{{item.name}}" bindtap="onForYouTap">
-        <view class="fy-l">
-          <text class="fy-city">{{item.name}}</text>
-          <text class="fy-prov">{{item.province}}</text>
-        </view>
-        <text class="fy-why">{{item.why}}</text>
-        <text class="fy-score">{{item.score}}</text>
-      </view>
-    </view>
-  </view>
   <!-- 行程状态：出发倒计时 + 预约提醒 合并为一卡（v1.19.59 减法） -->
   <view class="card plan-status" wx:if="{{countdown || remind}}">
     <view class="ps-row" wx:if="{{countdown}}" bindtap="goPlan">
