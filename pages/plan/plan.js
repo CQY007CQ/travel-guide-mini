@@ -28,7 +28,7 @@ Page(SafePage({
   td: false,
   view: [], summary: "", stats: "", mixTxt: "",
   metaChips: [], budgetLine: "", modeTxt: "", pickTxt: "",
-  clothText: "", stayText: "", goText: "", guideOpen: true,
+  clothText: "", stayText: "", goText: "", guideOpen: false,
   open: -1, detailText: "", detailName: "", detailTags: [], timing: null, routeOpen: -1, offlineHow: "",
   isFav: false, favReady: false,
   wishMiss: [], wishAll: 0, wishPlan: [],
@@ -161,16 +161,11 @@ Page(SafePage({
    const end = new Date(d0); end.setDate(end.getDate() + plan.days.length - 1);
    const dstr = s => (s.getMonth() + 1) + "月" + s.getDate() + "日";
    chips.push(dstr(d0) + "（" + wd + "）— " + dstr(end));
-   const daysLeft = Math.round((d0 - new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())) / 86400000);
-   chips.push("距出发 " + Math.max(0, daysLeft) + " 天");
-   const sn = getSeason(dep[1]);
-   chips.push(sn.name + "季出行");
   }
   if (segs) {
    chips.unshift(segs.map(s => s.cityName + s.days + "天").join(" → ") + " · 共 " + plan.days.length + " 天");
   } else {
    if (plan.isProv) chips.unshift("全省精华游 · " + plan.cityName);
-   if (city && city.best) chips.push("最佳：" + city.best);
   }
   if (plan.travelMode && MODE_LABEL[plan.travelMode]) chips.push(MODE_LABEL[plan.travelMode]);
   if (plan.customAmt > 0) chips.push("自定义总预算 ¥" + plan.customAmt);
