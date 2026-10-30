@@ -239,6 +239,8 @@ Page(SafePage({
    // v1.17.10：省域行程用「省级速览」（按全省真实景点数算建议天数、必吃取具体菜名）；
    // 旧实现一律 cityBrief(plan.cityName)，而省名会被 findCity 兜成 generic 城 → 建议 2 天 + 泛化必吃
    brief: segs ? null : (plan.isProv ? T.provBrief(plan.province) : T.cityBrief(plan.cityName)),
+   // v1.19.145：酒店门户（单城行程才有具体城市的比价搜索词；多城/全省不展示）
+   hotelPortals: (!segs && !plan.isProv && plan.cityName) ? T.hotelPortals(plan.cityName, plan) : [],
    countdown: T.tripCountdown(plan),
    isFav: (segs || plan.isProv) ? false : T.isFaved(plan.cityName), favReady: true,
    wishAll: wish.length, wishPlan: hit.map(n => ({ name: n, on: true })), wishMiss: miss.map(n => ({ name: n, on: false })),
@@ -937,6 +939,13 @@ Page(SafePage({
  // v1.18：天气卡 / 想玩未排上列表默认收起，点击标题展开
  toggleWx() { this.setData({ wxOpen: !this.data.wxOpen }); },
  toggleWish() { this.setData({ wishOpen: !this.data.wishOpen }); },
+ // v1.19.145：复制酒店比价搜索词到剪贴板（个人主体不内嵌预订，引导去平台 App 比价）
+ copyPortal(e) {
+  const t = e.currentTarget.dataset.term;
+  const p = e.currentTarget.dataset.platform;
+  if (!t) return;
+  wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制，去" + p + "比价", icon: "none" }) });
+ },
  // v1.19 P0-3：行程体检默认收起（只留标题+风险等级，点开看明细）
  toggleCheck() { this.setData({ checkOpen: !this.data.checkOpen }); },
  /* ---- v1.15：复制行程体检摘要 ---- */

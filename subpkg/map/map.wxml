@@ -75,12 +75,16 @@
 
     <!-- 住宿图层 -->
     <view wx:if="{{layer==='stay'}}" class="card">
-      <view class="h3">建议住宿区</view>
-      <view wx:if="{{hotel}}" class="hotel" bindtap="goHotel">
-        <text class="h-em">{{hotel.name}}</text>
-        <text class="h-sub dim">点击定位酒店，可一键导航</text>
+      <view class="h3">建议住宿区（点击导航）</view>
+      <view class="hotel" wx:for="{{hotelAreas}}" wx:key="name" data-i="{{index}}" bindtap="goHotel">
+        <text class="h-em">{{item.name}}</text>
+        <text class="h-sub dim">{{item.note || '点击定位这片区域，可一键导航'}}</text>
       </view>
-      <view wx:else class="tip-inner dim">本城暂无酒店坐标，参考下方建议</view>
+      <view class="portal-t">去这些平台比价（点按复制搜索词）</view>
+      <view class="portals">
+        <view class="portal" wx:for="{{hotelPortals}}" wx:key="platform" data-term="{{item.term}}" data-platform="{{item.platform}}" bindtap="copyPortal">{{item.platform}}</view>
+      </view>
+      <view class="tip-inner dim" wx:if="{{!hotelAreas.length}}">本城暂无收录住宿区域，参考上方建议</view>
     </view>
   </block>
 </view>

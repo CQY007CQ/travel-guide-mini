@@ -167,14 +167,15 @@ Page(SafePage({
     // 美食 + 住宿图层（预算贴合：美食平价优先排序 / 酒店取当前档位）放入 setData
     const bKey = (plan && plan.budget) || "mid";
     const foodList = T.budgetFoodFirst(T.foodSpotsFor(cityName), bKey, false).slice(0, 18);
-    const hotel = T.hotelPointFor(cityName, bKey);
+    const hotelAreas = T.hotelAreaPins(cityName, bKey);
+    const hotelPortals = T.hotelPortals(cityName, plan);
     // 拼接图层：仅「景点」层展示标点与当天行进连线，美食/住宿层互斥显示
     const isSpotLayer = this.data.layer === "spots";
     let showMk = isSpotLayer ? mk.slice() : [];
     let showPolyline = (isSpotLayer && realCoords.length >= 2)
       ? [{ points: realCoords, color: "#d4a94e", width: 4, dottedLine: false, arrowLine: true }]
       : [];
-    let showFoodList = [], showHotel = hotel;
+    let showFoodList = [];
     if (this.data.layer === "food") {
       foodList.forEach(fs => {
         if (fs.lat && fs.lon) showMk.push({
@@ -187,13 +188,13 @@ Page(SafePage({
       });
       showFoodList = foodList;
     } else if (this.data.layer === "stay") {
-      if (hotel) showMk.push({
-        id: showMk.length, latitude: hotel.lat, longitude: hotel.lon,
+      hotelAreas.forEach((h, i) => showMk.push({
+        id: showMk.length, latitude: h.lat, longitude: h.lon,
         width: 28, height: 28,
-        callout: { content: "酒店 · " + hotel.name, fontSize: 12, color: "#eaeff7",
+        callout: { content: "住 · " + h.name, fontSize: 12, color: "#eaeff7",
           bgColor: "rgba(212,169,78,.85)", borderRadius: 10, padding: 4, display: "BYCLICK" },
-        markerType: "stay", name: hotel.name || ""
-      });
+        markerType: "stay", name: h.name || "", areaIdx: i
+      }));
     }
     const isMultiCity = !!(segs && segs.length > 1);
     this.setData({
@@ -203,7 +204,7 @@ Page(SafePage({
         (isMultiCity ? " · " + cityName : ""),
       markers: showMk,
       polyline: showPolyline,
-      list, foodList, hotel: showHotel,
+      list, foodList, hotelAreas: hotelAreas, hotelPortals: hotelPortals,
       tagList, tagFilter,
       // v1.8.4 B11：当天动线顺路度
       route: T.routeScore(plan, di),
@@ -287,9 +288,17 @@ Page(SafePage({
     }
     wx.openLocation({ latitude: fs.lat, longitude: fs.lon, name: fs.shop, address: fs.addr, scale: 16 });
   },
-  goHotel() {
-    const h = this.data.hotel;
+  goHotel(e) {
+    const i = e.currentTarget.dataset.i;
+    const list = this.data.hotelAreas || [];
+    const h = (typeof i === "number" && list[i]) ? list[i] : list[0];
     if (!h) { wx.showToast({ title: "暂无酒店坐标", icon: "none" }); return; }
-    wx.openLocation({ latitude: h.lat, longitude: h.lon, name: h.name, scale: 16 });
+    wx.openLocation({ latitude: h.lat, longitude: h.lon, name: h.name, address: h.note, scale: 16 });
+  },
+  copyPortal(e) {
+    const t = e.currentTarget.dataset.term;
+    const p = e.currentTarget.dataset.platform;
+    if (!t) return;
+    wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制，去" + p + "比价", icon: "none" }) });
   }
 }));

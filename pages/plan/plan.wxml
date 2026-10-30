@@ -148,6 +148,10 @@
         <view class="bf-t"><image class="ic ic-sm" src="/images/icons/home.png"/>住宿建议</view>
         <view class="bf-x">{{brief.stayTip}}</view>
       </view>
+      <view class="bf-sec" wx:if="{{hotelPortals.length}}">
+        <view class="bf-t"><image class="ic ic-sm" src="/images/icons/home.png"/>酒店门户（点按复制搜索词）</view>
+        <view class="chips"><text class="chip portal" wx:for="{{hotelPortals}}" wx:key="platform" data-term="{{item.term}}" data-platform="{{item.platform}}" catchtap="copyPortal">{{item.platform}}</text></view>
+      </view>
       <view class="bf-sec" wx:if="{{brief.travel}}">
         <view class="bf-t"><image class="ic ic-sm" src="/images/icons/route.png"/>市内交通</view>
         <view class="bf-x">{{brief.travel}}</view>

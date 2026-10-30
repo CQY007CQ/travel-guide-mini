@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.144";
+const APP_VER = "1.19.145";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -458,6 +458,61 @@ function hotelPointFor(cityName, budgetKey) {
   const name = pick ? ((pick.place || "") + " · " + (pick.brands || "")) : "市中心酒店区";
   return { name, lat: c.lat, lon: c.lon, tier: pick ? pick.tier : lab };
  } catch (e) { return null; }
+}
+
+// ============ 酒店住宿区域（多片区推荐 + 平台门户）— v1.19.145 ============
+// 数据来源：城市知识库 c.areas（46 城已精选为 {name,note} 对象；其余城退化为通用建议）。
+// 合规：个人主体不内嵌预订网页、不做交易；门户只提供「平台 + 复制搜索词」引导去 App 比价。
+function normHotelAreas(arr) {
+  if (!Array.isArray(arr) || !arr.length) return null;
+  const out = [];
+  for (const a of arr) {
+    if (a && typeof a === "object" && a.name) out.push({ name: a.name, note: a.note || "" });
+    else if (typeof a === "string" && a) out.push({ name: a, note: "" });
+  }
+  return out.length ? out : null;
+}
+const HOTEL_AREA_GENERIC = [
+  { name: "市中心商圈", note: "城市核心区，吃住行最便利" },
+  { name: "高铁站 / 机场附近", note: "赶车赶机方便，适合中转或过夜" },
+  { name: "景区 / 地标周边", note: "游玩省时，价格略高于市区" }
+];
+// 返回 { areas:[{name,note}], stayTip }：精选优先，其余城给通用三片区
+function hotelAreasFor(cityName, budgetKey) {
+  const c = findCity(cityName);
+  const areas = normHotelAreas(c && c.areas) || HOTEL_AREA_GENERIC.slice();
+  const stayTip = (c && c.stayTip) ||
+    "优先选地铁站 500m 内、商圈附近的连锁酒店，出行方便；订前多平台比价，价差可达 10–30%。";
+  return { areas, stayTip };
+}
+// 地图多点：以城市中心为锚，各片区加 ≤0.015° 微偏移（不臆造具体酒店坐标，仅标「推荐住这片」）
+const _AREA_OFFS = [[0, 0], [0.012, 0.009], [-0.010, 0.013], [0.008, -0.014], [-0.013, -0.008]];
+function hotelAreaPins(cityName, budgetKey) {
+  const cc = P.getCoord(cityName);
+  if (!cc || !cc.lat || !cc.lon) return [];
+  const info = hotelAreasFor(cityName, budgetKey);
+  return info.areas.map((a, i) => {
+    const off = _AREA_OFFS[i % _AREA_OFFS.length];
+    return { name: a.name, note: a.note, lat: +(cc.lat + off[0]).toFixed(6), lon: +(cc.lon + off[1]).toFixed(6) };
+  });
+}
+// 酒店门户：平台 + 可复制搜索词（引导去 App 比价，不内嵌预订）
+const HOTEL_PLATFORMS = ["携程", "美团", "飞猪", "同程", "Agoda", "Booking"];
+function hotelPortals(cityName, plan, areaName) {
+  if (!cityName) return [];
+  let dates = "";
+  if (plan && plan.depart) {
+    const d0 = String(plan.depart).slice(0, 10);
+    const n = (plan.days && plan.days.length) || 1;
+    const dt = new Date(d0.replace(/-/g, "/"));
+    if (!isNaN(dt.getTime())) {
+      const end = new Date(dt); end.setDate(end.getDate() + n);
+      const f = x => (x.getMonth() + 1) + "月" + x.getDate() + "日";
+      dates = " " + f(dt) + "入住 " + f(end) + "退房";
+    }
+  }
+  const kw = cityName + (areaName ? " " + areaName : "") + " 酒店" + dates;
+  return HOTEL_PLATFORMS.map(p => ({ platform: p, term: kw }));
 }
 
 /* ---------- 预算（与网页版同语义） ---------- */
@@ -2061,6 +2116,7 @@ function cityBrief(cityName) {
   // v1.17.4：按真实游览强度估算 —— 每天约 3 个景点（已计入城际/城内通勤与用餐）。
   // 旧公式 round(exp/2.4) 且 [2,5] 夹取，导致景点多的城市（30+）恒为 5 天、少的恒为 2 天，与真实脱节。
   const days = Math.min(8, Math.max(2, Math.round(exp / 3))) || 3;
+  const ha = hotelAreasFor(c.name);
   return {
     name: c.name,
     climate: c.climate || "", climateTxt: CLIMATE_TXT[c.climate] || "气候宜人",
@@ -2070,8 +2126,8 @@ function cityBrief(cityName) {
     // v1.17.10：剔掉「本地招牌菜/老字号小吃」这类泛化占位，用户要的是具体菜名；全泛化时干脆不显示
     foods: (Array.isArray(c.foods) ? c.foods : []).filter(f => !F_GENERIC_FOOD.test(String(f))).slice(0, 6),
     foodNote: c.foodNote || "",
-    areas: (Array.isArray(c.areas) ? c.areas : []).slice(0, 3).map(a => ({ name: a.name, note: a.note })),
-    stayTip: c.stayTip || "",
+    areas: ha.areas.slice(0, 4),
+    stayTip: ha.stayTip,
     travel: c.cityTravel || c.travel || "",
     text: c.name + " · 建议 " + days + " 天 · " + (CLIMATE_TXT[c.climate] || "")
   };
@@ -3973,8 +4029,9 @@ function layerOf(climate, month) {
 // 25) 住宿建议
 function stayZoneOf(city) {
  if (!city) return "";
- const a = (Array.isArray(city.areas) ? city.areas : [])[0];
- return (a ? "首选 " + a.name + "（" + a.note + "）" : "选择交通枢纽或商圈附近") + "。" + (city.stayTip || "");
+ const info = hotelAreasFor(city.name);
+ const areaTxt = info.areas.map(a => "· " + a.name + (a.note ? "（" + a.note + "）" : "")).join("\n");
+ return "推荐住宿区域：\n" + areaTxt + "\n\n" + info.stayTip;
 }
 // 26) 交通备注精简
 function moveNote(city) {
@@ -5560,7 +5617,7 @@ module.exports = {
  routeAdvicePlus, highlightOf, crowdTipOf, packExtra,
  badgesOf, yearReportNew, chinaLite, transportEstimate,
  provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, provinceDayCap, provinceSuggestedDays, cityDayCap, provBrief, nearbyCityOf, D, P,
- poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor,
+ poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
  spotTagOf, searchSpots,
  customBudgetObj, budgetTotalObj,
  isFrameName, isDetailable, stripHtml, spotDetailText, spotNoteDisp, spotInfo, spotInfoText,
