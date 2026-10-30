@@ -62,6 +62,9 @@ const W = {
   limited: -25,      // 数据覆盖有限
   missWeight: -10,   // 每个"必需标签"未命中的扣分
   missTagMin: 6,     // 权重 ≥ 该值的标签视为"必需"（用户明确要的核心诉求）
+  heatMax: 16,        // 综合热度先验上限（让无意图时也能给出有区分度的"热门目的地"排序）
+  provinceBoost: 10,  // 显式点名省份 → 该省城市加权（"浙江的古镇"优先浙江）
+  extremeBoost: 8,    // "最…"类诉求 → 强化已命中标签维度
 };
 
 /* ── 兴趣标签词典 ──
@@ -146,6 +149,34 @@ function qualityOf(city) {
   return q;
 }
 
+/* ── 综合热度：用真实语料做"知名度/成熟度"代理（无外部流量数据，纯离线派生）──
+ * 维度：景点规模(对数压缩防超大城垄断) 0.40 + 评级覆盖 0.25 + 均分 0.20 + 性价比 0.15。
+ * 用途：① 无明确意图时给出有区分度的"热门目的地"排序（不再全城同分）；
+ *       ② 有意图时作为轻微先验破平。与质量先验(q.prom)解耦——prom 只作微调次序，
+ *       heat 才主导"这座城整体值不值得去"的宏观排序。 */
+function heatOf(city) {
+  const exps = Array.isArray(city.experiences) ? city.experiences : [];
+  const n = exps.length;
+  const q = qualityOf(city);
+  const expN = Math.min(1, Math.log10(1 + n) / Math.log10(1 + 400)); // 400 景点≈满
+  const ratedN = Math.min(1, q.rated / 15);
+  const avgN = Math.max(0, Math.min(1, (q.avg - 4.0) / 1.0));        // 4.0→0, 5.0→1
+  const val = safeCall(function () { return T.valueScoreOf(city.name); }, 60);
+  const valN = Math.max(0, Math.min(1, (val - 50) / 40));            // 50→0, 90→1
+  return Math.max(0, Math.min(1, 0.40 * expN + 0.25 * ratedN + 0.20 * avgN + 0.15 * valN));
+}
+
+/* 省份集合缓存（从真实城市语料去重，避免"海南"误命中"海口"等短串） */
+let _provinceCache = null;
+function provinceSet() {
+  if (_provinceCache) return _provinceCache;
+  const s = new Set();
+  const _c = (D && D.CITIES) || [];
+  for (let i = 0; i < _c.length; i++) { const p = (_c[i] && _c[i].province) || ""; if (p) s.add(p); }
+  _provinceCache = s;
+  return s;
+}
+
 function hitCount(corpus, re) {
   if (!re) return 0;
   const m = corpus.match(re);
@@ -218,7 +249,16 @@ function extractPrefs(text, opts) {
     if (nm && nm.length > 1 && s.indexOf(nm) >= 0 && nm.length > _bestLen) { namedCity = nm; _bestLen = nm.length; }
   }
 
-  return { text: s, tags: tags, days: days, budget: budget, pace: pace, month: month, extreme: extreme, namedCity: namedCity };
+  /* 省份提取：query 显式含某已知省份 → 该省城市加权（"浙江的古镇"优先浙江）。
+   * 取最长匹配，避免短名误命中。 */
+  let province = "";
+  const _pset = provinceSet();
+  let _pbest = 0;
+  _pset.forEach(function (p) {
+    if (p.length > 1 && s.indexOf(p) >= 0 && p.length > _pbest) { province = p; _pbest = p.length; }
+  });
+
+  return { text: s, tags: tags, days: days, budget: budget, pace: pace, month: month, extreme: extreme, namedCity: namedCity, province: province };
 }
 
 /* ── 相关性：绝对量 + 密度 双因子 ──
@@ -360,6 +400,23 @@ function scoreCity(city, prefs, month) {
     push("你提到的城市", 50, "已按你点名的目的地优先");
   }
 
+  /* ⑩ 综合热度先验（离线派生知名度/成熟度代理）：无意图时给出有区分度的"热门目的地"
+   * 排序（不再全城同分）；有意图时作为轻微先验破平（上限 16 < 相关性 44，不喧宾夺主）。 */
+  const heat = heatOf(city);
+  raw += heat * W.heatMax;
+
+  /* ⑪ 省份定向：query 显式含某省份 → 该省城市加权（"浙江的古镇"优先浙江）。 */
+  if (p.province && p.province === city.province) {
+    raw += W.provinceBoost;
+    push("本省优先", W.provinceBoost, "你提到了" + p.province + "，优先推荐该省目的地");
+  }
+
+  /* ⑫ 最高级诉求强化："最…"类诉求 → 已命中维度再提一档，让"最大/最老"的城更靠前。 */
+  if (p.extreme && rel.sum > 0) {
+    raw += W.extremeBoost;
+    push("突出核心诉求", W.extremeBoost, "「最…」类诉求，已强化你点名的维度");
+  }
+
   const score = Math.max(1, Math.min(99, Math.round(raw)));
 
   reasons.sort(function (a, b) { return Math.abs(b.delta) - Math.abs(a.delta); });
@@ -373,7 +430,7 @@ function scoreCity(city, prefs, month) {
 
   /* 无明确意图时，summary 不再伪装成「命中理由」，直接说明是综合热度推荐 */
   const hasIntent = (rel.sum > 0) || isNamed;
-  const summary = hasIntent ? summarize(top) : "综合热度推荐（未识别到具体偏好，已按成熟度·季节·性价比排序）";
+  const summary = hasIntent ? summarize(top) : "综合热度推荐（未识别到具体偏好，已按景点规模·评级·性价比·季节综合排序）";
 
   return {
     name: city.name,
@@ -477,6 +534,8 @@ module.exports = {
   relevanceOf: relevanceOf,
   scoreCity: scoreCity,
   qualityOf: qualityOf,
+  heatOf: heatOf,
+  provinceSet: provinceSet,
   recommend: recommend,
   explain: explain,
   corpusOf: corpusOf,

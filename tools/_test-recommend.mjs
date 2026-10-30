@@ -15,6 +15,8 @@
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const R = require("../utils/recommend.js");
+const T2 = require("../utils/travel.js");
+const D2 = (T2 && T2.D) || {};
 
 let pass = 0, fail = 0;
 function ok(name, cond, extra) {
@@ -143,6 +145,22 @@ console.log("【智能性/透明度】");
   const scores = intent.list.map(x => x.score);
   const uniq = Array.from(new Set(scores));
   ok("防退化：Top5 分数不全相同", uniq.length > 1, scores.join(","));
+
+  // ⑥ 无意图路径也须有区分度（heat 先验破平，不再全 34 分）
+  const idleScores = idle.list.map(x => x.score);
+  const idleUniq = Array.from(new Set(idleScores));
+  ok("无意图：Top5 分数不全相同（有区分度）", idleUniq.length > 1, idleScores.join(","));
+
+  // ⑦ 省份定向：显式点名省份 → 该省城市压过同名类外省强城
+  const zhejiang = R.recommend("浙江 古镇 三天", { month: 10, topN: 5 });
+  const zjNames = zhejiang.list.map(x => x.name);
+  const zjCount = zjNames.filter(function (n) {
+    const c = (D2.CITIES || []).filter(function (c) { return c && c.name === n; })[0];
+    return c && c.province === "浙江";
+  }).length;
+  ok("省份定向：浙江城优先（Top5≥2 个浙江）", zjCount >= 2, zjNames.join(",") + " 浙江=" + zjCount);
+  // 平遥(山西)是无省份限定时古镇 Top1；点名浙江后不应再压过浙江古镇
+  ok("省份定向：外省强城不压本省（平遥不进前 3）", zjNames.indexOf("平遥") < 0 || zjNames.indexOf("平遥") >= 3, zjNames.join(","));
 }
 
 /* ── ④ 单城解释 ── */
