@@ -186,6 +186,8 @@ step "全省生成回归 (v1.15)" bash -c '
 step "高强度压测 (v1.17.5)" "$NODE" tools/stress-test.mjs
 step "WXML 结构校验" "$NODE" tools/check-wxml.mjs
 step "页面结构 + 事件配对" "$NODE" tools/check-handlers.mjs
+# v1.19.147：导航死链 + 跳转合规审计（按键能否正常跳转：死链 / switchTab 误用 / 动态 url 列出）
+step "导航死链审计 (按键跳转)" "$NODE" tools/_nav-audit.mjs
 
 # 【v1.19.78 修正】微信约束是「每包独立 2MB 压缩后红线」，旧版把全项目（含 1.7MB 数据分包）
 # 累加成一个数去比对 2MB → 必然误报。改为按 app.json 主包+各分包逐包核算（tools/check-pkgsize.mjs）。
