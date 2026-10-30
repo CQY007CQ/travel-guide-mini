@@ -2,6 +2,7 @@
 // 覆盖：mergeWeatherByDay 把「每城 7 天预报」对齐到 plan.days（旧版只用首站城市，多城错位）；
 //      超预报窗口的天被跳过；无 segments 时回退 plan.cityName；rainyDaySpots 形态与室内命中。
 import { createRequire } from "module";
+import { readFileSync } from "fs";
 const req = createRequire(process.cwd() + "/");
 const W = req("./utils/weather.js");
 
@@ -84,6 +85,22 @@ ok("status 含 invalid key → auth", cStatus.type === "auth");
 let envErr = null, envList = null;
 W.fetchPlanWeather(plan, (list, err) => { envList = list; envErr = err; });
 ok("无 wx 环境 → 回调 err.type=env（list 为空）", envErr && envErr.type === "env" && Array.isArray(envList) && envList.length === 0);
+
+// v1.19.154：Key 为占位符时（有 wx 但没配 Key）→ 明确归类为 no_key，绝不发起请求
+let noKeyErr = null;
+const savedWx = global.wx;
+global.wx = { request() {} }; // 有 wx 但 Key 是占位符 → 应短路为 no_key，绝不发起请求
+W.fetchPlanWeather(plan, (list, err) => { noKeyErr = err; });
+global.wx = savedWx;
+ok("有 wx 但 Key 占位符 → err.type=no_key（明确提示需配置，不误发请求）", !!noKeyErr && noKeyErr.type === "no_key", noKeyErr ? noKeyErr.type : "null");
+
+// v1.19.154：wx.request 必须带 timeout（否则弱网/服务端挂起会让天气卡永久卡在「加载中…」）。
+// 因 Key 为占位符时 fetchPlanWeather 短路返回 no_key，无法在 node 下发真实请求，
+// 故校验构建产物里 wx.request 调用确实携带了 timeout 选项。
+let builtSrc = "";
+try { builtSrc = readFileSync(process.cwd() + "/utils/weather.js", "utf8"); } catch (e) {}
+const hasTimeout = /timeout\s*:\s*(8e3|\d{3,})/.test(builtSrc);
+ok("构建产物 wx.request 携带 timeout（弱网不永久卡死）", hasTimeout);
 
 console.log(fail ? ("\n✗ weather151 单测失败 " + fail + " 项") : "\n✓ weather151 单测全部通过");
 process.exit(fail ? 1 : 0);

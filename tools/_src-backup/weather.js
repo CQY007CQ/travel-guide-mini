@@ -138,10 +138,9 @@ function fetchPlanWeather(plan, cb) {
   if (!cities.length) { cb([], { type: "nocity" }); return; }
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayYMD = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
   const first = new Date(String(plan.days[0].date).slice(0, 10).replace(/-/g, "/"));
   first.setHours(0, 0, 0, 0);
-  let gap = Math.round((first - today) / 86400000);
-  if (gap < 0) gap = 0;
 
   const byCity = {};
   let pending = 0, finished = false, aggErr = null;
@@ -174,7 +173,7 @@ function fetchPlanWeather(plan, cb) {
   cities.forEach(function (city) {
     const c = coordOf(city);
     if (!c) { byCity[city] = { byDate: {}, city: city }; return; } // 无坐标：占位，避免 dayCityOf 误判
-    const wkey = city + "|" + gap + "|" + QW_API_HOST;
+    const wkey = city + "|" + todayYMD + "|" + QW_API_HOST;
     const cached = _WX_CACHE[wkey];
     if (cached && (Date.now() - cached.t) < _WX_TTL) { byCity[city] = { byDate: cached.v, city: city }; return; }
     pending++;
@@ -183,6 +182,7 @@ function fetchPlanWeather(plan, cb) {
       url: QW_API_HOST + "/v7/weather/7d",
       data: { location: lon + "," + lat, key: QW_KEY },
       header: { "X-QW-Api-Key": QW_KEY },
+      timeout: 8000, // v1.19.154：弱网/服务端无响应时避免天气卡永久卡在「加载中…」（默认可能挂起数十秒）
       success(res) {
         try {
           const d = res && res.data;
