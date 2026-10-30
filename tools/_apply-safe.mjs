@@ -64,6 +64,14 @@ try {
     foodShops[_cn] = foodShops[_cn].concat(_f2[_cn]);
   }
 } catch (e) { /* 无第二批时跳过 */ }
+// v205 美食菜单/口碑试点（10 热门城市）：仅含 {shop,menu,rep,note} 扩展字段，§6.6 命中已有店回写
+try {
+  const _f3 = (req("./tools/v205-food-menu.js") || {}).FOOD_SPOTS_ADD || {};
+  for (const _cn in _f3) {
+    if (!foodShops[_cn]) foodShops[_cn] = [];
+    foodShops[_cn] = foodShops[_cn].concat(_f3[_cn]);
+  }
+} catch (e) { /* 无 v205 批次时跳过 */ }
 
 // 内联 cleanSpotName（避免 require utils/travel.js 触发 wx/微信全局，node 下崩溃）
 function cleanSpotName(name) {
@@ -440,24 +448,45 @@ if (provPruned) console.log("PROVINCE_CITIES 清理非标准 key:", provPruned);
 
 // 6.6) 美食店铺并入（v199-food-shops.js 的 FOOD_SPOTS_ADD，高德真实餐饮 POI）
 // 按「店名」去重，已有同城同名店则跳过，避免重复；只收有真实坐标的店（可导航）。
-let foodAdded = 0;
+// v205 起：补丁可只含 {shop, menu, rep, note}（无坐标）——用于给已入库老店补「菜单/口碑/编辑点评」，
+//   命中已有同名店则合并扩展字段（menu/rep/note，不覆盖已有、不重复追加），新店仍只收有真实坐标者。
+let foodAdded = 0, foodMerged = 0;
 for (const cn in foodShops) {
   const list = foodShops[cn];
   if (!Array.isArray(list) || !list.length) continue;
   if (!base.FOOD_SPOTS) base.FOOD_SPOTS = {};
   if (!Array.isArray(base.FOOD_SPOTS[cn])) base.FOOD_SPOTS[cn] = [];
-  const seen = new Set(base.FOOD_SPOTS[cn].map(x => String((x && (x.shop || x.name)) || "").trim()));
+  // 建索引：店名 → 已入库条目（用于扩展字段回写）
+  const byName = {};
+  for (const s of base.FOOD_SPOTS[cn]) { const n = String((s && (s.shop || s.name)) || "").trim(); if (n) byName[n] = s; }
+  const seen = new Set(Object.keys(byName));
   for (const it of list) {
     if (!it) continue;
     const nm = String(it.shop || it.name || "").trim();
-    if (!nm || seen.has(nm)) continue;
-    if (typeof it.lat !== "number" || typeof it.lon !== "number") continue;  // 无真实坐标不收
-    seen.add(nm);
-    base.FOOD_SPOTS[cn].push({ shop: nm, addr: it.addr || "", lat: it.lat, lon: it.lon, price: it.price || "" });
-    foodAdded++;
+    if (!nm) continue;
+    const hasCoord = typeof it.lat === "number" && typeof it.lon === "number";
+    if (hasCoord) {
+      // 真实新店（有坐标）：按店名去重跳过已有，否则入库
+      if (seen.has(nm)) continue;
+      seen.add(nm);
+      const _new = { shop: nm, addr: it.addr || "", lat: it.lat, lon: it.lon, price: it.price || "" };
+      base.FOOD_SPOTS[cn].push(_new);
+      byName[nm] = _new;   // 注册，便于同批次后续扩展条目也能回写
+      foodAdded++;
+    } else {
+      // 扩展补丁（无坐标）：命中已有同名店 → 回写 menu/rep/note（幂等，不覆盖已有）
+      const ex = byName[nm];
+      if (!ex) continue;
+      let changed = false;
+      if (Array.isArray(it.menu) && it.menu.length && !Array.isArray(ex.menu)) { ex.menu = it.menu; changed = true; }
+      if (it.rep && !ex.rep) { ex.rep = it.rep; changed = true; }
+      if (it.note && !ex.note) { ex.note = it.note; changed = true; }
+      if (changed) foodMerged++;
+    }
   }
 }
 if (foodAdded) console.log("美食店铺新增:", foodAdded);
+if (foodMerged) console.log("美食店铺扩展字段合并(菜单/口碑/点评):", foodMerged);
 
 // §9.7 显示名精简（v204-name-clean.js 由 _gen-name-clean.mjs 自动生成）：
 // 剥离冗余行政区划前缀（广州市白云山风景区 → 白云山风景区）+ 修双横线/多余右括号。

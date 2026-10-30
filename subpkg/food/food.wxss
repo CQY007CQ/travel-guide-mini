@@ -36,6 +36,29 @@
 .slot-chip { font-size: calc(24rpx * var(--fs, 1)); padding: 8rpx 24rpx; border-radius: 28rpx; background: rgba(var(--ln-rgb, 100,116,139), .07); border: 1rpx solid rgba(var(--ln-rgb, 100,116,139), .14); color: var(--tx-2, #46536b); }
 .slot-chip.on { background: rgba(212,169,78,.16); color: var(--acc, #b3872e); border-color: rgba(212,169,78,.42); font-weight: 600; }
 
+/* v1.21 菜单 / 口碑 / 编辑点评（试点热门城市） */
+.rep-tag { flex-shrink: 0; font-size: calc(20rpx * var(--fs, 1)); font-weight: 600; margin-left: 10rpx;
+  padding: 2rpx 12rpx; border-radius: 99rpx; border: 1rpx solid transparent; }
+.rep-tag.rep-old { color: var(--gold-tx, #f5c76a); background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.32); }
+.rep-tag.rep-local { color: var(--green, #4cd49c); background: rgba(76,212,156,.12); border-color: rgba(76,212,156,.3); }
+.rep-tag.rep-tourist { color: var(--blue, #8ec9ff); background: rgba(125,211,252,.12); border-color: rgba(125,211,252,.3); }
+.rep-tag.rep-street { color: #e8965a; background: rgba(232,150,90,.12); border-color: rgba(232,150,90,.3); }
+.rep-tag.rep-fine { color: #b98cff; background: rgba(185,140,255,.12); border-color: rgba(185,140,255,.3); }
+
+.menu { margin-top: 14rpx; padding: 14rpx 16rpx; border-radius: 14rpx;
+  background: rgba(var(--ln-rgb, 148,163,184),.05); border: 1rpx solid rgba(var(--ln-rgb, 148,163,184),.12); }
+.menu-h { display: block; font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: var(--chip-tx, #d4a94e); letter-spacing: 1rpx; margin-bottom: 8rpx; }
+.menu-row { display: flex; align-items: center; justify-content: space-between; font-size: calc(24rpx * var(--fs, 1)); padding: 4rpx 0; }
+.menu-n { color: var(--t1, #eaeff7); }
+.menu-p { color: var(--t3, #8fa3bc); font-size: calc(22rpx * var(--fs, 1)); margin-left: 16rpx; flex-shrink: 0; }
+.menu-foot { display: block; font-size: calc(19rpx * var(--fs, 1)); margin-top: 8rpx; }
+.menu-empty { font-size: calc(22rpx * var(--fs, 1)); margin-top: 12rpx; }
+
+.shop-note { margin-top: 14rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); line-height: 1.7;
+  padding: 12rpx 16rpx; border-radius: 12rpx; background: rgba(var(--ln-rgb, 148,163,184),.04); border-left: 4rpx solid rgba(212,169,78,.5); }
+.note-tag { display: inline-block; font-size: calc(18rpx * var(--fs, 1)); font-weight: 700; color: #14100a;
+  background: linear-gradient(135deg, #e2b65c, #b8892f); padding: 2rpx 10rpx; border-radius: 6rpx; margin-right: 10rpx; }
+
 /* v1.9.0：口味小标签 */
 .tag-sub { opacity: .6; font-size: calc(18rpx * var(--fs, 1)); margin-left: 6rpx; }
 

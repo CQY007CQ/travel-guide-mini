@@ -21,6 +21,15 @@ Page(SafePage({
     activeDish: "", dishNote: "", shopHead: "" },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
+  // 口碑标签 → 样式 key（与 food.wxss 的 .rep-* 对应）
+  _repClass(rep) {
+    if (rep === "老字号") return "old";
+    if (rep === "本地人常去") return "local";
+    if (rep === "游客打卡") return "tourist";
+    if (rep === "市井烟火") return "street";
+    if (rep === "宴请名店") return "fine";
+    return "";
+  },
   // v1.11：美食页依赖 FOOD_SPOTS 表，城市未收录时也要给出空态而不是崩掉
   onLoad() { this.__boot = T.ready().catch(() => null); },
   onShow() {
@@ -89,7 +98,12 @@ Page(SafePage({
         lat: s.lat, lon: s.lon,
         band: s.bandName || "", hit: !!s.hit,
         bandKey: s.bandName === '平价' ? 'low' : s.bandName === '中档' ? 'mid' : s.bandName === '高档' ? 'high' : '',
-        m: 0
+        m: 0,
+        // v1.21：菜单 / 口碑 / 编辑点评（试点热门城市；非试点店无这些字段，UI 优雅回退）
+        menu: Array.isArray(s.menu) ? s.menu : [],
+        rep: s.rep || "",
+        repKey: _repClass(s.rep),
+        note: s.note || ""
       }, { slot: T.mealSlotOf((s.food || "") + " " + (s.shop || "")) });
       // 副标题预计算：food 字段全库几乎为空，直接拼会渲染出「 · 地址」这种多一个点的情况
       o.sub = s.food ? (s.food + " · " + (s.addr || "")) : (s.addr || "");

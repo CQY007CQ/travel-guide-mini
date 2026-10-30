@@ -139,6 +139,8 @@ step "模糊测试 recommend (标签组合/极端输入)" "$NODE" tools/_fuzz-re
 step "单测 emergency (旅途应急分诊)" "$NODE" tools/_test-emergency.mjs
 # 菜名→店铺匹配：命中正确性 + 无命中不瞎给 + 品牌联想不被词根覆盖
 step "单测 foodmap (菜名→店铺)" "$NODE" tools/_test-foodmap.mjs
+# 美食菜单/口碑试点（10 热门城市）：每城每家 menu(1-3)/rep/note 完整，经分块真实加载校验
+step "单测 food-menu (菜单·口碑·点评 试点)" "$NODE" tools/_test-food-menu.mjs
 # 「今日正当时」已于 2026-10-29 按用户要求下线，原接线测试改为「下线守卫」（防被无意加回）
 step "单测 insp 下线守卫" "$NODE" tools/_test-insp-removed.mjs
 step "单测 气候补充去重" "$NODE" tools/_test-climate-dedupe.mjs

@@ -112,9 +112,16 @@ try {
   for (const ck in (D.FOOD_SPOTS || {})) {
     const arr = D.FOOD_SPOTS[ck];
     if (!Array.isArray(arr)) continue;
-    D.FOOD_SPOTS[ck] = arr.map(x => (x && typeof x === "object")
-      ? { shop: x.shop, lat: +Number(x.lat).toFixed(3), lon: +Number(x.lon).toFixed(3), price: x.price || "" }
-      : x);
+    // v1.21：试点城市（10 热门）的店铺带 menu/rep/note 扩展字段，这里一并保留；
+    // 非试点城市无这些字段，条件写入避免给上千家店塞空数组撑包。
+    D.FOOD_SPOTS[ck] = arr.map(x => {
+      if (!(x && typeof x === "object")) return x;
+      const o = { shop: x.shop, lat: +Number(x.lat).toFixed(3), lon: +Number(x.lon).toFixed(3), price: x.price || "" };
+      if (Array.isArray(x.menu) && x.menu.length) o.menu = x.menu;
+      if (x.rep) o.rep = x.rep;
+      if (x.note) o.note = x.note;
+      return o;
+    });
   }
   // v1.19.37：CITY_LANDMARKS_EXTRA 去重——99.9% 的名字已在 SPOT_COORDS 可解析
   //（getSpotCity 先扫坐标库），仅保留「coords 里没有」的独有名字，省 ~106KB 且零功能损失。
