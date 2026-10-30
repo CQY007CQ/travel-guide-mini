@@ -467,8 +467,8 @@ function normHotelAreas(arr) {
   if (!Array.isArray(arr) || !arr.length) return null;
   const out = [];
   for (const a of arr) {
-    if (a && typeof a === "object" && a.name) out.push({ name: a.name, note: a.note || "" });
-    else if (typeof a === "string" && a) out.push({ name: a, note: "" });
+    if (a && typeof a === "object" && a.name) out.push({ name: a.name, note: a.note || "", price: a.price || "" });
+    else if (typeof a === "string" && a) out.push({ name: a, note: "", price: "" });
   }
   return out.length ? out : null;
 }
@@ -493,7 +493,7 @@ function hotelAreaPins(cityName, budgetKey) {
   const info = hotelAreasFor(cityName, budgetKey);
   return info.areas.map((a, i) => {
     const off = _AREA_OFFS[i % _AREA_OFFS.length];
-    return { name: a.name, note: a.note, lat: +(cc.lat + off[0]).toFixed(6), lon: +(cc.lon + off[1]).toFixed(6) };
+    return { name: a.name, note: a.note, price: a.price || "", lat: +(cc.lat + off[0]).toFixed(6), lon: +(cc.lon + off[1]).toFixed(6) };
   });
 }
 // 酒店门户：平台 + 可复制搜索词（引导去 App 比价，不内嵌预订）

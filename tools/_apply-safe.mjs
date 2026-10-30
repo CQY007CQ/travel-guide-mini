@@ -72,6 +72,24 @@ try {
     foodShops[_cn] = foodShops[_cn].concat(_f3[_cn]);
   }
 } catch (e) { /* 无 v205 批次时跳过 */ }
+// v206 美食缺坐标补丁（geocode/geo 取得，仅坐标，按店名回写）—— §6.7 消费
+let foodCoords = {};
+try { foodCoords = (req("./tools/v206-food-coords.js") || {}).FOOD_COORDS_ADD || {}; } catch (e) { /* 无美食坐标批次时跳过 */ }
+// v207 Tier1 编辑整理管线（菜单/口碑/酒店参考价区间），§6.6 消费 FOOD_SPOTS_ADD
+try {
+  const _r7 = (req("./tools/v207-rich-info.js") || {});
+  const _f7 = _r7.FOOD_SPOTS_ADD || {};
+  for (const _cn in _f7) { if (!foodShops[_cn]) foodShops[_cn] = []; foodShops[_cn] = foodShops[_cn].concat(_f7[_cn]); }
+} catch (e) { /* 无 v207 批次时跳过 */ }
+// v207 酒店片区参考价区间（HOTEL_AREA_NOTES）—— §6.8 消费
+let hotelNotes = {};
+try { hotelNotes = (req("./tools/v207-rich-info.js") || {}).HOTEL_AREA_NOTES || {}; } catch (e) { /* 无 v207 批次时跳过 */ }
+// v208 Tier1 编辑整理管线（第二批美食扩城，10 城×3 店），§6.6 消费 FOOD_SPOTS_ADD
+try {
+  const _r8 = (req("./tools/v208-rich-info.js") || {});
+  const _f8 = _r8.FOOD_SPOTS_ADD || {};
+  for (const _cn in _f8) { if (!foodShops[_cn]) foodShops[_cn] = []; foodShops[_cn] = foodShops[_cn].concat(_f8[_cn]); }
+} catch (e) { /* 无 v208 批次时跳过 */ }
 
 // 内联 cleanSpotName（避免 require utils/travel.js 触发 wx/微信全局，node 下崩溃）
 function cleanSpotName(name) {
@@ -487,6 +505,50 @@ for (const cn in foodShops) {
 }
 if (foodAdded) console.log("美食店铺新增:", foodAdded);
 if (foodMerged) console.log("美食店铺扩展字段合并(菜单/口碑/点评):", foodMerged);
+
+// §6.7) 美食缺坐标回写（v206-food-coords.js 的 FOOD_COORDS_ADD）：
+//   按「店名」匹配已入库美食店，仅当该店缺坐标时补入 lat/lon（不覆盖已有、幂等、不凭空造店）。
+if (foodCoords && Object.keys(foodCoords).length) {
+  let foodCoordSet = 0;
+  for (const cn in foodCoords) {
+    if (!base.FOOD_SPOTS || !Array.isArray(base.FOOD_SPOTS[cn])) continue;
+    const byName = {};
+    for (const s of base.FOOD_SPOTS[cn]) { const n = String((s && (s.shop || s.name)) || "").trim(); if (n) byName[n] = s; }
+    for (const e of (foodCoords[cn] || [])) {
+      const nm = String((e && e[0]) || "").trim();
+      if (!nm) continue;
+      const ex = byName[nm];
+      if (!ex) continue;                                          // 找不到同名店 -> 跳过（不凭空造店）
+      if (typeof ex.lat === "number" && typeof ex.lon === "number") continue;  // 已有坐标 -> 不动
+      ex.lat = +e[1]; ex.lon = +e[2];
+      foodCoordSet++;
+    }
+  }
+  if (foodCoordSet) console.log("美食坐标回写:", foodCoordSet);
+}
+
+// §6.8) 酒店片区参考价区间（v207-rich-info.js 的 HOTEL_AREA_NOTES）：
+//   按「城市+片区名」匹配 CITIES[].areas，补入 price（参考价区间）、追加 note。
+//   不覆盖已有 note，仅在其后追加；片区名须与 base 完全一致（含中间点·）。
+if (hotelNotes && Object.keys(hotelNotes).length) {
+  let hotelNoteSet = 0;
+  for (const cn in hotelNotes) {
+    const city = (base.CITIES || []).find((c) => c.name === cn);
+    if (!city || !Array.isArray(city.areas)) continue;
+    const byName = {};
+    for (const a of city.areas) { const n = String((a && a.name) || "").trim(); if (n) byName[n] = a; }
+    for (const e of (hotelNotes[cn] || [])) {
+      const nm = String((e && e.name) || "").trim();
+      if (!nm) continue;
+      const ex = byName[nm];
+      if (!ex) continue;                              // 片区名不匹配 -> 跳过（不凭空造片区）
+      if (e.price && !ex.price) ex.price = e.price;
+      if (e.note) ex.note = (ex.note ? ex.note + "；" : "") + e.note;
+      hotelNoteSet++;
+    }
+  }
+  if (hotelNoteSet) console.log("酒店片区参考价/点评回写:", hotelNoteSet);
+}
 
 // §9.7 显示名精简（v204-name-clean.js 由 _gen-name-clean.mjs 自动生成）：
 // 剥离冗余行政区划前缀（广州市白云山风景区 → 白云山风景区）+ 修双横线/多余右括号。

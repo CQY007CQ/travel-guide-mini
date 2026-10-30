@@ -139,6 +139,7 @@
         <view class="bf-t"><image class="ic ic-sm" src="/images/icons/home.png"/>住哪儿</view>
         <view class="bf-area" wx:for="{{brief.areas}}" wx:key="name">
           <text class="bf-an">{{item.name}}</text><text class="bf-ax dim">{{item.note}}</text>
+          <text class="bf-ap" wx:if="{{item.price}}">参考价 · {{item.price}}</text>
         </view>
       </view>
       <view class="bf-sec" wx:if="{{brief.stayTip}}">

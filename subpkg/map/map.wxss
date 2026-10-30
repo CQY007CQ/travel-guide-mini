@@ -41,6 +41,7 @@
 .hotel:active { background: rgba(212,169,78,.08); }
 .h-em { font-size: calc(30rpx * var(--fs, 1)); font-weight: 700; color: var(--chip-tx, #d4a94e); display: block; }
 .h-sub { font-size: calc(21rpx * var(--fs, 1)); display: block; margin-top: 6rpx; }
+.h-price { font-size: calc(21rpx * var(--fs, 1)); display: block; margin-top: 8rpx; color: var(--acc, #d4a94e); }
 .dim { color: var(--t4, #5b6b82); }
 .portal-t { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8495ad); margin: 22rpx 0 12rpx; }
 .portals { display: flex; flex-wrap: wrap; gap: 14rpx; }

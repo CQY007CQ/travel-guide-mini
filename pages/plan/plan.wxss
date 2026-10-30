@@ -547,6 +547,8 @@
 
 .bf-ax { font-size: calc(20rpx * var(--fs, 1)); line-height: 1.75; }
 
+.bf-ap { display: block; font-size: calc(20rpx * var(--fs, 1)); color: var(--acc, #d4a94e); line-height: 1.7; margin-top: 3rpx; }
+
 /* ===== v1.6 · 每天行尾：加景点 / 怎么去 ===== */
 .day-foot {
   display: flex; gap: 14rpx; margin-top: 22rpx;

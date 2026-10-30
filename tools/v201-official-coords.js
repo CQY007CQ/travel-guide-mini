@@ -1,4 +1,4 @@
-// 自动生成：官方名录/全库缺坐标景点补坐标（geocode/geo）
+// 自动生成：坐标补全（geocode/geo，合规）
 module.exports = {
  "COORDS_ADD": {
   "北京": [

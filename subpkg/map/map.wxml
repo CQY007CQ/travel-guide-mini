@@ -79,6 +79,7 @@
       <view class="hotel" wx:for="{{hotelAreas}}" wx:key="name" data-i="{{index}}" bindtap="goHotel">
         <text class="h-em">{{item.name}}</text>
         <text class="h-sub dim">{{item.note || '点击定位这片区域，可一键导航'}}</text>
+        <text class="h-price" wx:if="{{item.price}}">参考价 · {{item.price}}</text>
       </view>
       <view class="portal-t">去这些平台比价（点按复制搜索词）</view>
       <view class="portals">
