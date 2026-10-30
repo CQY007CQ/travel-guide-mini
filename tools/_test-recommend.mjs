@@ -111,6 +111,40 @@ console.log("【标签覆盖】");
   }
 }
 
+/* ── ④b 智能性 / 透明度回归（v1.19.147+ 升级锁）──
+ * 锁住用户投诉的核心：① 点名城市必须锚定到榜首；② 无意图时明确标注"综合热度"不伪装；
+ * ③ 每条带可解释 reasonTag；④ "最…"类诉求记 extreme 但不编造年代排序；
+ * ⑤ 防止"无论输入什么都出同一批城市 + 同一分数"的退化（曾出现花卉市场→全城 34 分）。 */
+console.log("【智能性/透明度】");
+{
+  // ① 点名城市锚定：query 显式含城市名 → 该城必须进榜首，且理由标注"你提到的城市"
+  const named = R.recommend("火锅 美食 成都", { month: 10, topN: 5 });
+  ok("点名城锚定：成都进榜首", named.list.length && named.list[0].name === "成都", named.list.map(x => x.name).join(","));
+  ok("点名城锚定：理由标注点名", named.list.length && named.list[0].reasonTag === "你提到的城市", named.list[0] && named.list[0].reasonTag);
+  ok("点名城锚定：mode=city", named.mode === "city", named.mode);
+
+  // ② 无明确意图：不伪装成命中理由，明确综合热度
+  const idle = R.recommend("随便逛逛", { month: 10, topN: 5 });
+  ok("无意图：noIntent=true", idle.noIntent === true, String(idle.noIntent));
+  ok("无意图：mode=overall", idle.mode === "overall", idle.mode);
+  ok("无意图：榜首标注综合热度", idle.list.length && idle.list[0].reasonTag === "综合热度", idle.list[0] && idle.list[0].reasonTag);
+  ok("无意图：summary 诚实说明", idle.list.length && idle.list[0].summary.indexOf("综合热度推荐") >= 0, idle.list[0] && idle.list[0].summary);
+
+  // ③ 每条都带 reasonTag（前端据此展示"分数=什么"）
+  const intent = R.recommend("海边亲子游，五天，舒适", { month: 10, topN: 5 });
+  ok("有意图：每条 reasonTag 非空", intent.list.every(x => typeof x.reasonTag === "string" && x.reasonTag.length > 0), intent.list.map(x => x.reasonTag).join("|"));
+
+  // ④ 最高级诉求记 extreme，但不编造年代排序
+  const ext = R.recommend("有最大的花卉市场", { month: 10, topN: 5 });
+  ok("最高级诉求：extreme=true", ext.extreme === true, String(ext.extreme));
+  ok("花卉诉求：命中 photo 标签", ext.prefs.tags.indexOf("photo") >= 0, JSON.stringify(ext.prefs.tags));
+
+  // ⑤ 退化防护：同一输入 Top5 分数不允许全部相同（曾出现全 34 分）
+  const scores = intent.list.map(x => x.score);
+  const uniq = Array.from(new Set(scores));
+  ok("防退化：Top5 分数不全相同", uniq.length > 1, scores.join(","));
+}
+
 /* ── ④ 单城解释 ── */
 console.log("【单城解释】");
 {
