@@ -48,7 +48,7 @@ Page(SafePage({
   // v1.6：城市速览 / 倒计时
   brief: null, briefOpen: false, countdown: null,
   // v1.18：天气卡 / 想玩未排上列表默认收起（减法：首屏更轻）
-  wxOpen: false, wishOpen: false,
+  wxOpen: true, wishOpen: false,
   // v1.8.4 A1/B12/B17：人流提示 / 单日卡点 / 城市打分贴士
   hints: [], cityNote: null, cnOpen: false, cnScore: 0, cnTips: "", cnToggleTx: "去打分 ▾",
   // v1.8.5 C5：顶部天数快速导航

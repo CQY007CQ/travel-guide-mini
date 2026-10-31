@@ -15,7 +15,7 @@
 // 失败/不可用：Key 未配置、断网、超预报窗口、Key 无效 → 静默降级（天气卡隐藏/提示），绝不影响行程主流程。
 const T = require("./travel.js");
 
-const QW_API_HOST = "https://devapi.qweather.com"; // 若账号分配了自定义域名，改成你的 xxx.qweatherapi.com
+const QW_API_HOST = "https://j864228fx2.re.qweatherapi.com"; // 和风新计费模型：每个项目分配专属域名（devapi.qweather.com 对本 Key 返回 Invalid Host）
 const QW_KEY = "d84611f29a4d48d48a36227b613de255";              // 和风开发者控制台获取的免费 Key（v1.19.157 接入）
 
 // 和风天气现象文字 → 归一化 icon / 合成 WMO 码 / 雨雪判定（合成码只为复用既有的 riskOf/outfitIndex）
