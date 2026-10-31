@@ -14,7 +14,7 @@
           <text wx:if="{{bookN}}" class="dim"> · 其中 {{bookN}} 项需提前预约</text>
           <text wx:else class="dim"> · 均无需强制预约</text>
         </view>
-        <view class="tk-est" wx:if="{{tkSum > 0}}"><image class="ic ic-sm" src="/images/icons/wallet.png"/>门票预估 <text class="gold">¥{{tkSum}}</text><text class="dim">（{{peopleN}} 人合计 · 仅供参考）</text></view>
+        <view class="tk-est" wx:if="{{tkSum > 0}}"><image class="ic ic-sm" src="/images/icons/wallet.png"/>门票 <text class="gold">¥{{tkSum}}</text><text class="dim">（{{peopleN}} 人合计）</text></view>
         <view class="tk-bar"><view class="tk-fill" style="width:{{tkPct}}%"></view></view>
       </view>
       <view wx:if="{{!tickets.length}}" class="dim note">行程中的景点暂无强制预约要求，出发前到官方渠道确认开放情况即可</view>

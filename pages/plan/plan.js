@@ -178,7 +178,7 @@ Page(SafePage({
   const bo = T.budgetTotalObj(plan);
   let budgetLine = "";
   if (bo) {
-   budgetLine = "预计花费：人均约 ¥" + bo.daily + "/天 × " + bo.people + "人 × " + bo.days + "天 ≈ ¥" + bo.totalBudget +
+   budgetLine = "花费：人均 ¥" + bo.daily + "/天 × " + bo.people + "人 × " + bo.days + "天 = ¥" + bo.totalBudget +
     "（住宿 " + bo.hotel + " · 餐饮 " + bo.food + " · " + bo.note + "）";
   }
   // 想玩命中提示
@@ -376,7 +376,7 @@ Page(SafePage({
   const base = T.tripCheck(plan);
   const ins = [];
   const ts = T.ticketSumOf(plan);
-  if (ts && ts.n > 0) ins.push({ t: "门票预估", x: ts.n + " 个景点按挂牌价约 ¥" + ts.fee + "，旺季与园内交通会浮动，以预约页为准", lv: "info" });
+  if (ts && ts.n > 0) ins.push({ t: "门票", x: ts.n + " 个景点按挂牌价 ¥" + ts.fee + "，旺季与园内交通会浮动，以预约页为准", lv: "info" });
   const single = !plan.segments || plan.segments.length <= 1;
   if (single) {
    const lh = T.cityLongHint(plan);

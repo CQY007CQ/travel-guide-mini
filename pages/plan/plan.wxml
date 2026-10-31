@@ -139,7 +139,7 @@
         <view class="bf-t"><image class="ic ic-sm" src="/images/icons/home.png"/>住哪儿</view>
         <view class="bf-area" wx:for="{{brief.areas}}" wx:key="name">
           <text class="bf-an">{{item.name}}</text><text class="bf-ax dim">{{item.note}}</text>
-          <text class="bf-ap" wx:if="{{item.price}}">参考价 · {{item.price}}</text>
+          <text class="bf-ap" wx:if="{{item.price}}">{{item.price}}</text>
         </view>
       </view>
       <view class="bf-sec" wx:if="{{brief.stayTip}}">
@@ -360,7 +360,7 @@
       </view>
 
       <!-- v1.9：本日动线与步行量估算 -->
-      <view class="mv-line dim" wx:if="{{day.mv && day.mv.legs > 0}}"><image class="ic ic-sm" src="/images/icons/route.png"/>动线约 {{day.mv.km}} km<text wx:if="{{day.mv.steps}}"> · 预计步行 {{day.mv.steps}} 步</text></view>
+      <view class="mv-line dim" wx:if="{{day.mv && day.mv.legs > 0}}"><image class="ic ic-sm" src="/images/icons/route.png"/>动线 {{day.mv.km}} km<text wx:if="{{day.mv.steps}}"> · 步行 {{day.mv.steps}} 步</text></view>
 
       <!-- 行尾：加个景点 / 怎么去 -->
       <view class="day-foot">

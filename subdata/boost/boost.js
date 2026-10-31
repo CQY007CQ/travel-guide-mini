@@ -104,7 +104,7 @@ Page(SafePage({
   onBInput(e) { this.setData({ cityB: e.detail.value }); },
   calcTrans() {
     const r = T.transportEstimate(this.data.cityA.trim(), this.data.cityB.trim());
-    this.setData({ trans: r ? (r.railText + "，" + r.price + "；" + r.hotel) : "暂未收录这对城市的参考数据" });
+    this.setData({ trans: r ? (r.railText + "，" + r.price + "；" + r.hotel) : "暂未收录这对城市的出行数据" });
   },
 
   onAmtInput(e) { this.setData({ amt: e.detail.value }); },

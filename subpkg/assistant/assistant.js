@@ -78,7 +78,7 @@ Page(SafePage({
     const people = hasPlan && plan.people ? plan.people : 0;
     const pace = hasPlan && plan.pace ? ({ leisure: "轻松", balance: "平衡", speed: "特种兵" })[plan.pace] || "" : "";
     const ctx = hasPlan
-      ? ("正在查：" + plan.cityName + (city && plan.cityName !== city ? "（当前参考 " + city + "）" : "") +
+      ? ("正在查：" + plan.cityName + (city && plan.cityName !== city ? "（当前：" + city + "）" : "") +
          (people ? " · " + people + " 人" : "") + (pace ? " · " + pace + "节奏" : "") + " · 离线可用")
       : "先生成一份行程，下面卡片就能直接查";
     this.setData({ hasPlan, ctx });

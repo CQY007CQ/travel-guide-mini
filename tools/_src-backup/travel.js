@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.154";
+const APP_VER = "1.19.155";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -1116,7 +1116,7 @@ function askAssistant(rawQ, plan) {
  if (/吃|美食|餐厅|饭店|小吃|必吃|好吃|推荐.*吃|哪家/.test(q)) {
   if (cityObj && cityObj.foods && cityObj.foods.length) L(city + "必吃：" + cityObj.foods.slice(0, 8).join("、"));
   const shops = _foodNames(city, 6);
-  if (shops.length) L("\n名店参考：" + shops.join("、"));
+  if (shops.length) L("\n名店：" + shops.join("、"));
   L("\n详情可在「更多 → 美食名店」看地址/人均，支持一键导航。");
   return { text: lines.join("\n"), tag: "ok" };
  }
@@ -1133,7 +1133,7 @@ function askAssistant(rawQ, plan) {
   const sa = stayAdvice(cityObj);
   L(sa || city + "住宿建议：优先地铁站 500m 内、商圈附近，出行方便。");
   const ht = hotelPointFor(city);
-  if (ht) L("\n中心参考：" + ht.name);
+  if (ht) L("\n中心：" + ht.name);
   L("\n订酒店前四平台（携程/美团/飞猪/去哪儿）比价，价差可达 10-30%。");
   return { text: lines.join("\n"), tag: "ok" };
  }
@@ -2844,7 +2844,7 @@ function iouStats() {
 /* ---------- B12 景点停留估算 + 单日卡点预警（不假装精确，按类型给参考时长） ---------- */
 function durOf(name) {
  const n = String(name || "");
- const H = (h) => ({ h: h, tip: "参考停留约 " + h + " 小时" });
+ const H = (h) => ({ h: h, tip: "停留约 " + h + " 小时" });
  if (/博物馆|美术馆|科技馆|纪念馆|宫|院|展览|图书馆/.test(n)) return H(2.5);
  if (/演出|秀|剧|脱口秀/.test(n)) return H(2);
  if (/山|峰|谷|峡|长城|瀑布|森林公园|草原|湖|湿地/.test(n)) return H(3);
@@ -2867,7 +2867,7 @@ function dayLoad(plan, di) {
  const over = Math.max(0, total - 12);
  const heavy = items.slice().sort((a, b) => b.h - a.h);
  return { n: items.length, hours: Math.round(total * 10) / 10, over: Math.round(over * 10) / 10,
-  top: heavy.slice(0, 2), txt: "景点参考合计约 " + (Math.round(total * 10) / 10) + " 小时" +
+  top: heavy.slice(0, 2), txt: "景点合计约 " + (Math.round(total * 10) / 10) + " 小时" +
    (over > 0 ? "，超出 12 小时可用时长 " + (Math.round(over * 10) / 10) + " 小时，建议减负" : "，节奏健康") };
 }
 
@@ -3028,7 +3028,7 @@ function budgetCheckOf(plan) {
  const userLabel = (D.BUDGETS[userTier] && D.BUDGETS[userTier].label) || "舒适型";
  const userDaily = (D.BUDGETS[userTier] && D.BUDGETS[userTier].daily) || "300-600";
  const refDaily = (D.BUDGETS[cost] && D.BUDGETS[cost].daily) || "300-600";
- if (!ref || !u) return { lv: "na", txt: "参考数据不足，先按感觉定预算吧", cost, costTxt, userTier, userLabel, userDaily, refDaily };
+ if (!ref || !u) return { lv: "na", txt: "数据不足，先按感觉定预算吧", cost, costTxt, userTier, userLabel, userDaily, refDaily };
  const userMid = (u[0] + u[1]) / 2;
  let lv = "fit", txt;
  if (userMid < ref[0] * 0.85) {
@@ -3036,9 +3036,9 @@ function budgetCheckOf(plan) {
   txt = c.name + "消费" + costTxt + "，你选的「" + userLabel + "」档（日均 " + userDaily + " 元）可能偏紧，升一档更从容";
  } else if (userMid > ref[1] * 1.15) {
   lv = "loose";
-  txt = c.name + costTxt + "，你留的「" + userLabel + "」档（日均 " + userDaily + " 元）比常见参考（" + refDaily + " 元）宽裕，机动金很足";
+  txt = c.name + costTxt + "，你留的「" + userLabel + "」档（日均 " + userDaily + " 元）比常见（" + refDaily + " 元）宽裕，机动金很足";
  } else {
-  txt = c.name + costTxt + "，参考日均 " + refDaily + " 元，你选的「" + userLabel + "」档正好落在合理区间";
+  txt = c.name + costTxt + "，日均 " + refDaily + " 元，你选的「" + userLabel + "」档正好落在合理区间";
  }
  return { lv, txt, city: c.name, cost, costTxt, userTier, userLabel, userDaily, refDaily };
 }
@@ -3549,8 +3549,8 @@ function todayOverHint(plan) {
   const spent = todaySpent();
   if (spent <= 0) return null;
   const ref = budgetPerDay(plan);
-  if (spent > ref * 1.5) return { lv: "over", txt: "今日已花 ¥" + Math.round(spent) + "，明显超出参考（¥" + ref + "），后面几笔悠着点" };
-  if (spent > ref * 1.15) return { lv: "warn", txt: "今日 ¥" + Math.round(spent) + " 略超参考（¥" + ref + "），记一笔会更清楚" };
+  if (spent > ref * 1.5) return { lv: "over", txt: "今日已花 ¥" + Math.round(spent) + "，明显超出（¥" + ref + "），后面几笔悠着点" };
+  if (spent > ref * 1.15) return { lv: "warn", txt: "今日 ¥" + Math.round(spent) + " 略超（¥" + ref + "），记一笔会更清楚" };
   return null;
  } catch (e) { return null; }
 }
@@ -5627,7 +5627,7 @@ function transportEstimate(cityA, cityB) {
   const hit = _RAIL_EST[k1] || _RAIL_EST[k2];
   if (!hit) return null;
   const h = hit[0];
-  return { railHours: h, railText: (h < 2 ? Math.round(h * 60) + " 分钟" : h + " 小时左右"), price: "二等座约 ¥" + hit[1], hotel: "连锁酒店 ¥200-450/晚（参考）" };
+  return { railHours: h, railText: (h < 2 ? Math.round(h * 60) + " 分钟" : h + " 小时左右"), price: "二等座约 ¥" + hit[1], hotel: "连锁酒店 ¥200-450/晚" };
 }
 
 module.exports = {

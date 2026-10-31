@@ -51,11 +51,11 @@
         </view>
         <view class="shop-sub">{{item.sub}}</view>
         <view wx:if="{{item.menu.length}}" class="menu">
-          <text class="menu-h">招牌参考 · 参考价</text>
+          <text class="menu-h">招牌菜</text>
           <view class="menu-row" wx:for="{{item.menu}}" wx:for-item="m" wx:key="n">
             <text class="menu-n">{{m.n}}</text><text class="menu-p">{{m.p}}</text>
           </view>
-          <text class="menu-foot dim">参考价，到店以实价为准</text>
+          <text class="menu-foot dim">到店以实价为准</text>
         </view>
         <view wx:else class="menu-empty dim">菜单整理中…</view>
         <view wx:if="{{item.note}}" class="shop-note"><text class="note-tag">编辑点评</text>{{item.note}}</view>

@@ -106,7 +106,7 @@ Page(SafePage({
       out.nowTag = now ? (ord(now.period) <= cur ? "正在玩" : "接下来") : "";
       out.spent = Math.round(T.todaySpent());
       const bAmt = plan.customAmt > 0 ? "自定义 ¥" + plan.customAmt : "¥" + T.budgetDaily(plan.budget);
-      out.budgetTxt = (plan.people > 1 ? plan.people + " 人 · " : "") + "预算参考 " + bAmt + "/人·天";
+      out.budgetTxt = (plan.people > 1 ? plan.people + " 人 · " : "") + "预算 " + bAmt + "/人·天";
       out.gauge = T.budgetGauge(plan);  // 总预算进度条（账本实际花费 vs 总预算参考）
       // 想玩命中今天：金色提示（对齐网页版 ★ 想玩高亮；合并条目/别名也命中，去重）
       const hitToday = [...new Set(

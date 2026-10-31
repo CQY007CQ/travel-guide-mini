@@ -65,7 +65,7 @@
   </view>
 
   <view class="card">
-    <view class="card-head"><text class="card-title">交通预估</text></view>
+    <view class="card-head"><text class="card-title">交通</text></view>
     <view class="qbar">
       <input class="qinput" placeholder="出发城市" value="{{cityA}}" bindinput="onAInput" />
       <input class="qinput" placeholder="到达城市" value="{{cityB}}" bindinput="onBInput" />

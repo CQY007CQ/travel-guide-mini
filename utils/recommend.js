@@ -379,7 +379,7 @@ function scoreCity(city, prefs, month) {
 
   /* ⑧ 覆盖诚实 */
   const limited = !!city.limited || expCount === 0;
-  if (limited) { raw += W.limited; push("数据覆盖有限", W.limited, "该城景点资料较少，结果仅供参考"); }
+  if (limited) { raw += W.limited; push("数据覆盖有限", W.limited, "该城景点资料较少，建议结合官方渠道确认"); }
 
   /* ⑨ 必选项语义：用户明确要的核心诉求（如"海边"+"亲子"）应当同时满足。
    * 纯求和会让"只是亲子强、但不是海边"的城市挤进榜单（实测重庆进过海边榜），

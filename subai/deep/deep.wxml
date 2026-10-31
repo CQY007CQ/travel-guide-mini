@@ -8,7 +8,7 @@
         <image class="ic" src="/images/icons/city.png"/>
         <text class="dp-title">{{cur.name}}</text>
       </view>
-      <view class="dp-sub dim">{{cur.updated}} 整理 · 共 {{cur.total}} 条 · 经验参考，票价与班次以官方当日公告为准</view>
+      <view class="dp-sub dim">{{cur.updated}} 整理 · 共 {{cur.total}} 条 · 票价与班次以官方当日公告为准</view>
       <view class="dp-copy" bindtap="onCopy"><image class="ic ic-sm" src="/images/icons/copy.png"/>复制这份清单</view>
     </view>
 

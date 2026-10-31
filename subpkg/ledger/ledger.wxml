@@ -153,12 +153,12 @@
     <view class="card fc-card" wx:if="{{forecast && forecast.budget > 0}}">
       <view class="h3 row-between">
         <view class="h3-l"><image class="ic" src="/images/icons/trend.png"/>花费预测</view>
-        <text class="fc-lv {{forecast.over ? 'over' : 'ok'}}">{{forecast.over ? '可能超支' : '预计可控'}}</text>
+        <text class="fc-lv {{forecast.over ? 'over' : 'ok'}}">{{forecast.over ? '可能超支' : '花费可控'}}</text>
       </view>
       <view class="fc-nums">
-        <view class="fc-n"><text class="fc-v">¥{{forecast.forecast}}</text><text class="fc-l">预计全程</text></view>
+        <view class="fc-n"><text class="fc-v">¥{{forecast.forecast}}</text><text class="fc-l">全程花费</text></view>
         <view class="fc-n"><text class="fc-v">¥{{forecast.perDay}}</text><text class="fc-l">已花日均</text></view>
-        <view class="fc-n"><text class="fc-v">¥{{forecast.budget}}</text><text class="fc-l">预算参考</text></view>
+        <view class="fc-n"><text class="fc-v">¥{{forecast.budget}}</text><text class="fc-l">预算</text></view>
       </view>
       <view class="bud-bar u-mt14">
         <view class="bud-fill {{forecast.over ? 'over' : ''}}" style="width:{{forecast.pct > 100 ? 100 : forecast.pct}}%"></view>

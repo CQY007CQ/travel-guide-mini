@@ -168,8 +168,8 @@ Page(SafePage({
           const spent = Math.round(T.totalSpent());
           over = spent > totalBud;
           budPct = Math.min(100, Math.round(spent / totalBud * 100));
-          budTxt = "已花 ¥" + spent + " / 预算参考约 ¥" + Math.round(totalBud) +
-            (over ? " · 已超参考，收一收啦" : " · 在预算参考内，继续玩");
+          budTxt = "已花 ¥" + spent + " / 预算 ¥" + Math.round(totalBud) +
+            (over ? " · 已超预算，收一收啦" : " · 在预算内，继续玩");
         }
       }
     } catch (e) {}
