@@ -107,7 +107,7 @@ if (keyPlaceholder) {
 // 故校验构建产物里 wx.request 调用确实携带了 timeout 选项。
 let builtSrc = "";
 try { builtSrc = readFileSync(process.cwd() + "/utils/weather.js", "utf8"); } catch (e) {}
-const hasTimeout = /timeout\s*:\s*(8e3|\d{3,})/.test(builtSrc);
+const hasTimeout = /timeout\s*:\s*(\d{3,}|[0-9]+e[0-9]+)/.test(builtSrc);
 ok("构建产物 wx.request 携带 timeout（弱网不永久卡死）", hasTimeout);
 
 console.log(fail ? ("\n✗ weather151 单测失败 " + fail + " 项") : "\n✓ weather151 单测全部通过");

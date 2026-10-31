@@ -170,19 +170,16 @@ function fetchPlanWeather(plan, cb) {
     }
     return byDate;
   };
-  cities.forEach(function (city) {
-    const c = coordOf(city);
-    if (!c) { byCity[city] = { byDate: {}, city: city }; return; } // 无坐标：占位，避免 dayCityOf 误判
-    const wkey = city + "|" + todayYMD + "|" + QW_API_HOST;
-    const cached = _WX_CACHE[wkey];
-    if (cached && (Date.now() - cached.t) < _WX_TTL) { byCity[city] = { byDate: cached.v, city: city }; return; }
-    pending++;
+  // 瞬态失败自动重试：真机/弱网下，行程页冷启动首次拉天气常因 DNS+TLS 握手超时（8s 偏紧）偶发失败，
+  // 但用户手动点「重试」后立即成功（连接已热）。此处内置一次退避重试，让冷启动抖动自愈，用户无感。
+  const MAX_RETRY = 1; // 额外重试 1 次（共 2 次尝试）
+  const loadCity = function (city, c, wkey, attempt) {
     const lat = Number(c.lat).toFixed(2), lon = Number(c.lon).toFixed(2);
     wx.request({
       url: QW_API_HOST + "/v7/weather/7d",
       data: { location: lon + "," + lat, key: QW_KEY },
       header: { "X-QW-Api-Key": QW_KEY },
-      timeout: 8000, // v1.19.154：弱网/服务端无响应时避免天气卡永久卡在「加载中…」（默认可能挂起数十秒）
+      timeout: 15000, // v1.19.161：放宽至 15s，覆盖真机冷启动 TLS 握手；仍失败时由下方重试兜底
       success(res) {
         try {
           const d = res && res.data;
@@ -197,8 +194,26 @@ function fetchPlanWeather(plan, cb) {
         } catch (e) { byCity[city] = { byDate: {}, city: city }; }
         pending--; finish();
       },
-      fail() { setErr({ type: "net", msg: "天气加载失败，请重试" }); byCity[city] = { byDate: {}, city: city }; pending--; finish(); }
+      fail() {
+        if (attempt < MAX_RETRY) {
+          // 仅对传输层失败（超时/网络抖动）重试；API 错误码（auth/quota/param）不重试
+          setTimeout(function () { loadCity(city, c, wkey, attempt + 1); }, 400 * attempt);
+          return;
+        }
+        setErr({ type: "net", msg: "天气加载失败，请重试" });
+        byCity[city] = { byDate: {}, city: city };
+        pending--; finish();
+      }
     });
+  };
+  cities.forEach(function (city) {
+    const c = coordOf(city);
+    if (!c) { byCity[city] = { byDate: {}, city: city }; return; } // 无坐标：占位，避免 dayCityOf 误判
+    const wkey = city + "|" + todayYMD + "|" + QW_API_HOST;
+    const cached = _WX_CACHE[wkey];
+    if (cached && (Date.now() - cached.t) < _WX_TTL) { byCity[city] = { byDate: cached.v, city: city }; return; }
+    pending++;
+    loadCity(city, c, wkey, 0); // 首请求同步发起（保证单测同步断言有效），失败才异步重试
   });
   finish(); // 全部命中缓存 / 无坐标时立即结算
 }
