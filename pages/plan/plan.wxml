@@ -181,7 +181,7 @@
     </view>
     <scroll-view wx:if="{{wxOpen}}" scroll-x class="wx-scroll" show-scrollbar="{{false}}">
       <view class="wx-days">
-        <view class="wx-day {{d.risk ? 'risk' : ''}}" wx:for="{{wxList}}" wx:key="date">
+        <view class="wx-day {{d.risk ? 'risk' : ''}}" wx:for="{{wxList}}" wx:for-item="d" wx:key="date">
           <view class="wxd-date">{{d.dateText}}{{d.isToday ? ' · 今' : ''}}<text wx:if="{{wxIsMulti && d.cityTx}}" class="wxd-city"> · {{d.cityTx}}</text></view>
           <view class="wxd-main"><text class="wxd-desc">{{d.desc}}</text></view>
           <view class="wxd-temp">
