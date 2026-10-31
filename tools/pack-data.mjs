@@ -92,6 +92,31 @@ if (Object.keys(_KEYMAP).length) D.__A = _KEYMAP; // 附带正向映射，供加
 //   3) 坐标 6 位小数 → 3 位：精度约 110 米，远高于浏览/导航需要
 //   4) 景点备注上限 26 字：超长文案多来自采集截断，页面也放不下
 // 实测合计约 -310KB base64（2014KB 主包），是让 2 万景点 + 6.8 千家美食店进 2MB 主包的关键。
+// v1.19.156 坐标健康修复：haversine（km）
+function _havKm(a, b, c, d) {
+  const R = 6371, t = Math.PI / 180;
+  const dLat = (c - a) * t, dLon = (d - b) * t;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a * t) * Math.cos(c * t) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+let _coordNulled = 0;
+// 省-坐标一致性辅助：构建 cityKey→省 映射；给定坐标返回最近 city 所在省，用于判别误地理编码。
+const _keyProv = {};
+for (const k in (D.CITY_COORDS || {})) {
+  const c = (D.CITIES || []).find(x => x.name === k || x.id === k);
+  if (c && c.province) _keyProv[k] = c.province;
+}
+function _nearestProvince(lat, lon) {
+  let best = null, bd = 1e9;
+  for (const k in (D.CITY_COORDS || {})) {
+    const c = D.CITY_COORDS[k];
+    if (!Array.isArray(c) || c.length < 2) continue;
+    const d = _havKm(c[0], c[1], lat, lon);
+    if (d < bd) { bd = d; best = k; }
+  }
+  return best ? (_keyProv[best] || null) : null;
+}
+
 try {
   for (const k in (D.SPOT_INFO || {})) {
     const v = D.SPOT_INFO[k];
@@ -103,12 +128,27 @@ try {
   for (const ck in (D.SPOT_COORDS || {})) {
     const arr = D.SPOT_COORDS[ck];
     if (!Array.isArray(arr)) continue;
+    const ctr = D.CITY_COORDS[ck] || (() => { const c = (D.CITIES || []).find(x => x.name === ck || x.id === ck); return c ? D.CITY_COORDS[c.name] : null; })();
+    if (!ctr) continue;
+    // v1.19.156 坐标健康修复：仅当「距城心 >300km 且落到了别的省」才判定为误地理编码 → 降级到城市中心。
+    // 同省远点（阿拉善/和田/那曲/重庆等超大市域）一律保留真实坐标，避免误伤；同时能抓出大跨度市域里个别跨省错点。
+    const cityProv = (() => { const c = (D.CITIES || []).find(x => x.name === ck || x.id === ck); return c ? c.province : null; })();
     for (let i = 0; i < arr.length; i++) {
       const e = arr[i];
       if (!Array.isArray(e) || e.length < 3) continue;
-      arr[i] = [e[0], +Number(e[1]).toFixed(3), +Number(e[2]).toFixed(3)];
+      const lat = +Number(e[1]).toFixed(3), lon = +Number(e[2]).toFixed(3);
+      arr[i] = [e[0], lat, lon];
+      const d = _havKm(ctr[0], ctr[1], lat, lon);
+      if (d > 300) {
+        const cp = _nearestProvince(lat, lon);
+        const crossProv = cp && cityProv && cp !== cityProv;
+        // 跨省错位一律降级；另加极端距离兜底（>1200km，远超任何地市合理跨度，
+        // 且能兜住「最近城市无省信息」时漏判的跨省错点，如就近落在石河子/蓟州等无CITIES条目的坐标点）。
+        if (crossProv || d > 1200) { arr[i] = [e[0], +ctr[0].toFixed(3), +ctr[1].toFixed(3)]; _coordNulled++; }
+      }
     }
   }
+  if (_coordNulled) console.log("坐标健康修复: 降级 " + _coordNulled + " 个错位景点坐标(超大市域阈值) 至城市中心");
   for (const ck in (D.FOOD_SPOTS || {})) {
     const arr = D.FOOD_SPOTS[ck];
     if (!Array.isArray(arr)) continue;
