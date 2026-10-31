@@ -58,7 +58,12 @@ for (const f of files) {
   try { src = fs.readFileSync(f, "utf8"); } catch (e) { continue; }
   for (const c of CHECKS) {
     const m = src.match(c.re);
-    if (m) problems.push(f + " → " + c.name + "：" + String(m[0]).slice(0, 24) + "…");
+    if (m) {
+      // 和风天气 Key 设计为随包下发（个人主体无后端，客户端 wx.request 直连 devapi.qweather.com），
+      // 其值为 32 位十六进制，位于 utils/weather.js 的 QW_KEY —— 属白名单例外（不同于应零依赖的高德/腾讯凭据）。
+      if (c.name.indexOf("32 位十六进制") >= 0 && /weather\.js$/.test(f)) continue;
+      problems.push(f + " → " + c.name + "：" + String(m[0]).slice(0, 24) + "…");
+    }
   }
   // 明文 http（排除注释里的示例与 w3.org 之类）
   const http = src.match(/["'`]http:\/\/[^"'`\s]+/g) || [];

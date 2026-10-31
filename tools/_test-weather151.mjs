@@ -86,13 +86,21 @@ let envErr = null, envList = null;
 W.fetchPlanWeather(plan, (list, err) => { envList = list; envErr = err; });
 ok("无 wx 环境 → 回调 err.type=env（list 为空）", envErr && envErr.type === "env" && Array.isArray(envList) && envList.length === 0);
 
-// v1.19.154：Key 为占位符时（有 wx 但没配 Key）→ 明确归类为 no_key，绝不发起请求
-let noKeyErr = null;
+// v1.19.154 / v1.19.157：Key 占位符 → 短路 no_key（不误发请求）；填入真实 Key → 正常发起请求（不短路）。
+// 状态自适应：随包 Key 状态变化时两分支各自生效（占位符时守住 no_key，真 Key 时验证不短路）。
+let noKeyErr = null, reqCalled = false;
 const savedWx = global.wx;
-global.wx = { request() {} }; // 有 wx 但 Key 是占位符 → 应短路为 no_key，绝不发起请求
+global.wx = { request() { reqCalled = true; } }; // 有 wx
 W.fetchPlanWeather(plan, (list, err) => { noKeyErr = err; });
 global.wx = savedWx;
-ok("有 wx 但 Key 占位符 → err.type=no_key（明确提示需配置，不误发请求）", !!noKeyErr && noKeyErr.type === "no_key", noKeyErr ? noKeyErr.type : "null");
+let builtForTest = "";
+try { builtForTest = readFileSync(process.cwd() + "/utils/weather.js", "utf8"); } catch (e) {}
+const keyPlaceholder = /QW_KEY\s*=\s*"在此填写和风天气Key"/.test(builtForTest);
+if (keyPlaceholder) {
+  ok("有 wx 但 Key 占位符 → err.type=no_key（明确提示需配置，不误发请求）", !!noKeyErr && noKeyErr.type === "no_key");
+} else {
+  ok("填入真实 Key 时不短路 → 发起 wx.request 且不报 no_key", reqCalled === true && !(noKeyErr && noKeyErr.type === "no_key"));
+}
 
 // v1.19.154：wx.request 必须带 timeout（否则弱网/服务端挂起会让天气卡永久卡在「加载中…」）。
 // 因 Key 为占位符时 fetchPlanWeather 短路返回 no_key，无法在 node 下发真实请求，
