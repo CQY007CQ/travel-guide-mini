@@ -64,10 +64,22 @@ function loadData() {
 function gatherScenic(D, haveSet) {
   const PY2CN = {};
   for (const c of (D.CITIES || [])) { if (c && c.id && c["@A"]) PY2CN[c.id] = c["@A"]; }
+  // 省名规范化：部分源数据（CITY_LANDMARKS["吉林"]）用「省名简称」当城市键，
+  // 但 CITY_COORDS / SPOT_DETAILS_BY_CITY 用的是「市」全名（吉林市）。若直接按省名 geocode 并写回
+  // SPOT_COORDS["吉林"]，pack-data 的「脏省名键清理」会整条删掉（防省域解析串城），导致坐标永远进不了包、
+  // 每天补全都显示 NET_NEW=0。这里把「省名简称且有对应 市 坐标」的键归一化为市全名，使坐标落到持久键上。
+  const _MUNI = new Set(["北京", "天津", "上海", "重庆", "香港", "澳门"]);
+  const _prov = D.PROVINCE_CITIES || {};
+  const normCity = (c) => {
+    if (!c || _MUNI.has(c)) return c;
+    if (_prov[c] && D.CITY_COORDS && D.CITY_COORDS[c + "市"]) return c + "市";
+    return c;
+  };
   const jobs = [];
   const seen = new Set();
   let fuzzyCovered = 0;
   const push = (city, name) => {
+    city = normCity(city);
     if (!city || !name) return;
     const k = city + " " + name;
     if (haveSet.has(k) || seen.has(k)) return;
