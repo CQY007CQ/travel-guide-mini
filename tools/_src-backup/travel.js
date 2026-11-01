@@ -34,7 +34,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.162";
+const APP_VER = "1.19.163";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -2479,6 +2479,7 @@ const HOME_TILES = [
   { k: "food", t: "必吃美食", ic: "food", url: "/subpkg/food/food" },
   { k: "ledger", t: "旅行账本", ic: "bill", url: "/subpkg/ledger/ledger" },
   { k: "prep", t: "出行准备", ic: "luggage", url: "/subpkg/prep/prep" },
+  { k: "spotsearch", t: "按标签找景点", ic: "target", url: "/subpkg/spotsearch/spotsearch" },
   { k: "assistant", t: "本地速查", ic: "compass", url: "/subpkg/assistant/assistant" },
    { k: "today", t: "今天怎么走", ic: "sun", url: "/pages/today/today" }
  ];

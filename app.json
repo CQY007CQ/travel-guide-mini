@@ -59,7 +59,8 @@
         "prep/prep",
         "assistant/assistant",
         "guide/guide",
-        "toolkit/toolkit"
+        "toolkit/toolkit",
+        "spotsearch/spotsearch"
       ]
     },
     {

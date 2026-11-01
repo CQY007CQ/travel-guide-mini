@@ -379,7 +379,7 @@ assert("6 月最贵分类 门票", lm.months[0].top === "门票", lm.months[0].t
 
 console.log("== 18. 首页入口 / 收藏多站 ==");
 const tl = T.homeTileList();
-assert("默认 6 个入口", tl.length === 6, tl.length);
+assert("默认 7 个入口（含按标签找景点）", tl.length === 7, tl.length);
 T.setHomeTiles(["map", "food"]);
 assert("自定义后剩 2 个", T.homeTiles().length === 2, T.homeTiles());
 assert("列表跟随自定义", T.homeTileList().length === 2);
