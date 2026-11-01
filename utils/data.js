@@ -181,6 +181,53 @@ function utf8Decode(bytes) {
   return s;
 }
 
+// v1.19.173 坐标完整性自检（只读、零重打包风险）：用 v1.19.156 已验证规则扫描全量景点坐标，
+// 凡「距所属城心 >300km 且落点省份≠城市所在省，或距城心 >1200km」者，视为错位并 console.warn。
+// 仅告警、不做任何改写；目的是让未来的坐标回归（重新打包误伤、数据更新引入错点、合并脚本回潮）
+// 在加载期即可暴露，而不是等用户线上报「地图标点跑到别的省」才后知后觉。
+// 无违规时不输出任何内容、不增体积、不拖性能：热路径每点仅一次距离计算，
+// 仅 300~1200km 的少数远景点才反查落点省份（绝大多数景点 dOwn≤300 直接短路退出）。
+function _hav(la1, lo1, la2, lo2) {
+  const R = 6371, toR = x => x * Math.PI / 180;
+  const dLat = toR(la2 - la1), dLon = toR(lo2 - lo1);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toR(la1)) * Math.cos(toR(la2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+let _coordWarn = 0;
+function checkCoordIntegrity() {
+  const cc = DATA.CITY_COORDS || {};
+  const c2p = DATA.CITY2PROV || {};
+  // 预建「所有城市中心」索引，用于反查落点省份（仅在需要时才扫描）
+  const centers = [];
+  for (const c in cc) {
+    const v = cc[c];
+    if (Array.isArray(v) && v.length >= 2) centers.push([v[0], v[1], c2p[c]]);
+  }
+  let bad = 0;
+  for (const city in DATA.SPOT_COORDS) {
+    const cc0 = cc[city];
+    if (!Array.isArray(cc0) || cc0.length < 2) continue;
+    const cityProv = c2p[city];
+    const list = DATA.SPOT_COORDS[city];
+    if (!Array.isArray(list)) continue;
+    for (const row of list) {
+      if (!Array.isArray(row) || row.length < 3) continue;
+      const lat = +row[1], lon = +row[2];
+      if (!isFinite(lat) || !isFinite(lon)) continue;
+      const dOwn = _hav(lat, lon, cc0[0], cc0[1]);
+      if (dOwn > 1200) { bad++; if (console && console.warn) console.warn("[data] 坐标疑似越界: " + city + "·" + row[0] + " 距城心" + Math.round(dOwn) + "km(>1200)"); continue; }
+      if (dOwn <= 300) continue; // 热路径：绝大多数景点在此退出，无需反查省份
+      // 仅 300~1200km 的少数远景点才反查落点省份
+      let prov = null, bd = 1e9;
+      for (const [la, lo, p] of centers) { const d = _hav(lat, lon, la, lo); if (d < bd) { bd = d; prov = p; } }
+      if (prov && prov !== cityProv) { bad++; if (console && console.warn) console.warn("[data] 坐标疑似越界: " + city + "·" + row[0] + " 距城心" + Math.round(dOwn) + "km 落点省=" + prov + " 城市省=" + cityProv); }
+    }
+  }
+  _coordWarn += bad;
+  if (bad) console.warn("[data] 坐标完整性自检: 发现 " + bad + " 个疑似越界坐标，请核查 SPOT_COORD_FIX / pack-data 规则");
+  return bad;
+}
+
 // v1.20.x：支持「多数据分包」——把城市数据切成多个 chunk 文件（subdata/subdata2…），
 // 各自独立 2MB 上限、懒加载。合并语义：对象键按城市名并集、数组去重拼接、其余覆盖。
 function isObj(x) { return x && typeof x === "object" && !Array.isArray(x); }
@@ -222,6 +269,7 @@ function applyPacked(packed) {
   dedupeSpots();
   fillBestSeason();
   applyHotelAreasExtra();
+  checkCoordIntegrity(); // v1.19.173 只读自检：加载期暴露坐标回归，零改写零重打包风险
   DATA.__dataReady = true;
   return DATA;
 }
@@ -282,6 +330,7 @@ function initData() {
   return _ready;
 }
 DATA.initData = initData;
+DATA.checkCoordIntegrity = checkCoordIntegrity; // v1.19.173 暴露给单测：返回越界坐标数
 
 // Node / 测试环境（没有 require.async）：模块加载即同步就绪，保证 allcheck/tools 照常同步 require
 if (typeof require.async !== "function") {
