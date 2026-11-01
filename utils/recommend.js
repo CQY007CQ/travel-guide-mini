@@ -10,9 +10,12 @@
  *
  * ── 它到底做了什么（答辩口径）──
  * 这是一个**基于内容的推荐（content-based recommendation）**：
- *   1) 自然语言需求 → 兴趣标签（18 类标签词典，纯前端匹配，无网络）
- *   2) 每座城市在真实语料（景点名/点评/区域/美食）上做标签命中计数
- *   3) 加权线性打分：相关性（绝对量 55% + 密度 45%）＋ 季节 ＋ 成熟度先验 ＋ 预算 ＋ 性价比 ＋ 天数
+ *   1) 自然语言需求 → 兴趣标签：先用 18 类词典做主匹配，再并入「按标签找景点」共享的 50 维词库
+ *      （utils/spot-tags.js，含 autumn/免费/海岛/森林/峡谷…18 类覆盖不到的意图），纯前端匹配、无网络
+ *   2) 每座城市在真实语料（景点名/点评/区域/美食）上做标签命中计数；
+ *      对 50 维词库特有的意图（如 秋天/红叶/免费/海岛），改用「真实景点标签命中数」计分 ——
+ *      比语料正则更准（正则会把"黄山"这类字面含"海"的误伤，景点标签不会）
+ *   3) 加权线性打分：相关性（绝对量 + 密度 双因子）＋ 季节 ＋ 成熟度先验 ＋ 预算 ＋ 性价比 ＋ 天数
  *   4) 输出 Top-N，每条附**可解释理由**（命中哪类、命中几处、密度多少、举例景点）
  * 没有随机数、没有云端、没有生成式模型 —— 同一输入永远同一输出，可单测、可复现、可逐条解释。
  *
@@ -30,6 +33,9 @@
 
 const T = require("./travel.js");
 const D = T.D;
+// 复用「按标签找景点」的 50 维共享词库（utils/spot-tags.js）：让「智能推荐」与「标签检索」同源，
+// 既扩展意图识别（雪山/红叶/免费/海岛/森林…），又把城市相关性建立在「真实景点标签」上（比语料正则更准）。
+const ST = require("./spot-tags.js");
 
 /* ── 权重表（唯一的主观参数，全部可解释、可调）── */
 const W = {
@@ -65,6 +71,11 @@ const W = {
   heatMax: 16,        // 综合热度先验上限（让无意图时也能给出有区分度的"热门目的地"排序）
   provinceBoost: 10,  // 显式点名省份 → 该省城市加权（"浙江的古镇"优先浙江）
   extremeBoost: 8,    // "最…"类诉求 → 强化已命中标签维度
+  // 50 维共享词库（spot-tags.js）特有的意图（autumn/免费/海岛/森林…）用"真实景点标签命中数"计分。
+  // 它是 18 类主相关性的「补充信号」：上限刻意低于相关性满分(44)，不喧宾夺主；
+  // 但当一条 query 的意图只能被 50 维词库表达（如"秋天 红叶"）时，它就成为相关性主驱动力。
+  relevanceSTNorm: 12, // 50 维补充相关性归一化分母：sum 达到 12 视为满分
+  relevanceSTMax: 14,  // 50 维补充相关性满分
 };
 
 /* ── 兴趣标签词典 ──
@@ -120,6 +131,30 @@ function corpusOf(city) {
   const s = parts.join(" ");
   _corpusCache.set(key, s);
   return s;
+}
+
+/* ── 城市真实景点标签聚合（复用 50 维共享词库 utils/spot-tags.js）──
+ * 比 corpusOf + 正则更准：corpusOf 是在"整城拼起来的大字符串"上跑正则，会把字面含"海"的
+ * 黄山/海藻/上海路之类误伤成海滨；而这里对每座城市的「每一个真实景点」单独跑 ST.tagSpot，
+ * 统计每个标签被多少个真实景点携带。返回 map: tagKey -> { count, examples:[景点名] }。
+ * 仅当 query 含 50 维词库特有意图时才被调用（scoreCity 里按需触发），平时零开销。 */
+const _spotTagCache = new Map();
+function citySpotTags(city) {
+  const key = (city && city.id) || (city && city.name) || "";
+  if (_spotTagCache.has(key)) return _spotTagCache.get(key);
+  const out = {};
+  const exps = Array.isArray(city.experiences) ? city.experiences : [];
+  for (let i = 0; i < exps.length; i++) {
+    const keys = ST.tagSpot(exps[i], city);
+    for (let j = 0; j < keys.length; j++) {
+      const k = keys[j];
+      if (!out[k]) out[k] = { count: 0, examples: [] };
+      out[k].count++;
+      if (out[k].examples.length < 2 && exps[i] && exps[i].name) out[k].examples.push(exps[i].name);
+    }
+  }
+  _spotTagCache.set(key, out);
+  return out;
 }
 
 /* ── 游玩成熟度：用真实评级（D.SPOT_INFO）作质量先验 ──
@@ -207,6 +242,14 @@ function extractPrefs(text, opts) {
     for (let j = 0; j < t.words.length; j++) {
       if (s.indexOf(t.words[j]) >= 0) { tags.push(t.key); break; }
     }
+  }
+  /* 并入 50 维共享词库（spot-tags.js）能识别、但 18 类主词典覆盖不到或覆盖不准的意图
+   * （秋天/红叶→autumn、免费→free、海岛→island、森林→forest、峡谷/瀑布/雪山(snowmtn)…）。
+   * 词重叠抑制已在 ST.parseQueryTags 内处理（"雪山"→snowmtn 而非 mountain），
+   * 故直接并入即可，无需再二次抑制。去重避免与 18 类同名词（oldtown/sea/…）重复。 */
+  const stKeys = ST.parseQueryTags(s);
+  for (let i = 0; i < stKeys.length; i++) {
+    if (tags.indexOf(stKeys[i]) < 0) tags.push(stKeys[i]);
   }
   let days = 0;
   const dm = s.match(/(\d+)\s*[天日]/);
@@ -300,6 +343,42 @@ function relevanceOf(city, tagKeys, expCount, corpus) {
   return { sum: sum, matched: matched, required: required, matchedRequired: matchedRequired, detail: detail };
 }
 
+/* ── 50 维共享词库补充相关性：用「真实景点标签命中数」计分（比语料正则更准）──
+ * 只处理 18 类主词典覆盖不到、或覆盖不准的意图（autumn/免费/海岛/森林/峡谷/瀑布/雪山(snowmtn)…）。
+ * 与 relevanceOf 同构（绝对量 + 密度 双因子，复用同一套 W 常量），但 hits 来源是 citySpotTags
+ * 的真实景点标签计数，而非在全文语料上跑正则。返回结构与 relevanceOf 一致。
+ * 注意：这里只做「正向加分」，不做 missWeight 的 AND 语义扣分 —— 50 维意图多为"锦上添花"的
+ * 维度（如秋天/免费），扣分会过度惩罚；其区分度由「命中即加成、未命中不加」自然体现。 */
+function relevanceOfSpot(city, stTagKeys, expCount) {
+  const map = citySpotTags(city);
+  let sum = 0;
+  const detail = [];
+  let matched = 0;
+  for (let i = 0; i < stTagKeys.length; i++) {
+    const def = ST.TAG_BY_KEY[stTagKeys[i]];
+    if (!def) continue;
+    const info = map[stTagKeys[i]];
+    if (!info || info.count <= 0) continue;
+    const hits = info.count;
+    const density = hits / Math.max(6, expCount);
+    const absCore = Math.min(1, Math.pow(hits / W.absCap, W.absPow));
+    const densCore = W.coreFloor + W.coreSpan * Math.min(1, density / W.coreSat);
+    const combo = W.absW * absCore + W.densW * densCore;
+    const d = def.w * combo;
+    sum += d;
+    if (hits >= W.hitBonusAt) sum += W.hitBonus;
+    matched++;
+    detail.push({
+      key: def.key, label: def.label, hits: hits,
+      density: Math.round(density * 1000) / 1000,
+      combo: Math.round(combo * 100) / 100,
+      delta: Math.round(d) + (hits >= W.hitBonusAt ? W.hitBonus : 0),
+      examples: info.examples.slice(0, 2),
+    });
+  }
+  return { sum: sum, matched: matched, detail: detail };
+}
+
 /* ── 单城打分 ──
  * 所有 delta 均为可解释整数，求和即分数；_raw 为未取整值，用于稳定破平。 */
 function scoreCity(city, prefs, month) {
@@ -318,7 +397,10 @@ function scoreCity(city, prefs, month) {
 
   let raw = W.base;
 
-  /* ① 相关性（主导项） */
+  /* ① 相关性（主导项）：18 类主词典 + 50 维共享词库补充信号 */
+  // 50 维补充意图：在 18 类中查不到(TAG_BY_KEY 有、tagOf 无)的标签，才走"真实景点标签命中数"路径；
+  // 与 18 类同名的标签（oldtown/sea/…）仍由主路径处理，保证既有黄金用例不变。
+  const stKeys = tagKeys.filter(function (k) { return ST.TAG_BY_KEY[k] && !tagOf(k); });
   const rel = relevanceOf(city, tagKeys, expCount, corpus);
   if (rel.sum > 0) {
     const relNorm = Math.min(1, rel.sum / W.relevanceNorm);
@@ -326,6 +408,16 @@ function scoreCity(city, prefs, month) {
     for (let i = 0; i < rel.detail.length; i++) {
       const d = rel.detail[i];
       push(d.label, d.delta, "命中 " + d.hits + " 处（密度 " + Math.round(d.density * 100) + "%）" + (d.examples.length ? "，如 " + d.examples.join("、") : ""));
+    }
+  }
+  // 50 维补充相关性（真实景点标签命中数）：仅当 query 含补充意图时才有值，平时 sum=0 不影响
+  const relST = stKeys.length ? relevanceOfSpot(city, stKeys, expCount) : { sum: 0, matched: 0, detail: [] };
+  if (relST.sum > 0) {
+    const stNorm = Math.min(1, relST.sum / W.relevanceSTNorm);
+    raw += stNorm * W.relevanceSTMax;
+    for (let i = 0; i < relST.detail.length; i++) {
+      const d = relST.detail[i];
+      push(d.label, d.delta, "「" + d.hits + " 个景点」符合（密度 " + Math.round(d.density * 100) + "%）" + (d.examples.length ? "，如 " + d.examples.join("、") : ""));
     }
   }
 
@@ -422,14 +514,15 @@ function scoreCity(city, prefs, month) {
   reasons.sort(function (a, b) { return Math.abs(b.delta) - Math.abs(a.delta); });
   const top = reasons.slice(0, 5);
 
-  /* 主因标签（透明化）：点名 > 命中标签 > 综合热度 */
+  /* 主因标签（透明化）：点名 > 命中标签(18 类 或 50 维补充) > 综合热度 */
   let reasonTag = "";
   if (isNamed) reasonTag = "你提到的城市";
-  else if (rel.sum > 0 && rel.detail.length) reasonTag = rel.detail[0].label;
+  else if (rel.detail.length) reasonTag = rel.detail[0].label;
+  else if (relST.detail.length) reasonTag = relST.detail[0].label;
   else reasonTag = "综合热度";
 
   /* 无明确意图时，summary 不再伪装成「命中理由」，直接说明是综合热度推荐 */
-  const hasIntent = (rel.sum > 0) || isNamed;
+  const hasIntent = (rel.sum > 0 || relST.sum > 0) || isNamed;
   const summary = hasIntent ? summarize(top) : "综合热度推荐（未识别到具体偏好，已按景点规模·评级·性价比·季节综合排序）";
 
   return {
@@ -441,9 +534,10 @@ function scoreCity(city, prefs, month) {
     limited: limited,
     expCount: expCount,
     seasonNote: seasonNote,
-    relevance: Math.round(rel.sum * 100) / 100,
+    relevance: Math.round((rel.sum + relST.sum) * 100) / 100,
     reasonTag: reasonTag,
     tagHits: rel.detail,
+    tagHitsST: relST.detail,
     reasons: top,
     summary: summary,
   };
@@ -532,6 +626,8 @@ module.exports = {
   TAGS: TAGS,
   extractPrefs: extractPrefs,
   relevanceOf: relevanceOf,
+  relevanceOfSpot: relevanceOfSpot,
+  citySpotTags: citySpotTags,
   scoreCity: scoreCity,
   qualityOf: qualityOf,
   heatOf: heatOf,

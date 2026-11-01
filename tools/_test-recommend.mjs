@@ -163,6 +163,31 @@ console.log("【智能性/透明度】");
   ok("省份定向：外省强城不压本省（平遥不进前 3）", zjNames.indexOf("平遥") < 0 || zjNames.indexOf("平遥") >= 3, zjNames.join(","));
 }
 
+/* ── ④c 50 维共享词库补充意图（v1.19.164 优化锁）──
+ * 锁住本次优化的核心：18 类主词典覆盖不到/不准的意图（秋天/红叶/免费/海岛…），
+ * 现在经「按标签找景点」共享词库识别，并改用「真实景点标签命中数」计分。
+ * 只断言这些意图 label 出现在 Top5 的可解释理由里（不锁城名，避免脆断言）。
+ * 回归意义：此前这些意图会被彻底忽略（既不进 tags、也不驱动排序）。 */
+console.log("【50 维共享词库补充意图】");
+{
+  const hasReason = (list, label) => list.some(x => (x.reasons || []).some(r => r.label === label));
+
+  const autumn = R.recommend("秋天 看红叶 小众 五天", { month: 10, topN: 5 });
+  ok("秋天红叶：Top5 出现「秋季适宜」理由（autumn 词库意图被识别）", hasReason(autumn.list, "秋季适宜"), JSON.stringify(autumn.list.map(x => x.reasonTag)));
+
+  const free = R.recommend("免费 海边 三天", { month: 10, topN: 5 });
+  ok("免费海边：Top5 出现「免费开放」理由（free 词库意图被识别）", hasReason(free.list, "免费开放"), JSON.stringify(free.list.map(x => x.reasons && x.reasons.map(r => r.label))));
+
+  const island = R.recommend("海岛 潜水 一周", { month: 10, topN: 5 });
+  ok("海岛潜水：Top5 出现「离岛小岛」理由（island 词库意图被识别）", hasReason(island.list, "离岛小岛"), JSON.stringify(island.list.map(x => x.reasons && x.reasons.map(r => r.label))));
+
+  // 雪山/冰川/高原：snowmtn 经真实景点标签命中（而非仅语料正则），Top1 须为高原雪山目的地
+  const snow = R.recommend("雪山 冰川 高原 七天", { month: 10, topN: 5 });
+  ok("雪山高原：Top1 为高原雪山类目的地（丽江/迪庆/喀什/甘孜/日喀则之一）",
+    ["丽江", "迪庆", "喀什", "甘孜", "日喀则"].indexOf((snow.list[0] || {}).name) >= 0,
+    snow.list.map(x => x.name).join(","));
+}
+
 /* ── ④ 单城解释 ── */
 console.log("【单城解释】");
 {
