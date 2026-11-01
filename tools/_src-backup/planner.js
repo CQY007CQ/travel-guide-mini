@@ -24,6 +24,9 @@ const _read = (k, def) => {
 
 const { BIG_EXCLUDE, BIG_SPOT_DAYS, BUDGETS, BUDGET_STYLE, CAPITAL_COORDS, CITIES, CITY2PROV, CITY_COORDS, CITY_LANDMARKS, CITY_LANDMARKS_EXTRA, CITY_LANDMARKS_EXTRA2, CITY_LANDMARKS_EXTRA3, CITY_LANDMARKS_EXTRA4, CITY_LANDMARKS_EXTRA5, CITY_LANDMARKS_EXTRA6, EXTRA_SPOTS, EXTRA_SPOTS2, EXTRA_SPOTS3, EXTRA_SPOTS4, EXTRA_SPOTS5, GENERIC_SPOT_WORDS, GEN_HOTELS, HOTELS, PROVINCE_CAPITAL, PROVINCE_CITIES, PROVINCE_CITY_FOODS, PROVINCE_INFO, PROVINCE_LANDMARKS, PROVINCE_REGION, REGION_DEFAULT, PERIOD_ORDER, SPOT_CITY_FIX, SPOT_COORDS, SPOT_DETAILS, SPOT_HIDDEN, SPOT_SEP, SUNRISE_SPOTS } = require("./data.js");
 
+// v1.19.169 收敛地球距离计算：统一走 utils/geo.js（原 haversine 实现在此，已合并）
+const { haversine } = require("./geo.js");
+
 // —— 晚间具名演出表：避免行程里出现「看一场本地演出」这类无场馆无剧目的泛安排 ——
 // 每个城市给「具体场馆 + 演出」，晚上空闲时段直接落到具名条目（在哪儿看什么）。
 // 自动补坐标：行程池中地理编码(WGS84→GCJ02, OSM photon)救回的知名景点 —— 让「点一下直接导航」尽量全覆盖
@@ -1092,15 +1095,7 @@ if (anchor && anchor.lat && anchor.lon) return { lat: anchor.lat, lon: anchor.lo
 return null;
 }
 
-// v1.11：入参可能非坐标对象（fuzz 抓到 reading 'lat' of null）
-function haversine(a, b){
- if(!a || !b || typeof a.lat !== "number" || typeof b.lat !== "number" || typeof a.lon !== "number" || typeof b.lon !== "number") return 0;
- const R = 6371;
- const dLat = (b.lat-a.lat)*Math.PI/180, dLon = (b.lon-a.lon)*Math.PI/180;
- const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
- return Math.round(2*R*Math.asin(Math.sqrt(s)));
-}
-
+// v1.11：入参可能非坐标对象（fuzz 抓到 reading 'lat' of null）—— geo.haversine 已统一处理空/非法入参
 function getCoord(cityName){
  if(CITY_COORDS[cityName]) return {lat:CITY_COORDS[cityName][0], lon:CITY_COORDS[cityName][1], approx:false};
  if(CAPITAL_COORDS[cityName]) return {lat:CAPITAL_COORDS[cityName][0], lon:CAPITAL_COORDS[cityName][1], approx:false};

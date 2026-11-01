@@ -10,15 +10,16 @@ const D = T.D;
 let fail = 0;
 const ok = (n, c) => { console.log((c ? "  ✓ " : "  ✗ FAIL: ") + n); if (!c) fail++; };
 
-// 1) 精选城：北京 应返回 3 个带 note 的片区 + 精选住荐
+// 1) 精选城：北京 应返回 ≥3 个带 note 的片区（含 v1.19.171 扩展的「王府井/东单」等）+ 精选住荐
 const bj = T.hotelAreasFor("北京");
-ok("北京返回 3 个住宿片区", bj.areas.length === 3);
+ok("北京返回 ≥3 个住宿片区", bj.areas.length >= 3);
 ok("北京片区均为 {name,note}", bj.areas.every(a => a.name && typeof a.note === "string"));
+ok("北京含扩展片区(王府井/前门/国贸)", bj.areas.some(a => /王府井|前门|国贸|三里屯/.test(a.name)));
 ok("北京住荐含精选文案(地铁)", /地铁/.test(bj.stayTip));
 
-// 2) 地图多点：3 个 pin，坐标锚定市中心且偏移≤0.02°
+// 2) 地图多点：pin 数 = 片区数，坐标锚定市中心且偏移≤0.02°
 const bjPins = T.hotelAreaPins("北京");
-ok("北京地图 pin 数 = 3", bjPins.length === 3);
+ok("北京地图 pin 数 = 片区数", bjPins.length === bj.areas.length && bjPins.length >= 3);
 const cc = T.P.getCoord("北京");
 ok("北京中心点存在", !!cc && typeof cc.lat === "number");
 const inRange = cc && bjPins.every(p => typeof p.lat === "number" && typeof p.lon === "number" && Math.abs(p.lat - cc.lat) <= 0.02 && Math.abs(p.lon - cc.lon) <= 0.02 && p.name);
@@ -32,9 +33,10 @@ ok("空名退化通用 3 片区", g.areas.length === 3 && g.areas.every(a => a.n
 const ab = T.hotelAreasFor("阿坝");
 ok("阿坝(字符串片区)归一化为对象", ab.areas.length >= 1 && ab.areas.every(a => a.name && typeof a.note === "string"));
 
-// 5) 门户：6 平台 + 含日期搜索词
+// 5) 门户：13 个平台（v1.19.171 由 6 扩到 13）+ 含日期搜索词
 const withDates = T.hotelPortals("北京", { depart: "2026-10-01", days: 3 });
-ok("门户平台数 = 6", withDates.length === 6 && withDates.every(p => p.platform && p.term));
+ok("门户平台数 ≥6（已扩容）", withDates.length >= 6 && withDates.every(p => p.platform && p.term));
+ok("门户含新增平台(高德/小红书/抖音)", withDates.some(p => ["高德", "小红书", "抖音"].includes(p.platform)));
 ok("含日期搜索词含「入住」", withDates[0].term.includes("北京") && withDates[0].term.includes("酒店") && withDates[0].term.includes("入住"));
 
 // 6) 门户：无行程日期时不带日期
@@ -49,6 +51,10 @@ ok("stayZoneOf 列出多片区(前门)", /前门/.test(z) && z.includes("推荐�
 const cb = T.cityBrief("北京");
 ok("cityBrief.areas 为对象且非空", cb && Array.isArray(cb.areas) && cb.areas.length >= 1 && cb.areas.every(a => a.name));
 ok("cityBrief.stayTip 非空", cb && cb.stayTip && cb.stayTip.length > 0);
+
+// 9) 扩展覆盖：非精选旅游城（喀什，原走通用 3 片区）现并入扩展片区（v1.19.171）
+const kh = T.hotelAreasFor("喀什");
+ok("喀什并入选区(老城/艾提尕尔)", kh.areas.some(a => /老城|艾提尕尔/.test(a.name)) && kh.areas.every(a => a.name && typeof a.note === "string"));
 
 console.log(fail ? ("\n✗ 酒店单测失败 " + fail + " 项") : "\n✓ 酒店单测全部通过");
 process.exit(fail ? 1 : 0);

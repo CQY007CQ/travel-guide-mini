@@ -6,6 +6,7 @@ const EL = require("../../utils/errlog.js"); // v1.19.106：本地错误日志�
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 const INS = require("../../utils/insights.js");   // v1.19.137：本机旅行数据洞察（真实记录聚合）
 const PZ = require("../../utils/personalize.js");  // v1.19.138：个性化目的地推荐（真实画像驱动）
+const CP = require("../../utils/corpus.js");       // v1.19.169：离线知识库规模统计（平台级「大数据」）
 const TOOL_TOTAL = Array.isArray(TOOL_GROUPS) ? TOOL_GROUPS.reduce((s, g) => s + (g.items ? g.items.length : 0), 0) : 0;
 const app = getAppSafe();
 
@@ -176,6 +177,7 @@ Page(SafePage({
       backupTip: bkTip,
       insights: INS.insights(),   // v1.19.137：本机数据洞察（花费结构 / 月度趋势 / 出行节奏 / 省份分布）
       personalized: PZ.personalized(5),   // v1.19.138：基于真实画像的个性化目的地推荐
+      corpus: CP.corpusStats(),   // v1.19.169：离线知识库规模（城市/景点/美食/应急医院 + 气候与区域分布）
       errN: EL.count(), // v1.19.106：错误日志条数，随页面刷新更新
       // 减法：无行程时只留「记账(可独立用) + 通用」，地图/美食/准备/速查待生成行程后再出现，减少空转入口
       groups: hasPlan ? [

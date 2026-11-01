@@ -9,7 +9,7 @@ import { createRequire } from "module";
 const req = createRequire(process.cwd() + "/");
 const terser = req("terser");
 
-const TARGETS = ["travel", "planner", "pako-inflate", "weather", "store", "toolkit-groups"];
+const TARGETS = ["travel", "planner", "pako-inflate", "weather", "store", "toolkit-groups", "geo", "corpus"];
 
 async function main() {
   let saved = 0;

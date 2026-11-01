@@ -151,6 +151,7 @@ step "单测 spotsearch (按标签找景点·倒排检索 v1.19.163)" "$NODE" to
 # 「今日正当时」已于 2026-10-29 按用户要求下线，原接线测试改为「下线守卫」（防被无意加回）
 step "单测 insp 下线守卫" "$NODE" tools/_test-insp-removed.mjs
 step "单测 气候补充去重" "$NODE" tools/_test-climate-dedupe.mjs
+step "单测 景点去重 (v1.19.167)" "$NODE" tools/_test-dedup.mjs
 step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/_test-v11988-sharecard.mjs
 step "单测 plan-handlers (行程页交互回归 v1.19.109)" "$NODE" tools/_test-plan-handlers.mjs
 # v1.19.93：全页面启动冒烟——vm 模拟 17 个注册页「被打开」（Page 构造+onLoad+onShow）。

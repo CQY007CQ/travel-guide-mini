@@ -1,6 +1,8 @@
 // 页面高层接口：组合 data.js + planner.js + 本地存储，让页面尽量薄
 const D = require("./data.js");
 const store = require("./store.js");
+// v1.19.169 收敛地球距离计算：统一走 utils/geo.js（合并原 haversineKm/_havKm/_km2 与 planner.haversine）
+const { haversine, haversineKm } = require("./geo.js");
 
 // v1.20 数据拆分包：data-packed.js 移入 subdata/data，主包异步加载。
 // planner.js 在模块顶层对 data.js 做了 36 个字段解构，必须在数据就绪后再 require，
@@ -34,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.165";
+const APP_VER = "1.19.171";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -307,22 +309,39 @@ function provinceSuggestedDays(province, pace) {
 //（芜湖、唐山）也能选 14 天，生成出 10~12 天的「留白」空天。
 // 做法：用 14 天探针跑一次，数出「确实有非框架景点」的天数，再 +1 天作自由活动缓冲。
 // 比按可玩池规模估算更准（池子里的景点未必都会被排进行程）。
+// v1.19.170 修正探针失真：原实现用「14 天探针里有多少天含真景点」直接当上限，但行程生成器
+// 对「短行程」会前压景点（把少数真景点堆在前几天），导致 14 天探针看着能填 4 天，用户真选 4 天时
+// 末天却只剩「退房/自由活动/返程」空天（黄龙即此例）。改为：以探针给出的上限为上界，再逐长度校验
+// 「请求 N 天时 N 天（除抵达日）均不空」，取满足条件的最大 N —— 既不超卖天数，也顺带把短行程前压失真兜住。
 const _cityCapCache = new Map();
+function _planDayFilled(d) {
+ const items = (d && d.items) || [];
+ return items.some(it => it && it.name && !isFrameName(it.name));
+}
 function cityDayCap(cityName, pace) {
  const ck = String(cityName || "") + "|" + (pace || "balance");
  if (_cityCapCache.has(ck)) return _cityCapCache.get(ck);
- let n = 5;
+ const pc = { city: cityName, depart: "2027-01-01", budget: "mid", pace: pace || "balance" };
+ let upper = 5;
  try {
-  const arr = buildPlan({ city: cityName, days: 14, depart: "2027-01-01", budget: "mid", pace: pace || "balance" });
+  const arr = buildPlan(Object.assign({ days: 14 }, pc));
   if (Array.isArray(arr) && arr.length) {
    let withSpot = 0;
-   arr.forEach(d => {
-    const ok = (Array.isArray(d.items) ? d.items : []).some(it => it && it.name && !isFrameName(it.name));
-    if (ok) withSpot++;
-   });
-   n = Math.max(2, Math.min(14, withSpot));
+   arr.forEach(d => { if (_planDayFilled(d)) withSpot++; });
+   upper = Math.max(2, Math.min(14, withSpot));
   }
- } catch (e) { n = 5; }
+ } catch (e) { upper = 5; }
+ // 逐长度校验：取「请求 L 天时，第 2..L 天（抵达日豁免）均含真景点」的最大 L
+ let n = 2;
+ for (let L = 2; L <= upper; L++) {
+  let ok = true;
+  try {
+   const p = buildPlan(Object.assign({ days: L }, pc));
+   if (!Array.isArray(p) || p.length !== L) ok = false;
+   else for (let i = 1; i < L; i++) { if (!_planDayFilled(p[i])) { ok = false; break; } }
+  } catch (e) { ok = false; }
+  if (ok) n = L; else break; // 一旦某长度出现空天，更长必也空（景点已用尽），停止
+ }
  _cityCapCache.set(ck, n);
  return n;
 }
@@ -485,8 +504,12 @@ function hotelAreasFor(cityName, budgetKey) {
     "优先选地铁站 500m 内、商圈附近的连锁酒店，出行方便；订前多平台比价，价差可达 10–30%。";
   return { areas, stayTip };
 }
-// 地图多点：以城市中心为锚，各片区加 ≤0.015° 微偏移（不臆造具体酒店坐标，仅标「推荐住这片」）
-const _AREA_OFFS = [[0, 0], [0.012, 0.009], [-0.010, 0.013], [0.008, -0.014], [-0.013, -0.008]];
+// 地图多点：以城市中心为锚，各片区加微偏移（不臆造具体酒店坐标，仅标「推荐住这片」）。
+// v1.19.171 由 5 组扩到 8 组，让合并后的城市（精选 3 + 扩展 4 = 最多 7 个片区）各有独立锚点、不重叠。
+const _AREA_OFFS = [
+  [0, 0], [0.012, 0.009], [-0.010, 0.013], [0.008, -0.014],
+  [-0.013, -0.008], [0.014, -0.004], [-0.006, 0.016], [-0.015, 0.006]
+];
 function hotelAreaPins(cityName, budgetKey) {
   const cc = P.getCoord(cityName);
   if (!cc || !cc.lat || !cc.lon) return [];
@@ -497,7 +520,9 @@ function hotelAreaPins(cityName, budgetKey) {
   });
 }
 // 酒店门户：平台 + 可复制搜索词（引导去 App 比价，不内嵌预订）
-const HOTEL_PLATFORMS = ["携程", "美团", "飞猪", "同程", "Agoda", "Booking"];
+// v1.19.171 扩容：由原 6 个主流 OTA 扩到 13 个，覆盖「综合 OTA / 出境 / 民宿 / 内容种草 / 地图比价」，
+// 给用户更多比价入口（个人主体不内嵌交易，仅复制搜索词）。
+const HOTEL_PLATFORMS = ["携程", "美团", "飞猪", "同程", "去哪儿", "艺龙", "途家", "Agoda", "Booking", "Airbnb", "小红书", "抖音", "高德"];
 function hotelPortals(cityName, plan, areaName) {
   if (!cityName) return [];
   let dates = "";
@@ -2144,7 +2169,7 @@ function cityBrief(cityName) {
     // v1.17.10：剔掉「本地招牌菜/老字号小吃」这类泛化占位，用户要的是具体菜名；全泛化时干脆不显示
     foods: (Array.isArray(c.foods) ? c.foods : []).filter(f => !F_GENERIC_FOOD.test(String(f))).slice(0, 6),
     foodNote: c.foodNote || "",
-    areas: ha.areas.slice(0, 4),
+    areas: ha.areas.slice(0, 6),
     stayTip: ha.stayTip,
     travel: c.cityTravel || c.travel || "",
     text: c.name + " · 建议 " + days + " 天 · " + (CLIMATE_TXT[c.climate] || "")
@@ -2873,12 +2898,7 @@ function dayLoad(plan, di) {
 }
 
 /* ---------- B11 当天动线顺路度（真实坐标连线总里程 vs 片区跨度；示意点不计分） ---------- */
-function _havKm(a, b) {
- const R = 6371, rad = x => x * Math.PI / 180;
- const dLat = rad(b.latitude - a.latitude), dLon = rad(b.longitude - a.longitude);
- const h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
- return 2 * R * Math.asin(Math.sqrt(h));
-}
+const _havKm = haversine; // 别名：入参兼容 {latitude,longitude}
 function routeScore(plan, di) {
  const day = plan && plan.days && plan.days[di];
  if (!day) return null;
@@ -3424,11 +3444,6 @@ function dayMove(day, cityName) {
  });
  steps = Math.min(24000, Math.round(steps / 500) * 500);
  return { km: Math.round(km * 10) / 10, legs, steps };
-}
-function haversineKm(a, b) {
- const R = 6371, dLa = (b.lat - a.lat) * Math.PI / 180, dLo = (b.lon - a.lon) * Math.PI / 180;
- const s = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLo / 2) ** 2;
- return Math.round(2 * R * Math.asin(Math.sqrt(s)) * 10) / 10;
 }
 // —— 返程日预留贴士 ——
 function endTripTip(plan) {
@@ -5322,7 +5337,6 @@ function planCheckup(plan) {
   try {
     const days = (plan && Array.isArray(plan.days) ? plan.days : []).map(d => (d && d.items ? d.items : []));
     if (!days.length) return { score: 0, items: [{ k: "empty", label: "行程为空", ok: false }], tips: ["先生成一份行程再体检"] };
-    const _km2 = (a, b) => { const R=6371, dLa=(b.lat-a.lat)*Math.PI/180, dLo=(b.lon-a.lon)*Math.PI/180, la1=a.lat*Math.PI/180, la2=b.lat*Math.PI/180, h=Math.sin(dLa/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
     // 1) 动线：每天相邻真实景点的最大跨度
     let worstLeg = 0, worstDay = -1;
     days.forEach((its, di) => {
@@ -5333,7 +5347,7 @@ function planCheckup(plan) {
         const a = P.getSpotCoord(plan.cityName || pts[i].cityName || "", pts[i].name);
         const b = P.getSpotCoord(plan.cityName || pts[i + 1].cityName || "", pts[i + 1].name);
         if (a && b && a.lat && b.lat) {
-          const km = _km2({ lat: a.lat, lon: a.lon }, { lat: b.lat, lon: b.lon });
+          const km = haversine({ lat: a.lat, lon: a.lon }, { lat: b.lat, lon: b.lon });
           if (km > worstLeg) { worstLeg = km; worstDay = di + 1; }
         }
       }
@@ -5452,12 +5466,7 @@ function askTrip(plan, question) {
 
 
 /* ============ 新功能 P1（v1.19.13+） ============ */
-const _km2 = (a, b) => {
-  const R = 6371, dLa = (b.lat - a.lat) * Math.PI / 180, dLo = (b.lon - a.lon) * Math.PI / 180;
-  const la1 = a.lat * Math.PI / 180, la2 = b.lat * Math.PI / 180;
-  const h = Math.sin(dLa / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLo / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-};
+const _km2 = haversine; // 别名：统一走 utils/geo.js
 // 动线优化建议：找出每天跨度过大的相邻对，给出换序/拆天建议
 function routeAdvicePlus(plan) {
   const out = [];

@@ -62,8 +62,9 @@ for (const c in D.HOSPITALS) {
   for (const h of list) {
     hosp++;
     ok("医院字段完整：" + c + "/" + h.n, !!h.n && typeof h.lat === "number" && typeof h.lon === "number" && !!h.lv);
-    // 中国境内粗略边界，防止坐标写反（lat/lon 互换会落在境外）
-    ok("坐标在中国境内：" + c + "/" + h.n, h.lat > 18 && h.lat < 54 && h.lon > 73 && h.lon < 135, h.lat + "," + h.lon);
+    // 中国境内粗略边界，防止坐标写反（lat/lon 互换会落在境外）。
+    // 下界取 16：中国最南端三沙（永兴岛，约 16.8°N）属合法领土；上界 54 / 经度 73–135 仍能在坐标互换时拦截（互换后 lat∈73–135 必超 54 上界）。
+    ok("坐标在中国境内：" + c + "/" + h.n, h.lat > 16 && h.lat < 54 && h.lon > 73 && h.lon < 135, h.lat + "," + h.lon);
     ok("距城中心 ≤25km：" + c + "/" + h.n, h.kmc > 0 && h.kmc <= 25, String(h.kmc));
   }
 }

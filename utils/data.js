@@ -3,6 +3,10 @@
 // 页面侧统一在 travel.js 的 ready() 之后使用数据；planner.js 因模块顶层解构 data.js，
 // 由 travel.js 惰性 require（数据就绪后才加载），避免拿到空数据。
 const pako = require("./pako-inflate.js");
+// v1.19.171 扩展酒店住宿区域：额外的「城市级住哪儿区域指引」静态数据，加载时并入 CITIES[].areas。
+// 与 data.js 同目录（utils/），不被 build-min 压缩；try/catch 保证缺失时不影响数据加载。
+let HA = {};
+try { HA = require("./hotel-areas.js"); } catch (e) { HA = {}; }
 
 const DATA = {
   CITIES: [], SPOT_COORDS: {}, CITY_COORDS: {}, PROVINCE_CITIES: {}, PROVINCES: [],
@@ -10,6 +14,107 @@ const DATA = {
   BIG_SPOT_DAYS: [], SUNRISE_SPOTS: [], PREP_CHECKLIST: []
 };
 DATA.__dataReady = false;
+
+// v1.19.166 坐标修正覆盖层：修正若干被误地理编码的景点。
+// 这些景点原坐标落在别的城市/省份，距所属城市中心 98~1116km，明显错误（地图标点错位、行程距离计算失真）。
+// 覆盖在 applyPacked 之后、对所有消费方（行程生成/地图/景点检索）统一生效；不改动打包基数据，零重打包风险。
+// 坐标均为各景点所属城市内的合理落点（SAR/小城 ±1km 级、漠河远郊也落在正确县域），远优于原 100~1100km 错位。
+const SPOT_COORD_FIX = {
+  "澳门": {
+    "郑家大屋": [22.1906, 113.5385],   // 亚婆井前地·岗顶，原 [31.413,109.071] 落到湖北/重庆
+    "北帝庙": [22.1975, 113.5410],     // 澳门半岛（大三巴/大炮台一带），原 [23.891,112.876] 落到广东清远
+    "海事博物馆": [22.1819, 113.5319]  // 妈阁庙前地，原 [23.079,113.505] 落到广东广州
+  },
+  "香港": {
+    "大澳渔村": [22.2526, 113.8636],   // 大屿山·大澳，原坐标落到广东阳江（209km）
+    "大馆": [22.2820, 114.1540]        // 中环·大馆（荷李活道），原坐标落到广东清远（170km）
+  },
+  "漠河": {
+    "黑龙江源头": [53.480, 121.480],    // 漠河西北·龙江第一湾/源头，原 [45.742,126.662] 落到牡丹江/延边（857km）
+    "北极林海观音": [53.294, 122.204]  // 漠河观音山一带，原 [48.446,129.441] 落到佳木斯（698km）
+  }
+};
+function applyCoordFix() {
+  for (const city in SPOT_COORD_FIX) {
+    const list = DATA.SPOT_COORDS[city];
+    if (!Array.isArray(list)) continue;
+    const m = SPOT_COORD_FIX[city];
+    for (const row of list) {
+      if (Array.isArray(row) && m[row[0]]) { row[1] = m[row[0]][0]; row[2] = m[row[0]][1]; }
+    }
+  }
+}
+
+// v1.19.167 景点去重：同城 SPOT_COORDS 内出现完全同名的重复副本（仙桃/天门/潜江 等，
+// 单城同一景点被录入 41 次、坐标完全一致），导致地图/行程中同一景点重复出现 40+ 次。
+// 加载时按「城市 + 景点名 + 坐标」去重，仅移除逐字节相同的副本、保留首个，零信息损失。
+let _dedupRemoved = 0;
+function dedupeSpots() {
+  for (const city in DATA.SPOT_COORDS) {
+    const list = DATA.SPOT_COORDS[city];
+    if (!Array.isArray(list)) continue;
+    const seen = Object.create(null);
+    const out = [];
+    for (const row of list) {
+      if (!Array.isArray(row)) { out.push(row); continue; }
+      const key = JSON.stringify([row[0], row[1], row[2]]);
+      if (seen[key]) { _dedupRemoved++; continue; }
+      seen[key] = 1; out.push(row);
+    }
+    DATA.SPOT_COORDS[city] = out;
+  }
+  if (_dedupRemoved) console.warn("[data] 同城重复景点去重移除 " + _dedupRemoved + " 条副本");
+}
+
+// v1.19.169 气候派生补齐 best 季节字段：打包基数据里部分城市缺 best（约 331 城），
+// 导致「适宜时节 / 最佳季 / 今日正当时」对这批城只能回退到泛化的「四季皆宜」，推荐信息稀薄。
+// 按气候带给出稳定的季节描述（离线、确定性、可复现），调高推荐信息密度，不触碰打包基数据（零重打包风险）。
+// 月份写法沿用 bestMonths 解析约定（"5-10月" 区间、"11-次年4月" 跨年），让「今日正当时」能正确命中。
+const BEST_BY_CLIMATE = {
+  plateau: "5-10月最佳，夏季凉爽宜避暑",
+  temperate: "4-5月与9-10月，春秋气候宜人",
+  cold: "冬季冰雪与夏季避暑，12-2月、6-8月",
+  dry: "春秋最佳，4-5月、9-10月避开酷暑风沙",
+  hot: "春、秋最舒适，3-5月、9-11月避开盛夏",
+  tropical: "11-次年4月旱季最佳，避开雨季",
+  subtropical: "3-5月与10-11月，春秋舒适",
+  alpine: "6-9月宜游，冬季雪景壮美",
+  temperate_continental: "6-9月温暖少风，最佳出行期"
+};
+let _bestFilled = 0;
+function fillBestSeason() {
+  for (const c of DATA.CITIES) {
+    if (!c || c.best) continue;
+    const v = BEST_BY_CLIMATE[c.climate] || BEST_BY_CLIMATE["temperate"];
+    if (v) { c.best = v; _bestFilled++; }
+  }
+  if (_bestFilled) console.warn("[data] 气候派生补齐 best 季节字段 " + _bestFilled + " 城");
+}
+
+// v1.19.171 扩展酒店住宿区域：把 utils/hotel-areas.js 的 HOTEL_AREAS_EXTRA（约 60 个热门旅游城市，
+// 每城 3-4 个「商圈/地标/交通枢纽」住哪儿区域指引，含参考价区间）按城市名并入 CITIES[].areas，
+// 既给 46 城精选区「追加更多选择」，又把覆盖扩到更多旅游城市（原本走通用三片区）。
+// 合规：区域级指引，不臆造酒店门牌号；价格一律「参考价区间」，非实时报价、非交易。
+// 幂等：按片区名去重，多数据分块重复调用 applyPacked 也不会重复追加。
+let _hotelAreasMerged = 0;
+function applyHotelAreasExtra() {
+  const EX = (HA && HA.HOTEL_AREAS_EXTRA) || {};
+  const keys = Object.keys(EX);
+  if (!keys.length) return;
+  for (const c of DATA.CITIES) {
+    const ex = EX[c.name];
+    if (!ex || !Array.isArray(ex) || !ex.length) continue;
+    if (!Array.isArray(c.areas)) c.areas = [];
+    const have = new Set(c.areas.map(a => (a && a.name) || ""));
+    for (const a of ex) {
+      if (a && a.name && !have.has(a.name)) {
+        c.areas.push({ name: a.name, note: a.note || "", price: a.price || "" });
+        have.add(a.name); _hotelAreasMerged++;
+      }
+    }
+  }
+  if (_hotelAreasMerged) console.warn("[data] 扩展酒店住宿区域并入 " + _hotelAreasMerged + " 条");
+}
 
 function b64ToBytes(b64) {
   try {
@@ -90,6 +195,10 @@ function applyPacked(packed) {
     delete parsed.__A;
   }
   mergeInto(DATA, parsed);
+  applyCoordFix();
+  dedupeSpots();
+  fillBestSeason();
+  applyHotelAreasExtra();
   DATA.__dataReady = true;
   return DATA;
 }
