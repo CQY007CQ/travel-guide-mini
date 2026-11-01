@@ -3,6 +3,10 @@
 // 页面侧统一在 travel.js 的 ready() 之后使用数据；planner.js 因模块顶层解构 data.js，
 // 由 travel.js 惰性 require（数据就绪后才加载），避免拿到空数据。
 const pako = require("./pako-inflate.js");
+// v1.19.171 扩展酒店住宿区域：额外的「城市级住哪儿区域指引」静态数据，加载时并入 CITIES[].areas。
+// 与 data.js 同目录（utils/），不被 build-min 压缩；try/catch 保证缺失时不影响数据加载。
+let HA = {};
+try { HA = require("./hotel-areas.js"); } catch (e) { HA = {}; }
 
 const DATA = {
   CITIES: [], SPOT_COORDS: {}, CITY_COORDS: {}, PROVINCE_CITIES: {}, PROVINCES: [],
@@ -10,6 +14,160 @@ const DATA = {
   BIG_SPOT_DAYS: [], SUNRISE_SPOTS: [], PREP_CHECKLIST: []
 };
 DATA.__dataReady = false;
+
+// v1.19.166 坐标修正覆盖层：修正若干被误地理编码的景点。
+// 这些景点原坐标落在别的城市/省份，距所属城市中心 98~1116km，明显错误（地图标点错位、行程距离计算失真）。
+// 覆盖在 applyPacked 之后、对所有消费方（行程生成/地图/景点检索）统一生效；不改动打包基数据，零重打包风险。
+// 坐标均为各景点所属城市内的合理落点（SAR/小城 ±1km 级、漠河远郊也落在正确县域），远优于原 100~1100km 错位。
+const SPOT_COORD_FIX = {
+  "澳门": {
+    "郑家大屋": [22.1906, 113.5385],   // 亚婆井前地·岗顶，原 [31.413,109.071] 落到湖北/重庆
+    "北帝庙": [22.1975, 113.5410],     // 澳门半岛（大三巴/大炮台一带），原 [23.891,112.876] 落到广东清远
+    "海事博物馆": [22.1819, 113.5319]  // 妈阁庙前地，原 [23.079,113.505] 落到广东广州
+  },
+  "香港": {
+    "大澳渔村": [22.2526, 113.8636],   // 大屿山·大澳，原坐标落到广东阳江（209km）
+    "大馆": [22.2820, 114.1540]        // 中环·大馆（荷李活道），原坐标落到广东清远（170km）
+  },
+  "漠河": {
+    "黑龙江源头": [53.480, 121.480],    // 漠河西北·龙江第一湾/源头，原 [45.742,126.662] 落到牡丹江/延边（857km）
+    "北极林海观音": [53.294, 122.204]  // 漠河观音山一带，原 [48.446,129.441] 落到佳木斯（698km）
+  }
+};
+function applyCoordFix() {
+  for (const city in SPOT_COORD_FIX) {
+    const list = DATA.SPOT_COORDS[city];
+    if (!Array.isArray(list)) continue;
+    const m = SPOT_COORD_FIX[city];
+    for (const row of list) {
+      if (Array.isArray(row) && m[row[0]]) { row[1] = m[row[0]][0]; row[2] = m[row[0]][1]; }
+    }
+  }
+}
+
+// v1.19.172 模糊 POI 坐标补录：纳林湖 / 网师园 / 九凌湖 / 新寨嘉那嘛呢石经城 此前因 geocode 30001（POI 非地址）
+// 整体跳过、长期挂在「已知未解」。现以公开权威坐标（腾讯/高德/维基/政府文档交叉确认）经城市归属校验后补入，
+// 使地图/检索/行程引用时落到真实位置而非城市中心。仅补坐标（不编造景点文案、不擅自塞进行程库），
+// 符合本项目「只加经核实数据、勿臆造」铁律。广化寺（莆田/北京重名）、石龙山（多地重名）因名称歧义、无法唯一归属，按「勿臆造」跳过。
+const SPOT_COORD_ADD = [
+  ["巴彦淖尔", "纳林湖", 40.532227, 106.64907],
+  ["苏州", "网师园", 31.298021, 120.633654],
+  ["贵港", "九凌湖", 22.966533, 109.474596],
+  ["玉树", "新寨嘉那嘛呢石经城", 33.018206, 97.059472]
+];
+let _spotCoordAdded = 0;
+function applySpotCoordAdd() {
+  for (const [city, name, lat, lon] of SPOT_COORD_ADD) {
+    if (!DATA.SPOT_COORDS[city]) DATA.SPOT_COORDS[city] = [];
+    const arr = DATA.SPOT_COORDS[city];
+    if (arr.some(r => r[0] === name)) continue; // 幂等：已存在不重复加（多分块重复调用安全）
+    arr.push([name, lat, lon]);
+    _spotCoordAdded++;
+  }
+  if (_spotCoordAdded) console.warn("[data] 模糊 POI 坐标补录 " + _spotCoordAdded + " 个");
+}
+
+// v1.19.174 稀疏县景点补全：给数据稀疏、行程易出空天的旅游小城追加经公开权威核实的真实景点坐标。
+// 目的：直接消解压测红项「黄龙 D4 空天」（黄龙 6→9 个真实景点，提升可填天数与行程密度），并整体提升
+// 酉阳/奉节/武隆/荔波/兴义/那拉提/茫崖/抚远等知名稀疏县的地图标点与行程素材。
+// 合规：仅补经核实坐标（WebSearch 交叉核验腾讯地图/维基/政府文档），不编造景点文案、不塞臆造数据；
+// 所有点距所属城心均 <300km 且落点省份一致，通过 v1.19.156 坐标自检规则。幂等：按景点名去重。
+const SPOT_ENRICH = [
+  ["黄龙", "牟尼沟", 32.5925, 103.5563],
+  ["黄龙", "扎嘎瀑布", 32.5618, 103.5025],
+  ["黄龙", "松潘古城", 32.6375, 103.5983],
+  ["酉阳", "酉阳桃花源", 28.8520, 108.7529],
+  ["奉节", "白帝城", 31.0346, 109.5897],
+  ["武隆", "天生三桥", 29.4328, 107.8036],
+  ["武隆", "仙女山", 29.4983, 107.7408],
+  ["荔波", "小七孔", 25.2670, 107.6896],
+  ["兴义", "万峰林", 25.0099, 104.9249],
+  ["那拉提", "那拉提草原", 43.2401, 84.0234],
+  ["茫崖", "茫崖翡翠湖", 38.0793, 90.9967],
+  ["抚远", "东极广场", 48.4611, 135.8722]
+];
+let _spotEnriched = 0;
+function applySpotEnrich() {
+  for (const [city, name, lat, lon] of SPOT_ENRICH) {
+    if (!DATA.SPOT_COORDS[city]) DATA.SPOT_COORDS[city] = [];
+    const arr = DATA.SPOT_COORDS[city];
+    if (arr.some(r => r[0] === name)) continue; // 幂等：已存在不重复追加（多分块重复调用安全）
+    arr.push([name, lat, lon]);
+    _spotEnriched++;
+  }
+  if (_spotEnriched) console.warn("[data] 稀疏县景点补全 " + _spotEnriched + " 个");
+}
+
+// v1.19.167 景点去重：同城 SPOT_COORDS 内出现完全同名的重复副本（仙桃/天门/潜江 等，
+// 单城同一景点被录入 41 次、坐标完全一致），导致地图/行程中同一景点重复出现 40+ 次。
+// 加载时按「城市 + 景点名 + 坐标」去重，仅移除逐字节相同的副本、保留首个，零信息损失。
+let _dedupRemoved = 0;
+function dedupeSpots() {
+  for (const city in DATA.SPOT_COORDS) {
+    const list = DATA.SPOT_COORDS[city];
+    if (!Array.isArray(list)) continue;
+    const seen = Object.create(null);
+    const out = [];
+    for (const row of list) {
+      if (!Array.isArray(row)) { out.push(row); continue; }
+      const key = JSON.stringify([row[0], row[1], row[2]]);
+      if (seen[key]) { _dedupRemoved++; continue; }
+      seen[key] = 1; out.push(row);
+    }
+    DATA.SPOT_COORDS[city] = out;
+  }
+  if (_dedupRemoved) console.warn("[data] 同城重复景点去重移除 " + _dedupRemoved + " 条副本");
+}
+
+// v1.19.169 气候派生补齐 best 季节字段：打包基数据里部分城市缺 best（约 331 城），
+// 导致「适宜时节 / 最佳季 / 今日正当时」对这批城只能回退到泛化的「四季皆宜」，推荐信息稀薄。
+// 按气候带给出稳定的季节描述（离线、确定性、可复现），调高推荐信息密度，不触碰打包基数据（零重打包风险）。
+// 月份写法沿用 bestMonths 解析约定（"5-10月" 区间、"11-次年4月" 跨年），让「今日正当时」能正确命中。
+const BEST_BY_CLIMATE = {
+  plateau: "5-10月最佳，夏季凉爽宜避暑",
+  temperate: "4-5月与9-10月，春秋气候宜人",
+  cold: "冬季冰雪与夏季避暑，12-2月、6-8月",
+  dry: "春秋最佳，4-5月、9-10月避开酷暑风沙",
+  hot: "春、秋最舒适，3-5月、9-11月避开盛夏",
+  tropical: "11-次年4月旱季最佳，避开雨季",
+  subtropical: "3-5月与10-11月，春秋舒适",
+  alpine: "6-9月宜游，冬季雪景壮美",
+  temperate_continental: "6-9月温暖少风，最佳出行期"
+};
+let _bestFilled = 0;
+function fillBestSeason() {
+  for (const c of DATA.CITIES) {
+    if (!c || c.best) continue;
+    const v = BEST_BY_CLIMATE[c.climate] || BEST_BY_CLIMATE["temperate"];
+    if (v) { c.best = v; _bestFilled++; }
+  }
+  if (_bestFilled) console.warn("[data] 气候派生补齐 best 季节字段 " + _bestFilled + " 城");
+}
+
+// v1.19.171 扩展酒店住宿区域：把 utils/hotel-areas.js 的 HOTEL_AREAS_EXTRA（约 60 个热门旅游城市，
+// 每城 3-4 个「商圈/地标/交通枢纽」住哪儿区域指引，含参考价区间）按城市名并入 CITIES[].areas，
+// 既给 46 城精选区「追加更多选择」，又把覆盖扩到更多旅游城市（原本走通用三片区）。
+// 合规：区域级指引，不臆造酒店门牌号；价格一律「参考价区间」，非实时报价、非交易。
+// 幂等：按片区名去重，多数据分块重复调用 applyPacked 也不会重复追加。
+let _hotelAreasMerged = 0;
+function applyHotelAreasExtra() {
+  const EX = (HA && HA.HOTEL_AREAS_EXTRA) || {};
+  const keys = Object.keys(EX);
+  if (!keys.length) return;
+  for (const c of DATA.CITIES) {
+    const ex = EX[c.name];
+    if (!ex || !Array.isArray(ex) || !ex.length) continue;
+    if (!Array.isArray(c.areas)) c.areas = [];
+    const have = new Set(c.areas.map(a => (a && a.name) || ""));
+    for (const a of ex) {
+      if (a && a.name && !have.has(a.name)) {
+        c.areas.push({ name: a.name, note: a.note || "", price: a.price || "" });
+        have.add(a.name); _hotelAreasMerged++;
+      }
+    }
+  }
+  if (_hotelAreasMerged) console.warn("[data] 扩展酒店住宿区域并入 " + _hotelAreasMerged + " 条");
+}
 
 function b64ToBytes(b64) {
   try {
@@ -54,6 +212,53 @@ function utf8Decode(bytes) {
   return s;
 }
 
+// v1.19.173 坐标完整性自检（只读、零重打包风险）：用 v1.19.156 已验证规则扫描全量景点坐标，
+// 凡「距所属城心 >300km 且落点省份≠城市所在省，或距城心 >1200km」者，视为错位并 console.warn。
+// 仅告警、不做任何改写；目的是让未来的坐标回归（重新打包误伤、数据更新引入错点、合并脚本回潮）
+// 在加载期即可暴露，而不是等用户线上报「地图标点跑到别的省」才后知后觉。
+// 无违规时不输出任何内容、不增体积、不拖性能：热路径每点仅一次距离计算，
+// 仅 300~1200km 的少数远景点才反查落点省份（绝大多数景点 dOwn≤300 直接短路退出）。
+function _hav(la1, lo1, la2, lo2) {
+  const R = 6371, toR = x => x * Math.PI / 180;
+  const dLat = toR(la2 - la1), dLon = toR(lo2 - lo1);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toR(la1)) * Math.cos(toR(la2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+let _coordWarn = 0;
+function checkCoordIntegrity() {
+  const cc = DATA.CITY_COORDS || {};
+  const c2p = DATA.CITY2PROV || {};
+  // 预建「所有城市中心」索引，用于反查落点省份（仅在需要时才扫描）
+  const centers = [];
+  for (const c in cc) {
+    const v = cc[c];
+    if (Array.isArray(v) && v.length >= 2) centers.push([v[0], v[1], c2p[c]]);
+  }
+  let bad = 0;
+  for (const city in DATA.SPOT_COORDS) {
+    const cc0 = cc[city];
+    if (!Array.isArray(cc0) || cc0.length < 2) continue;
+    const cityProv = c2p[city];
+    const list = DATA.SPOT_COORDS[city];
+    if (!Array.isArray(list)) continue;
+    for (const row of list) {
+      if (!Array.isArray(row) || row.length < 3) continue;
+      const lat = +row[1], lon = +row[2];
+      if (!isFinite(lat) || !isFinite(lon)) continue;
+      const dOwn = _hav(lat, lon, cc0[0], cc0[1]);
+      if (dOwn > 1200) { bad++; if (console && console.warn) console.warn("[data] 坐标疑似越界: " + city + "·" + row[0] + " 距城心" + Math.round(dOwn) + "km(>1200)"); continue; }
+      if (dOwn <= 300) continue; // 热路径：绝大多数景点在此退出，无需反查省份
+      // 仅 300~1200km 的少数远景点才反查落点省份
+      let prov = null, bd = 1e9;
+      for (const [la, lo, p] of centers) { const d = _hav(lat, lon, la, lo); if (d < bd) { bd = d; prov = p; } }
+      if (prov && prov !== cityProv) { bad++; if (console && console.warn) console.warn("[data] 坐标疑似越界: " + city + "·" + row[0] + " 距城心" + Math.round(dOwn) + "km 落点省=" + prov + " 城市省=" + cityProv); }
+    }
+  }
+  _coordWarn += bad;
+  if (bad) console.warn("[data] 坐标完整性自检: 发现 " + bad + " 个疑似越界坐标，请核查 SPOT_COORD_FIX / pack-data 规则");
+  return bad;
+}
+
 // v1.20.x：支持「多数据分包」——把城市数据切成多个 chunk 文件（subdata/subdata2…），
 // 各自独立 2MB 上限、懒加载。合并语义：对象键按城市名并集、数组去重拼接、其余覆盖。
 function isObj(x) { return x && typeof x === "object" && !Array.isArray(x); }
@@ -90,6 +295,13 @@ function applyPacked(packed) {
     delete parsed.__A;
   }
   mergeInto(DATA, parsed);
+  applyCoordFix();
+  applySpotCoordAdd();
+  applySpotEnrich(); // v1.19.174 稀疏县景点补全
+  dedupeSpots();
+  fillBestSeason();
+  applyHotelAreasExtra();
+  checkCoordIntegrity(); // v1.19.173 只读自检：加载期暴露坐标回归，零改写零重打包风险
   DATA.__dataReady = true;
   return DATA;
 }
@@ -150,6 +362,7 @@ function initData() {
   return _ready;
 }
 DATA.initData = initData;
+DATA.checkCoordIntegrity = checkCoordIntegrity; // v1.19.173 暴露给单测：返回越界坐标数
 
 // Node / 测试环境（没有 require.async）：模块加载即同步就绪，保证 allcheck/tools 照常同步 require
 if (typeof require.async !== "function") {

@@ -14,6 +14,20 @@ const req = createRequire(process.cwd() + "/");
 
 const D = req("./utils/data.js");
 
+// ── v1.19.174 打包期坐标完整性硬门禁 ─────────────────────────────────
+// 复用加载期同款 checkCoordIntegrity()（v1.19.156 规则：距城心>300km且跨省 或 >1200km），
+// D 此刻已是「SPOT_COORD_FIX 等覆盖层生效后的最终数据」，故 7 个历史误编码已被修正、不会误报；
+// 若检出越界，说明出现了「未被 SPOT_COORD_FIX 覆盖的新坐标回归」——直接中止打包，
+// 强制开发者先加入 SPOT_COORD_FIX 再重打包，把坐标回归从「上线后告警」前移到「打包即拦截」。
+{
+  const _bad = D.checkCoordIntegrity();
+  if (_bad > 0) {
+    console.error("❌ 打包期坐标完整性门禁失败：发现 " + _bad + " 个越界坐标（未被 SPOT_COORD_FIX 覆盖的新回归），请修正数据或补充 SPOT_COORD_FIX 后重打包");
+    process.exit(1);
+  }
+  console.log("✓ 打包期坐标完整性门禁通过");
+}
+
 // ── v1.19.55: JSON 键别名压缩（无损）────────────────────────────────
 // 仅别名高频 schema 键（出现次数>=MIN_ALIAS_FREQ 且长度>2），数据名键（公园/餐厅/城市名等）保持原样。
 // 每个分块 blob 内附带正向映射 __A；加载器(data.js) 据此还原，无需双文件同步。
@@ -261,8 +275,10 @@ function splitValue(v, maxB64) {
 
 // 把整个 DATA 切成若干「DATA 形状」的局部对象（同键可能出现在多块，供 mergeInto 合并）
 function splitData(D, maxB64) {
-  // __A 是「键别名正向映射」，由下方统一注入每个分块（保证多分包各自可独立还原），这里先排除避免被随机切走
-  const keys = Object.keys(D).filter(k => k !== "__dataReady" && k !== "initData" && k !== "__A");
+  // __A 是「键别名正向映射」，由下方统一注入每个分块（保证多分包各自可独立还原），这里先排除避免被随机切走；
+  // 同时排除函数类型的值（如 initData / checkCoordIntegrity 等挂在 DATA 上的方法），函数无法 JSON 序列化、
+  // 若漏网会让 Buffer.from(JSON.stringify(fn)) 收到 undefined 而崩溃（v1.19.173 加 checkCoordIntegrity 后暴露）。
+  const keys = Object.keys(D).filter(k => k !== "__dataReady" && k !== "initData" && k !== "__A" && typeof D[k] !== "function");
   const chunks = []; let cur = {}; let curB = 0;
   const flush = () => { if (Object.keys(cur).length) { chunks.push(cur); cur = {}; curB = 0; } };
   for (const k of keys) {

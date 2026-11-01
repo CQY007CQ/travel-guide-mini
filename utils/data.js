@@ -67,6 +67,37 @@ function applySpotCoordAdd() {
   if (_spotCoordAdded) console.warn("[data] 模糊 POI 坐标补录 " + _spotCoordAdded + " 个");
 }
 
+// v1.19.174 稀疏县景点补全：给数据稀疏、行程易出空天的旅游小城追加经公开权威核实的真实景点坐标。
+// 目的：直接消解压测红项「黄龙 D4 空天」（黄龙 6→9 个真实景点，提升可填天数与行程密度），并整体提升
+// 酉阳/奉节/武隆/荔波/兴义/那拉提/茫崖/抚远等知名稀疏县的地图标点与行程素材。
+// 合规：仅补经核实坐标（WebSearch 交叉核验腾讯地图/维基/政府文档），不编造景点文案、不塞臆造数据；
+// 所有点距所属城心均 <300km 且落点省份一致，通过 v1.19.156 坐标自检规则。幂等：按景点名去重。
+const SPOT_ENRICH = [
+  ["黄龙", "牟尼沟", 32.5925, 103.5563],
+  ["黄龙", "扎嘎瀑布", 32.5618, 103.5025],
+  ["黄龙", "松潘古城", 32.6375, 103.5983],
+  ["酉阳", "酉阳桃花源", 28.8520, 108.7529],
+  ["奉节", "白帝城", 31.0346, 109.5897],
+  ["武隆", "天生三桥", 29.4328, 107.8036],
+  ["武隆", "仙女山", 29.4983, 107.7408],
+  ["荔波", "小七孔", 25.2670, 107.6896],
+  ["兴义", "万峰林", 25.0099, 104.9249],
+  ["那拉提", "那拉提草原", 43.2401, 84.0234],
+  ["茫崖", "茫崖翡翠湖", 38.0793, 90.9967],
+  ["抚远", "东极广场", 48.4611, 135.8722]
+];
+let _spotEnriched = 0;
+function applySpotEnrich() {
+  for (const [city, name, lat, lon] of SPOT_ENRICH) {
+    if (!DATA.SPOT_COORDS[city]) DATA.SPOT_COORDS[city] = [];
+    const arr = DATA.SPOT_COORDS[city];
+    if (arr.some(r => r[0] === name)) continue; // 幂等：已存在不重复追加（多分块重复调用安全）
+    arr.push([name, lat, lon]);
+    _spotEnriched++;
+  }
+  if (_spotEnriched) console.warn("[data] 稀疏县景点补全 " + _spotEnriched + " 个");
+}
+
 // v1.19.167 景点去重：同城 SPOT_COORDS 内出现完全同名的重复副本（仙桃/天门/潜江 等，
 // 单城同一景点被录入 41 次、坐标完全一致），导致地图/行程中同一景点重复出现 40+ 次。
 // 加载时按「城市 + 景点名 + 坐标」去重，仅移除逐字节相同的副本、保留首个，零信息损失。
@@ -266,6 +297,7 @@ function applyPacked(packed) {
   mergeInto(DATA, parsed);
   applyCoordFix();
   applySpotCoordAdd();
+  applySpotEnrich(); // v1.19.174 稀疏县景点补全
   dedupeSpots();
   fillBestSeason();
   applyHotelAreasExtra();
