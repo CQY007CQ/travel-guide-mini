@@ -37,6 +37,12 @@ const D = T.D;
 // 既扩展意图识别（雪山/红叶/免费/海岛/森林…），又把城市相关性建立在「真实景点标签」上（比语料正则更准）。
 const ST = require("./spot-tags.js");
 
+/* 18 类主词典与 50 维词库的「同义键」：同一意图被两套词典各自表达（snowmt↔snowmtn 高原雪山、
+ * grass↔grassland 草原）。若同时出现在 prefs.tags，必须只让 18 类主路径计分（黄金用例契约所在），
+ * ST 补充路径跳过该键 —— 否则"雪山"会被 snowmt(语料正则) 与 snowmtn(真实景点标签) 重复加权，
+ * 凭空把高原雪山类城市抬得过高。其余同名键（oldtown/sea/lake…）本来就只在主路径计分，不受影响。 */
+const ST_SYNONYM_OF = { snowmtn: "snowmt", grassland: "grass" };
+
 /* ── 权重表（唯一的主观参数，全部可解释、可调）── */
 const W = {
   base: 14,          // 基分：保证每城非零起点，排序稳定
@@ -304,9 +310,24 @@ function extractPrefs(text, opts) {
   return { text: s, tags: tags, days: days, budget: budget, pace: pace, month: month, extreme: extreme, namedCity: namedCity, province: province };
 }
 
-/* ── 相关性：绝对量 + 密度 双因子 ──
- * combo = absW * min(1, hits/absSat) + densW * (coreFloor + coreSpan*min(1, density/coreSat))
- * 前者让"馆藏量大"的大城市不吃亏，后者让"整城就是古镇"的小城能冒头。 */
+/* ── 相关性：绝对量 + 密度 双因子（relevanceOf 与 relevanceOfSpot 共用）──
+ * combo = absW * min(1, hits/absSat^absPow) + densW * (coreFloor + coreSpan*min(1, density/coreSat))
+ * 前者让"馆藏量大"的大城市不吃亏，后者让"整城就是古镇"的小城能冒头。
+ * 抽成纯函数，两处复用，避免双份公式日后悄悄走形。 */
+function comboScore(hits, expCount, w) {
+  const density = hits / Math.max(6, expCount);
+  const absCore = Math.min(1, Math.pow(hits / W.absCap, W.absPow)); // 幂刻度，保留大城之间差距
+  const densCore = W.coreFloor + W.coreSpan * Math.min(1, density / W.coreSat);
+  const combo = W.absW * absCore + W.densW * densCore;
+  const val = w * combo; // 浮点，与原始 `d = def.w * combo` 一致：sum 不取整（W 权重据此锁定，取整会漂排序）
+  return {
+    density: density,
+    combo: combo,
+    val: val,
+    delta: Math.round(val) + (hits >= W.hitBonusAt ? W.hitBonus : 0), // 仅展示用取整
+  };
+}
+
 function relevanceOf(city, tagKeys, expCount, corpus) {
   let sum = 0;
   const detail = [];
@@ -323,20 +344,15 @@ function relevanceOf(city, tagKeys, expCount, corpus) {
     else hits = hitCount(corpus, def.re);
     if (hits <= 0) continue;
 
-    const density = hits / Math.max(6, expCount);
-    const absCore = Math.min(1, Math.pow(hits / W.absCap, W.absPow)); // 幂刻度，保留大城之间差距
-    const densCore = W.coreFloor + W.coreSpan * Math.min(1, density / W.coreSat);
-    const combo = W.absW * absCore + W.densW * densCore;
-    const d = def.w * combo;
-    sum += d;
-    if (hits >= W.hitBonusAt) sum += W.hitBonus;
+    const sc = comboScore(hits, expCount, def.w);
+    sum += sc.val; // 浮点累加（与原始一致）；hitBonus 已含于 delta 仅展示用，故此处不再加
     matched++;
     if (isReq) matchedRequired++;
     detail.push({
       key: def.key, label: def.label, hits: hits,
-      density: Math.round(density * 1000) / 1000,
-      combo: Math.round(combo * 100) / 100,
-      delta: Math.round(d) + (hits >= W.hitBonusAt ? W.hitBonus : 0),
+      density: Math.round(sc.density * 1000) / 1000,
+      combo: Math.round(sc.combo * 100) / 100,
+      delta: sc.delta,
       examples: def.foodsMin ? (city.foods || []).slice(0, 2) : hitExamples(city, def.re, 2),
     });
   }
@@ -360,19 +376,14 @@ function relevanceOfSpot(city, stTagKeys, expCount) {
     const info = map[stTagKeys[i]];
     if (!info || info.count <= 0) continue;
     const hits = info.count;
-    const density = hits / Math.max(6, expCount);
-    const absCore = Math.min(1, Math.pow(hits / W.absCap, W.absPow));
-    const densCore = W.coreFloor + W.coreSpan * Math.min(1, density / W.coreSat);
-    const combo = W.absW * absCore + W.densW * densCore;
-    const d = def.w * combo;
-    sum += d;
-    if (hits >= W.hitBonusAt) sum += W.hitBonus;
+    const sc = comboScore(hits, expCount, def.w);
+    sum += sc.val; // 浮点累加（与原始一致）；hitBonus 仅含于展示用 delta
     matched++;
     detail.push({
       key: def.key, label: def.label, hits: hits,
-      density: Math.round(density * 1000) / 1000,
-      combo: Math.round(combo * 100) / 100,
-      delta: Math.round(d) + (hits >= W.hitBonusAt ? W.hitBonus : 0),
+      density: Math.round(sc.density * 1000) / 1000,
+      combo: Math.round(sc.combo * 100) / 100,
+      delta: sc.delta,
       examples: info.examples.slice(0, 2),
     });
   }
@@ -400,7 +411,13 @@ function scoreCity(city, prefs, month) {
   /* ① 相关性（主导项）：18 类主词典 + 50 维共享词库补充信号 */
   // 50 维补充意图：在 18 类中查不到(TAG_BY_KEY 有、tagOf 无)的标签，才走"真实景点标签命中数"路径；
   // 与 18 类同名的标签（oldtown/sea/…）仍由主路径处理，保证既有黄金用例不变。
-  const stKeys = tagKeys.filter(function (k) { return ST.TAG_BY_KEY[k] && !tagOf(k); });
+  // 同义键（snowmtn↔snowmt / grassland↔grass）：主路径已覆盖该意图，补充路径跳过，避免同一意图被重复加权。
+  const stKeys = tagKeys.filter(function (k) {
+    if (!ST.TAG_BY_KEY[k] || tagOf(k)) return false;          // 主路径已处理的（同名键）
+    const syn = ST_SYNONYM_OF[k];
+    if (syn && tagOf(syn)) return false;                      // 同义键：主路径已计分，跳过防重复加权
+    return true;
+  });
   const rel = relevanceOf(city, tagKeys, expCount, corpus);
   if (rel.sum > 0) {
     const relNorm = Math.min(1, rel.sum / W.relevanceNorm);
@@ -514,12 +531,19 @@ function scoreCity(city, prefs, month) {
   reasons.sort(function (a, b) { return Math.abs(b.delta) - Math.abs(a.delta); });
   const top = reasons.slice(0, 5);
 
-  /* 主因标签（透明化）：点名 > 命中标签(18 类 或 50 维补充) > 综合热度 */
+  /* 主因标签（透明化）：点名 > 最强"内容命中"标签(18 类 ∪ 50 维) > 综合热度。
+   * 取 rel.detail 与 relST.detail 合并后 |delta| 最大者 —— 即用户意图中"证据最强"的那类，
+   * 而非数组里的第一个 18 类键（"森林 徒步 秘境"此前会误显示泛化的"山水自然"，现优先显示"森林秘境"）。
+   * 注意：只用内容命中（detail），不混入季节/预算/成熟度等加成理由，避免 reasonTag 被"正值最佳季节"抢走。 */
   let reasonTag = "";
   if (isNamed) reasonTag = "你提到的城市";
-  else if (rel.detail.length) reasonTag = rel.detail[0].label;
-  else if (relST.detail.length) reasonTag = relST.detail[0].label;
-  else reasonTag = "综合热度";
+  else {
+    const contentTags = rel.detail.concat(relST.detail);
+    if (contentTags.length) {
+      contentTags.sort(function (a, b) { return Math.abs(b.delta) - Math.abs(a.delta); });
+      reasonTag = contentTags[0].label;
+    } else reasonTag = "综合热度";
+  }
 
   /* 无明确意图时，summary 不再伪装成「命中理由」，直接说明是综合热度推荐 */
   const hasIntent = (rel.sum > 0 || relST.sum > 0) || isNamed;
