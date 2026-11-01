@@ -121,6 +121,19 @@ const PACE_WORDS = {
   speed: ["特种兵", "紧凑", "赶", "暴走", "多玩", "效率"],
 };
 const CN_NUM = { 一: 1, 两: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+// 中文月份映射（含 11/12，避免"十一月"被拆成"十"→10）
+const CN_MONTH = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10, 十一: 11, 十二: 12 };
+
+/* 从自然语言解析出行月份（"3月"/"3月份"/"三月"/"十一月"）。
+ * 仅当文本显式提到月份才返回，否则 0（交由后续回退当前月）；
+ * 带"个"的"一个月"等时长表述不会误中（正则要求数字/汉字紧邻"月"，"1个月"的"个"会打断匹配）。 */
+function parseMonthFromText(s) {
+  const num = s.match(/(\d{1,2})\s*月/);
+  if (num) { const m = parseInt(num[1], 10); if (m >= 1 && m <= 12) return m; }
+  const cn = s.match(/([一二三四五六七八九十]+)\s*月/);
+  if (cn) { const m = CN_MONTH[cn[1]]; if (m) return m; }
+  return 0;
+}
 
 /* ── 语料缓存：每座城市只拼一次 ── */
 const _corpusCache = new Map();
@@ -274,8 +287,11 @@ function extractPrefs(text, opts) {
     for (let i = 0; i < PACE_WORDS[k].length; i++) if (s.indexOf(PACE_WORDS[k][i]) >= 0) { pace = k; break; }
     if (pace !== "balance") break;
   }
+  // 月份来源优先级：调用方显式给的 month > 文本里解析出的月份 > 当前月。
+  // 此前 month 完全不读文本，导致"三月去赏花"被按当前月（如 11 月）评分，季节匹配失真。
   let month = 0;
   if (o.month) month = Math.max(1, Math.min(12, parseInt(o.month, 10) || 0));
+  if (!month) { const mt = parseMonthFromText(s); if (mt) month = mt; }
   if (!month) { try { month = new Date().getMonth() + 1; } catch (e) { month = 0; } }
 
   /* 最高级词：最老/最大/最高…——项目无"建成年代"数据，无法据此真排序，

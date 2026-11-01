@@ -12,6 +12,7 @@ const req = createRequire(process.cwd() + "/");
 const T = req("./utils/travel.js");
 const INS = req("./utils/insights.js");
 const PZ = req("./utils/personalize.js");
+const R = req("./utils/recommend.js");
 const D = T.D;
 
 let pass = 0, fail = 0;
@@ -876,6 +877,31 @@ assert("范围内 di=3 → 西安（不变）", T.segCityOfDay({ segments: mUlt.
 assert("越界 di=99 → 末段西安", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, 99) === "西安", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, 99));
 assert("越界 di=-1 → 首段北京", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, -1) === "北京", T.segCityOfDay({ segments: mUlt.segments, cityName: "北京 → 西安" }, -1));
 assert("无 segments 回退 cityName", T.segCityOfDay({ cityName: "成都" }, 99) === "成都");
+
+console.log("== 35. v1.19.175 · 推荐解析出行月份 ==");
+{
+  const cur = new Date().getMonth() + 1;
+  const ep = R.extractPrefs("三月去赏花", {});
+  assert("中文「三月」→ month=3", ep.month === 3, String(ep.month));
+  const ep2 = R.extractPrefs("3月份去海边", {});
+  assert("数字「3月」→ month=3", ep2.month === 3, String(ep2.month));
+  const ep3 = R.extractPrefs("十一月看红叶", {});
+  assert("「十一月」→ month=11", ep3.month === 11, String(ep3.month));
+  const ep4 = R.extractPrefs("十二月滑雪", {});
+  assert("「十二月」→ month=12", ep4.month === 12, String(ep4.month));
+  // 「一个月」是时长表述，不应被误解析成 1 月（正则要求数字/汉字紧邻"月"，"个"会打断）
+  const ep5 = R.extractPrefs("攒够钱一个月去玩", {});
+  assert("「一个月」不被误判为 1 月", ep5.month !== 1, String(ep5.month));
+  // 无月份信息时回退当前月（锁住兜底，避免悄然变成固定值）
+  const ep6 = R.extractPrefs("随便逛逛", {});
+  assert("无月份→回退当前月(" + cur + ")", ep6.month === cur, String(ep6.month));
+  // 显式 month 选项优先于文本解析（既有调用方契约：测试/UI 选月不被动覆盖）
+  const ep7 = R.extractPrefs("三月去，但选了10月", { month: 10 });
+  assert("显式 month 优先于文本", ep7.month === 10, String(ep7.month));
+  // 解析出的月份要真正流进推荐引擎（季节匹配据此生效）
+  const rec = R.recommend("海边 五天 三月", { topN: 3 });
+  assert("解析月份流进 recommend.prefs.month", rec.prefs && rec.prefs.month === 3, String(rec.prefs && rec.prefs.month));
+}
 
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
