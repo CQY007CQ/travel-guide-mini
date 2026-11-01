@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.175";
+const APP_VER = "1.19.176";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -162,6 +162,86 @@ const _FREE_ALTS = [
   "当地自由探索 · 河堤慢走", "当地自由探索 · 小店淘货", "当地自由探索 · 城墙边遛弯",
   "当地自由探索 · 街心公园"
 ];
+
+// v1.19.176 动线优化：同一天多个景点按地理就近重排（最近邻贪心），让「上午/下午/晚上」的
+// 游览动线更顺、少走回头路；同时挂上 day.routeCoords（按重排顺序的坐标序列），作为地图连线联动的数据基础。
+// 仅对「普通景点日」生效：含 深度游览/继续深度游览/看日出/凌晨出发/云海 等叙事拆行的是强时序特殊日
+// （山区/大景点一日游），保持原顺序，避免破坏「清晨爬山→上午登顶→下午继续」这类叙事。
+function _routeSpotsOf(name) {
+  const s = String(name || "");
+  if (!s) return [];
+  // 去掉动作前缀（抵达/入住/出发前往/前往/深度游览/继续深度游览/游览/凌晨出发）与结尾的「」
+  let t = s.replace(/^(抵达\s*\+\s*入住|出发前往|前往|深度游览|继续深度游览|游览|凌晨出发)[\s·「「]*/, "")
+           .replace(/[」』]\s*$/, "");
+  // 酒店/民宿/客栈/青旅等住宿串不是景点
+  if (/酒店|民宿|客栈|青旅/.test(t)) return [];
+  // 按 + 拆成候选景点名
+  return t.split(/\s*\+\s*/).map(x => x.trim()).filter(Boolean);
+}
+function _coordOf(cityName, name) {
+  const spots = _routeSpotsOf(name);
+  if (!spots.length || !cityName) return null;
+  for (const sp of spots) {
+    let c = null;
+    try { c = P.getSpotCoord(cityName, sp); } catch (e) { c = null; }
+    if (c && typeof c.lat === "number" && typeof c.lon === "number") return { lat: c.lat, lon: c.lon, spot: sp };
+  }
+  return null;
+}
+function _periodVocab(n) {
+  const map = {
+    1: ["上午"],
+    2: ["上午", "下午"],
+    3: ["上午", "下午", "晚上"],
+    4: ["早上", "上午", "下午", "晚上"],
+    5: ["早上", "上午", "下午", "傍晚", "晚上"]
+  };
+  if (map[n]) return map[n];
+  const base = ["上午", "下午", "晚上"];
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(base[i % 3]);
+  return out;
+}
+function _isNarrativeDay(items) {
+  return (items || []).some(it => /深度游览|继续深度游览|看日出|凌晨出发|云海|看晚霞/.test(String(it.name || "")));
+}
+function optimizeDayRoute(day) {
+  if (!day || !Array.isArray(day.items) || !day.cityName) return day;
+  const items = day.items;
+  if (_isNarrativeDay(items)) return day;
+  // 仅「非框架」真实景点参与重排；框架行（抵达/退房/返程/自由探索/休整等）位置固定
+  const slots = [];
+  items.forEach((it, i) => { if (it && typeof it.name === "string" && !isFrameName(it.name)) slots.push(i); });
+  if (slots.length < 2) return day; // 不足两个景点无需重排
+  const pts = slots.map(i => ({ idx: i, item: items[i], c: _coordOf(day.cityName, items[i].name) }));
+  const known = pts.filter(p => p.c);
+  if (known.length < 2) return day; // 多数景点查不到坐标则放弃（保持原序，安全）
+  // 最近邻贪心：从第一个已知点出发，每次选最近的下一个
+  const order = [];
+  const rest = known.slice();
+  let cur = rest.shift();
+  order.push(cur);
+  while (rest.length) {
+    let bi = -1, bd = Infinity;
+    for (let k = 0; k < rest.length; k++) {
+      const d = haversine(cur.c, rest[k].c);
+      if (d < bd) { bd = d; bi = k; }
+    }
+    cur = rest.splice(bi, 1)[0];
+    order.push(cur);
+  }
+  // 把重排后的真实景点放回原位槽，框架行不动
+  const newItems = items.slice();
+  slots.forEach((slotIdx, k) => { newItems[slotIdx] = order[k].item; });
+  day.items = newItems;
+  // 时段标签按「早→晚」重新分配，保持一天的时间叙事顺滑
+  const vocab = _periodVocab(slots.length);
+  slots.forEach((slotIdx, k) => { if (newItems[slotIdx]) newItems[slotIdx].period = vocab[k]; });
+  // 给地图联动预留：按重排顺序挂上坐标序列
+  day.routeCoords = order.map(p => ({ lat: p.c.lat, lon: p.c.lon, name: p.c.spot }));
+  return day;
+}
+
 function polishRelax(days) {
   if (!Array.isArray(days)) return days;
   // v1.19.10：按天索引轮替（原全局 ri 在 10 天行程里第 5 个休整项会与第 1 个撞文案）
@@ -180,6 +260,7 @@ function polishRelax(days) {
         }
       }
     }
+    try { optimizeDayRoute(d); } catch (e) {}
   }
   return days;
 }
