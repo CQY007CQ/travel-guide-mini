@@ -45,6 +45,28 @@ function applyCoordFix() {
   }
 }
 
+// v1.19.172 模糊 POI 坐标补录：纳林湖 / 网师园 / 九凌湖 / 新寨嘉那嘛呢石经城 此前因 geocode 30001（POI 非地址）
+// 整体跳过、长期挂在「已知未解」。现以公开权威坐标（腾讯/高德/维基/政府文档交叉确认）经城市归属校验后补入，
+// 使地图/检索/行程引用时落到真实位置而非城市中心。仅补坐标（不编造景点文案、不擅自塞进行程库），
+// 符合本项目「只加经核实数据、勿臆造」铁律。广化寺（莆田/北京重名）、石龙山（多地重名）因名称歧义、无法唯一归属，按「勿臆造」跳过。
+const SPOT_COORD_ADD = [
+  ["巴彦淖尔", "纳林湖", 40.532227, 106.64907],
+  ["苏州", "网师园", 31.298021, 120.633654],
+  ["贵港", "九凌湖", 22.966533, 109.474596],
+  ["玉树", "新寨嘉那嘛呢石经城", 33.018206, 97.059472]
+];
+let _spotCoordAdded = 0;
+function applySpotCoordAdd() {
+  for (const [city, name, lat, lon] of SPOT_COORD_ADD) {
+    if (!DATA.SPOT_COORDS[city]) DATA.SPOT_COORDS[city] = [];
+    const arr = DATA.SPOT_COORDS[city];
+    if (arr.some(r => r[0] === name)) continue; // 幂等：已存在不重复加（多分块重复调用安全）
+    arr.push([name, lat, lon]);
+    _spotCoordAdded++;
+  }
+  if (_spotCoordAdded) console.warn("[data] 模糊 POI 坐标补录 " + _spotCoordAdded + " 个");
+}
+
 // v1.19.167 景点去重：同城 SPOT_COORDS 内出现完全同名的重复副本（仙桃/天门/潜江 等，
 // 单城同一景点被录入 41 次、坐标完全一致），导致地图/行程中同一景点重复出现 40+ 次。
 // 加载时按「城市 + 景点名 + 坐标」去重，仅移除逐字节相同的副本、保留首个，零信息损失。
@@ -196,6 +218,7 @@ function applyPacked(packed) {
   }
   mergeInto(DATA, parsed);
   applyCoordFix();
+  applySpotCoordAdd();
   dedupeSpots();
   fillBestSeason();
   applyHotelAreasExtra();
