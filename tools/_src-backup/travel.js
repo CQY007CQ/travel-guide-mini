@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.176";
+const APP_VER = "1.19.177";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -242,6 +242,43 @@ function optimizeDayRoute(day) {
   return day;
 }
 
+// v1.19.177 攻略自评分：从「紧凑度 / 覆盖度 / 节奏均衡」三维度给行程打分并给改进建议。
+// 紧凑度：日内多景点平均总路程（越短越顺）；覆盖度：日均真实景点数；节奏：各天景点数离散系数（越均衡越好）。
+// 评分仅依赖已有坐标，纯离线、零额外请求；挂到 plan.evaluation 供页面「攻略评分」卡展示。
+function evaluatePlan(plan) {
+  const days = Array.isArray(plan) ? plan : ((plan && plan.days) || []);
+  if (!days.length) return { score: 0, grade: "—", suggestions: ["暂无可评估的行程"], detail: {} };
+  const narrRe = /深度游览|继续深度游览|看日出|凌晨出发|云海/;
+  const info = days.map((d, di) => {
+    const items = (d.items || []).filter(it => it && typeof it.name === "string" && !isFrameName(it.name) && !narrRe.test(it.name));
+    const coords = items.map(it => _coordOf(d.cityName, it.name)).filter(Boolean);
+    let dist = 0;
+    for (let i = 1; i < coords.length; i++) dist += haversine(coords[i - 1], coords[i]);
+    return { di, n: items.length, dist, hasCoords: coords.length >= 2 };
+  });
+  const daysN = days.length;
+  const totalSpots = info.reduce((a, x) => a + x.n, 0);
+  const avgSpots = totalSpots / daysN;
+  const distDays = info.filter(x => x.hasCoords);
+  const avgDist = distDays.length ? distDays.reduce((a, x) => a + x.dist, 0) / distDays.length : 0;
+  const mean = avgSpots;
+  const variance = info.reduce((a, x) => a + (x.n - mean) * (x.n - mean), 0) / daysN;
+  const cv = mean > 0 ? Math.sqrt(variance) / mean : 0;
+  const compactScore = Math.max(0, 100 - avgDist * 4);   // 日均 25km → 0 分
+  const coverScore = Math.min(100, avgSpots * 28);        // 日均 ~3.6 个 → 满分
+  const rhythmScore = Math.max(0, 100 - cv * 120);        // 离散系数 0.83 → 0 分
+  const score = Math.max(0, Math.min(100, Math.round(compactScore * 0.4 + coverScore * 0.35 + rhythmScore * 0.25)));
+  const grade = score >= 85 ? "优秀" : score >= 70 ? "良好" : score >= 55 ? "尚可" : "待优化";
+  const sugg = [];
+  info.forEach(x => { if (x.hasCoords && x.dist > 18) sugg.push("第" + (x.di + 1) + "天景点跨度约" + Math.round(x.dist) + "km，建议按区域就近游玩或调整顺序"); });
+  const emptyDays = info.filter(x => !x.n).length;
+  if (emptyDays > 0) sugg.push(emptyDays + " 天安排偏空，可补 1–2 个景点让行程更充实");
+  if (cv > 0.5) sugg.push("各天景点数量不均，把密集日的景点匀到空闲日，节奏更舒服");
+  if (avgSpots < 2) sugg.push("整体景点偏少，可加点特色体验（夜游 / 美食 / 演出）");
+  if (!sugg.length) sugg.push("动线紧凑、节奏均衡，是一份很顺的行程");
+  return { score, grade, suggestions: sugg, detail: { avgDist: +avgDist.toFixed(1), avgSpots: +avgSpots.toFixed(1), cv: +cv.toFixed(2) } };
+}
+
 function polishRelax(days) {
   if (!Array.isArray(days)) return days;
   // v1.19.10：按天索引轮替（原全局 ri 在 10 天行程里第 5 个休整项会与第 1 个撞文案）
@@ -276,17 +313,19 @@ function buildPlan(opts) {
  if (!city) throw new Error("unsupported city: " + (raw && (raw.name || raw)));
  const daysN = parseInt(opts.days, 10);
  if (!(daysN > 0)) throw new Error("天数无效，请至少选择 1 天");
- const _out = P.buildPlanDays(city, daysN, opts.depart, opts.budget || "mid", {
-  style: opts.pace || "balance",
-  pickSpots: opts.picks || [],
-  pickOnly: opts.pickOnly !== false,
-  stayMountain: opts.stayMountain !== false,
-  travelMode: opts.travelMode || opts.mode || "",
-  bias: opts.bias || "", // v1.15：历史古迹/自然风光/默认
-  lastMode: "return", nextCity: "", seg: 0
- });
- if (!_out || !_out.length) throw new Error("出发日期无效，请重新选择");
- return polishRelax(_out);
+  const _out = P.buildPlanDays(city, daysN, opts.depart, opts.budget || "mid", {
+   style: opts.pace || "balance",
+   pickSpots: opts.picks || [],
+   pickOnly: opts.pickOnly !== false,
+   stayMountain: opts.stayMountain !== false,
+   travelMode: opts.travelMode || opts.mode || "",
+   bias: opts.bias || "", // v1.15：历史古迹/自然风光/默认
+   lastMode: "return", nextCity: "", seg: 0
+  });
+  if (!_out || !_out.length) throw new Error("出发日期无效，请重新选择");
+  const _plan = polishRelax(_out);
+  try { _plan.evaluation = evaluatePlan(_plan); } catch (e) {}
+  return _plan;
 }
 
 /* ---------- 多站串联（≤4 站，对齐网页 generateMulti） ---------- */
@@ -349,7 +388,10 @@ function buildMultiPlan(opts) {
    dateStart: segDateStart, dateEnd: segDateEnd, days: segDays
   });
  }
-  return { days: polishRelax(out), segments, totalDays: out.length, route };
+  const _days = polishRelax(out);
+  const _res = { days: _days, segments, totalDays: out.length, route };
+  try { _res.evaluation = evaluatePlan(_days); } catch (e) {}
+  return _res;
 }
 
 /* ---------- 「全省 · 省内精华游」（镜像网页版 __all 模式） ---------- */
@@ -360,10 +402,11 @@ function buildProvPlan(opts) {
  if (!prov || !D.PROVINCE_CITIES || !D.PROVINCE_CITIES[prov]) throw new Error("unsupported province: " + prov);
  const daysN = parseInt(opts && opts.days, 10);
  if (!(daysN > 0)) throw new Error("天数无效，请至少选择 1 天");
- const _out = P.buildProvincePlanDays(prov, daysN, opts.depart, opts.budget || "mid",
-  opts.pace || "balance", opts.stayMountain !== false, opts.travelMode || "", opts.bias || "");
-  if (!_out || !_out.length) throw new Error("出发日期无效，请重新选择");
-  return polishRelax(_out);
+  const _out = P.buildProvincePlanDays(prov, daysN, opts.depart, opts.budget || "mid",
+   opts.pace || "balance", opts.stayMountain !== false, opts.travelMode || "", opts.bias || "");
+  const _plan = polishRelax(_out);
+  try { _plan.evaluation = evaluatePlan(_plan); } catch (e) {}
+  return _plan;
 }
 
 // v1.17.4：全省精华游天数上限 —— 旧实现固定用 days:12 探针再取其实际天数，
@@ -5725,7 +5768,7 @@ module.exports = {
  ready, planCheckup, swapSpotFor, askTrip,
  routeAdvicePlus, highlightOf, crowdTipOf, packExtra,
  badgesOf, yearReportNew, chinaLite, transportEstimate,
- provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, provinceDayCap, provinceSuggestedDays, cityDayCap, provBrief, nearbyCityOf, D, P,
+ provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, provinceDayCap, provinceSuggestedDays, cityDayCap, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
  spotTagOf, searchSpots,
  customBudgetObj, budgetTotalObj,

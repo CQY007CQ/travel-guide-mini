@@ -156,6 +156,7 @@ step "单测 模糊POI坐标补录 (v1.19.172)" "$NODE" tools/_test-fuzzy-poi.mj
 step "单测 坐标完整性自检 (v1.19.173)" "$NODE" tools/_test-coord-integrity.mjs
 step "单测 稀疏县景点补全 (v1.19.174)" "$NODE" tools/_test-spot-enrich.mjs
 step "单测 动线优化 (v1.19.176 最近邻贪心重排)" "$NODE" tools/_test-route-opt.mjs
+step "单测 攻略自评分 (v1.19.177 评分+建议)" "$NODE" tools/_test-score.mjs
 step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/_test-v11988-sharecard.mjs
 step "单测 plan-handlers (行程页交互回归 v1.19.109)" "$NODE" tools/_test-plan-handlers.mjs
 # v1.19.93：全页面启动冒烟——vm 模拟 17 个注册页「被打开」（Page 构造+onLoad+onShow）。
