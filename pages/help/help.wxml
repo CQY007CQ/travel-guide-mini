@@ -41,7 +41,7 @@
     </view>
   </view>
 
-  <!-- 第三步：就近医院 -->
+  <!-- 第三步：就近医院（仅展示已核验的具名医院） -->
   <view class="card er-hos" wx:if="{{city && hos.length}}">
     <view class="er-h">第三步 · 就近医院（{{city}}）</view>
     <view class="er-hrow" wx:for="{{hos}}" wx:key="n" data-i="{{index}}" bindtap="onNav">
@@ -54,13 +54,33 @@
     <view class="er-pick" bindtap="onPickCity">切换城市</view>
   </view>
 
+  <!-- 降级态：本城无已核验医院名单。不编造机构名，改为地图搜索 -->
   <view class="card er-none" wx:if="{{city && !hos.length}}">
-    <text class="er-nt">该城市暂未收录医院坐标</text>
-    <text class="er-ns">请用地图 App 搜索「医院 急诊」就近前往，或直接拨打 120。</text>
+    <text class="er-nt">{{city}} 暂无已核验的医院名单</text>
+    <text class="er-ns">为避免给出并不存在的机构，这里不列具体医院名。请在地图中搜索「医院」或「急诊」，就近前往；急危重症直接拨打 120。</text>
+    <view class="er-mapbtn" wx:if="{{apLat}}" bindtap="onMapSearch">在地图中搜索附近医院</view>
+    <view class="er-pick" bindtap="onPickCity">切换城市</view>
   </view>
 
   <view class="card er-pick-only" wx:if="{{!city}}">
     <view class="er-pick" bindtap="onPickCity">选择城市</view>
+  </view>
+
+  <!-- 城市选择弹层：可搜索（451 城超出 showActionSheet 的 6 项上限） -->
+  <view class="pk-mask" wx:if="{{pickOpen}}" bindtap="onPickClose">
+    <view class="pk-panel" catchtap="noop">
+      <view class="pk-top">
+        <input class="pk-input" value="{{kw}}" placeholder="搜索城市名" focus="{{pickOpen}}" bindinput="onPickInput"/>
+        <text class="pk-x" bindtap="onPickClose">关闭</text>
+      </view>
+      <scroll-view class="pk-list" scroll-y>
+        <view class="pk-item" wx:for="{{cityList}}" wx:key="*this" data-c="{{item}}" bindtap="onPickTap">
+          <text class="pk-n">{{item}}</text>
+          <text class="pk-tag" wx:if="{{apSet[item]}}">仅位置</text>
+        </view>
+        <view class="pk-empty" wx:if="{{!cityList.length}}">没有匹配的城市</view>
+      </scroll-view>
+    </view>
   </view>
 
   <view class="er-disclaim">

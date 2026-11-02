@@ -54,7 +54,14 @@ for (const r of D.TRIAGE) {
   ok("规则提示不得为空：" + r.dept, String(r.tip || "").trim().length >= 8);
 }
 
-let hosp = 0, cityN = 0;
+/* v1.19.180 数据可信度：HOSPITALS 只允许具名真实机构，禁止用「城市名+固定后缀」模板回填凑覆盖率 */
+const SUFFIX = ["人民医院", "中医院", "妇幼保健院", "中心医院", "第一人民医院", "第二人民医院", "第三人民医院", "中西医结合医院"];
+const TPL = (city, name) => {
+  const base = city.replace(/市$/, "");
+  return SUFFIX.some((s) => name === base + s || name === city + s);
+};
+
+let hosp = 0, cityN = 0, tplHit = 0;
 for (const c in D.HOSPITALS) {
   cityN++;
   const list = D.HOSPITALS[c] || [];
@@ -66,10 +73,35 @@ for (const c in D.HOSPITALS) {
     // 下界取 16：中国最南端三沙（永兴岛，约 16.8°N）属合法领土；上界 54 / 经度 73–135 仍能在坐标互换时拦截（互换后 lat∈73–135 必超 54 上界）。
     ok("坐标在中国境内：" + c + "/" + h.n, h.lat > 16 && h.lat < 54 && h.lon > 73 && h.lon < 135, h.lat + "," + h.lon);
     ok("距城中心 ≤25km：" + c + "/" + h.n, h.kmc > 0 && h.kmc <= 25, String(h.kmc));
+    if (TPL(c, h.n)) { tplHit++; console.log("  ✗ 模板机构名回流：" + c + "/" + h.n); }
   }
 }
-ok("覆盖城市 ≥10", cityN >= 10, cityN);
-ok("医院总数 ≥12", hosp >= 12, hosp);
+ok("不得出现模板生成的机构名（v1.19.168 教训，勿回潮）", tplHit === 0, tplHit + " 条");
+ok("具名医院覆盖 ≥100 城", cityN >= 100, cityN);
+ok("具名医院总数 ≥140 家", hosp >= 140, hosp);
+
+/* 降级城市：只有城中心坐标，不得含任何医院记录 */
+let apN = 0;
+for (const c in D.APPROX) {
+  apN++;
+  const p = D.APPROX[c];
+  ok("降级城坐标合法：" + c, Array.isArray(p) && p.length === 2 && p[0] > 16 && p[0] < 54 && p[1] > 73 && p[1] < 135, JSON.stringify(p));
+  ok("降级城不得同时含具名医院：" + c, !D.HOSPITALS[c]);
+}
+ok("降级城市数 ≥200", apN >= 200, apN);
+ok("两集合不重叠且合成可选城市全集", (() => {
+  const a = new Set(Object.keys(D.HOSPITALS)), b = new Set(Object.keys(D.APPROX));
+  for (const k of b) if (a.has(k)) return false;
+  const all = E.cities();
+  return all.length === a.size + b.size;
+})());
+ok("isApprox/approxCoord 与数据一致", (() => {
+  const ap = Object.keys(D.APPROX)[0];
+  const vf = Object.keys(D.HOSPITALS)[0];
+  return E.isApprox(ap) === true && E.isApprox(vf) === false &&
+    Array.isArray(E.approxCoord(ap)) && E.approxCoord(vf) === null &&
+    E.hospitalsOf(ap).length === 0 && E.hospitalsOf(vf).length > 0;
+})());
 
 /* 排序是纯几何（距城中心升序），不是主观推荐 */
 ok("医院按距城中心升序", (() => {

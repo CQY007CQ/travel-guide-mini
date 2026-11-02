@@ -70,6 +70,38 @@ function coordOf(cityName) {
 const _WX_CACHE = {};
 const _WX_TTL = 10 * 60 * 1000;
 
+// v1.19.180：持久化天气缓存 —— 进程内缓存一冷启动就没了，弱网/飞行模式下首次进行程页必然空窗。
+// 落盘一份（按 城市|当天|域名 为键，30 分钟 TTL），冷启动时先读盘，能直接出天气再后台刷新。
+// 全程 try/catch：存储不可用（Node 测试 / 隐私限制）时静默退回纯内存，不影响主流程。
+const _PK = "wxcacheV1.";
+const _WX_TTL_DISK = 30 * 60 * 1000;
+function _diskGet(k) {
+  try {
+    if (typeof wx === "undefined" || !wx.getStorageSync) return null;
+    const r = wx.getStorageSync(_PK + k);
+    if (!r || !r.t || !r.v) return null;
+    if (Date.now() - r.t > _WX_TTL_DISK) return null;
+    return r.v;
+  } catch (e) { return null; }
+}
+function _diskSet(k, v) {
+  try {
+    if (typeof wx === "undefined" || !wx.setStorageSync) return;
+    wx.setStorageSync(_PK + k, { t: Date.now(), v: v });
+    // 只保留最近 6 个城市的盘上缓存，避免长期累积把本地存储撑大
+    let idx = [];
+    try { idx = wx.getStorageSync("wxcacheIdxV1") || []; } catch (e) { idx = []; }
+    idx = idx.filter((x) => x && x.k !== k);
+    idx.push({ k: k, t: Date.now() });
+    if (idx.length > 6) {
+      const drop = idx.slice(0, idx.length - 6);
+      idx = idx.slice(idx.length - 6);
+      for (const d of drop) { try { wx.removeStorageSync(_PK + d.k); } catch (e) {} }
+    }
+    wx.setStorageSync("wxcacheIdxV1", idx);
+  } catch (e) {}
+}
+
 // 多城行程：每天归属的城市（day.cityName 优先，缺失时按 segments 区间回退，再回退 plan.cityName）。
 // byCity 作为「该候选是否真有数据」的二次校验，避免 day.cityName 与分段城市名不一致导致整天天气丢失。
 function dayCityOf(plan, k, byCity) {
@@ -189,6 +221,7 @@ function fetchPlanWeather(plan, cb) {
           } else {
             const byDate = normDaily(d.daily);
             _WX_CACHE[wkey] = { t: Date.now(), v: byDate };
+            _diskSet(wkey, byDate); // v1.19.180 同时落盘，冷启动可直接复用
             byCity[city] = { byDate: byDate, city: city };
           }
         } catch (e) { byCity[city] = { byDate: {}, city: city }; }
@@ -212,6 +245,13 @@ function fetchPlanWeather(plan, cb) {
     const wkey = city + "|" + todayYMD + "|" + QW_API_HOST;
     const cached = _WX_CACHE[wkey];
     if (cached && (Date.now() - cached.t) < _WX_TTL) { byCity[city] = { byDate: cached.v, city: city }; return; }
+    // v1.19.180：内存未命中先看盘（冷启动/切页场景），命中即先出天气，不阻塞首屏
+    const disk = _diskGet(wkey);
+    if (disk) {
+      _WX_CACHE[wkey] = { t: Date.now(), v: disk };
+      byCity[city] = { byDate: disk, city: city };
+      return;
+    }
     pending++;
     loadCity(city, c, wkey, 0); // 首请求同步发起（保证单测同步断言有效），失败才异步重试
   });

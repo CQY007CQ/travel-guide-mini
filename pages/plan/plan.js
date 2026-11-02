@@ -1153,9 +1153,19 @@ Page(SafePage({
     const city = plan ? (plan.cityName || "") : "";
     const days = plan && plan.days ? plan.days.length : 0;
     // v1.19.76：分享带 city/days 深链参数，对方点开直达「已填好该城市的出发页」，提升搜索/分享获客
+    // v1.19.180：再带上 depart/pace/budget/mode 与 auto=1 —— 行程生成是确定性的，
+    //            参数齐了对方点开即可复现同一份行程（同款攻略），不用自己再调一遍选项。
     const q = [];
     if (city) q.push("city=" + encodeURIComponent(city));
     if (days) q.push("days=" + days);
+    try {
+      const d0 = plan && plan.days && plan.days[0] && plan.days[0].date;
+      if (d0) q.push("depart=" + encodeURIComponent(String(d0).slice(0, 10)));
+      if (plan && plan.pace) q.push("pace=" + encodeURIComponent(plan.pace));
+      if (plan && plan.budget) q.push("budget=" + encodeURIComponent(plan.budget));
+      if (plan && plan.travelMode) q.push("mode=" + encodeURIComponent(plan.travelMode));
+      if (city && days) q.push("auto=1");
+    } catch (e) {}
     const path = "/pages/index/index" + (q.length ? "?" + q.join("&") : "");
     const ret = {
       title: (plan ? "我做了份「" + plan.cityName + "·" + days + "天攻略」，景点路线美食都排好了" : "旅行攻略生成器") + "（离线可用）",

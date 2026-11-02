@@ -218,3 +218,87 @@
   line-height: 1.7;
   color: var(--t4, #7d92ab);
 }
+
+/* ── 降级态：地图搜索按钮（不列具名医院，给可执行动作） ── */
+.er-mapbtn {
+  margin-top: 20rpx;
+  height: 84rpx;
+  line-height: 84rpx;
+  text-align: center;
+  border-radius: 18rpx;
+  font-size: calc(25rpx * var(--fs, 1));
+  font-weight: 700;
+  color: var(--gold-tx, #8f6a1f);
+  background: var(--gold-bg, rgba(201, 162, 74, .12));
+  border: 1rpx solid var(--gold-line, rgba(201, 162, 74, .42));
+}
+.er-mapbtn:active { opacity: .86; }
+
+/* ── 城市选择弹层 ── */
+.pk-mask {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(6, 10, 18, .5);
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+}
+.pk-panel {
+  width: 100%;
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 26rpx 26rpx 0 0;
+  background: var(--card-bg, #fff);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+}
+.pk-top {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 22rpx 24rpx;
+  border-bottom: 1rpx solid var(--line, rgba(125, 146, 171, .18));
+}
+.pk-input {
+  flex: 1;
+  height: 68rpx;
+  padding: 0 20rpx;
+  border-radius: 14rpx;
+  font-size: calc(25rpx * var(--fs, 1));
+  color: var(--tx, #18233a);
+  background: var(--input-bg, rgba(125, 146, 171, .1));
+}
+.pk-x {
+  flex: none;
+  font-size: calc(24rpx * var(--fs, 1));
+  color: var(--t3, #64748b);
+  padding: 8rpx 4rpx;
+}
+.pk-list { flex: 1; max-height: 62vh; }
+.pk-item {
+  display: flex;
+  align-items: center;
+  height: 84rpx;
+  padding: 0 28rpx;
+  border-bottom: 1rpx solid var(--line, rgba(125, 146, 171, .12));
+}
+.pk-item:active { background: rgba(125, 146, 171, .1); }
+.pk-n {
+  font-size: calc(26rpx * var(--fs, 1));
+  color: var(--tx, #18233a);
+}
+.pk-tag {
+  margin-left: 14rpx;
+  font-size: calc(18rpx * var(--fs, 1));
+  color: var(--t4, #7d92ab);
+  border: 1rpx solid var(--line, rgba(125, 146, 171, .3));
+  border-radius: 8rpx;
+  padding: 2rpx 8rpx;
+}
+.pk-empty {
+  padding: 44rpx 0;
+  text-align: center;
+  font-size: calc(23rpx * var(--fs, 1));
+  color: var(--t4, #7d92ab);
+}

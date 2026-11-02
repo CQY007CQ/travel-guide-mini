@@ -196,7 +196,47 @@ Page(SafePage({
           this.setData({ days: d, daysText: d + " 天" });
         }
       }
+      // v1.19.180：接住分享方带来的生成参数，并支持 auto=1 一键复现同款行程。
+      // 行程生成是确定性的（同城/同天数/同日期/同节奏 → 同一份行程），故参数齐即可复现。
+      const patch = {};
+      try {
+        if (options.pace && Array.isArray(this.data.paceVals)) {
+          const i = this.data.paceVals.indexOf(String(options.pace));
+          if (i >= 0) patch.paceIdx = i;
+        }
+        if (options.budget && Array.isArray(this.data.budgetKeys)) {
+          const i = this.data.budgetKeys.indexOf(String(options.budget));
+          if (i >= 0) patch.budgetIdx = i;
+        }
+        if (options.mode && Array.isArray(this.data.travelModeVals)) {
+          const i = this.data.travelModeVals.indexOf(String(options.mode));
+          if (i >= 0) patch.travelModeIdx = i;
+        }
+        // 出发日：仅接受不早于今天的日期，避免打开一份过期行程
+        if (options.depart) {
+          const dp = String(decodeURIComponent(options.depart)).slice(0, 10);
+          const t = new Date(dp + "T00:00:00");
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          if (!isNaN(t.getTime()) && t.getTime() >= today.getTime()) patch.depart = dp;
+        }
+      } catch (e) {}
+      if (Object.keys(patch).length) {
+        this.setData(patch, () => { try { this._syncAdv(); } catch (e) {} });
+      }
       wx.showToast({ title: "已为你填好「" + cn + "」", icon: "none" });
+      // auto=1：对方是「打开别人的攻略」，直接生成同一份行程进入行程页
+      if (String(options.auto) === "1") {
+        this._autoGenOnce = true;
+        setTimeout(() => {
+          if (!this._autoGenOnce) return;
+          this._autoGenOnce = false;
+          try {
+            const D = T.D;
+            if (D && D.__dataReady === false) { this.__autoPending = true; return; }
+            this.generate();
+          } catch (e) { /* 自动生成失败则留在首页，用户可手动点 */ }
+        }, 420);
+      }
     } catch (e) { /* 深链失败静默降级，不影响首页正常使用 */ }
   },
 
@@ -209,6 +249,11 @@ Page(SafePage({
     if (!p || typeof p !== "object") return;
     const deepCity = !!(options && options.city);
     const deepDays = !!(options && options.days);
+    // v1.19.180：深链若已指定节奏/预算/出行方式（来自「打开别人的攻略」），这些维度不再被偏好覆盖，
+    // 否则对方看到的行程就复现不出来了。
+    const deepPace = !!(options && options.pace);
+    const deepBudget = !!(options && options.budget);
+    const deepMode = !!(options && options.mode);
     // 城市：仅当深链未指定时才用偏好（跨省份也要正确切到偏好城市所在的省）
     if (!deepCity && p.city) {
       try {
@@ -222,9 +267,9 @@ Page(SafePage({
     // 天数 / 节奏 / 出行方式 / 预算：用偏好补齐（深链已设天数则跳过）
     const patch = {};
     if (!deepDays && p.days && p.days > 0) { patch.days = p.days; patch.daysText = p.days + " 天"; }
-    if (p.pace && Array.isArray(this.data.paceVals)) { const i = this.data.paceVals.indexOf(p.pace); if (i >= 0) patch.paceIdx = i; }
-    if (p.travelMode && Array.isArray(this.data.travelModeVals)) { const i = this.data.travelModeVals.indexOf(p.travelMode); if (i >= 0) patch.travelModeIdx = i; }
-    if (p.budget && Array.isArray(this.data.budgetKeys)) { const i = this.data.budgetKeys.indexOf(p.budget); if (i >= 0) patch.budgetIdx = i; }
+    if (p.pace && !deepPace && Array.isArray(this.data.paceVals)) { const i = this.data.paceVals.indexOf(p.pace); if (i >= 0) patch.paceIdx = i; }
+    if (p.travelMode && !deepMode && Array.isArray(this.data.travelModeVals)) { const i = this.data.travelModeVals.indexOf(p.travelMode); if (i >= 0) patch.travelModeIdx = i; }
+    if (p.budget && !deepBudget && Array.isArray(this.data.budgetKeys)) { const i = this.data.budgetKeys.indexOf(p.budget); if (i >= 0) patch.budgetIdx = i; }
     if (Object.keys(patch).length) {
       this.setData(patch, () => { try { this._syncAdv(); } catch (e) {} });
     }
