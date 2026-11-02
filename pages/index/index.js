@@ -212,12 +212,10 @@ Page(SafePage({
           const i = this.data.travelModeVals.indexOf(String(options.mode));
           if (i >= 0) patch.travelModeIdx = i;
         }
-        // 出发日：仅接受不早于今天的日期，避免打开一份过期行程
+        // 出发日：过期（早于今天）顺延今天，保证 auto=1 复现的是「今天起」的有效行程（v1.19.182）
         if (options.depart) {
-          const dp = String(decodeURIComponent(options.depart)).slice(0, 10);
-          const t = new Date(dp + "T00:00:00");
-          const today = new Date(); today.setHours(0, 0, 0, 0);
-          if (!isNaN(t.getTime()) && t.getTime() >= today.getTime()) patch.depart = dp;
+          const clamped = T.clampDepart(String(decodeURIComponent(options.depart)));
+          if (clamped) patch.depart = clamped;
         }
       } catch (e) {}
       if (Object.keys(patch).length) {

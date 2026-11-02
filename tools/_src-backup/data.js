@@ -98,6 +98,71 @@ function applySpotEnrich() {
   if (_spotEnriched) console.warn("[data] 稀疏县景点补全 " + _spotEnriched + " 个");
 }
 
+// v1.19.182 美食富信息扩城：把「非试点 20 城」的热门旅游城，补上经公开资料核验的
+// 真实老字号 / 招牌菜 / 参考价 / 编辑点评（menu/rep/note），补齐富信息覆盖空白。
+// 合规：仅补经核验数据、不臆造；menu 价写「参考价」、rep 取自白名单、note 为编辑点评。
+// 增量合并：按「城市 + 店名」定位 —— 若 base 已存在同名店则补 menu/rep/note（不覆盖已有），否则新增，幂等安全。
+// 数据来源（公开探店 / 老字号资料交叉核验）：天津（登瀛楼/耳朵眼/桂发祥/红旗饭庄）、
+// 哈尔滨（老厨家/马迭尔/秋林里道斯/华梅）、兰州（马子禄/吾穆勒/磨沟沿）。后续城按同管线续补。
+const FOOD_ENRICH = [
+  ["天津", "登瀛楼饭庄", [["罾蹦鲤鱼", 68], ["八珍豆腐", 48], ["老爆三", 42]], "老字号", "1913 年创立的津鲁菜代表，罾蹦鲤鱼带鳞炸透浇糖醋汁，外酥里嫩"],
+  ["天津", "耳朵眼炸糕", [["炸糕", 3]], "老字号", "津门三绝之一，糯米皮现炸外酥里糯，豆沙绵密"],
+  ["天津", "桂发祥十八街麻花", [["夹馅麻花", 25]], "老字号", "1927 年创号，国家级非遗技艺，伴手礼首选"],
+  ["天津", "红旗饭庄", [["罾蹦鲤鱼", 68], ["独面筋", 42]], "老字号", "1925 年开业，津菜活化石，八大碗非遗传承基地"],
+  ["哈尔滨", "老厨家", [["锅包肉", 48], ["得莫利炖鱼", 85]], "老字号", "1910 年创立，锅包肉发源地，第四代传人主理"],
+  ["哈尔滨", "马迭尔冷饮厅", [["原味冰棍", 5]], "游客打卡", "1906 年传承，中央大街地标冷饮，纯奶香无添加"],
+  ["哈尔滨", "秋林里道斯", [["红肠", 30]], "老字号", "俄式熏肠本土代表，果木熏烤蒜香浓郁，可真空作伴手礼"],
+  ["哈尔滨", "华梅西餐厅", [["罐焖牛肉", 68], ["红菜汤", 38]], "老字号", "1925 年俄式西餐老字号，罐焖牛肉酥皮封口"],
+  ["兰州", "马子禄牛肉面", [["牛肉面(二细)", 12]], "老字号", "1915 年百年中华老字号，游客求稳首选，一清二白三红四绿五黄"],
+  ["兰州", "吾穆勒蓬灰牛肉面", [["厚切牛肉面", 18]], "本地人常去", "蓬灰和面更筋道，厚切卤牛肉比硬币还厚"],
+  ["兰州", "磨沟沿老字号", [["牛肉面(二细)", 16]], "本地人常去", "凌晨 4 点牛骨羊脊骨鸡架三吊 18 小时，汤清亮如琥珀"]
+];
+const FOOD_REP_OK = new Set(["老字号", "本地人常去", "游客打卡", "市井烟火", "宴请名店"]);
+let _foodEnriched = 0;
+function applyFoodEnrich() {
+  for (const [city, name, menu, rep, note] of FOOD_ENRICH) {
+    if (!DATA.FOOD_SPOTS[city]) DATA.FOOD_SPOTS[city] = [];
+    const arr = DATA.FOOD_SPOTS[city];
+    let shop = arr.find(s => s && s.shop === name);
+    if (!shop) { shop = { shop: name }; arr.push(shop); _foodEnriched++; }
+    if (!Array.isArray(shop.menu) || !shop.menu.length) {
+      shop.menu = (menu || []).map(m => ({ n: m[0], p: typeof m[1] === "number" ? "¥" + m[1] : m[1] }));
+    }
+    if (!shop.rep) shop.rep = rep;
+    if (!shop.note) shop.note = note;
+  }
+  if (_foodEnriched) console.warn("[data] 美食富信息扩城 " + _foodEnriched + " 家（增量合并）");
+}
+
+// v1.19.182 团队合并入口：由 tools/_merge-team-enrich.mjs 把 7 人分区采集结果注入 TEAM_FOOD_ENRICH。
+// 与 applyFoodEnrich 同口径：按「城市 + 店名」定位，缺失字段才补，幂等安全。
+// >>>TEAM_FOOD_START>>>
+const TEAM_FOOD_ENRICH = {};
+// <<<TEAM_FOOD_END<<<
+let _teamFoodAdded = 0;
+function applyTeamFoodEnrich() {
+  for (const city in TEAM_FOOD_ENRICH) {
+    const shops = TEAM_FOOD_ENRICH[city];
+    if (!Array.isArray(shops) || !shops.length) continue;
+    if (!DATA.FOOD_SPOTS[city]) DATA.FOOD_SPOTS[city] = [];
+    const arr = DATA.FOOD_SPOTS[city];
+    for (const sh of shops) {
+      if (!sh || !sh.shop) continue;
+      let shop = arr.find(s => s && s.shop === sh.shop);
+      if (!shop) { shop = { shop: sh.shop }; arr.push(shop); _teamFoodAdded++; }
+      if (sh.lat != null) shop.lat = sh.lat;
+      if (sh.lon != null) shop.lon = sh.lon;
+      if (sh.price) shop.price = sh.price;
+      if (!Array.isArray(shop.menu) || !shop.menu.length) {
+        shop.menu = (sh.menu || []).map(m => ({ n: m.n, p: (typeof m.p === "number" ? "¥" + m.p : m.p) }));
+      }
+      if (!shop.rep) shop.rep = sh.rep;
+      if (!shop.note) shop.note = sh.note;
+    }
+  }
+  if (_teamFoodAdded) console.warn("[data] 团队美食合并 " + _teamFoodAdded + " 家（增量合并）");
+}
+
 // v1.19.167 景点去重：同城 SPOT_COORDS 内出现完全同名的重复副本（仙桃/天门/潜江 等，
 // 单城同一景点被录入 41 次、坐标完全一致），导致地图/行程中同一景点重复出现 40+ 次。
 // 加载时按「城市 + 景点名 + 坐标」去重，仅移除逐字节相同的副本、保留首个，零信息损失。
@@ -167,6 +232,50 @@ function applyHotelAreasExtra() {
     }
   }
   if (_hotelAreasMerged) console.warn("[data] 扩展酒店住宿区域并入 " + _hotelAreasMerged + " 条");
+}
+
+// v1.19.183 逐酒店 + 房型扩展：把 utils/hotel-areas.js 的 HOTEL_LIST_EXTRA（公开常识级具名真酒店种子）
+// 与 TEAM_HOTEL_LIST_ENRICH（7 人分区采集，含房型）按城市名并入 CITIES[].hotels，
+// 闭环原始需求「酒店的位置、价格、所开房型」。
+// 合规：具名真实、房价写参考价区间、房型为通用类别；坐标真实优先，空则运行时回退城市中心。
+// 幂等：按酒店名去重，多数据分块重复调用 applyPacked 也不重复追加。
+let _hotelListMerged = 0;
+function findCityByName(cn) {
+  let c = DATA.CITIES.find(x => x && x.name === cn);
+  if (!c && typeof cn === "string" && cn.endsWith("市")) c = DATA.CITIES.find(x => x && x.name === cn.slice(0, -1));
+  return c;
+}
+function applyHotelListExtra() {
+  const SRC = (HA && HA.HOTEL_LIST_EXTRA) || {};
+  const TEAM = (HA && HA.TEAM_HOTEL_LIST_ENRICH) || {};
+  const mergeFrom = (map) => {
+    if (!map || typeof map !== "object") return;
+    for (const cn in map) {
+      const arr = map[cn];
+      if (!Array.isArray(arr) || !arr.length) continue;
+      const c = findCityByName(cn);
+      if (!c) continue;
+      if (!Array.isArray(c.hotelList)) c.hotelList = [];
+      const have = new Set(c.hotelList.map(h => (h && h.name) || ""));
+      for (const h of arr) {
+        if (!h || !h.name || have.has(h.name)) continue;
+        c.hotelList.push({
+          name: String(h.name),
+          addr: h.addr || "",
+          price: h.price || "",
+          rooms: Array.isArray(h.rooms) ? h.rooms.map(r => ({ type: String(r && r.type || ""), price: (r && r.price) || "" })).filter(r => r.type) : [],
+          lat: (h.lat != null && h.lat !== "") ? +h.lat : null,
+          lon: (h.lon != null && h.lon !== "") ? +h.lon : null,
+          note: h.note || "",
+          collected: h.collected || ""
+        });
+        have.add(h.name); _hotelListMerged++;
+      }
+    }
+  };
+  mergeFrom(SRC);
+  mergeFrom(TEAM);
+  if (_hotelListMerged) console.warn("[data] 逐酒店+房型并入 " + _hotelListMerged + " 家");
 }
 
 function b64ToBytes(b64) {
@@ -298,9 +407,12 @@ function applyPacked(packed) {
   applyCoordFix();
   applySpotCoordAdd();
   applySpotEnrich(); // v1.19.174 稀疏县景点补全
+  applyFoodEnrich(); // v1.19.182 美食富信息扩城（加载期增量合并，不进打包基数据）
+  applyTeamFoodEnrich(); // v1.19.182 团队美食合并（7 人分区采集，加载期增量合并）
   dedupeSpots();
   fillBestSeason();
   applyHotelAreasExtra();
+  applyHotelListExtra(); // v1.19.183 逐酒店 + 房型并入 CITIES[].hotels
   checkCoordIntegrity(); // v1.19.173 只读自检：加载期暴露坐标回归，零改写零重打包风险
   DATA.__dataReady = true;
   return DATA;
@@ -343,11 +455,9 @@ function initData() {
       // v1.19.64：先给每条挂 applyPacked（无论多晚拿到都应用，绝不丢数据），
       // 再用 Promise.race 限时推进 —— 分包慢/卡时也不至于让 ready() 永不 resolve（黑屏）。
       const _jobs = [
-        require.async("../subdata/data/data-packed.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; }),
-        require.async("../subdata2/data/data-packed2.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; })
+        require.async("../subdata/data/data-packed.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; })
       ];
       await Promise.race([Promise.all(_jobs), _sleep(9000)]);
-      // 若数据被拆到 subdata3…：在此按同样一行格式再追加一条字面量。
     } else {
       // Node / 测试端：无 require.async，直接同步 require（可用变量；微信那条约束不适用）
       for (const p of CHUNK_PATHS) {

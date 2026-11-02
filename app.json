@@ -71,18 +71,6 @@
       ]
     },
     {
-      "root": "subdata2",
-      "pages": [
-        "boost2/boost2"
-      ]
-    },
-    {
-      "root": "subdata3",
-      "pages": [
-        "boost3/boost3"
-      ]
-    },
-    {
       "root": "subai",
       "pages": [
         "deep/deep"

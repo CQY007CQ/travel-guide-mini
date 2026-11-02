@@ -159,6 +159,14 @@ step "单测 动线优化 (v1.19.176 最近邻贪心重排)" "$NODE" tools/_test
 step "单测 攻略自评分 (v1.19.177 评分+建议)" "$NODE" tools/_test-score.mjs
 step "单测 跨会话偏好学习 (v1.19.178 记/取/回填)" "$NODE" tools/_test-prefs.mjs
 step "单测 字号无障碍 (v1.19.181 跟随系统字号)" "$NODE" tools/_test-a11y.mjs
+# v1.19.182：全量城市空天 / 稀疏扫描门禁（守护 cityDayCap 上限，防稀疏县末天空天回归）
+step "单测 全量空天扫描 (v1.19.182)" "$NODE" tools/_scan-sparse.mjs
+# v1.19.182：批量生成冒烟门禁（多城 × 多天数 × 多节奏，统计异常率 / 空天率 / 评分基线）
+step "单测 批量生成冒烟 (v1.19.182)" "$NODE" tools/_smoke-batch.mjs
+# v1.19.182：分享深链出发日边界（过期顺延今天，保证 auto=1 复现有效行程）
+step "单测 分享过期日期边界 (v1.19.182)" "$NODE" tools/_test-clamp-depart.mjs
+# v1.19.182：美食富信息扩城（加载期增量合并，字段完整 / 同城幂等）
+step "单测 美食富信息扩城 (v1.19.182)" "$NODE" tools/_test-food-enrich.mjs
 step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/_test-v11988-sharecard.mjs
 step "单测 plan-handlers (行程页交互回归 v1.19.109)" "$NODE" tools/_test-plan-handlers.mjs
 # v1.19.93：全页面启动冒烟——vm 模拟 17 个注册页「被打开」（Page 构造+onLoad+onShow）。
@@ -203,6 +211,22 @@ step "导航死链审计 (按键跳转)" "$NODE" tools/_nav-audit.mjs
 # 【v1.19.78 修正】微信约束是「每包独立 2MB 压缩后红线」，旧版把全项目（含 1.7MB 数据分包）
 # 累加成一个数去比对 2MB → 必然误报。改为按 app.json 主包+各分包逐包核算（tools/check-pkgsize.mjs）。
 step "分包体积体检 (每包 2MB 红线)" "$NODE" tools/check-pkgsize.mjs
+
+# 【v1.19.182 体积预算门禁】把「数据分包被静默撑爆 / 主包逻辑膨胀」从「上传后盯尺寸表」升级为 fail-fast。
+# data-packed.js 硬红线 1800KB（字节精确）：超阈值即红（防数据回归把包撑爆，也卡住残包异常缩小由 verify-release 兜底）；
+# utils 主包逻辑总体积预算 ≤1000KB：留足 headroom 的同时卡住无谓膨胀（富信息/覆盖层增量都算在主包内）。
+step "体积预算门禁 (data≤1800KB / utils≤1000KB)" bash -c '
+  dp="subdata/data/data-packed.js"; [ -f "$dp" ] || dp=$(ls subdata*/data/data-packed*.js 2>/dev/null | head -1)
+  sz=0; [ -f "$dp" ] && sz=$(wc -c < "$dp")
+  ut=$(cat utils/*.js 2>/dev/null | wc -c)
+  echo "  data-packed: $((sz/1024))KB  红线 1800KB"
+  echo "  utils 逻辑:  $((ut/1024))KB  预算 1000KB"
+  bad=0
+  [ "$sz" -gt 1843200 ] && { echo "  ✗ FAIL: data-packed 超 1800KB"; bad=1; }
+  [ "$ut" -gt 1024000 ] && { echo "  ✗ FAIL: utils 主包逻辑超 1000KB"; bad=1; }
+  [ "$sz" -lt 102400 ] && { echo "  ✗ FAIL: data-packed 异常偏小（疑似残包）"; bad=1; }
+  exit $bad
+'
 
 # 【P0-2 发布安全门禁】把「数据分包被 ignoreUploadUnusedFiles 静默剥离成 10KB 残包」这条
 # 最危险的静默灾难型 footgun 从「上传后人工盯尺寸表」升级为 fail-fast。详见 tools/verify-release.mjs。

@@ -568,6 +568,14 @@
 
 .bf-ap { display: block; font-size: calc(20rpx * var(--fs, 1)); color: var(--acc, #d4a94e); line-height: 1.7; margin-top: 3rpx; }
 
+.bf-hotel { padding: 12rpx 0; border-top: 1rpx dashed rgba(var(--ln-rgb, 148, 163, 184), .12); }
+.bf-hotel:first-of-type { border-top: none; padding-top: 4rpx; }
+.bf-hn { font-size: calc(23rpx * var(--fs, 1)); font-weight: 600; color: var(--t1, #eaeff7); }
+.bf-hx { font-size: calc(20rpx * var(--fs, 1)); color: var(--t2, #c3cfe0); margin-top: 2rpx; }
+.bf-hp { font-size: calc(20rpx * var(--fs, 1)); color: var(--acc, #d4a94e); margin-top: 4rpx; }
+.bf-hnote { font-size: calc(19rpx * var(--fs, 1)); color: var(--t2, #c3cfe0); margin-top: 6rpx; line-height: 1.6; }
+.bf-hhint { font-size: calc(18rpx * var(--fs, 1)); color: var(--t3, #8b98ad); margin-top: 12rpx; line-height: 1.6; }
+
 /* ===== v1.6 · 每天行尾：加景点 / 怎么去 ===== */
 .day-foot {
   display: flex; gap: 14rpx; margin-top: 22rpx;
@@ -736,6 +744,13 @@
 .day-tag { display: inline-block; margin-left: 12rpx; padding: 2rpx 14rpx; border-radius: 20rpx; font-size: calc(19rpx * var(--fs, 1)); color: #a07d2c; background: rgba(212,169,78,.14); border: 1rpx solid rgba(212,169,78,.28); vertical-align: 1rpx; }
 
 .td .day-tag { color: #e0bd6a; background: rgba(212,169,78,.12); }
+
+/* v1.19.182：天气 × 行程联动 —— 雨天日标 + 雨天引导 + 长行程天气兜底提示（冷蓝调，区别于金色主强调） */
+.day-rain { display: inline-flex; align-items: center; gap: 4rpx; margin-left: 12rpx; padding: 2rpx 12rpx; border-radius: 20rpx; font-size: calc(19rpx * var(--fs, 1)); color: #7fb3e8; background: rgba(94,160,220,.14); border: 1rpx solid rgba(94,160,220,.3); vertical-align: 1rpx; }
+.day-rain-hint { display: flex; align-items: center; gap: 8rpx; margin: 8rpx 0 2rpx; font-size: calc(20rpx * var(--fs, 1)); color: #9fc4e6; background: rgba(94,160,220,.1); border-radius: 12rpx; padding: 8rpx 14rpx; }
+.day-rain-hint .ic, .day-rain .ic { width: 24rpx; height: 24rpx; opacity: .9; flex: none; }
+.wx-long-hint { display: flex; align-items: center; gap: 8rpx; margin: 10rpx 2rpx 2rpx; font-size: calc(20rpx * var(--fs, 1)); color: var(--dim, #9aa6b8); }
+.wx-long-hint .ic { width: 24rpx; height: 24rpx; opacity: .8; flex: none; }
 
 .mv-line { display: flex; align-items: center; gap: 8rpx; font-size: calc(21rpx * var(--fs, 1)); margin: 14rpx 20rpx 0; color: var(--tx-3, #64748b); }
 

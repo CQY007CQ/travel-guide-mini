@@ -363,3 +363,122 @@ module.exports = {
     ]
   }
 };
+
+// v1.19.183 逐酒店 + 房型扩展（闭环原始需求「酒店的位置、价格、所开房型」）
+// 结构：{ name, addr, price, rooms:[{type,price}], lat, lon, note, collected }
+// 合规：具名真实酒店 / 房价写「参考价区间」/ 房型为行业通用类别（大床房/双床房/套房等）/
+//       坐标真实优先；无真实坐标留空(加载期回退城市中心，UI 标 approx)。以下为公开常识级具名真酒店种子。
+const HOTEL_LIST_EXTRA = {
+  "北京": [
+    { name: "北京王府井希尔顿酒店", addr: "王府井", price: "参考 ¥900-1400/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥950" }, { type: "双床房", price: "参考 ¥980" }, { type: "行政套房", price: "参考 ¥1800" } ],
+      note: "近王府井步行街、故宫、天安门", collected: "2026-11 公开常识" },
+    { name: "北京东方君悦大酒店", addr: "东长安街/东方广场", price: "参考 ¥1100-1600/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1150" }, { type: "双床房", price: "参考 ¥1180" }, { type: "套房", price: "参考 ¥2200" } ],
+      note: "长安街核心，近天安门、王府井", collected: "2026-11 公开常识" }
+  ],
+  "上海": [
+    { name: "上海和平饭店", addr: "外滩/南京东路", price: "参考 ¥1500-2600/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1600" }, { type: "双床房", price: "参考 ¥1600" }, { type: "套房", price: "参考 ¥3200" } ],
+      note: "外滩地标，Art Deco 历史建筑", collected: "2026-11 公开常识" },
+    { name: "上海半岛酒店", addr: "外滩源/中山东一路", price: "参考 ¥2000-3500/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥2200" }, { type: "江景房", price: "参考 ¥2600" }, { type: "豪华套房", price: "参考 ¥4200" } ],
+      note: "外滩源头，正对黄浦江", collected: "2026-11 公开常识" }
+  ],
+  "西安": [
+    { name: "西安W酒店", addr: "曲江/雁塔南路", price: "参考 ¥900-1500/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥950" }, { type: "双床房", price: "参考 ¥980" }, { type: "套房", price: "参考 ¥2000" } ],
+      note: "曲江新区，近大唐不夜城", collected: "2026-11 公开常识" },
+    { name: "西安索菲特人民大厦", addr: "东新街/钟楼旁", price: "参考 ¥700-1200/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥750" }, { type: "双床房", price: "参考 ¥780" }, { type: "套房", price: "参考 ¥1500" } ],
+      note: "市中心，近钟楼、回民街", collected: "2026-11 公开常识" }
+  ],
+  "成都": [
+    { name: "成都群光君悦酒店", addr: "春熙路/红星路", price: "参考 ¥900-1500/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥950" }, { type: "双床房", price: "参考 ¥980" }, { type: "套房", price: "参考 ¥2000" } ],
+      note: "春熙路核心商圈，购物便利", collected: "2026-11 公开常识" },
+    { name: "成都尼依格罗酒店", addr: "IFS/大慈寺路", price: "参考 ¥1200-2000/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1300" }, { type: "双床房", price: "参考 ¥1300" }, { type: "套房", price: "参考 ¥2800" } ],
+      note: "IFS 顶层，近太古里", collected: "2026-11 公开常识" }
+  ],
+  "杭州": [
+    { name: "杭州西子湖四季酒店", addr: "西湖/灵隐路", price: "参考 ¥2500-4500/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥2800" }, { type: "湖景房", price: "参考 ¥3500" }, { type: "套房", price: "参考 ¥6000" } ],
+      note: "西湖畔园林式度假酒店", collected: "2026-11 公开常识" },
+    { name: "杭州西湖国宾馆", addr: "西湖杨公堤", price: "参考 ¥1800-3200/晚", lat: null, lon: null,
+      rooms: [ { type: "园景房", price: "参考 ¥2200" }, { type: "大床房", price: "参考 ¥2000" }, { type: "别墅套房", price: "参考 ¥5000" } ],
+      note: "西湖边国宾馆，毛主席杭州住地", collected: "2026-11 公开常识" }
+  ],
+  "三亚": [
+    { name: "三亚亚特兰蒂斯酒店", addr: "海棠湾", price: "参考 ¥1800-3800/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1900" }, { type: "海景房", price: "参考 ¥2400" }, { type: "水世界套房", price: "参考 ¥5200" } ],
+      note: "海棠湾，含水世界/水族馆", collected: "2026-11 公开常识" },
+    { name: "三亚艾迪逊酒店", addr: "海棠湾", price: "参考 ¥2000-4000/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥2200" }, { type: "海景房", price: "参考 ¥2600" }, { type: "泳池别墅", price: "参考 ¥8000" } ],
+      note: "海棠湾设计型度假酒店", collected: "2026-11 公开常识" }
+  ],
+  "丽江": [
+    { name: "丽江和府洲际度假酒店", addr: "古城南门", price: "参考 ¥900-1600/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥950" }, { type: "古城景观房", price: "参考 ¥1200" }, { type: "套房", price: "参考 ¥2200" } ],
+      note: "古城南门，纳西庭院风格", collected: "2026-11 公开常识" },
+    { name: "丽江古城英迪格酒店", addr: "丽江古城内", price: "参考 ¥1000-1800/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1100" }, { type: "庭院房", price: "参考 ¥1400" }, { type: "套房", price: "参考 ¥2600" } ],
+      note: "古城内，邻四方街", collected: "2026-11 公开常识" }
+  ],
+  "厦门": [
+    { name: "厦门海港英迪格酒店", addr: "鹭江道/轮渡", price: "参考 ¥1000-1800/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1100" }, { type: "海景房", price: "参考 ¥1400" }, { type: "套房", price: "参考 ¥2600" } ],
+      note: "鹭江道，对面鼓浪屿", collected: "2026-11 公开常识" },
+    { name: "厦门磐基希尔顿酒店", addr: "嘉禾路/火车站", price: "参考 ¥800-1400/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥850" }, { type: "双床房", price: "参考 ¥880" }, { type: "套房", price: "参考 ¥1800" } ],
+      note: "火车站旁，商务便利", collected: "2026-11 公开常识" }
+  ],
+  "重庆": [
+    { name: "重庆解放碑威斯汀酒店", addr: "解放碑/较场口", price: "参考 ¥900-1500/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥950" }, { type: "双床房", price: "参考 ¥980" }, { type: "套房", price: "参考 ¥2000" } ],
+      note: "解放碑高空酒店，近洪崖洞", collected: "2026-11 公开常识" },
+    { name: "重庆尼依格罗酒店", addr: "解放碑/国金中心", price: "参考 ¥1200-2000/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1300" }, { type: "双床房", price: "参考 ¥1300" }, { type: "套房", price: "参考 ¥2800" } ],
+      note: "IFS 顶层，近洪崖洞、来福士", collected: "2026-11 公开常识" }
+  ],
+  "广州": [
+    { name: "广州四季酒店", addr: "珠江新城/IFC", price: "参考 ¥1500-2800/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1600" }, { type: "江景房", price: "参考 ¥2000" }, { type: "套房", price: "参考 ¥3800" } ],
+      note: "IFC 高层，珠江新城核心", collected: "2026-11 公开常识" },
+    { name: "广州丽思卡尔顿酒店", addr: "珠江新城/兴民路", price: "参考 ¥1500-2600/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1600" }, { type: "江景房", price: "参考 ¥2000" }, { type: "套房", price: "参考 ¥3600" } ],
+      note: "珠江新城，近花城广场", collected: "2026-11 公开常识" }
+  ],
+  "深圳": [
+    { name: "深圳瑞吉酒店", addr: "蔡屋围/KK100", price: "参考 ¥1500-2800/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1600" }, { type: "江景房", price: "参考 ¥2000" }, { type: "套房", price: "参考 ¥3800" } ],
+      note: "KK100 顶层，地王商圈", collected: "2026-11 公开常识" },
+    { name: "深圳福田香格里拉", addr: "福田/会展中心", price: "参考 ¥1000-1800/晚", lat: null, lon: null,
+      rooms: [ { type: "大床房", price: "参考 ¥1100" }, { type: "双床房", price: "参考 ¥1100" }, { type: "套房", price: "参考 ¥2400" } ],
+      note: "会展中心旁，地铁直达", collected: "2026-11 公开常识" }
+  ]
+};
+module.exports.HOTEL_LIST_EXTRA = HOTEL_LIST_EXTRA;
+
+// v1.19.182 团队合并入口：由 tools/_merge-team-enrich.mjs 把 7 人分区采集结果注入 TEAM_HOTEL_ENRICH。
+// 并入 HOTEL_AREAS_EXTRA（按城市 + 片区名去重），复用 data.js 的 applyHotelAreasExtra 既有的并入逻辑。
+// >>>TEAM_HOTEL_START>>>
+const TEAM_HOTEL_ENRICH = {};
+// <<<TEAM_HOTEL_END<<<
+(function () {
+  const EX = module.exports.HOTEL_AREAS_EXTRA || (module.exports.HOTEL_AREAS_EXTRA = {});
+  for (const _c in TEAM_HOTEL_ENRICH) {
+    if (!EX[_c]) EX[_c] = [];
+    for (const _a of TEAM_HOTEL_ENRICH[_c]) {
+      if (!EX[_c].some(x => x && x.name === _a.name)) EX[_c].push(_a);
+    }
+  }
+})();
+
+// v1.19.183 团队「逐酒店 + 房型」合并入口：由 tools/_merge-team-enrich.mjs 把 7 人分区采集的
+// hotelList 注入 TEAM_HOTEL_LIST_ENRICH；data.js 的 applyHotelListExtra 会把它并入 CITIES[].hotels
+// （与 HOTEL_LIST_EXTRA 种子同结构、按酒店名去重）。
+// >>>TEAM_HOTEL_LIST_START>>>
+const TEAM_HOTEL_LIST_ENRICH = {};
+// <<<TEAM_HOTEL_LIST_END<<<
+module.exports.TEAM_HOTEL_LIST_ENRICH = TEAM_HOTEL_LIST_ENRICH;

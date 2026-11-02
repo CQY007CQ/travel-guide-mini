@@ -142,6 +142,19 @@
           <text class="bf-ap" wx:if="{{item.price}}">{{item.price}}</text>
         </view>
       </view>
+      <view class="bf-sec" wx:if="{{brief.hotelList.length}}">
+        <view class="bf-t"><image class="ic ic-sm" src="/images/icons/home.png"/>具体酒店推荐</view>
+        <view class="bf-hotel" wx:for="{{brief.hotelList}}" wx:key="name">
+          <view class="bf-hn">{{item.name}}</view>
+          <view class="bf-hx dim">{{item.addr}}</view>
+          <view class="bf-hp" wx:if="{{item.price}}">{{item.price}}</view>
+          <view class="chips" wx:if="{{item.rooms.length}}">
+            <text class="chip" wx:for="{{item.rooms}}" wx:for-item="r" wx:key="type">{{r.type}} · {{r.price}}</text>
+          </view>
+          <view class="bf-hnote dim" wx:if="{{item.note}}">{{item.note}}</view>
+        </view>
+        <view class="bf-hhint dim" wx:if="{{brief.hotelList[0].collected}}">采集于 {{brief.hotelList[0].collected}} · 参考价随行就市，预订前多平台比价</view>
+      </view>
       <view class="bf-sec" wx:if="{{brief.stayTip}}">
         <view class="bf-t"><image class="ic ic-sm" src="/images/icons/home.png"/>住宿建议</view>
         <view class="bf-x">{{brief.stayTip}}</view>
@@ -205,6 +218,7 @@
         </view>
       </view>
     </scroll-view>
+    <view wx:if="{{wxLongTripHint}}" class="wx-long-hint dim"><image class="ic ic-sm" src="/images/icons/calendar2.png"/>行程超过 7 天，仅前 7 天逐日预报，后续请临近再查</view>
   </view>
 
   <!-- 雨雪天备选：目的地有雨/雪时，推荐室内或雨/雪景友好的景点（离线，不依赖天气请求） -->
@@ -278,9 +292,11 @@
         <view class="day-txt">
           <view class="day-title-row">
             <view class="day-theme">{{day.theme || '行程'}}</view>
+            <view wx:if="{{day.isRainy}}" class="day-rain"><image class="ic ic-sm" src="/images/icons/umbrella.png"/>雨天</view>
             <view wx:if="{{segs.length && day.segName}}" class="seg-tag"><image class="ic ic-sm" src="/images/icons/pin.png"/>{{day.segName}}</view>
           </view>
           <view class="day-date dim">{{day.dateText}}<text wx:if="{{day.dayTag && day.dayTag !== '休整日' && day.dayTag !== '轻松日' && day.dayTag !== '均衡日'}}" class="day-tag">{{day.dayTag}}</text></view>
+          <view wx:if="{{day.rainyHint}}" class="day-rain-hint"><image class="ic ic-sm" src="/images/icons/umbrella.png"/>{{day.rainyHint}}</view>
         </view>
         <view class="dh-ops">
           <view class="day-map" catchtap="jumpMap" data-di="{{di}}"><image class="ic ic-sm" src="/images/icons/map.png"/>地图</view>

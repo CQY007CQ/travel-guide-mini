@@ -45,6 +45,7 @@ Page(SafePage({
   wxErrType: "", wxErrMsg: "", wxErrRetry: false,
   // 雨雪天备选：目的地有雨/雪时推荐室内或雨/雪景友好景点
   rainyShow: false, rainySpots: [], rainyKinds: [], rainyKindsTx: "",
+  wxLongTripHint: false, // v1.19.182：行程 >7 天，仅前 7 天有预报的兜底提示
   // v1.6：城市速览 / 倒计时
   brief: null, briefOpen: false, countdown: null,
   // v1.18：天气卡 / 想玩未排上列表默认收起（减法：首屏更轻）
@@ -137,6 +138,8 @@ Page(SafePage({
    segName: segs ? segs[segByDay[di]].cityName : "",
    segIndex: segs ? segByDay[di] : -1,
    dayTag: T.themeTagOf(d),
+   isRainy: d.isRainy ? 1 : 0,          // v1.19.182：天气联动 —— 当天有雨/雪时日卡挂雨标
+   rainyHint: d.rainyHint || "",        // v1.19.182：雨天日优先室内/展馆的引导文案
    route: T.routeAdvice(plan, di),
    load: T.dayLoad(plan, di),   // v1.8.4 B12：单日参考时长 / 超时预警
    mv: (!plan.isProv) ? T.dayMove(d, segs ? segs[segByDay[di]].cityName : (plan.cityName || "")) : null,
@@ -527,9 +530,27 @@ Page(SafePage({
      else if (rainyKinds.indexOf("snow") >= 0) rainyKindsTx = "有降雪";
      else rainyKindsTx = "有降雨";
    }
+   // v1.19.182：天气 × 行程联动 —— 把「雨天日」标注回日卡，并给出「优先室内/展馆」引导。
+   // 不改 buildPlan 生成的行程顺序（保持 auto=1 复现确定性），仅在展示层加标注 + 引导。
+   const _rainyDates = {};
+   list.forEach(function (w) { if (w.isRain || w.isSnow) _rainyDates[String(w.date).slice(0, 10)] = 1; });
+   const _indoorNames = (rainySpots || []).slice(0, 2).map(function (s) { return s.name; });
+   const _indoorTx = _indoorNames.length ? ("雨天建议优先室内/展馆：" + _indoorNames.join("、")) : "雨天路滑，注意安全，优先安排室内景点";
+   (plan.days || []).forEach(function (d, k) {
+     const ds = String(d.date).slice(0, 10);
+     if (_rainyDates[ds]) { d.isRainy = true; d.rainyHint = _indoorTx; }
+     else { d.isRainy = false; d.rainyHint = ""; }
+   });
+   // 回写展示层：view 是 plan.days 的转换副本（转换段已拷贝 isRainy/rainyHint，重渲染不丢）
+   if (Array.isArray(this.data.view)) {
+     (plan.days || []).forEach(function (d, k) {
+       if (this.data.view[k]) { this.data.view[k].isRainy = d.isRainy ? 1 : 0; this.data.view[k].rainyHint = d.rainyHint || ""; }
+     }.bind(this));
+   }
+   const _longHint = (plan.days && plan.days.length > 7);
    // 多城/全省游：分段 >1 或同一份预报里出现不止一座城市 → 卡片标「各站按所在城市预报」并逐日显示城市
    const multi = !!segs || (wxList.length > 1 && wxList.some(function (w, i) { return i > 0 && w.city && wxList[0].city && w.city !== wxList[0].city; }));
-   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: multi, wxLoading: false, wxErrType: "", wxErrMsg: "", wxErrRetry: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx });
+   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: multi, wxLoading: false, wxErrType: "", wxErrMsg: "", wxErrRetry: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx, view: this.data.view, wxLongTripHint: _longHint });
   });
  },
 

@@ -974,3 +974,17 @@ const APPROX = {
 };
 
 module.exports = { TRIAGE, HOSPITALS, APPROX };
+
+// v1.19.182 团队合并入口：由 tools/_merge-team-enrich.mjs 把 7 人分区采集结果注入 TEAM_HOSP_ENRICH。
+// 并入 HOSPITALS（按城市 + 医院名去重）。严守 v1.19.180 口径：只收具名真实医院，禁模板名回填。
+// >>>TEAM_HOSP_START>>>
+const TEAM_HOSP_ENRICH = {};
+// <<<TEAM_HOSP_END<<<
+(function () {
+  for (const _c in TEAM_HOSP_ENRICH) {
+    if (!HOSPITALS[_c]) HOSPITALS[_c] = [];
+    for (const _h of TEAM_HOSP_ENRICH[_c]) {
+      if (!HOSPITALS[_c].some(x => x && x.n === _h.n)) HOSPITALS[_c].push(_h);
+    }
+  }
+})();

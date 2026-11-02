@@ -456,6 +456,18 @@ function buildProvPlan(opts) {
   return _plan;
 }
 
+// v1.19.182：分享深链出发日边界处理 —— 过期（早于今天）的出发日顺延到今天，
+// 保证 auto=1 一键复现的是「今天起」的有效行程（而非一份已经过去的行程）。
+// 非过期（含今天及以后）原样返回；非法日期返回 null 交由调用方兜底。
+function clampDepart(dp) {
+  if (!dp || typeof dp !== "string") return null;
+  const s = String(dp).slice(0, 10);
+  const t = new Date(s + "T00:00:00");
+  if (isNaN(t.getTime())) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return t.getTime() >= today.getTime() ? s : _ymdOf(today);
+}
+
 // v1.17.4：全省精华游天数上限 —— 旧实现固定用 days:12 探针再取其实际天数，
 // 等于把上限永久夹在 12 天以内（无论该省能串多少城、多少景点）。改为用足够大的探针值
 // 取「真实可生成天数」，并缓存结果（UI 在节奏切换时会反复调用）。
@@ -2341,6 +2353,7 @@ function cityBrief(cityName) {
     foods: (Array.isArray(c.foods) ? c.foods : []).filter(f => !F_GENERIC_FOOD.test(String(f))).slice(0, 6),
     foodNote: c.foodNote || "",
     areas: ha.areas.slice(0, 6),
+    hotelList: (c.hotelList || []).slice(0, 5), // v1.19.183 逐酒店+房型（具名真实，含房型参考价）
     stayTip: ha.stayTip,
     travel: c.cityTravel || c.travel || "",
     text: c.name + " · 建议 " + days + " 天 · " + (CLIMATE_TXT[c.climate] || "")
@@ -5829,7 +5842,7 @@ module.exports = {
  ready, planCheckup, swapSpotFor, askTrip,
  routeAdvicePlus, highlightOf, crowdTipOf, packExtra,
  badgesOf, yearReportNew, chinaLite, transportEstimate,
- provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, provBrief, nearbyCityOf, D, P,
+ provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
  spotTagOf, searchSpots,
  customBudgetObj, budgetTotalObj,
