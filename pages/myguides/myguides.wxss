@@ -1,0 +1,43 @@
+.page { padding: 28rpx 24rpx 60rpx; min-height: 100vh; background: var(--bg, #f5f6f8); }
+.td.page { background: #0d0d0d; }
+.head { margin: 8rpx 6rpx 22rpx; }
+.h-t { font-size: calc(40rpx * var(--fs, 1)); font-weight: 800; color: var(--t1, #18233a); }
+.h-s { margin-top: 8rpx; font-size: calc(24rpx * var(--fs, 1)); }
+
+.dim { color: var(--tx-2, #6b7689); }
+
+.card {
+  background: var(--card-bg, #fff);
+  border-radius: 20rpx;
+  padding: 26rpx 26rpx 22rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 16rpx rgba(20,30,50,.06);
+}
+.td .card { background: #1a1a1a; box-shadow: none; border: 1rpx solid rgba(255,255,255,.06); }
+
+.mg-item { transition: transform .18s ease, opacity .18s ease; }
+.mg-item:active { transform: scale(.985); opacity: .92; }
+.mg-top { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.mg-title { flex: 1; font-size: calc(31rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #18233a); }
+.td .mg-title { color: #f2f3f5; }
+.mg-del { flex: none; font-size: calc(24rpx * var(--fs, 1)); color: #c0563f; padding: 6rpx 14rpx; border-radius: 999rpx; background: rgba(192,86,63,.1); }
+.td .mg-del { color: #e08c78; background: rgba(224,140,120,.14); }
+.mg-meta { margin-top: 12rpx; font-size: calc(24rpx * var(--fs, 1)); }
+.mg-go { margin-top: 16rpx; font-size: calc(26rpx * var(--fs, 1)); font-weight: 600; color: var(--gold, #d4a94e); }
+
+.tip { margin-top: 12rpx; padding: 0 6rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--tx-2, #6b7689); }
+
+.empty { margin-top: 160rpx; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.empty-emoji { font-size: 96rpx; }
+.empty-t1 { margin-top: 24rpx; font-size: calc(32rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #18233a); }
+.td .empty-t1 { color: #f2f3f5; }
+.empty-t2 { margin-top: 12rpx; padding: 0 60rpx; font-size: calc(25rpx * var(--fs, 1)); line-height: 1.6; }
+.empty-btn {
+  margin-top: 40rpx; padding: 22rpx 56rpx; border-radius: 999rpx; text-align: center;
+  background: linear-gradient(135deg, var(--gold, #d4a94e) 0%, #e7c578 100%);
+  color: #fff; font-size: calc(29rpx * var(--fs, 1)); font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-item, .mg-item:active { transition: none; }
+}

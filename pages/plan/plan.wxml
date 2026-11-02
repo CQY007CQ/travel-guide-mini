@@ -397,6 +397,11 @@
     <view class="dpp-more" bindtap="onDeep">看全部 {{deep.total}} 条本地玩法 ›</view>
   </view>
 
+  <!-- v1.19.179：保存当前行程到「我的攻略」本地库 -->
+  <view class="save-bar" wx:if="{{hasPlan}}">
+    <view class="save-btn {{savedId ? 'saved' : ''}}" bindtap="onSavePlan">{{savedId ? '已保存到我的攻略 ✓' : '保存到我的攻略'}}</view>
+  </view>
+
   <view class="tip">点行展开可换景点/调序 · 按住右侧拖动</view>
 
   <!-- v1.19.76：分享长图离屏画布（不参与布局，仅用于生成分享图片） -->

@@ -44,6 +44,21 @@
     </view>
   </view>
 
+  <!-- v1.19.179：我的攻略库（专注浏览 / 打开 / 删除，区别于上面的快速恢复） -->
+  <view class="group" wx:if="{{planLibN > 0}}">
+    <view class="group-title">我的攻略</view>
+    <view class="card group-card">
+      <view class="menu" bindtap="goMyGuides">
+        <image class="m-ic" src="/images/icons/luggage.png"/>
+        <view class="m-txt">
+          <view class="m-t">我的攻略库</view>
+          <view class="m-d dim">已保存 {{planLibN}} 份行程，随时再打开</view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+  </view>
+
   <!-- 旅行足迹 -->
   <view class="group" wx:if="{{foot.spots > 0 || foot.cities > 0}}">
     <view class="group-title">旅行足迹</view>

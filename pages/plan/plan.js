@@ -56,7 +56,9 @@ Page(SafePage({
   // v1.19.77：拖动排序（dragSh 为逐条预计算的 transform 字符串，WXML 只做数组取值）
   dragOn: false, dragDi: -1, dragI: -1, dragSh: [],
   // v1.19.78：城市深度玩法（随 subai 分包懒加载；未收录城市保持 null → UI 自动不显示）
-  deep: null
+  deep: null,
+  // v1.19.179：「我的攻略」本地库——当前行程是否已保存到库（命中签名则回显「已保存」）
+  savedId: "", savedAt: 0
  },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
@@ -78,6 +80,13 @@ Page(SafePage({
      return;
     }
     if (!this.data.hasPlan) this.setData({ hasPlan: true });
+    // v1.19.179：回显「已保存」状态（按 城市/天数/首日均 签名匹配本地行程存档库）
+    try {
+      const sig = this._planSig(plan);
+      const hit = (T.listSavedPlans() || []).find(p => p && p.sig === sig);
+      if (hit) { if (this.data.savedId !== hit.id) this.setData({ savedId: hit.id, savedAt: hit.ts || 0 }); }
+      else if (this.data.savedId) this.setData({ savedId: "", savedAt: 0 });
+    } catch (e) {}
     this.__animOn = true;   // v1.19.77：进页才放错落入场动效
     this._render(plan);
     this._checkDueRemind();
@@ -86,6 +95,24 @@ Page(SafePage({
    } catch (e) {
     wx.showToast({ title: "行程加载异常，请重试", icon: "none" });
    }
+  },
+
+  // v1.19.179：行程签名——对齐 travel.js 行程存档(savePlanSlot)的 sig 算法，保证「已保存」状态可正确回显
+  _planSig(plan) {
+    const d0 = (plan && plan.days && plan.days[0] && plan.days[0].date) ? String(plan.days[0].date).slice(0, 10) : "";
+    return ((plan && plan.cityName) || "") + "|" + ((plan && plan.days) ? plan.days.length : 0) + "|" + d0;
+  },
+  // v1.19.179：「保存到我的攻略」——复用既有本地行程存档(miniPlansV1)，下次从「更多 → 我的行程」或「我的攻略」库打开
+  onSavePlan() {
+    try {
+      const plan = app.globalData && app.globalData.plan;
+      if (!plan || !plan.days || !plan.days.length) { wx.showToast({ title: "暂无行程可保存", icon: "none" }); return; }
+      const wasSaved = !!this.data.savedId;
+      const r = T.savePlanSlot(plan);   // 同 sig 自动覆盖，不堆积
+      if (!r) { wx.showToast({ title: "保存失败", icon: "none" }); return; }
+      this.setData({ savedId: r.id });
+      wx.showToast({ title: wasSaved ? "已更新我的攻略" : "已保存到我的攻略", icon: "none" });
+    } catch (e) { wx.showToast({ title: "保存失败，请重试", icon: "none" }); }
   },
 
  _render(plan) {

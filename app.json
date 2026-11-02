@@ -5,6 +5,7 @@
     "pages/today/today",
     "pages/plan/plan",
     "pages/more/more",
+    "pages/myguides/myguides",
     "pages/help/help"
   ],
   "window": {

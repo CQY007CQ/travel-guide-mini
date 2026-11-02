@@ -783,3 +783,17 @@
 }
 .dpp-more:active { transform: scale(.965); opacity: .9; }
 @media (prefers-reduced-motion: reduce) { .dpp-more { transition: none; } }
+
+/* ── v1.19.179：保存到「我的攻略」本地库 ───────────────── */
+.save-bar { margin-top: 20rpx; padding: 0 4rpx 8rpx; }
+.save-btn {
+  padding: 22rpx 26rpx; border-radius: 18rpx; text-align: center;
+  background: linear-gradient(135deg, var(--gold, #d4a94e) 0%, #e7c578 100%);
+  color: #fff; font-size: calc(29rpx * var(--fs, 1)); font-weight: 700;
+  box-shadow: 0 6rpx 18rpx rgba(212,169,78,.28);
+  transition: transform .18s ease, opacity .18s ease;
+}
+.save-btn:active { transform: scale(.97); opacity: .9; }
+/* 已保存：金描边 + 透明底，单一金色调内区分状态，不引入新色相 */
+.save-btn.saved { background: transparent; color: var(--gold, #d4a94e); border: 2rpx solid var(--gold, #d4a94e); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .save-btn { transition: none; } }

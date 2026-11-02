@@ -1,0 +1,25 @@
+<view class="page {{td ? 'td' : ''}}">
+  <view class="head">
+    <view class="h-t">我的攻略</view>
+    <view class="h-s dim">本地收藏的行程，离线可看、随时再打开</view>
+  </view>
+
+  <block wx:if="{{!empty}}">
+    <view class="card mg-item" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="openPlan">
+      <view class="mg-top">
+        <view class="mg-title">{{item.title}}</view>
+        <view class="mg-del" catchtap="delPlan" data-id="{{item.id}}">删除</view>
+      </view>
+      <view class="mg-meta dim">{{item.cityName}} · {{item.days}} 天 · 保存于 {{item.dateText}}</view>
+      <view class="mg-go">打开行程 ›</view>
+    </view>
+    <view class="tip">点卡片打开完整行程；删除仅移除收藏，不影响原生成记录</view>
+  </block>
+
+  <view class="empty" wx:else>
+    <view class="empty-emoji">🧳</view>
+    <view class="empty-t1">还没有收藏的攻略</view>
+    <view class="empty-t2 dim">去「出发」生成一个行程，再点「保存到我的攻略」</view>
+    <view class="empty-btn" bindtap="goGen">去生成攻略</view>
+  </view>
+</view>
