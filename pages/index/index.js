@@ -124,6 +124,7 @@ Page(SafePage({
       this._syncAdv();
       this._syncHoli();
       this._applyDeepLink(options);
+      this._applyPrefs(options);
     } catch (e) {
       try {
         this.setData({
@@ -197,6 +198,36 @@ Page(SafePage({
       }
       wx.showToast({ title: "已为你填好「" + cn + "」", icon: "none" });
     } catch (e) { /* 深链失败静默降级，不影响首页正常使用 */ }
+  },
+
+  // v1.19.178 跨会话偏好预填：用 learnPrefs 记下的「上次生成选项」回填出发页，减少重复点选。
+  // 优先级：深链(options.city/options.days)已显式指定时，对应维度以深链为准、不覆盖；其余维度仍用偏好补齐。
+  // 全程 try/catch 兜底，任何异常都不影响首页正常渲染（偏好预填只是锦上添花）。
+  _applyPrefs(options) {
+    let p = null;
+    try { p = T.getPrefs(); } catch (e) { p = null; }
+    if (!p || typeof p !== "object") return;
+    const deepCity = !!(options && options.city);
+    const deepDays = !!(options && options.days);
+    // 城市：仅当深链未指定时才用偏好（跨省份也要正确切到偏好城市所在的省）
+    if (!deepCity && p.city) {
+      try {
+        const provs = this.data.provinces || T.provinces();
+        for (let pi = 0; pi < provs.length; pi++) {
+          const cs = T.citiesOf(provs[pi]) || [];
+          if (cs.some(c => c.name === p.city)) { this._fillProv(pi, p.city); break; }
+        }
+      } catch (e) {}
+    }
+    // 天数 / 节奏 / 出行方式 / 预算：用偏好补齐（深链已设天数则跳过）
+    const patch = {};
+    if (!deepDays && p.days && p.days > 0) { patch.days = p.days; patch.daysText = p.days + " 天"; }
+    if (p.pace && Array.isArray(this.data.paceVals)) { const i = this.data.paceVals.indexOf(p.pace); if (i >= 0) patch.paceIdx = i; }
+    if (p.travelMode && Array.isArray(this.data.travelModeVals)) { const i = this.data.travelModeVals.indexOf(p.travelMode); if (i >= 0) patch.travelModeIdx = i; }
+    if (p.budget && Array.isArray(this.data.budgetKeys)) { const i = this.data.budgetKeys.indexOf(p.budget); if (i >= 0) patch.budgetIdx = i; }
+    if (Object.keys(patch).length) {
+      this.setData(patch, () => { try { this._syncAdv(); } catch (e) {} });
+    }
   },
 
   /* ---- 目的地省 / 市 ---- */

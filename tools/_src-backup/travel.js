@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.177";
+const APP_VER = "1.19.178";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -279,6 +279,53 @@ function evaluatePlan(plan) {
   return { score, grade, suggestions: sugg, detail: { avgDist: +avgDist.toFixed(1), avgSpots: +avgSpots.toFixed(1), cv: +cv.toFixed(2) } };
 }
 
+// v1.19.178 跨会话偏好学习：把每次生成行程的选项（城市/天数/节奏/预算/出行方式/偏好）记住，
+// 下次打开出发页自动预填，少点几次。store 在真机/工具里持久化；Node 测试环境无 wx，退化为内存缓存（同进程内可读写）。
+const PREF_KEY = "learnedPrefsV1";
+let _prefCache = null;
+function _pickPref(o) {
+  if (!o || typeof o !== "object") return null;
+  const p = { at: Date.now() };
+  const raw = o.city;
+  if (raw) p.city = (typeof raw === "string") ? raw : (raw.name || "");
+  if (o.province) p.province = o.province;
+  if (Array.isArray(o.route)) p.route = o.route.map(r => ({ name: r.name, days: r.days }));
+  if (o.days != null) { const d = parseInt(o.days, 10); if (d > 0) p.days = d; }
+  if (o.pace) p.pace = o.pace;
+  if (o.budget) p.budget = o.budget;
+  if (o.travelMode || o.mode) p.travelMode = o.travelMode || o.mode;
+  if (o.bias) p.bias = o.bias;
+  if (o.stayMountain !== undefined) p.stayMountain = !!o.stayMountain;
+  if (Array.isArray(o.picks)) p.picks = o.picks.map(x => (typeof x === "string" ? x : (x.name || ""))).filter(Boolean);
+  return p;
+}
+function learnPrefs(opts) {
+  const p = _pickPref(opts);
+  if (!p) return;
+  _prefCache = p;
+  try { store.set(PREF_KEY, p); } catch (e) {}
+}
+function getPrefs() {
+  if (_prefCache && typeof _prefCache === "object") return _prefCache;
+  try { const p = store.get(PREF_KEY, null); if (p && typeof p === "object") { _prefCache = p; return p; } } catch (e) {}
+  return null;
+}
+// 用已学偏好回填缺失项（不覆盖显式传入），供 builder 在 opts 不全时兜底
+function applyLearned(opts) {
+  const p = getPrefs();
+  if (!p || !opts || typeof opts !== "object") return opts;
+  const o = Object.assign({}, opts);
+  if (o.city == null && p.city) o.city = p.city;
+  if (o.days == null && p.days) o.days = p.days;
+  if (!o.pace && p.pace) o.pace = p.pace;
+  if (!o.budget && p.budget) o.budget = p.budget;
+  if (!o.travelMode && !o.mode && p.travelMode) o.travelMode = p.travelMode;
+  if (o.stayMountain === undefined && p.stayMountain !== undefined) o.stayMountain = p.stayMountain;
+  if (!o.bias && p.bias) o.bias = p.bias;
+  if (!o.picks && Array.isArray(p.picks)) o.picks = p.picks;
+  return o;
+}
+
 function polishRelax(days) {
   if (!Array.isArray(days)) return days;
   // v1.19.10：按天索引轮替（原全局 ri 在 10 天行程里第 5 个休整项会与第 1 个撞文案）
@@ -324,7 +371,7 @@ function buildPlan(opts) {
   });
   if (!_out || !_out.length) throw new Error("出发日期无效，请重新选择");
   const _plan = polishRelax(_out);
-  try { _plan.evaluation = evaluatePlan(_plan); } catch (e) {}
+  try { _plan.evaluation = evaluatePlan(_plan); learnPrefs(opts); } catch (e) {}
   return _plan;
 }
 
@@ -390,7 +437,7 @@ function buildMultiPlan(opts) {
  }
   const _days = polishRelax(out);
   const _res = { days: _days, segments, totalDays: out.length, route };
-  try { _res.evaluation = evaluatePlan(_days); } catch (e) {}
+  try { _res.evaluation = evaluatePlan(_days); learnPrefs(opts); } catch (e) {}
   return _res;
 }
 
@@ -405,7 +452,7 @@ function buildProvPlan(opts) {
   const _out = P.buildProvincePlanDays(prov, daysN, opts.depart, opts.budget || "mid",
    opts.pace || "balance", opts.stayMountain !== false, opts.travelMode || "", opts.bias || "");
   const _plan = polishRelax(_out);
-  try { _plan.evaluation = evaluatePlan(_plan); } catch (e) {}
+  try { _plan.evaluation = evaluatePlan(_plan); learnPrefs(opts); } catch (e) {}
   return _plan;
 }
 
@@ -5768,7 +5815,7 @@ module.exports = {
  ready, planCheckup, swapSpotFor, askTrip,
  routeAdvicePlus, highlightOf, crowdTipOf, packExtra,
  badgesOf, yearReportNew, chinaLite, transportEstimate,
- provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, provinceDayCap, provinceSuggestedDays, cityDayCap, provBrief, nearbyCityOf, D, P,
+ provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
  spotTagOf, searchSpots,
  customBudgetObj, budgetTotalObj,
