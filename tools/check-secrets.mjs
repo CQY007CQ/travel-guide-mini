@@ -60,8 +60,9 @@ for (const f of files) {
     const m = src.match(c.re);
     if (m) {
       // 和风天气 Key 设计为随包下发（个人主体无后端，客户端 wx.request 直连 devapi.qweather.com），
-      // 其值为 32 位十六进制，位于 utils/weather.js 的 QW_KEY —— 属白名单例外（不同于应零依赖的高德/腾讯凭据）。
-      if (c.name.indexOf("32 位十六进制") >= 0 && /weather\.js$/.test(f)) continue;
+      // 其值为 32 位十六进制，存放于 keys 单出口（utils/keys.js 的 DEFAULT.qweatherKey，由 weather.js 经 keys.js 读取）
+      // —— 属白名单例外（不同于应零依赖的高德/腾讯凭据）。keys.js 是唯一的 key 保险库，明文 key 只许在这里。
+      if (c.name.indexOf("32 位十六进制") >= 0 && /(weather|keys)\.js$/.test(f)) continue;
       problems.push(f + " → " + c.name + "：" + String(m[0]).slice(0, 24) + "…");
     }
   }

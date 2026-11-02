@@ -6,17 +6,18 @@
 //  和风 devapi.qweather.com 是国内已备案域名，白名单可过审；免费档给 7 天预报，数据含天气现象/温度/湿度/UV/风/日出日落，
 //  足够做下雨下雪检测与「雨雪天备选」推荐。
 //
-// 配置（你来做，代码已就绪）：
+// 配置（统一走 utils/keys.js 单出口，v1.19.184 合规归一）：
 //  1) 去 https://dev.qweather.com 注册（个人主体需实名认证），建项目拿 Key；
-//  2) 把 Key 填到下方 QW_KEY；若账号分配了自定义域名（xxx.qweatherapi.com），改 QW_API_HOST；
+//  2) 把 Key 填到 utils/keys.js 的 DEFAULT.qweatherKey；若账号分配了自定义域名（xxx.qweatherapi.com），改 DEFAULT.qweatherHost；
+//     （也支持运行时 wx.setStorageSync("__app_keys__", {...}) 注入，不重新发版临时换 Key）
 //  3) 小程序后台「开发管理→开发设置→服务器域名」把请求域名加入 request 合法域名；
 //  4) 可选：和风控制台「安全域名」加上你的小程序 request 域名，防止 Key 被他人盗用。
+//  合规铁律：Key 必须登记在本人 / 本小程序主体账号下，严禁借用他人 Key（历史借用高德曾致封禁 + 主体不一致）。
 //
 // 失败/不可用：Key 未配置、断网、超预报窗口、Key 无效 → 静默降级（天气卡隐藏/提示），绝不影响行程主流程。
 const T = require("./travel.js");
 
-const QW_API_HOST = "https://j864228fx2.re.qweatherapi.com"; // 和风新计费模型：每个项目分配专属域名（devapi.qweather.com 对本 Key 返回 Invalid Host）
-const QW_KEY = "d84611f29a4d48d48a36227b613de255";              // 和风开发者控制台获取的免费 Key（v1.19.157 接入）
+const KEYS = require("./keys.js"); // v1.19.184：Key 统一走 keys.js 单出口（fail-closed，合规归一，严禁散落硬编码）
 
 // 和风天气现象文字 → 归一化 icon / 合成 WMO 码 / 雨雪判定（合成码只为复用既有的 riskOf/outfitIndex）
 const QW_RE_THUNDER = /雷|暴|飑/;
@@ -160,7 +161,7 @@ function classifyApiError(d) {
 function fetchPlanWeather(plan, cb) {
   if (!plan || !plan.days || !plan.days.length) { cb([], { type: "empty" }); return; }
   if (typeof wx === "undefined" || !wx.request) { cb([], { type: "env" }); return; }
-  if (!QW_KEY || QW_KEY.indexOf("在此填写") >= 0) { cb([], { type: "no_key", msg: "天气服务未启用（需在和风后台配置 Key）" }); return; } // Key 未配置 → 明确提示
+  if (!KEYS.qweatherConfigured()) { cb([], { type: "no_key", msg: "天气服务未启用（需在和风后台配置 Key）" }); return; } // Key 未配置 → 明确提示（fail-closed）
   // 行程涉及的城市（去重保序）：有分段用分段城市，否则用 plan.cityName
   const rawCities = (Array.isArray(plan.segments) && plan.segments.length)
     ? plan.segments.map(function (s) { return s.cityName; })
@@ -208,9 +209,9 @@ function fetchPlanWeather(plan, cb) {
   const loadCity = function (city, c, wkey, attempt) {
     const lat = Number(c.lat).toFixed(2), lon = Number(c.lon).toFixed(2);
     wx.request({
-      url: QW_API_HOST + "/v7/weather/7d",
-      data: { location: lon + "," + lat, key: QW_KEY },
-      header: { "X-QW-Api-Key": QW_KEY },
+      url: KEYS.qweatherHost() + "/v7/weather/7d",
+      data: { location: lon + "," + lat, key: KEYS.qweatherKey() },
+      header: { "X-QW-Api-Key": KEYS.qweatherKey() },
       timeout: 15000, // v1.19.161：放宽至 15s，覆盖真机冷启动 TLS 握手；仍失败时由下方重试兜底
       success(res) {
         try {
@@ -242,7 +243,7 @@ function fetchPlanWeather(plan, cb) {
   cities.forEach(function (city) {
     const c = coordOf(city);
     if (!c) { byCity[city] = { byDate: {}, city: city }; return; } // 无坐标：占位，避免 dayCityOf 误判
-    const wkey = city + "|" + todayYMD + "|" + QW_API_HOST;
+    const wkey = city + "|" + todayYMD + "|" + KEYS.qweatherHost();
     const cached = _WX_CACHE[wkey];
     if (cached && (Date.now() - cached.t) < _WX_TTL) { byCity[city] = { byDate: cached.v, city: city }; return; }
     // v1.19.180：内存未命中先看盘（冷启动/切页场景），命中即先出天气，不阻塞首屏
