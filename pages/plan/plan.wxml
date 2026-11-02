@@ -149,7 +149,7 @@
           <view class="bf-hx dim">{{item.addr}}</view>
           <view class="bf-hp" wx:if="{{item.price}}">{{item.price}}</view>
           <view class="chips" wx:if="{{item.rooms.length}}">
-            <text class="chip" wx:for="{{item.rooms}}" wx:for-item="r" wx:key="type">{{r.type}} · {{r.price}}</text>
+            <text class="chip bf-chip" wx:for="{{item.rooms}}" wx:for-item="r" wx:key="type">{{r.type}} · {{r.price}}</text>
           </view>
           <view class="bf-hnote dim" wx:if="{{item.note}}">{{item.note}}</view>
         </view>

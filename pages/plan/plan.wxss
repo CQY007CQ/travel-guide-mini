@@ -568,13 +568,26 @@
 
 .bf-ap { display: block; font-size: calc(20rpx * var(--fs, 1)); color: var(--acc, #d4a94e); line-height: 1.7; margin-top: 3rpx; }
 
-.bf-hotel { padding: 12rpx 0; border-top: 1rpx dashed rgba(var(--ln-rgb, 148, 163, 184), .12); }
-.bf-hotel:first-of-type { border-top: none; padding-top: 4rpx; }
-.bf-hn { font-size: calc(23rpx * var(--fs, 1)); font-weight: 600; color: var(--t1, #eaeff7); }
-.bf-hx { font-size: calc(20rpx * var(--fs, 1)); color: var(--t2, #c3cfe0); margin-top: 2rpx; }
-.bf-hp { font-size: calc(20rpx * var(--fs, 1)); color: var(--acc, #d4a94e); margin-top: 4rpx; }
-.bf-hnote { font-size: calc(19rpx * var(--fs, 1)); color: var(--t2, #c3cfe0); margin-top: 6rpx; line-height: 1.6; }
-.bf-hhint { font-size: calc(18rpx * var(--fs, 1)); color: var(--t3, #8b98ad); margin-top: 12rpx; line-height: 1.6; }
+.bf-hotel {
+  position: relative;
+  background: linear-gradient(135deg, rgba(212,169,78,.08), rgba(212,169,78,.02));
+  border: 1rpx solid rgba(212,169,78,.16);
+  border-radius: 18rpx;
+  padding: 16rpx 18rpx 16rpx 22rpx;
+  margin-top: 12rpx;
+  box-shadow: inset 3rpx 0 0 var(--acc, #d4a94e);
+}
+.bf-hotel:first-of-type { margin-top: 4rpx; }
+.bf-hn { font-size: calc(23rpx * var(--fs, 1)); font-weight: 600; color: var(--t1, #eaeff7); letter-spacing: .3rpx; }
+.bf-hx { font-size: calc(20rpx * var(--fs, 1)); color: var(--t2, #c3cfe0); margin-top: 4rpx; }
+.bf-hp { font-size: calc(20rpx * var(--fs, 1)); font-weight: 600; color: var(--acc, #d4a94e); margin-top: 6rpx; }
+.bf-hnote { font-size: calc(19rpx * var(--fs, 1)); color: var(--t2, #c3cfe0); margin-top: 8rpx; line-height: 1.6; }
+.bf-hhint { font-size: calc(18rpx * var(--fs, 1)); color: var(--t3, #8b98ad); margin-top: 14rpx; line-height: 1.6; }
+.bf-chip {
+  font-size: calc(19rpx * var(--fs, 1)); color: var(--gold-tx, #d4a94e);
+  background: rgba(212,169,78,.1); border: 1rpx solid rgba(212,169,78,.22);
+  border-radius: 99rpx; padding: 5rpx 16rpx; line-height: 1.5;
+}
 
 /* ===== v1.6 · 每天行尾：加景点 / 怎么去 ===== */
 .day-foot {
