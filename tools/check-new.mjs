@@ -903,5 +903,27 @@ console.log("== 35. v1.19.175 · 推荐解析出行月份 ==");
   assert("解析月份流进 recommend.prefs.month", rec.prefs && rec.prefs.month === 3, String(rec.prefs && rec.prefs.month));
 }
 
+console.log("== 36. v1.19.183 · 个性化『可二刷』基于真实打卡城市 ==");
+// 旧实现 T.isVisited(city.name) 查的是「同名景点」，城市名几乎不可能等于景点名，
+// 导致『可二刷』理由永不触发。新实现用 footStats().cityList（真实打卡城市集合）判定。
+mem["miniFootV1"] = undefined;
+mem["miniLedgerV1"] = [];
+mem["miniPlansV1"] = undefined;
+T.markVisited("故宫", "北京", true);
+T.markVisited("天坛", "北京", true);
+const pzV = PZ.personalized(5);
+const bjV = pzV.list.filter(x => x.name === "北京")[0];
+assert("已打卡城市北京进入推荐", !!bjV, JSON.stringify(pzV.list.map(x => x.name)));
+if (bjV) assert("北京带『可二刷』理由（基于真实打卡城市，非死逻辑）", bjV.whyMeTx.indexOf("可二刷") >= 0, bjV.whyMeTx);
+// 未打卡城市不应误标『可二刷』
+const noV = pzV.list.filter(x => x.name !== "北京");
+assert("未打卡城市无『可二刷』误标", noV.every(x => x.whyMeTx.indexOf("可二刷") < 0), JSON.stringify(noV.map(x => x.name + ":" + x.whyMeTx)));
+// 还原：取消打卡 + 清状态，避免污染其他用例
+T.markVisited("故宫", "北京", false);
+T.markVisited("天坛", "北京", false);
+mem["miniFootV1"] = undefined;
+mem["miniLedgerV1"] = [];
+mem["miniPlansV1"] = undefined;
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

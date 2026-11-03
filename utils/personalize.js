@@ -28,10 +28,14 @@ function queryFromTendency(td) {
 }
 
 // 个性化加分（独立于底层引擎，只认用户真实数据）
-function _bonus(city, td) {
+// visitedSet：本机真实打卡过的城市名集合（footStats().cityList），由 personalized 计算一次后下传，
+// 避免对每个候选城重复调 footStats。v1.19.183：此前误用 T.isVisited(city.name) —— 它查的是
+// "同名景点是否打卡"，城市名几乎不可能等于某个景点名，导致"可二刷"理由形同死代码、永不触发。
+// 改用真实打卡城市集合后，去过的城市才会带"可二刷"理由。
+function _bonus(city, td, visitedSet) {
   let b = 0; const why = [];
   if (td.favProv && city.province === td.favProv) { b += 1.5; why.push("同你常去的" + td.favProv); }
-  if (T.isVisited && T.isVisited(city.name)) why.push("你打卡过，可二刷");
+  if (visitedSet && visitedSet.has(city.name)) why.push("你打卡过，可二刷");
   // v1.19.139：想去清单加权——用户在首页/行程页勾过的想玩城市，额外加分并给理由
   const wish = (T.getWish && T.getWish()) || [];
   if (wish.some(w => w && w.name === city.name)) { b += 1.2; why.push("就在你的想去清单里"); }
@@ -49,9 +53,14 @@ function personalized(n) {
   if (!base || base.pending) return { list: [], fromMe: false, pending: !!base && base.pending, tendency: td, summary: ins.summary };
   if (!base.list || !base.list.length) return { list: [], fromMe: false, pending: false, tendency: td, summary: ins.summary };
   const cities = (T.D && T.D.CITIES) || [];
+  // 本机真实打卡城市集合（一次性计算，下传给 _bonus 做"可二刷"判定）
+  const visitedSet = (function () {
+    const fs = (T.footStats && T.footStats()) || {};
+    return (fs && Array.isArray(fs.cityList)) ? new Set(fs.cityList) : new Set();
+  })();
   const scored = base.list.map((r) => {
     const city = cities.filter((c) => c && c.name === r.name)[0] || {};
-    const bo = _bonus(city, td);
+    const bo = _bonus(city, td, visitedSet);
     const total = (r.score || 0) + bo.b;
     const why = bo.why.slice();
     if (td.topCat) why.push("贴合你偏好的" + td.topCat);
