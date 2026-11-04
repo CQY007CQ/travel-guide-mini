@@ -463,7 +463,7 @@ module.exports.HOTEL_LIST_EXTRA = HOTEL_LIST_EXTRA;
 // v1.19.182 团队合并入口：由 tools/_merge-team-enrich.mjs 把 7 人分区采集结果注入 TEAM_HOTEL_ENRICH。
 // 并入 HOTEL_AREAS_EXTRA（按城市 + 片区名去重），复用 data.js 的 applyHotelAreasExtra 既有的并入逻辑。
 // >>>TEAM_HOTEL_START>>>
-const TEAM_HOTEL_ENRICH = {};
+const TEAM_HOTEL_ENRICH = {"杭州":[{"name":"西湖湖滨商圈","price":"参考¥400-1200/晚"},{"name":"武林广场商圈","price":"参考¥250-600/晚"},{"name":"河坊街/南宋御街历史街区","price":"参考¥200-500/晚"}],"苏州":[{"name":"平江路/观前街古城圈","price":"参考¥300-600/晚"},{"name":"金鸡湖/东方之门商圈","price":"参考¥600-1200/晚"},{"name":"山塘街历史街区","price":"参考¥400-800/晚"}],"南京":[{"name":"新街口商圈","price":"参考¥300-800/晚"},{"name":"夫子庙/老门东历史街区","price":"参考¥200-500/晚"},{"name":"鼓楼/湖南路商圈","price":"参考¥300-700/晚"}],"上海":[{"name":"南京东路/人民广场商圈","price":"参考¥400-1500/晚"},{"name":"外滩/陆家嘴商圈","price":"参考¥800-2500/晚"},{"name":"豫园/城隍庙街区","price":"参考¥400-1000/晚"}]};
 // <<<TEAM_HOTEL_END<<<
 (function () {
   const EX = module.exports.HOTEL_AREAS_EXTRA || (module.exports.HOTEL_AREAS_EXTRA = {});

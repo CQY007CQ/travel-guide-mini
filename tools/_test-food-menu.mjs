@@ -79,7 +79,9 @@ for (const c of CITIES) {
 // 断言
 const ok = (cond, msg) => { if (!cond) { console.log("  ✗ " + msg); fail++; } };
 ok(cityCnt === 10, "试点城市应覆盖 10 个，实际 " + cityCnt);
-ok(checked === 233, "试点店铺应覆盖 233 家，实际 " + checked);
+// v1.19.182 起团队分区合并会向 FOOD_SPOTS 增量追加真实采集店铺，试点店铺数随时间增长。
+// 此处只守「不低于基线 233、且不丢店」的下界，真正的完整性仍由下方 menu/rep/note 三项断言保证。
+ok(checked >= 233, "试点店铺应 ≥233 家（团队合并会新增），实际 " + checked);
 ok(noMenu === 0, "每家应有 1-3 道 menu 且字段完整，异常 " + noMenu);
 ok(badRep === 0, "每家 rep 应在白名单内，异常 " + badRep);
 ok(noNote === 0, "每家应有编辑点评 note，缺失 " + noNote);
