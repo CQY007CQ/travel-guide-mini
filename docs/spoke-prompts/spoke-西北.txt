@@ -1,12 +1,21 @@
 【本文件是给你的每日采集引擎提示词 · 板块：西北】
-使用前 4 步：
-1) 克隆工程：
-   git clone https://github.com/CQY007CQ/travel-guide-mini.git D:/guozihao/miniprogram-travel
-   （仓库已建，clone URL 固定如上）
-2) 在 WorkBuddy 新建 recurring automation，把本文件全文粘贴为 prompt。
-3) automation 的 cwds 设为：D:/guozihao/miniprogram-travel
+使用前 5 步：
+1) 一次性配置 GitHub 凭据（只需做一次，否则 clone/push 会卡在登录）：
+   - 登录 github.com → 右上角头像 → Settings → Developer settings →
+     Personal access tokens → Tokens (classic) → Generate new token (classic)
+     → Note 随便写（如 travel-spoke）、Expiration 按需设置、只勾 **repo** 这一组
+     → Generate → **复制那串 token（只显示这一次，务必存好）**。
+   - 记住你的 GitHub 用户名（登录名，不是昵称）。
+   - 在本机执行一次，让 git 记住凭据（之后不再弹窗）：
+       git config --global credential.helper wincred
+     （macOS 用 osxkeychain；Linux 用 store）
+2) 克隆工程（用「用户名 + 刚才的 token」顶替密码）：
+   git clone https://<你的GitHub用户名>:<token>@github.com/CQY007CQ/travel-guide-mini.git D:/guozihao/miniprogram-travel
+   （仓库已建，URL 固定如上；token 仅此一次写在 URL 里，之后靠凭据缓存）
+3) 在 WorkBuddy 新建 recurring automation，把本文件全文粘贴为 prompt。
+4) automation 的 cwds 设为：D:/guozihao/miniprogram-travel
    （必须是含 app.json 的那一层，别停在 D:/guozihao）
-4) 设定时（建议 07:00–08:30，确保在中枢 09:00 前 push 完），首次手动跑一次验证。
+5) 设定时（建议 07:00–08:30，确保在中枢 09:00 前 push 完），首次手动跑一次验证。
 
 ================================================================
 以下为提示词正文：
@@ -49,7 +58,7 @@
 - git add tools/team/team-region-西北.json（只 add 自己的板块文件，严禁 git add -A，避免误带他人/整合文件）。
 - git commit -F <临时文件>（信息含板块+日期+各 section 新增条数）；git push 到共享远程。
   - 非快进 → git pull --rebase 后重 push。
-  - 若 git 报权限/认证错 → 停止并提示用户配置远程凭据，不要反复重试。
+  - 若 git 报权限/认证错（GitHub 已不再接受账号密码，必须用 PAT/token）→ 停止并提示用户按「使用前 5 步·第 1 步」配置凭据，不要反复重试。
 
 ## 护栏
 - 零 API、零 key；失败即停。
