@@ -119,31 +119,7 @@
     </view>
   </view>
 
-  <!-- v1.19.169 · 离线知识库（平台级「大数据」：区别于「本机数据洞察」聚合的是用户自己的本地记录） -->
-  <view class="group" wx:if="{{corpus && corpus.ready}}">
-    <view class="group-title">离线知识库 · 大数据</view>
-    <view class="card group-card">
-      <view class="cp-head">{{corpus.headline}}</view>
-      <view class="cp-grid">
-        <view class="cp-n"><text class="cp-v">{{corpus.cities}}</text><text class="cp-l">城市</text></view>
-        <view class="cp-n"><text class="cp-v">{{corpus.spots}}</text><text class="cp-l">景点</text></view>
-        <view class="cp-n"><text class="cp-v">{{corpus.foods}}</text><text class="cp-l">美食点</text></view>
-        <view class="cp-n"><text class="cp-v gold">{{corpus.hospitals}}</text><text class="cp-l">应急医院</text></view>
-        <view class="cp-n"><text class="cp-v">{{corpus.provinces}}</text><text class="cp-l">省级区</text></view>
-      </view>
-      <view class="cp-sec" wx:if="{{corpus.climate.length}}">
-        <view class="cp-h">气候带分布</view>
-        <view class="cp-row" wx:for="{{corpus.climate}}" wx:key="k">
-          <view class="cp-lab">{{item.label}}<text class="cp-amt"> {{item.n}}</text></view>
-          <view class="cp-bar"><view class="cp-fill" style="width:{{item.pct}}%"></view></view>
-        </view>
-      </view>
-      <view class="cp-chips" wx:if="{{corpus.region.length}}">
-        <text class="cp-chip" wx:for="{{corpus.region}}" wx:key="k">{{item.label}} {{item.n}}</text>
-      </view>
-      <view class="cp-tip dim">全部为随包下发的离线结构化数据，无需联网即可规划</view>
-    </view>
-  </view>
+  <!-- v1.19.186 · 离线知识库·大数据卡片已迁至 pages/help（帮助页底部「离线数据来源·规模」板块） -->
 
   <!-- v1.19.137 · 本机数据洞察（真实记录聚合，离线 / 隐私优先） -->
   <view class="group" wx:if="{{insights}}">

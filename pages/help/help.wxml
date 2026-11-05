@@ -87,4 +87,28 @@
     以上为分诊常识与医院位置，急危重症请直接拨打 120。
   </view>
 
+  <!-- v1.19.186 · 离线数据来源 · 规模（从 more 页迁移：普通用户价值低，移至帮助页作为透明说明） -->
+  <view class="card" wx:if="{{corpus}}">
+    <view class="er-h">离线数据来源 · 规模</view>
+    <view class="cp-head">{{corpus.headline}}</view>
+    <view class="cp-grid">
+      <view class="cp-n"><text class="cp-v">{{corpus.cities}}</text><text class="cp-l">城市</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.spots}}</text><text class="cp-l">景点</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.foods}}</text><text class="cp-l">美食城</text></view>
+      <view class="cp-n"><text class="cp-v gold">{{corpus.hospitals}}</text><text class="cp-l">应急医院</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.provinces}}</text><text class="cp-l">省级区</text></view>
+    </view>
+    <view class="cp-sec" wx:if="{{corpus.climate.length}}">
+      <view class="cp-h">气候带分布</view>
+      <view class="cp-row" wx:for="{{corpus.climate}}" wx:key="k">
+        <view class="cp-lab">{{item.label}}<text class="cp-amt"> {{item.n}}</text></view>
+        <view class="cp-bar"><view class="cp-fill" style="width:{{item.pct}}%"></view></view>
+      </view>
+    </view>
+    <view class="cp-chips" wx:if="{{corpus.region.length}}">
+      <text class="cp-chip" wx:for="{{corpus.region}}" wx:key="k">{{item.label}} {{item.n}}</text>
+    </view>
+    <view class="cp-tip dim">全部为随包下发的离线结构化数据，无需联网即可规划</view>
+  </view>
+
 </view>
