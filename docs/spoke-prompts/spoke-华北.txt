@@ -1,8 +1,8 @@
 【本文件是给你的每日采集引擎提示词 · 板块：华北】
 使用前 4 步：
 1) 克隆工程：
-   git clone https://github.com/<你的用户名>/travel-guide-mini.git D:/guozihao/miniprogram-travel
-   （<你的用户名> 换成真实用户名，注意是 CQY097CQ 还是 CQY007CQ）
+   git clone https://github.com/CQY007CQ/travel-guide-mini.git D:/guozihao/miniprogram-travel
+   （仓库已建，clone URL 固定如上）
 2) 在 WorkBuddy 新建 recurring automation，把本文件全文粘贴为 prompt。
 3) automation 的 cwds 设为：D:/guozihao/miniprogram-travel
    （必须是含 app.json 的那一层，别停在 D:/guozihao）
