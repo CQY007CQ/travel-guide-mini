@@ -20,6 +20,11 @@ const GRADES = ["优秀", "良好", "尚可", "待优化", "—"];
     ok(ev && typeof ev.score === "number" && ev.score >= 0 && ev.score <= 100, `${city}: score∈[0,100] (${ev ? ev.score : "无"})`);
     ok(ev && GRADES.includes(ev.grade), `${city}: grade 合法 (${ev ? ev.grade : "无"})`);
     ok(ev && Array.isArray(ev.suggestions) && ev.suggestions.length >= 1, `${city}: suggestions 非空 (${ev ? ev.suggestions.length : 0} 条)`);
+    // v1.19.188：UI 卡依赖 detail 三维数值（日均景点/日均路程/节奏差异），必须存在且为数字
+    const d = ev && ev.detail;
+    ok(d && typeof d.avgSpots === "number", `${city}: detail.avgSpots 数值 (${d ? d.avgSpots : "无"})`);
+    ok(d && typeof d.avgDist === "number", `${city}: detail.avgDist 数值 (${d ? d.avgDist : "无"})`);
+    ok(d && typeof d.cv === "number", `${city}: detail.cv 数值 (${d ? d.cv : "无"})`);
     if (ev) {
       covers++;
       if (ev.suggestions.some(s => /跨度|km/.test(s))) distTips++;

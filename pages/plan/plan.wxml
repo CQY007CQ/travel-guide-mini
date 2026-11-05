@@ -78,6 +78,27 @@
     </view>
   </view>
 
+  <!-- 攻略自评分：三维指标（日均景点 / 日均路程 / 节奏差异）+ 改进建议（算法 v1.19.177，UI 落地 v1.19.188） -->
+  <view class="card score-card" wx:if="{{evaluation}}">
+    <view class="h3 row-between">
+      <view class="h3-l"><image class="ic" src="/images/icons/trend.png"/>攻略评分</view>
+      <view class="sc-head-r">
+        <text class="sc-grade {{evaluation.gcls}}">{{evaluation.grade}}</text>
+        <text class="sc-score">{{evaluation.score}}<text class="sc-u">分</text></text>
+      </view>
+    </view>
+    <view class="sc-metrics">
+      <view class="sc-m"><text class="sc-mv">{{evaluation.detail.avgSpots}}</text><text class="sc-ml">日均景点</text></view>
+      <view class="sc-sep"></view>
+      <view class="sc-m"><text class="sc-mv">{{evaluation.detail.avgDist}}<text class="sc-u">km</text></text><text class="sc-ml">日均路程</text></view>
+      <view class="sc-sep"></view>
+      <view class="sc-m"><text class="sc-mv">{{evaluation.detail.cv}}</text><text class="sc-ml">节奏差异</text></view>
+    </view>
+    <view class="sc-sugs">
+      <view class="sc-sug" wx:for="{{evaluation.suggestions}}" wx:key="*this"><text class="sc-sug-dot">·</text><text class="sc-sug-tx">{{item}}</text></view>
+    </view>
+  </view>
+
   <!-- v1.8.5 C5：顶部天数快速导航（sticky，点某天跳到对应卡） -->
   <view class="day-strip" wx:if="{{topDays.length > 1}}">
     <scroll-view scroll-x class="ds-scroll" enhanced show-scrollbar="{{false}}">

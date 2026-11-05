@@ -285,7 +285,15 @@ Page(SafePage({
    cityNote: (segs || plan.isProv) ? null : T.getCityNote(plan.cityName),
    cnOpen: false,
    cnToggleTx: ((segs || plan.isProv) ? null : T.getCityNote(plan.cityName)) ? "编辑 ▾" : "去打分 ▾",
-   topDays
+   topDays,
+   // v1.19.188：攻略自评分（算法 v1.19.177）落地 UI —— 把 plan.evaluation 透传视图，
+   // 并把中文 grade 映射成安全英文 class（WXSS 中文 class 选择器不稳），缺评则整体收起。
+   evaluation: (() => {
+    const ev = plan && plan.evaluation;
+    if (!ev) return null;
+    const gmap = { "优秀": "excellent", "良好": "good", "尚可": "fair", "待优化": "weak", "—": "na" };
+    return Object.assign({}, ev, { gcls: gmap[ev.grade] || "na" });
+   })()
   });
   this._maybeLoadWx(plan);
   this._loadDeep(plan);

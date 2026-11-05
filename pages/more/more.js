@@ -3,6 +3,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // more：功能聚合（分组）+ 想玩清单（内嵌可管理）
 const T = require("../../utils/travel.js");
 const EL = require("../../utils/errlog.js"); // v1.19.106：本地错误日志（被 SafePage / app.onError 兜住的异常）
+const KEYS = require("../../utils/keys.js"); // v1.19.188：第三方密钥统一出口（含运行时注入 setKeys）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 const INS = require("../../utils/insights.js");   // v1.19.137：本机旅行数据洞察（真实记录聚合）
 const PZ = require("../../utils/personalize.js");  // v1.19.138：个性化目的地推荐（真实画像驱动）
@@ -333,6 +334,37 @@ Page(SafePage({
     if (PKG[k]) { wx.navigateTo({ url: PKG[k] }); return; }
     // 防御：未知 key 不再跳转到非法拼接路径（避免死链/白屏），明确提示
     wx.showToast({ title: "该功能暂未开放", icon: "none" });
+  },
+
+  /* ---- 合规与密钥（v1.19.188）：运行时注入本人账号申请的第三方 Key ----
+     不改动源码 / 不重发版即可换成你自己的和风天气 / 高德 Key；
+     经 keys.js 的 __app_keys__ storage 覆盖路径，天气取数即时生效（fail-closed 已内置）。 */
+  onSetKeys() {
+    wx.showModal({
+      title: "配置和风天气 Key",
+      content: "在 dev.qweather.com 申请免费 Key（须为你本人和风账号）。粘贴后天气即用你的 Key；留空则保持默认。",
+      editable: true,
+      placeholderText: "粘贴和风天气 Key",
+      success: (r1) => {
+        if (!r1.confirm) return;
+        const qk = (r1.content || "").trim();
+        const patch = {};
+        if (qk) patch.qweatherKey = qk;
+        wx.showModal({
+          title: "配置高德 Key（可选）",
+          content: "当前小程序用微信内置地图组件，无需 Key；仅当你未来自行调用高德 API 时才需要。留空跳过。",
+          editable: true,
+          placeholderText: "粘贴高德 Key（可选）",
+          success: (r2) => {
+            const ak = (r2.content || "").trim();
+            if (ak) patch.amapKey = ak;
+            if (!Object.keys(patch).length) { wx.showToast({ title: "未改动", icon: "none" }); return; }
+            KEYS.setKeys(patch);
+            wx.showToast({ title: "已保存，下次加载天气即生效", icon: "none" });
+          }
+        });
+      }
+    });
   },
 
   /* ---- 行程存档：恢复 / 删除 ---- */

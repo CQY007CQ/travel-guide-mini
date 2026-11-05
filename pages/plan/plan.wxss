@@ -825,3 +825,24 @@
 /* 已保存：金描边 + 透明底，单一金色调内区分状态，不引入新色相 */
 .save-btn.saved { background: transparent; color: var(--gold, #d4a94e); border: 2rpx solid var(--gold, #d4a94e); box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .save-btn { transition: none; } }
+
+/* ── v1.19.188：攻略自评分卡（算法 v1.19.177）───────────────── */
+.score-card { padding-bottom: 22rpx; }
+.sc-head-r { display: flex; align-items: center; gap: 14rpx; }
+.sc-grade { font-size: calc(21rpx * var(--fs, 1)); font-weight: 700; padding: 4rpx 16rpx; border-radius: 99rpx; }
+.sc-grade.excellent { background: rgba(95, 185, 138, .14); color: var(--green, #5fb98a); }
+.sc-grade.good { background: rgba(212, 169, 78, .16); color: var(--gold-tx, #d4a94e); }
+.sc-grade.fair { background: rgba(212, 169, 78, .12); color: var(--gold-tx, #d4a94e); }
+.sc-grade.weak { background: rgba(229, 106, 106, .14); color: var(--red, #e56a6a); }
+.sc-grade.na { background: rgba(148, 163, 184, .14); color: var(--t4, #7d92ab); }
+.sc-score { font-size: calc(42rpx * var(--fs, 1)); font-weight: 800; color: var(--t1, #eaeff7); line-height: 1; }
+.sc-u { font-size: calc(20rpx * var(--fs, 1)); font-weight: 600; color: var(--t4, #7d92ab); margin-left: 2rpx; }
+.sc-metrics { display: flex; align-items: stretch; margin: 18rpx 0 2rpx; padding: 18rpx 0; background: rgba(var(--ln-rgb, 148, 163, 184), .05); border-radius: 14rpx; }
+.sc-m { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8rpx; }
+.sc-mv { font-size: calc(31rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); line-height: 1; }
+.sc-ml { font-size: calc(20rpx * var(--fs, 1)); color: var(--t4, #7d92ab); }
+.sc-sep { width: 1rpx; background: rgba(var(--ln-rgb, 148, 163, 184), .14); }
+.sc-sugs { margin-top: 16rpx; display: flex; flex-direction: column; gap: 11rpx; }
+.sc-sug { display: flex; align-items: flex-start; gap: 10rpx; font-size: calc(22rpx * var(--fs, 1)); line-height: 1.6; color: var(--t3, #b9c6da); }
+.sc-sug-dot { color: var(--gold, #d4a94e); flex-shrink: 0; font-weight: 700; }
+.sc-sug-tx { flex: 1; min-width: 0; }
