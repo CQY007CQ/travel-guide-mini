@@ -74,10 +74,14 @@ function travelRhythm() {
 }
 
 // 4) 足迹省份分布（复用 footHeatmap 的省份聚合，不碰未导出内部）
+// v1.19.182：footHeatmap 含 34 省种子（n 多为 0）。此前不过滤 → top6 全是 n=0 的
+// 北京/天津…，既渲染出「北京 0」假面板，又让 favProv 误把 n=0 北京当「最常去」。
+// 现只取 n>0 的真实足迹省，无足迹时返回空，由 WXML 的 wx:if 自动隐藏该小节。
 function footProvinces() {
   const h = (T.footHeatmap && T.footHeatmap()) || {};
   const provs = Array.isArray(h.provs) ? h.provs : [];
   const rows = provs
+    .filter(p => p && p.n > 0)
     .map(p => ({ prov: p.name, n: p.n }))
     .sort((a, b) => b.n - a.n)
     .slice(0, 6);

@@ -42,6 +42,26 @@ function _bonus(city, td, visitedSet) {
   return { b, why };
 }
 
+// 从底层 recommend 结果里抽取「这座城为什么上榜」的差异化证据：
+// 优先用 content 标签（reasonTag，如「美食小吃」）作分类，再附上具体例子
+// （reasons[].note 里的「如 绍兴黄酒、梅干菜扣肉」），保证每城理由不雷同且可追溯。
+// v1.19.182：此前 personalize 丢弃了 recommend 每城自带的差异化理由，只给每城追加
+// 同一句「贴合你偏好的X」，导致推荐列表理由雷同、看不出个性。现改为复用真实差异。
+function _whyFromReason(r) {
+  if (!r) return [];
+  const out = [];
+  const tag = r.reasonTag;
+  if (tag && tag !== "综合热度" && tag !== "你提到的城市") out.push("主打" + tag);
+  const hit = (r.reasons || []).filter(x => x && x.note && x.note.indexOf("如 ") >= 0);
+  if (hit.length) {
+    const ex = hit[0].note.split("如 ").pop();
+    if (ex) out.push(ex);
+  } else if (r.summary) {
+    out.push(r.summary);
+  }
+  return out;
+}
+
 // 主入口：返回 N 个「为你推荐」的目的地，每条带 whyMe 理由
 function personalized(n) {
   n = Math.max(1, Math.min(20, parseInt(n, 10) || 5));
@@ -62,12 +82,25 @@ function personalized(n) {
     const city = cities.filter((c) => c && c.name === r.name)[0] || {};
     const bo = _bonus(city, td, visitedSet);
     const total = (r.score || 0) + bo.b;
-    const why = bo.why.slice();
-    if (td.topCat) why.push("贴合你偏好的" + td.topCat);
-    return Object.assign({}, r, { _bonus: bo.b, whyMe: why, whyMeTx: why.join(" · "), total: total });
+    // v1.19.182：whyMe = 个性化加成（来自本机真实数据） + 底层引擎每城自带的差异化证据。
+    // 不再给每城追加同一句「贴合你偏好的X」，而是用 reasonTag + 具体例子（如「绍兴黄酒、梅干菜扣肉」），
+    // 让每条推荐都不重样、且能追溯「为什么是你」。
+    const why = bo.why.slice().concat(_whyFromReason(r));
+    return Object.assign({}, r, {
+      _bonus: bo.b, whyMe: why, whyMeTx: why.join(" · "),
+      tag: r.reasonTag || "", total: total
+    });
   }).sort((a, b) => (b.total - a.total) || ((b._raw || 0) - (a._raw || 0)) || a.name.localeCompare(b.name))
     .slice(0, n);
-  return { list: scored, fromMe: true, pending: false, tendency: td, summary: ins.summary };
+  // 模块 2 的独立引导语：基于真实画像拼出「为什么是为你推荐」，不再重复模块 1 的 summary。
+  const bits = [];
+  if (td.topCat) bits.push("偏好" + td.topCat);
+  if (td.season) bits.push(td.season + "季出行");
+  if (td.favProv) bits.push("常去" + td.favProv);
+  const intro = bits.length
+    ? ("根据你的真实画像（" + bits.join("、") + "）为你精选：")
+    : "根据你的历史记录为你精选：";
+  return { list: scored, fromMe: true, pending: false, tendency: td, summary: ins.summary, intro: intro };
 }
 
 module.exports = { personalized, queryFromTendency };

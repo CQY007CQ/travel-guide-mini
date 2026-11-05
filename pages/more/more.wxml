@@ -193,10 +193,11 @@
   <view class="group" wx:if="{{personalized && personalized.list.length}}">
     <view class="group-title">为你推荐 · 你的旅行画像</view>
     <view class="card group-card">
-      <view class="dim ins-sub">{{personalized.summary}}</view>
+      <view class="dim ins-sub">{{personalized.intro}}</view>
       <view class="pz-item" wx:for="{{personalized.list}}" wx:key="name">
         <view class="pz-main">
           <text class="pz-name">{{item.name}}</text>
+          <text class="pz-tag" wx:if="{{item.tag}}">{{item.tag}}</text>
           <text class="pz-prov dim" wx:if="{{item.province}}">{{item.province}}</text>
         </view>
         <view class="pz-why">{{item.whyMeTx}}</view>
