@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # 重绘底部 4 个 tab 图标（paper plane / map pin / compass / ellipsis）
-# 当前全部 32x32 px，高分屏发虚；本脚本按原设计矢量重绘为 162x162（3x 超采样 + LANCZOS 抗锯齿）。
+# 243x243 输出，5x 超采样 + LANCZOS 抗锯齿，几何更精致、线条更顺。
 # 配色沿用现有：深色主题未选=#8495ad，浅色主题未选=#4a5568，选中=金 #d4a94e。
 # 用法：python3 tools/_gen-tab-icons.py
 import math
 from PIL import Image, ImageDraw
 
 SIZE = 243
-SS = 3
+SS = 5                      # 超采样倍数（3 -> 5，边缘明显更顺）
 BIG = SIZE * SS
 f = BIG / 24.0
 
-C_DARK = (132, 149, 173, 255)
-C_LIGHT = (74, 85, 104, 255)
-C_GOLD = (212, 169, 78, 255)
-GOLD_DARK = (150, 115, 50, 255)
+C_DARK = (132, 149, 173, 255)   # 深色主题·未选
+C_LIGHT = (74, 85, 104, 255)    # 浅色主题·未选
+C_GOLD = (212, 169, 78, 255)    # 选中
+GOLD_DARK = (150, 115, 50, 255) # 选中态内的暗金（制造立体感）
 WHITE = (255, 255, 255, 255)
 
 
@@ -23,64 +23,74 @@ def P(x, y):
 
 
 def sw(u):
-    return max(1.0, u * f)
+    """24-grid 单位 -> BIG 像素（整数，靠超采样获得亚像素平滑）。"""
+    return max(1, int(round(u * f)))
 
 
 def draw_plane(d, color, filled):
-    # Feather "send" 纸飞机几何：更 recognizable
-    N, Ut, F, Lt = (22, 2), (2, 9), (11, 13), (15, 22)
+    # Material「send」纸飞机（朝右）：左缘上下两段直尾翼(C-D / F-A) + 深 V 缺口 E；
+    # 折缝 B-E 把机身分成上翼(亮金)/下翼(暗金)，而非平滑箭头。
+    A, B, C, D, E, F = (3, 21), (22, 12), (3, 3), (3, 10), (15, 12), (3, 14)
     if filled:
-        d.polygon([P(*N), P(*Ut), P(*F), P(*Lt)], fill=color)
-        d.line([P(*N), P(*F)], fill=GOLD_DARK, width=max(1, int(sw(1.7) * 0.5)))
+        d.polygon([P(*B), P(*C), P(*D), P(*E)], fill=color)        # 上翼（亮金）
+        d.polygon([P(*B), P(*E), P(*F), P(*A)], fill=GOLD_DARK)    # 下翼（暗金折面）
     else:
-        w = int(sw(1.7))
-        d.line([P(*N), P(*Ut), P(*F), P(*Lt), P(*N)], fill=color, width=w)
-        d.line([P(*N), P(*F)], fill=color, width=w)
+        w = sw(1.7)
+        d.line([P(*A), P(*B), P(*C), P(*D), P(*E), P(*F), P(*A)], fill=color, width=w, joint="curve")
+        d.line([P(*B), P(*E)], fill=color, width=w, joint="curve")
 
 
 def draw_pin(d, color, filled):
-    cx, cy, r = 12, 8.5, 6.2
+    # 经典地图钉：圆头 + 收尖到底部一点，内嵌空心圆（"你在这里"）
+    cx, cy, r = 12, 9, 5.6
     tip = (12, 21)
-    ang = math.radians(55)
+    ang = math.radians(58)
     lx, ly = cx - r * math.sin(ang), cy + r * math.cos(ang)
     rx, ry = cx + r * math.sin(ang), cy + r * math.cos(ang)
     if filled:
         d.ellipse([P(cx - r, cy - r), P(cx + r, cy + r)], fill=color)
         d.polygon([P(lx, ly), P(rx, ry), P(*tip)], fill=color)
-        chk = [(9.2, 8.5), (11.2, 10.6), (15, 6.2)]
-        d.line([P(*chk[0]), P(*chk[1])], fill=WHITE, width=int(sw(2.0)))
-        d.line([P(*chk[1]), P(*chk[2])], fill=WHITE, width=int(sw(2.0)))
+        ir = 2.3
+        d.ellipse([P(cx - ir, cy - ir), P(cx + ir, cy + ir)], fill=WHITE)
     else:
-        w = int(sw(1.7))
+        w = sw(1.7)
         d.ellipse([P(cx - r, cy - r), P(cx + r, cy + r)], outline=color, width=w)
-        d.line([P(lx, ly), P(*tip)], fill=color, width=w)
-        d.line([P(rx, ry), P(*tip)], fill=color, width=w)
-        ir = 2.6
+        d.line([P(lx, ly), P(*tip)], fill=color, width=w, joint="curve")
+        d.line([P(rx, ry), P(*tip)], fill=color, width=w, joint="curve")
+        ir = 2.3
         d.ellipse([P(cx - ir, cy - ir), P(cx + ir, cy + ir)], outline=color, width=w)
-        # 内部勾：未选态用同色（白底/深色底都可见），不画白色（白底会隐身）
-        chk = [(9.2, 8.5), (11.2, 10.6), (15, 6.2)]
-        d.line([P(*chk[0]), P(*chk[1])], fill=color, width=w)
-        d.line([P(*chk[1]), P(*chk[2])], fill=color, width=w)
 
 
 def draw_plan(d, color, filled):
-    cx, cy, r = 12, 12, 8
-    needle = [(12, 5.5), (13.6, 12), (12, 18.5), (10.4, 12)]
+    # 指南针：外环 + 四方位刻度 + 四芒针（北长南短）+ 中心轴
+    cx, cy, r = 12, 12, 8.2
+    tk = 1.3
+    ticks = [
+        ((cx, cy - r + tk), (cx, cy - r - tk)),
+        ((cx, cy + r - tk), (cx, cy + r + tk)),
+        ((cx - r + tk, cy), (cx - r - tk, cy)),
+        ((cx + r - tk, cy), (cx + r + tk, cy)),
+    ]
     if filled:
         d.ellipse([P(cx - r, cy - r), P(cx + r, cy + r)], fill=color)
-        d.polygon([P(*p) for p in needle], fill=GOLD_DARK)
-        d.ellipse([P(cx - 1.8, cy - 1.8), P(cx + 1.8, cy + 1.8)], fill=GOLD_DARK)
+        d.polygon([P(12, 4.2), P(13.3, 12), P(12, 19.8), P(10.7, 12)], fill=GOLD_DARK)  # 竖直针
+        d.polygon([P(4.2, 12), P(12, 10.7), P(19.8, 12), P(12, 13.3)], fill=GOLD_DARK)  # 水平针
+        d.ellipse([P(cx - 1.7, cy - 1.7), P(cx + 1.7, cy + 1.7)], fill=WHITE)
+        for a, b in ticks:
+            d.line([P(*a), P(*b)], fill=GOLD_DARK, width=sw(1.0))
     else:
-        w = int(sw(1.7))
+        w = sw(1.7)
         d.ellipse([P(cx - r, cy - r), P(cx + r, cy + r)], outline=color, width=w)
-        # 未选态：指针/中心点用同色（白底/深色底都可见），不画白色
-        d.polygon([P(*p) for p in needle], fill=color)
-        d.ellipse([P(cx - 1.8, cy - 1.8), P(cx + 1.8, cy + 1.8)], fill=color)
+        d.polygon([P(12, 4.2), P(13.3, 12), P(12, 19.8), P(10.7, 12)], fill=color)
+        d.polygon([P(4.2, 12), P(12, 10.7), P(19.8, 12), P(12, 13.3)], fill=color)
+        d.ellipse([P(cx - 1.7, cy - 1.7), P(cx + 1.7, cy + 1.7)], fill=color)
+        for a, b in ticks:
+            d.line([P(*a), P(*b)], fill=color, width=sw(1.0))
 
 
 def draw_more(d, color, filled):
-    for cx in (6, 12, 18):
-        rr = 2.7
+    for cx in (5, 12, 19):
+        rr = 2.5
         d.ellipse([P(cx - rr, 12 - rr), P(cx + rr, 12 + rr)], fill=color)
 
 
