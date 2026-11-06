@@ -169,6 +169,34 @@ function applyTeamFoodEnrich() {
   if (_teamFoodAdded) console.warn("[data] 团队美食合并 " + _teamFoodAdded + " 家（增量合并）");
 }
 
+// v1.19.192 v206 美食坐标补全：11 家已入库美食店此前带 (0,0) 占位坐标（无真实可导航点），
+// 经 geocode/公开资料核验后补真实经纬度。按「城市 + 店名」匹配，仅当该店坐标缺失或为 (0,0) 无效占位时写入，
+// 已有真实坐标则不动；找不到同名店不凭空造店。加载期增量合并，不进打包基数据（与 TEAM_FOOD_ENRICH 同口径）。
+// >>>FOOD_COORDS_V206_START>>>
+const FOOD_COORDS_V206 = {"厦门":[["四里沙茶面",24.488,118.096],["百家村好德来姜母鸭",24.462,118.093]],"青岛":[["春和楼",36.071,120.318],["船歌鱼水饺",36.066,120.366],["万和春排骨米饭",36.106,120.362],["众品老方子锅贴",36.062,120.399]],"黄山":[["老街第一楼",29.708,118.31]],"济南":[["超意兴把子肉",36.663,117.119]],"武夷山":[["老陈紫溪粉",27.663,117.987],["小光饼",27.647,117.98]],"千岛湖":[["我姐家·非遗手工小吃",29.606,119.039]]};
+// <<<FOOD_COORDS_V206_END<<<
+let _foodCoordBackfilled = 0;
+function applyFoodCoordBackfill() {
+  for (const city in FOOD_COORDS_V206) {
+    const list = FOOD_COORDS_V206[city];
+    if (!Array.isArray(list) || !list.length) continue;
+    const arr = DATA.FOOD_SPOTS[city];
+    if (!Array.isArray(arr)) continue;
+    const byName = {};
+    for (const s of arr) { const n = (s && (s.shop || s.name) || "").trim(); if (n) byName[n] = s; }
+    for (const e of list) {
+      const nm = (e && e[0] || "").trim();
+      if (!nm) continue;
+      const ex = byName[nm];
+      if (!ex) continue;                                                           // 找不到同名店 -> 跳过（不凭空造店）
+      const hasReal = typeof ex.lat === "number" && typeof ex.lon === "number" && !(ex.lat === 0 && ex.lon === 0);
+      if (hasReal) continue;                                                       // 已有真实坐标 -> 不动
+      ex.lat = +e[1]; ex.lon = +e[2]; _foodCoordBackfilled++;
+    }
+  }
+  if (_foodCoordBackfilled) console.warn("[data] v206 美食坐标回写 " + _foodCoordBackfilled + " 家");
+}
+
 // v1.19.167 景点去重：同城 SPOT_COORDS 内出现完全同名的重复副本（仙桃/天门/潜江 等，
 // 单城同一景点被录入 41 次、坐标完全一致），导致地图/行程中同一景点重复出现 40+ 次。
 // 加载时按「城市 + 景点名 + 坐标」去重，仅移除逐字节相同的副本、保留首个，零信息损失。
@@ -415,6 +443,7 @@ function applyPacked(packed) {
   applySpotEnrich(); // v1.19.174 稀疏县景点补全
   applyFoodEnrich(); // v1.19.182 美食富信息扩城（加载期增量合并，不进打包基数据）
   applyTeamFoodEnrich(); // v1.19.182 团队美食合并（7 人分区采集，加载期增量合并）
+  applyFoodCoordBackfill(); // v1.19.192 v206 美食坐标补全（11 家 (0,0) 占位回写真实坐标）
   dedupeSpots();
   fillBestSeason();
   applyHotelAreasExtra();
