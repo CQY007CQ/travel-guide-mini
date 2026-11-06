@@ -17,9 +17,9 @@
   </block>
 
   <view class="empty" wx:else>
-    <view class="empty-emoji">🧳</view>
-    <view class="empty-t1">还没有收藏的攻略</view>
-    <view class="empty-t2 dim">去「出发」生成一个行程，再点「保存到我的攻略」</view>
-    <view class="empty-btn" bindtap="goGen">去生成攻略</view>
+    <view class="em-ic"><image class="em-img" src="/images/icons/luggage.png"/></view>
+    <view class="em-t">还没有收藏的攻略</view>
+    <view class="em-s">去「出发」生成一个行程，再点「保存到我的攻略」<br/>收藏后离线可看、随时再打开</view>
+    <button class="em-btn btn-primary" bindtap="goGen">去生成攻略</button>
   </view>
 </view>

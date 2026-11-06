@@ -27,16 +27,7 @@
 
 .tip { margin-top: 12rpx; padding: 0 6rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--tx-2, #6b7689); }
 
-.empty { margin-top: 160rpx; display: flex; flex-direction: column; align-items: center; text-align: center; }
-.empty-emoji { font-size: 96rpx; }
-.empty-t1 { margin-top: 24rpx; font-size: calc(32rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #18233a); }
-.td .empty-t1 { color: #f2f3f5; }
-.empty-t2 { margin-top: 12rpx; padding: 0 60rpx; font-size: calc(25rpx * var(--fs, 1)); line-height: 1.6; }
-.empty-btn {
-  margin-top: 40rpx; padding: 22rpx 56rpx; border-radius: 999rpx; text-align: center;
-  background: linear-gradient(135deg, var(--gold, #d4a94e) 0%, #e7c578 100%);
-  color: #fff; font-size: calc(29rpx * var(--fs, 1)); font-weight: 700;
-}
+/* 空态改用全局 .empty 卡片（app.wxss），与「今日」页一致；图标悬浮动效由 em-float 提供 */
 
 @media (prefers-reduced-motion: reduce) {
   .mg-item, .mg-item:active { transition: none; }

@@ -221,6 +221,13 @@ page {
   font-size: calc(76rpx * var(--fs, 1));
   line-height: 1;
   filter: drop-shadow(0 10rpx 18rpx rgba(212, 169, 78, 0.25));
+  animation: em-float 3.4s ease-in-out infinite;
+}
+
+/* 空态图标：轻微悬浮，给静态卡片一点呼吸感（减少动画偏好时关闭） */
+@keyframes em-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10rpx); }
 }
 
 .empty .em-t { font-size: calc(31rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); margin-top: 26rpx; line-height: 1.5; }
@@ -262,7 +269,7 @@ page {
 .fb-pulse { animation: fb-pulse 1.8s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .fb-fade, .fb-fade-d1, .fb-fade-d2, .fb-fade-d3, .fb-pulse { animation: none; }
+  .fb-fade, .fb-fade-d1, .fb-fade-d2, .fb-fade-d3, .fb-pulse, .em-float { animation: none; }
 }
 
 /* v1.19.77 · 微动效：按压缩放（给"摸得到"的反馈，不影响布局） */
