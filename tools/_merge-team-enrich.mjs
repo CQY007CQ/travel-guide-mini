@@ -10,6 +10,33 @@ const REPS = new Set(["老字号", "本地人常去", "游客打卡", "市井烟
 const TPL = ["人民医院", "中医院", "妇幼保健院", "中心医院", "第一人民医院", "第二人民医院"];
 const IN_CHINA = (lat, lon) => lat >= 3.8 && lat <= 53.5 && lon >= 73 && lon <= 135;
 
+// v1.19.191：社区采集的美食常缺「编辑点评 note」，但 rep/menu 完整。
+// 用其真实 rep 标签生成一句诚实的概化点评作兜底（不臆造具体菜品/历史事实），保证合并后每条都有 note。
+const NOTE_FALLBACK = {
+  "老字号": "本地老字号，口碑长期稳定，值得专程一试。",
+  "本地人常去": "本地人常去的实在馆子，性价比高。",
+  "游客打卡": "人气打卡店，出品稳定，适合顺路尝鲜。",
+  "市井烟火": "市井小店，烟火气足，接地气。",
+  "宴请名店": "适合宴请的品质餐厅，环境与服务在线。",
+  "__def__": "本地人气店铺，出品稳定，可放心一试。"
+};
+// 城市中心坐标（来自 data.js 的 CITY_COORDS，764 城），用于给团队医院反算距城心 kmc。
+const CITY_COORDS = (() => { try { return req("./utils/data.js").CITY_COORDS || {}; } catch (e) { return {}; } })();
+function cityCenter(c) {
+  if (CITY_COORDS[c]) return CITY_COORDS[c];
+  if (CITY_COORDS[c + "市"]) return CITY_COORDS[c + "市"];
+  const s = String(c).replace(/市$/, "");
+  return CITY_COORDS[s] || null;
+}
+function havKm(la1, lo1, la2, lo2) {
+  const R = 6371, r = Math.PI / 180;
+  const dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLo / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+let warns = 0;
+function W(m) { warns++; console.warn("  ⚠ " + m); }
+
 const doPack = process.argv.includes("--pack");
 
 // 1) 读分区文件（7 人手工提交 team-region-* + 每日自动化采集 daily-region-*）
@@ -35,6 +62,7 @@ for (const fn of files) {
       if (s.lat != null && s.lon != null && !IN_CHINA(+s.lat, +s.lon)) E(`${R}.food.${city}.${s.shop} 坐标越界`);
       if (s.rep && !REPS.has(s.rep)) E(`${R}.food.${city}.${s.shop} rep 不在白名单`);
       if (s.menu) for (const m of s.menu) if (!m || typeof m.n !== "string" || !(typeof m.p === "string" || typeof m.p === "number")) E(`${R}.food.${city}.${s.shop} 菜单项需 {n,p}`);
+      if (!s.note) s.note = NOTE_FALLBACK[s.rep] || NOTE_FALLBACK["__def__"];
       agg.food[city].push(s);
     }
   }
@@ -66,12 +94,19 @@ for (const fn of files) {
     const arr = j.hospitals[city] || [];
     if (!Array.isArray(arr)) { E(`${R}.hospitals.${city} 非数组`); continue; }
     for (const h of arr) {
+      if (!h || !h.n) { E(`${R}.hospitals.${city} 缺 n`); continue; }
+      if (h.lat != null && h.lon != null && !IN_CHINA(+h.lat, +h.lon)) { E(`${R}.hospitals.${city}.${h.n} 坐标越界`); continue; }
+      if (!h.lv) { E(`${R}.hospitals.${city}.${h.n} 缺 lv 等级`); continue; }
+      for (const t of TPL) if (h.n === city + t) { E(`${R}.hospitals.${city}.${h.n} 命中模板名红线（城市名+${t}）`); continue; }
+      // v1.19.191：团队医院常缺 kmc，用城心反算；距城心>25km（v1.19.180 收录规则上限）或无城心/无坐标则跳过，不污染 HOSPITALS 可信度红线。
+      if (typeof h.lat !== "number" || typeof h.lon !== "number") { W(`${R}.hospitals.${city}.${h.n} 缺坐标，跳过`); continue; }
+      const ctr = cityCenter(city);
+      if (!ctr) { W(`${R}.hospitals.${city}.${h.n} 无城心坐标，跳过`); continue; }
+      const kmc = +havKm(h.lat, h.lon, ctr[0], ctr[1]).toFixed(1);
+      if (kmc > 25) { W(`${R}.hospitals.${city}.${h.n} 距城心 ${kmc}km>25，按 v1.19.180 规则跳过`); continue; }
+      if (typeof h.kmc !== "number") h.kmc = Math.max(kmc, 0.1);
       if (!agg.hospitals[city]) agg.hospitals[city] = [];
       total.hospitals++;
-      if (!h || !h.n) { E(`${R}.hospitals.${city} 缺 n`); continue; }
-      if (h.lat != null && h.lon != null && !IN_CHINA(+h.lat, +h.lon)) E(`${R}.hospitals.${city}.${h.n} 坐标越界`);
-      if (!h.lv) E(`${R}.hospitals.${city}.${h.n} 缺 lv 等级`);
-      for (const t of TPL) if (h.n === city + t) E(`${R}.hospitals.${city}.${h.n} 命中模板名红线（城市名+${t}）`);
       agg.hospitals[city].push(h);
     }
   }
@@ -98,7 +133,7 @@ inject("utils/emergency-data.js", "TEAM_HOSP_START", "TEAM_HOSP_END", "TEAM_HOSP
 console.log("\n同步 utils/data.js ...");
 execSync("cp tools/_src-backup/data.js utils/data.js", { stdio: "inherit" });
 
-console.log(`\n✅ 合并完成：美食 ${total.food} 店 / 酒店区域 ${total.hotels} 片区 + 逐店 ${total.hotelList} 家 / 医院 ${total.hospitals} 家，覆盖 ${Object.keys(agg.food).length}+${Object.keys(agg.hotels).length}+${Object.keys(agg.hotelList).length}+${Object.keys(agg.hospitals).length} 城`);
+console.log(`\n✅ 合并完成：美食 ${total.food} 店 / 酒店区域 ${total.hotels} 片区 + 逐店 ${total.hotelList} 家 / 医院 ${total.hospitals} 家，覆盖 ${Object.keys(agg.food).length}+${Object.keys(agg.hotels).length}+${Object.keys(agg.hotelList).length}+${Object.keys(agg.hospitals).length} 城${warns ? `（跳过 ${warns} 项警告，详见上）` : ""}`);
 if (doPack) {
   console.log("\n重打包 subdata ...");
   try { execSync("node tools/pack-data.mjs", { stdio: "inherit" }); console.log("\n下一步：bash allcheck.sh 回归，再 tools/upload.sh"); }

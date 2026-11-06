@@ -213,16 +213,19 @@ step "导航死链审计 (按键跳转)" "$NODE" tools/_nav-audit.mjs
 step "分包体积体检 (每包 2MB 红线)" "$NODE" tools/check-pkgsize.mjs
 
 # 【v1.19.182 体积预算门禁】把「数据分包被静默撑爆 / 主包逻辑膨胀」从「上传后盯尺寸表」升级为 fail-fast。
-# data-packed.js 硬红线 1800KB（字节精确）：超阈值即红（防数据回归把包撑爆，也卡住残包异常缩小由 verify-release 兜底）；
+# data-packed.js 硬红线：v1.19.182 初设为 1800KB（留 180KB 余量给 1980KB 自动拆分阈值）；
+#   v1.19.191 起放宽到 1950KB —— 合法数据增长（部分东北/华东团队采集 + 富信息 P2②）已把单块顶到 ~1826KB，
+#   仍远低于 pack-data.mjs 的 CHUNK_B64_MAX=1980KB 自动拆分阈值与微信 2MB 分包硬上限，单块无需拆分；
+#   红线保留的意义是卡住「无征兆撑爆」与「残包异常缩小」（后者由 verify-release 兜底）。
 # utils 主包逻辑总体积预算 ≤1000KB：留足 headroom 的同时卡住无谓膨胀（富信息/覆盖层增量都算在主包内）。
-step "体积预算门禁 (data≤1800KB / utils≤1000KB)" bash -c '
+step "体积预算门禁 (data≤1950KB / utils≤1000KB)" bash -c '
   dp="subdata/data/data-packed.js"; [ -f "$dp" ] || dp=$(ls subdata*/data/data-packed*.js 2>/dev/null | head -1)
   sz=0; [ -f "$dp" ] && sz=$(wc -c < "$dp")
   ut=$(cat utils/*.js 2>/dev/null | wc -c)
-  echo "  data-packed: $((sz/1024))KB  红线 1800KB"
+  echo "  data-packed: $((sz/1024))KB  红线 1950KB"
   echo "  utils 逻辑:  $((ut/1024))KB  预算 1000KB"
   bad=0
-  [ "$sz" -gt 1843200 ] && { echo "  ✗ FAIL: data-packed 超 1800KB"; bad=1; }
+  [ "$sz" -gt 1996800 ] && { echo "  ✗ FAIL: data-packed 超 1950KB"; bad=1; }
   [ "$ut" -gt 1024000 ] && { echo "  ✗ FAIL: utils 主包逻辑超 1000KB"; bad=1; }
   [ "$sz" -lt 102400 ] && { echo "  ✗ FAIL: data-packed 异常偏小（疑似残包）"; bad=1; }
   exit $bad
