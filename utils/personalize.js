@@ -35,7 +35,11 @@ function queryFromTendency(td) {
 function _bonus(city, td, visitedSet) {
   let b = 0; const why = [];
   if (td.favProv && city.province === td.favProv) { b += 1.5; why.push("同你常去的" + td.favProv); }
-  if (visitedSet && visitedSet.has(city.name)) why.push("你打卡过，可二刷");
+  // v1.19.192：已打卡城市带「可二刷」理由，但旧实现只写理由、不给任何排序权重，
+  // 导致"你打卡过"这条个性化信号形同虚设（显示却不生效，与排序脱节）。
+  // 现补一个轻微正权重，使理由与排序一致；幅度(1.0)小于想去清单(1.2)——
+  // 重游是弱于明确意愿的信号，且数值小、只在同一候选集内微调次序，不会压制新目的地探索。
+  if (visitedSet && visitedSet.has(city.name)) { b += 1.0; why.push("你打卡过，可二刷"); }
   // v1.19.139：想去清单加权——用户在首页/行程页勾过的想玩城市，额外加分并给理由
   const wish = (T.getWish && T.getWish()) || [];
   if (wish.some(w => w && w.name === city.name)) { b += 1.2; why.push("就在你的想去清单里"); }
@@ -103,4 +107,4 @@ function personalized(n) {
   return { list: scored, fromMe: true, pending: false, tendency: td, summary: ins.summary, intro: intro };
 }
 
-module.exports = { personalized, queryFromTendency };
+module.exports = { personalized, queryFromTendency, _bonus };

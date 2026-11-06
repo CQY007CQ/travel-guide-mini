@@ -981,5 +981,18 @@ const hm37 = T.footHeatmap();
 assert("北京宫格随之归零", !hm37.provs.some(p => p.name === "北京" && p.n > 0));
 mem["miniFootV1"] = undefined;
 
+console.log("== 38. v1.19.192 · 个性化『可二刷』带排序权重（理由与排序一致）==");
+// 旧实现 _bonus 对"已打卡城市"只 push 理由、b 不增加 → 理由显示却不生效（功能不一致）。
+// 现补轻微正权重，使"你打卡过，可二刷"既是理由、也对排序有对应效果。
+const bjP38 = D.CITIES.find(c => c.name === "北京");
+const tdP38 = { favProv: "", season: "", topCat: "" };
+const boYes38 = PZ._bonus(bjP38, tdP38, new Set(["北京"]));
+const boNo38 = PZ._bonus(bjP38, tdP38, new Set());
+assert("已打卡城市→带『可二刷』理由", boYes38.why.join("").indexOf("可二刷") >= 0, boYes38.why.join("·"));
+assert("未打卡城市→无『可二刷』理由", boNo38.why.join("").indexOf("可二刷") < 0, boNo38.why.join("·"));
+// 同 td / 同想去清单状态下两次调用唯一差异是 visitedSet → 分差即"可二刷"权重贡献
+assert("已打卡『可二刷』贡献正权重(差值≈1.0)", Math.abs((boYes38.b - boNo38.b) - 1.0) < 1e-9, "Δ=" + (boYes38.b - boNo38.b));
+assert("已打卡城市总权重高于未打卡", boYes38.b > boNo38.b, boYes38.b + " vs " + boNo38.b);
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
