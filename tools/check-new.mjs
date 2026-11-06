@@ -925,5 +925,61 @@ mem["miniFootV1"] = undefined;
 mem["miniLedgerV1"] = [];
 mem["miniPlansV1"] = undefined;
 
+console.log("== 37. v1.19.189 · 洞察记忆化签名修正（改分类/月份/省必须刷新）==");
+// 旧签名仅含「条数+总额+首条日期+足迹城市数」，漏掉分类/各条日期/计划月份/各省点亮数，
+// 导致仅改分类或挪动月份时 insights() 返回陈旧缓存（洞察卡不刷新，真实 bug）。
+mem["miniLedgerV1"] = [];
+mem["miniPlansV1"] = undefined;
+mem["miniFootV1"] = undefined;
+T.addLedger(300, "餐饮", "午", "", false, "2026-09-10", "");
+T.addLedger(100, "住宿", "酒店", "", false, "2026-09-11", "");
+const insA37 = INS.insights();
+assert("改前 topCat=餐饮", insA37.tendency.topCat === "餐饮", insA37.tendency.topCat);
+// 仅改分类、不动金额/条数：旧签名不变 → 会误命中陈旧缓存返回「餐饮」
+mem["miniLedgerV1"] = [];
+T.addLedger(300, "住宿", "住", "", false, "2026-09-10", "");
+T.addLedger(100, "餐饮", "吃", "", false, "2026-09-11", "");
+const insB37 = INS.insights();
+assert("改分类后 topCat 刷新为住宿（非陈旧餐饮）", insB37.tendency.topCat === "住宿", insB37.tendency.topCat);
+// 月份挪动：总额/条数不变，仅日期跨月 → 月度趋势必须刷新
+mem["miniLedgerV1"] = [];
+T.addLedger(300, "餐饮", "午", "", false, "2026-10-10", "");
+T.addLedger(100, "住宿", "酒店", "", false, "2026-10-11", "");
+const insC37 = INS.insights();
+assert("月份挪动后月度行=2026-10", insC37.month.rows.length === 1 && insC37.month.rows[0].ym === "2026-10", JSON.stringify(insC37.month.rows));
+// 足迹跨省搬家：城市数不变但省份不同 → 常去省必须刷新
+mem["miniLedgerV1"] = [];
+mem["miniFootV1"] = undefined;
+T.markVisited("故宫", "北京", true);
+const insD37 = INS.insights();
+const favBefore37 = insD37.tendency.favProv;
+T.markVisited("故宫", "北京", false);
+T.markVisited("外滩", "上海", true);
+const insE37 = INS.insights();
+assert("足迹跨省后 favProv 刷新", insE37.tendency.favProv !== favBefore37, favBefore37 + " -> " + insE37.tendency.favProv);
+// 还原，避免污染其他用例
+T.markVisited("外滩", "上海", false);
+mem["miniLedgerV1"] = [];
+mem["miniFootV1"] = undefined;
+mem["miniPlansV1"] = undefined;
+
+// v1.19.189：markVisited 取消打卡必须回收城市计数（旧实现只删 spot、城市集合永不回收，
+// 导致足迹热力图/个性化"常去省"长期失真；v1.19.189 改为：该城已无其它已打卡景点才清 cities）
+mem["miniFootV1"] = undefined;
+T.markVisited("故宫", "北京", true);
+T.markVisited("天坛", "北京", true);
+const fc137 = T.footStats();
+assert("两北京景点 → cityList 含北京", fc137.cityList.indexOf("北京") >= 0, JSON.stringify(fc137.cityList));
+T.markVisited("天坛", "北京", false);
+const fc237 = T.footStats();
+assert("取消天坛后北京仍在(故宫在)", fc237.cityList.indexOf("北京") >= 0, JSON.stringify(fc237.cityList));
+T.markVisited("故宫", "北京", false);
+const fc337 = T.footStats();
+assert("取消最后一个北京景点后城市回收", fc337.cityList.indexOf("北京") < 0, JSON.stringify(fc337.cityList));
+// 省份热力同步回收（footHeatmap 读 cities）
+const hm37 = T.footHeatmap();
+assert("北京宫格随之归零", !hm37.provs.some(p => p.name === "北京" && p.n > 0));
+mem["miniFootV1"] = undefined;
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

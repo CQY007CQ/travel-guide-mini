@@ -8,12 +8,19 @@ const T = require("./travel.js");
 // v1.19.139：记忆化。insights() 会被 more 页与 personalized() 多次调用，
 // 真实记录未变时直接返回同一份聚合结果（避免重复计算 + 跨调用读数不一致）。
 let _cache = { sig: "", val: null };
+// v1.19.189：原签名仅取「账条目数 + 总额 + 首条日期 + 足迹城市数」，漏掉了
+// 单笔分类 / 各条日期 / 计划出发月 / 各省点亮数。后果：用户仅改某笔分类（不改金额/条数）、
+// 或在月份间挪动花费、或改某计划出发月、或把足迹在省之间搬家时，签名不变 →
+// insights() 返回陈旧缓存，洞察卡不刷新（真实 bug，已被单测复现）。
+// 现改为对全部影响输出的原始数据做完整序列化，任一输入变化都触发重算。
 function _sig() {
   const L = (T.getLedger && T.getLedger()) || [];
   const P = (T.listSavedPlans && T.listSavedPlans()) || [];
   const f = (T.footHeatmap && T.footHeatmap()) || {};
-  let amt = 0; for (let i = 0; i < L.length; i++) amt += _num(L[i] && L[i].amt);
-  return [L.length, P.length, f.cities || 0, (L[0] && L[0].date) || "", Math.round(amt)].join("|");
+  const lpart = L.map(e => ((e && e.cat) || "") + "|" + ((e && e.date) || "") + "|" + Math.round(_num(e && e.amt))).join(";");
+  const ppart = P.map(p => (p && (p.depart || (p.days && p.days[0] && p.days[0].date))) || "").join(";");
+  const fpart = (Array.isArray(f.provs) ? f.provs : []).map(p => p.name + "=" + (p.n || 0)).join(";");
+  return lpart + "##" + ppart + "##" + fpart;
 }
 
 function _num(v) { const n = Number(v); return isFinite(n) ? n : 0; }

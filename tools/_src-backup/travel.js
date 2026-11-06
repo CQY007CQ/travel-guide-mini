@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.188";
+const APP_VER = "1.19.189";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -1556,7 +1556,17 @@ function isVisited(name) {
 function markVisited(name, city, on) {
  const f = _footRaw();
  const k = cleanSpotName(name) || name;
- if (on === false) { delete f.spots[k]; }
+ // v1.19.189：取消打卡不仅要删 spot，还必须清掉该城市在 r.cities 的计数
+ // （旧实现只 delete spots[k]，城市集合永不回收 → 足迹热力图/个性化"常去省"长期失真）。
+ // 仅当该城市已无其它已打卡景点时才清除，避免同城多景点互相误删。
+ if (on === false) {
+  delete f.spots[k];
+  if (city) {
+   let still = false;
+   for (const kk in f.spots) { if (f.spots[kk] && f.spots[kk].city === city) { still = true; break; } }
+   if (!still && f.cities) delete f.cities[city];
+  }
+ }
  else {
   // v1.19.135：合并写入，保留已写的个人评价（note），不被打卡动作覆盖
   const prev = f.spots[k] || {};
