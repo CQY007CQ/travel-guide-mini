@@ -208,6 +208,12 @@ Page(SafePage({
           const i = this.data.budgetKeys.indexOf(String(options.budget));
           if (i >= 0) patch.budgetIdx = i;
         }
+        // v1.19.193：自定义预算的分享方带上了总预算金额（amt），这里回填 customAmt，
+        // 否则 budgetIdx=custom 但 customAmt 为空，generate() 会因金额缺失而卡住、复现失败。
+        if (options.amt) {
+          const amt = parseFloat(String(decodeURIComponent(options.amt)));
+          if (amt > 0) patch.customAmt = String(amt);
+        }
         if (options.mode && Array.isArray(this.data.travelModeVals)) {
           const i = this.data.travelModeVals.indexOf(String(options.mode));
           if (i >= 0) patch.travelModeIdx = i;

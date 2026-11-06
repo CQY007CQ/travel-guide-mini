@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.192";
+const APP_VER = "1.19.194";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -502,7 +502,10 @@ function _planDayFilled(d) {
  return items.some(it => it && it.name && !isFrameName(it.name));
 }
 function cityDayCap(cityName, pace) {
- const ck = String(cityName || "") + "|" + (pace || "balance");
+ // 缓存键必须用「城市名」而非对象本身：入参实际是 city 对象，String(obj) 恒为 "[object Object]"，
+ // 会导致所有城市共享同一个缓存槽、互相覆盖（首个/末个城市的天数上限被错误套用到全部城市）。v1.19.193 修复。
+ const cn = (cityName && cityName.name) ? cityName.name : String(cityName || "");
+ const ck = cn + "|" + (pace || "balance");
  if (_cityCapCache.has(ck)) return _cityCapCache.get(ck);
  const pc = { city: cityName, depart: "2027-01-01", budget: "mid", pace: pace || "balance" };
  let upper = 5;
@@ -1136,7 +1139,12 @@ function copyPlanText(plan) {
  if (!plan || !plan.days) return "";
  const L = [];
  const fmt = s => String(s || "").slice(0, 10);
- L.push("" + plan.cityName + " " + plan.totalDays + " 天行程（出发 " + fmt(plan.depart) + "，预算 " + budgetLabel(plan.budget) + "）");
+ // v1.19.193：退化行程（缺 totalDays/depart，或经「我的攻略」恢复的早期存档）会泄漏 "undefined"；
+ // 用兜底值替换，保证复制出的文本始终可读。
+ const cityName = plan.cityName || "目的地";
+ const totalDays = (plan.totalDays != null) ? plan.totalDays : (Array.isArray(plan.days) ? plan.days.length : "");
+ const departStr = plan.depart ? fmt(plan.depart) : "未定";
+ L.push("" + cityName + " " + totalDays + " 天行程（出发 " + departStr + "，预算 " + budgetLabel(plan.budget) + "）");
  const city = findCity(plan.cityName);
  if (city && city.foods && city.foods.length) L.push("必吃：" + city.foods.join("、"));
  if (city && city.travel) L.push("" + city.travel);
@@ -1829,10 +1837,22 @@ function guessCat(name) {
 function parseQuickBill(str) {
   const s = String(str || "").trim();
   if (!s) return null;
-  const m = s.match(/(\d+(?:\.\d{1,2})?)/);
-  if (!m) return null;
-  const amt = Math.round(parseFloat(m[1]) * 100) / 100;
+  const all = [...s.matchAll(/(\d+(?:\.\d{1,2})?)(元|块|￥|¥|RMB|rmb)?/g)];
+  if (!all.length) return null;
+  // 金额识别（修复「第3天 早餐15元」被解析成 3 元 的 bug）：
+  // ① 紧跟货币单位（"15元"）最准，优先用；
+  // ② 否则在多个数字里取「最可能金额」= 最大的那个——
+  //    天数/人数等修饰数字（第3天、2个人）通常远小于真实金额，
+  //    「2个人吃饭88」「门票300 第2天」「第12天酒店600」都能正确取到 88/300/600；
+  // ③ 只有一个数字时直接用。
+  let chosen = all.find(m => m[2]);
+  if (!chosen) {
+    if (all.length === 1) chosen = all[0];
+    else chosen = all.slice().sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]))[0];
+  }
+  const amt = Math.round(parseFloat(chosen[1]) * 100) / 100;
   if (!(amt > 0)) return null;
+  const m = chosen;
   let name = (s.slice(0, m.index) + " " + s.slice(m.index + m[0].length))
     .replace(/[¥￥]/g, " ").replace(/块钱|块|元|rmb|RMB/gi, " ")
     .replace(/[，,。.;；]/g, " ").replace(/\s+/g, " ").trim();
@@ -4243,7 +4263,8 @@ function tripScoreOf(plan) {
 // 21) 去这里的理由
 function cityFirstLine(city) {
  if (!city) return "";
- return "去" + city.name + "：" + (city.best ? city.best.split("；")[0] + "，" : "") + (city.foods && city.foods[0] ? "别错过" + city.foods[0] + "。" : "");
+ const nm = (city.name) || (typeof city === "string" ? city : "") || "目的地";
+ return "去" + nm + "：" + (city.best ? city.best.split("；")[0] + "，" : "") + (city.foods && city.foods[0] ? "别错过" + city.foods[0] + "。" : "");
 }
 // 22) 城市美食动线（早市/正餐/宵夜）
 function foodRouteOf(city) {
@@ -4257,8 +4278,9 @@ function foodRouteOf(city) {
 function weatherFallback(city) {
  if (!city) return "";
  const cl = city.climate || "";
+ const nm = (city.name) || (typeof city === "string" ? city : "") || "目的地";
  const map = { tropical: "热带气候，全年暖热，备夏装+防晒，雨季常备伞", hot: "夏热冬温，夏季防暑、冬季薄外套", temperate: "四季分明，春秋最舒服，早晚加件外套", cold: "冬季寒冷，羽绒服备好；夏季凉爽宜人", dry: "干燥少雨，昼夜温差大，保湿防晒都要做", plateau: "高原气候，紫外线强、温差大，防高反+保暖" };
- return city.name + "：" + (map[cl] || "出行前看下当地天气") + "。" + (city.best ? "（" + city.best.split("；")[0] + "）" : "");
+ return nm + "：" + (map[cl] || "出行前看下当地天气") + "。" + (city.best ? "（" + city.best.split("；")[0] + "）" : "");
 }
 // 24) 穿衣参考（按气候+月份粗档）
 function layerOf(climate, month) {
@@ -4278,7 +4300,8 @@ function stayZoneOf(city) {
 // 26) 交通备注精简
 function moveNote(city) {
  if (!city) return "";
- return "去" + city.name + "：" + (city.travel || "") + " 市内：" + (city.cityTravel || "");
+ const nm = (city.name) || (typeof city === "string" ? city : "") || "目的地";
+ return "去" + nm + "：" + (city.travel || "") + " 市内：" + (city.cityTravel || "");
 }
 // 27) 提前量排序预约单（出发前该做啥）
 function bookingByLead(plan) {
@@ -4389,7 +4412,7 @@ const _planSpan = (plan) => {
 //    注：与既有 tripCountdown(倒计时大数字) 分工不同，这里给的是「阶段 + 待办进度 + 行动建议」
 function tripPhaseGuide(plan) {
   const sp = _planSpan(plan);
-  if (!sp.start) return { days: NaN, phase: "none", txt: "还没有行程", todo: [] };
+  if (!sp.start) return { days: 0, phase: "none", txt: "还没有行程", todo: [] };
   const left = _diffDays(sp.start, _todayStr());
   const done = (Array.isArray(plan.prepDone) ? plan.prepDone : []).length;
   const total = (Array.isArray(D.PREP_CHECKLIST) ? D.PREP_CHECKLIST : []).length;

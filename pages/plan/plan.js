@@ -1192,6 +1192,9 @@ Page(SafePage({
       if (d0) q.push("depart=" + encodeURIComponent(String(d0).slice(0, 10)));
       if (plan && plan.pace) q.push("pace=" + encodeURIComponent(plan.pace));
       if (plan && plan.budget) q.push("budget=" + encodeURIComponent(plan.budget));
+      // v1.19.193：自定义预算（budget=custom）必须一并带上总预算金额，否则对方 auto=1 复现时
+      // 取不到 customAmt，generate() 会因「请输入全行程总预算」而卡住，复现同款行程失败。
+      if (plan && plan.budget === "custom" && plan.customAmt) q.push("amt=" + encodeURIComponent(String(plan.customAmt)));
       if (plan && plan.travelMode) q.push("mode=" + encodeURIComponent(plan.travelMode));
       if (city && days) q.push("auto=1");
     } catch (e) {}

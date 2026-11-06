@@ -144,7 +144,6 @@ Page(SafePage({
           markerType: "spots", seq: 0, name: n
         });
         realCoords.push({ latitude: coord.lat, longitude: coord.lon });
-        if (!numbered) overCap++;
       }
       list.push({ name: n, period: it.period, real, seq: real ? seq : 0, tags: T.spotTagOf(n, cityName) });
     });

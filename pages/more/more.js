@@ -327,13 +327,26 @@ Page(SafePage({
     const k = e.currentTarget.dataset.k;
     if (k === "backupOut") { this.backupOut(); return; }
     if (k === "backupIn") { this.backupIn(); return; }
-    // 本地速查/记账/百宝箱无需行程也可用；其余行程页需要先生成攻略
-    if (!this.data.hasPlan && k !== "ledger" && k !== "assistant" && k !== "toolkit" && k !== "boost" && k !== "deep") { wx.showToast({ title: "先回「出发」页生成攻略", icon: "none" }); return; }
-    // v1.19.31 修复：工具页都在分包 subpkg 下，必须用 /subpkg/ 前缀（此前误用 /pages/ 导致全部点不动，同 HOME_TILES 旧 bug）
-    const PKG = { map: "/subpkg/map/map", food: "/subpkg/food/food", ledger: "/subpkg/ledger/ledger", prep: "/subpkg/prep/prep", assistant: "/subpkg/assistant/assistant", toolkit: "/subpkg/toolkit/toolkit", boost: "/subdata/boost/boost", deep: "/subai/deep/deep" };
-    if (PKG[k]) { wx.navigateTo({ url: PKG[k] }); return; }
-    // 防御：未知 key 不再跳转到非法拼接路径（避免死链/白屏），明确提示
-    wx.showToast({ title: "该功能暂未开放", icon: "none" });
+    // 无需行程也可用的入口（记账/本地速查/工具箱/深度内容/按标签找景点/今日/各 Tab）
+    const noPlanOk = ["ledger", "assistant", "toolkit", "boost", "deep", "spotsearch", "today", "index", "plan", "more"];
+    if (!this.data.hasPlan && noPlanOk.indexOf(k) < 0) { wx.showToast({ title: "先回「出发」页生成攻略", icon: "none" }); return; }
+    // 全量路由表：tabBar 页用 switchTab，分包/主包子页用 navigateTo（统一加载反馈，避免白屏）
+    const URLS = {
+      map: "/subpkg/map/map", food: "/subpkg/food/food", ledger: "/subpkg/ledger/ledger",
+      prep: "/subpkg/prep/prep", spotsearch: "/subpkg/spotsearch/spotsearch",
+      assistant: "/subpkg/assistant/assistant", toolkit: "/subpkg/toolkit/toolkit",
+      boost: "/subdata/boost/boost", deep: "/subai/deep/deep",
+      today: "/pages/today/today", index: "/pages/index/index", plan: "/pages/plan/plan", more: "/pages/more/more"
+    };
+    const u = URLS[k];
+    if (!u) { wx.showToast({ title: "该功能暂未开放", icon: "none" }); return; }
+    const TABS = ["/pages/index/index", "/pages/today/today", "/pages/plan/plan", "/pages/more/more"];
+    wx.showLoading({ title: "打开中" });
+    if (TABS.indexOf(u) >= 0) {
+      wx.switchTab({ url: u, fail: (er) => { wx.hideLoading(); wx.showToast({ title: "切换失败：" + ((er && er.errMsg) || "未知错误"), icon: "none" }); } });
+    } else {
+      wx.navigateTo({ url: u, success: () => wx.hideLoading(), fail: (er) => { wx.hideLoading(); wx.showToast({ title: "打开失败，请重试", icon: "none" }); } });
+    }
   },
 
   /* ---- 合规与密钥（v1.19.188）：运行时注入本人账号申请的第三方 Key ----
