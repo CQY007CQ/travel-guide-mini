@@ -6,7 +6,8 @@ import fs from "fs";
 import path from "path";
 import zlib from "zlib";
 
-const EXC = new Set(["tools", "shots", ".qr", "outputs", "node_modules", ".git", ".workbuddy"]);
+// web/ 是网页版产物（v1.20.0），已在 project.config.json 的 packOptions.ignore 排除，不进小程序包
+const EXC = new Set(["tools", "shots", ".qr", "outputs", "node_modules", ".git", ".workbuddy", "web", "docs"]);
 // 真正会进微信包的源码扩展名（文档/脚本/配置不计入包体）
 const SRC_EXT = /\.(js|wxml|wxss|json|wxs|png|jpe?g|gif|svg|ttf|woff2?)$/i;
 

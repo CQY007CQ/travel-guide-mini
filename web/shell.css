@@ -1,0 +1,170 @@
+/* web/shell.css —— 网页外壳：启动层 / tabBar / toast / modal / 表单元件
+ * 只放「小程序没有对应 WXSS」的那部分；页面本体样式由 app.css 提供。
+ * 配色与小程序一致：中性黑 #0d0d0d + 金色 #d4a94e，不引入蓝黑。
+ */
+:root {
+  /* rpx 基准必须跟画布宽度走：桌面端 #app 被限制在 520px，
+     若用 100vw（整窗宽）所有尺寸会被放大 1.5 倍以上，标题直接断行。 */
+  --rpx: calc(min(100vw, 520px) / 750);
+  --shell-bg: #f4f5f7;
+  --shell-card: #ffffff;
+  --shell-tx: #18233a;
+  --shell-tx2: #5b6b82;
+  --shell-tx3: #8fa3bc;
+  --shell-line: rgba(19, 29, 49, .10);
+  --gold: #d4a94e;
+  --gold-2: #c19337;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shell-bg: #0d0d0d;
+    --shell-card: #17181c;
+    --shell-tx: #eef2f8;
+    --shell-tx2: #c3ccda;
+    --shell-tx3: #8b96a8;
+    --shell-line: rgba(255, 255, 255, .10);
+  }
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--shell-bg);
+  color: var(--shell-tx);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body { padding-bottom: env(safe-area-inset-bottom); }
+a { text-decoration: none; color: inherit; }
+button { font-family: inherit; }
+
+/* ── 桌面端居中成一个「手机画布」，避免宽屏下布局散架 ── */
+#app {
+  max-width: 520px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--shell-bg);
+  position: relative;
+  overflow-x: hidden;
+}
+@media (min-width: 700px) {
+  body { background: #0b0b0d; }
+  #app {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 30px 80px rgba(0, 0, 0, .55);
+    min-height: 100vh;
+  }
+}
+
+/* ── 启动层 ── */
+#boot {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: #0d0d0d;
+  transition: opacity .35s ease;
+}
+#boot.hide { opacity: 0; pointer-events: none; }
+.boot-box { text-align: center; }
+.boot-ring {
+  width: 46px; height: 46px; margin: 0 auto 22px;
+  border-radius: 50%;
+  border: 3px solid rgba(212, 169, 78, .18);
+  border-top-color: var(--gold);
+  animation: bootspin .9s linear infinite;
+}
+@keyframes bootspin { to { transform: rotate(360deg); } }
+.boot-t { color: #f0e6d2; font-size: 17px; font-weight: 800; letter-spacing: 1px; }
+.boot-s { color: #7d8798; font-size: 12px; margin-top: 8px; }
+
+/* ── tabBar ── */
+#tabbar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 0; width: 100%; max-width: 520px;
+  display: flex; z-index: 900;
+  background: rgba(13, 13, 13, .94);
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  padding-bottom: env(safe-area-inset-bottom);
+  backdrop-filter: blur(14px);
+}
+#tabbar.hidden { display: none; }
+#tabbar .tb {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 3px; padding: 8px 0 7px; cursor: pointer;
+  font-size: 11px; color: #8b96a8; transition: color .18s;
+}
+#tabbar .tb img { width: 22px; height: 22px; opacity: .62; transition: opacity .18s; }
+#tabbar .tb.on { color: var(--gold); font-weight: 700; }
+#tabbar .tb.on img { opacity: 1; }
+body.has-tabbar #app { padding-bottom: 62px; }
+
+/* ── toast ── */
+.w-layer { position: fixed; inset: 0; z-index: 9500; pointer-events: none; }
+.w-toast { display: none; align-items: center; justify-content: center; }
+.w-toast-box {
+  max-width: 74vw; background: rgba(0, 0, 0, .82); color: #fff;
+  padding: 12px 18px; border-radius: 10px; font-size: 14px; line-height: 1.5;
+  text-align: center; animation: toastin .18s ease;
+}
+@keyframes toastin { from { opacity: 0; transform: translateY(6px); } }
+.w-ti-success { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #4ade80; margin-right: 8px; }
+.w-ti-error { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f87171; margin-right: 8px; }
+
+/* ── loading ── */
+.w-loading { display: flex; align-items: center; justify-content: center; pointer-events: auto; background: rgba(0, 0, 0, .18); }
+.w-loading-box {
+  background: rgba(0, 0, 0, .80); color: #fff; border-radius: 12px;
+  padding: 18px 22px; display: flex; align-items: center; gap: 10px; font-size: 13px;
+}
+.w-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; animation: bootspin .8s linear infinite; }
+
+/* ── modal ── */
+.w-modal { display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .42); pointer-events: auto; }
+.w-modal-box {
+  width: 78%; max-width: 380px; background: var(--shell-card); border-radius: 14px;
+  padding: 22px 20px 14px; text-align: center; animation: toastin .2s ease;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+}
+.w-mtitle { font-size: 16px; font-weight: 800; color: var(--shell-tx); }
+.w-mcontent { font-size: 13px; line-height: 1.65; color: var(--shell-tx2); margin-top: 10px; white-space: pre-wrap; }
+.w-mbtns { display: flex; gap: 10px; margin-top: 20px; }
+.w-mb {
+  flex: 1; border: none; border-radius: 9px; padding: 11px 0;
+  font-size: 14px; cursor: pointer; background: rgba(148, 163, 184, .14); color: var(--shell-tx2);
+}
+.w-mb-ok { background: linear-gradient(135deg, #e6bb62, var(--gold-2)); color: #171107; font-weight: 800; }
+
+/* ── action sheet ── */
+.w-sheet { display: flex; align-items: flex-end; background: rgba(0, 0, 0, .42); pointer-events: auto; }
+.w-sh-box { width: 100%; background: var(--shell-card); border-radius: 16px 16px 0 0; padding: 8px; }
+.w-sh-item, .w-sh-cancel {
+  display: block; width: 100%; border: none; background: transparent; color: var(--shell-tx);
+  padding: 14px; font-size: 15px; border-bottom: 1px solid var(--shell-line); cursor: pointer;
+}
+.w-sh-cancel { color: var(--shell-tx3); border-bottom: none; margin-top: 6px; }
+
+/* ── 图片预览 ── */
+.w-preview { display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .9); pointer-events: auto; }
+.w-pv-box { position: relative; max-width: 92vw; }
+.w-pv-box img { max-width: 92vw; max-height: 82vh; display: block; border-radius: 8px; }
+.w-pv-close {
+  position: absolute; right: 8px; top: -40px; background: rgba(255,255,255,.16);
+  color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+}
+
+/* ── 渲染错误 ── */
+.w-err { padding: 40px 24px; color: #e57373; font-size: 13px; line-height: 1.7; }
+
+/* ── 表单元件补丁：小程序 input/textarea/picker 的默认外观 ── */
+input, textarea, select {
+  font-family: inherit; font-size: inherit; color: inherit;
+  outline: none;
+  /* 清掉浏览器默认白底与边框，让页面 wxss 的 class 完全接管外观 */
+  background: transparent; border: none; padding: 0; margin: 0;
+  -webkit-appearance: none; appearance: none;
+}
+input::placeholder, textarea::placeholder { color: var(--shell-tx3); }
+.w-picker-wrap { position: relative; }
+.w-picker-input {
+  width: 100%; margin-top: 6px; padding: 9px 10px; border: 1px solid var(--shell-line);
+  background: rgba(148, 163, 184, .08); color: var(--shell-tx);
+}
+.w-picker-select { display: none; }

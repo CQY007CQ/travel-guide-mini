@@ -256,6 +256,9 @@ step "单测 门票清单布局 (逐字竖排防回潮)" "$NODE" tools/_test-tic
 # v1.19.204：帮助页离线规模统计把医院读成 0（数据真源在 emergency-data 而非 data.js），
 #             固化为「统计 vs 真源逐项一致 + 帮助页渲染 + 指南无静态数字」回归
 step "单测 离线数据规模口径 (医院统计为 0 防回潮)" "$NODE" tools/_test-corpus.mjs
+# v1.20.0：网页版 —— 把小程序同一份源码（utils + 页面 JS + WXML + WXSS）编译到浏览器。
+# 核心保障是「同源」：任何改动都先构建再用引擎冒烟验证，网页端不会悄悄漂移。
+step "网页版 构建与引擎冒烟 (与小程序同源)" bash -c '"$NODE" tools/web/build.mjs >/dev/null && "$NODE" tools/web/smoke.mjs | tail -4'
 
 echo ""
 echo "══════════════════════════════════════════════════"
