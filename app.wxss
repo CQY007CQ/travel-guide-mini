@@ -340,7 +340,7 @@ page {
 /* v1.19.186 · 离线知识库·大数据卡片的展示样式（全局，供 more/help 复用） */
 .cp-head { font-size: calc(24rpx * var(--fs, 1)); color: var(--t2, #3a4759); line-height: 1.6; margin: 0 8rpx 16rpx; padding: 14rpx 16rpx; background: rgba(212,169,78,.10); border-left: 4rpx solid #d4a94e; border-radius: 8rpx; }
 .cp-grid { display: flex; flex-wrap: wrap; gap: 10rpx 0; margin: 0 8rpx 6rpx; }
-.cp-n { width: 20%; display: flex; flex-direction: column; align-items: center; }
+.cp-n { width: 33.33%; display: flex; flex-direction: column; align-items: center; padding: 8rpx 0; }
 .cp-v { font-size: calc(34rpx * var(--fs, 1)); font-weight: 800; color: var(--t1, #1b2330); line-height: 1.1; }
 .cp-v.gold { color: #b8892f; }
 .cp-l { font-size: calc(20rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 4rpx; }

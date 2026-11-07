@@ -253,6 +253,9 @@ step "单测 美食页渲染 (假空态防回潮)" "$NODE" tools/_test-food-rend
 step "材料口径一致性 (版本/回归项/单测数/榜单)" "$NODE" tools/check-doc-consistency.mjs
 # v1.19.203：门票清单长票价把景点名挤成逐字竖排，固化为「全量数据拆分 + CSS 限宽」回归
 step "单测 门票清单布局 (逐字竖排防回潮)" "$NODE" tools/_test-ticket-layout.mjs
+# v1.19.204：帮助页离线规模统计把医院读成 0（数据真源在 emergency-data 而非 data.js），
+#             固化为「统计 vs 真源逐项一致 + 帮助页渲染 + 指南无静态数字」回归
+step "单测 离线数据规模口径 (医院统计为 0 防回潮)" "$NODE" tools/_test-corpus.mjs
 
 echo ""
 echo "══════════════════════════════════════════════════"

@@ -95,7 +95,8 @@
       <view class="cp-n"><text class="cp-v">{{corpus.cities}}</text><text class="cp-l">城市</text></view>
       <view class="cp-n"><text class="cp-v">{{corpus.spots}}</text><text class="cp-l">景点</text></view>
       <view class="cp-n"><text class="cp-v">{{corpus.foods}}</text><text class="cp-l">美食城</text></view>
-      <view class="cp-n"><text class="cp-v gold">{{corpus.hospitals}}</text><text class="cp-l">应急医院</text></view>
+      <view class="cp-n"><text class="cp-v gold">{{corpus.hospitals}}</text><text class="cp-l">具名医院</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.approxCities}}</text><text class="cp-l">搜索降级城</text></view>
       <view class="cp-n"><text class="cp-v">{{corpus.provinces}}</text><text class="cp-l">省级区</text></view>
     </view>
     <view class="cp-sec" wx:if="{{corpus.climate.length}}">

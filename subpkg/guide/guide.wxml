@@ -29,6 +29,6 @@
     </view>
   </block>
 
-  <view class="g-foot">{{total}} 条 · 点标题展开 · 随时可从「更多」页打开本页</view>
+  <view class="g-foot">v{{ver}} · {{total}} 条 · 点标题展开 · 随时可从「更多」页打开本页</view>
 
 </view>

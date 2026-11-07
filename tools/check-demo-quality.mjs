@@ -101,6 +101,32 @@ const checks = [
     must(read("tools/_test-foodmap.mjs").includes("../subpkg/utils/food-map.js"), "foodmap 单测路径未更新");
     must(read("tools/_test-spotsearch.mjs").includes("./subpkg/utils/spotsearch.js"), "spotsearch 单测路径未更新");
   }],
+  ["使用指南：字号单一真源 + 版本动态显示 + 直达链接有效", () => {
+    const g = read("subpkg/guide/guide.js");
+    const w = read("subpkg/guide/guide.wxml");
+    // 只看代码行：注释里回顾历史缺陷时提到旧键名，不算回潮
+    const code = g.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+    must(!/miniGuideFzV1/.test(code), "guide.js 仍在读遗留的私有字号键");
+    must(!/S\.(get|set)\s*\(/.test(code), "guide.js 仍在直接读写页面私有 store");
+    must(/onLoad\(\)[\s\S]{0,500}T\.fontScale\(\)/.test(g), "guide.js onLoad 未使用全局字号");
+    must(/ver:\s*T\.APP_VER/.test(g), "guide.js 未提供动态版本号");
+    must(/v\{\{ver\}\}/.test(w), "guide.wxml 未显示动态版本号");
+    // 直达链接必须真实注册；tab 判定必须与 app.json.tabBar.list 一致
+    // （与「更多」页历史故障同类：漏配一个路径，用户点了就是没反应）
+    const cfg = JSON.parse(read("app.json"));
+    const registered = new Set(cfg.pages || []);
+    (cfg.subPackages || []).forEach((s) => (s.pages || []).forEach((p) =>
+      registered.add(s.root.replace(/\/$/, "") + "/" + p)));
+    const tabs = new Set(((cfg.tabBar && cfg.tabBar.list) || []).map((x) => "/" + x.pagePath));
+    const urls = [...g.matchAll(/url:\s*"(\/[^"]+)"/g)].map((m) => m[1]);
+    must(urls.length >= 15, "使用指南直达链接数量异常（疑似漏配）");
+    urls.forEach((u) => must(registered.has(u.slice(1)), "未在 app.json 注册的直达链接: " + u));
+    const isTabLine = (g.match(/const isTab = \[([^\]]+)\]/) || [])[1] || "";
+    const declared = [...isTabLine.matchAll(/"(\/[^"]+)"/g)].map((m) => m[1]);
+    must(declared.length === tabs.size && declared.every((u) => tabs.has(u)),
+      "guide.js 的 tabBar 判定与 app.json.tabBar.list 不一致");
+    return `字号/版本已收敛，${urls.length} 条直达链接有效`;
+  }],
   ["版本一致性：真源 / 产物 / IDE 配置", () => {
     const a = (read("tools/_src-backup/travel.js").match(/const APP_VER = "([^"]+)"/) || [])[1];
     const b = (read("utils/travel.js").match(/APP_VER\s*=\s*"([^"]+)"/) || [])[1];
