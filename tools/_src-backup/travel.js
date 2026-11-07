@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.206";
+const APP_VER = "1.19.207";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -855,7 +855,14 @@ function navTarget(name, cityName) {
 }
 function baikeUrl(name) {
  const kw = baikeKeyword(name);
- return kw ? "https://baike.baidu.com/item/" + encodeURIComponent(kw).replace(/'/g, "%27") : "";
+ if (!kw) return "";
+ // v1.19.207：改走百科「站内搜索」入口，不再直拼 /item/ 词条页。
+ // 实测（2026-11-07）直接建 /item/校尉营关帝庙博物馆 是 403/空白页 —— 行程里
+ // 大量景点名带「博物馆 / 旧址馆 / 遗址公园」这类后缀，与百科词条名并不完全一致，
+ // 用户复制过去等于拿不到任何内容（就是这个「有些景点点百科没网址」）。
+ // search/word 的行为是：命中词条 302 到正文，未命中 302 到搜索结果页，
+ // 两种都有内容。实测故宫博物院 / 晋阳湖公园 均 302 到 /item/ 正文本体。
+ return "https://baike.baidu.com/search/word?word=" + encodeURIComponent(kw).replace(/'/g, "%27");
 }
 function baikeKeyword(name) {
  let n = String(name || "").trim();

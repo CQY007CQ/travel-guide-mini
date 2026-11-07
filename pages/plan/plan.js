@@ -871,7 +871,8 @@ Page(SafePage({
   const plan = app.globalData && app.globalData.plan;
   if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items || !plan.days[di].items[ix]) return;
   const url = T.baikeUrl(plan.days[di].items[ix].name);
-  if (!url) return;
+  // v1.19.207：景点名为空/整段被清洗掉时，不能什么都不发生（用户点了没反应）
+  if (!url) { wx.showToast({ title: "这条没有可搜的景点名", icon: "none" }); return; }
   wx.setClipboardData({ data: url, success: () => wx.showToast({ title: "百科链接已复制，到浏览器打开", icon: "none" }) });
  },
  onWish(e) {

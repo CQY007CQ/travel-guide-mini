@@ -2152,10 +2152,13 @@ function dedupSpots(list){
 function spotBaikeBar(name){
  const kw = baikeKeyword(name);
  if(!kw) return "";
- const url = "https://baike.baidu.com/item/" + uriEnc(kw);
+ // v1.19.207：与 travel.baikeUrl 保持一致，走 search/word 而不是 /item/。
+ // 原来的 hint 已经写着「未收录则列出搜索结果」，但 URL 拼的是词条页 ——
+ // 文案与行为不一致，词条不存在时用户点开是空白页。
+ const url = "https://baike.baidu.com/search/word?word=" + uriEnc(kw);
  return `<div class="sd-ops"><a class="sd-baike" href="${url}" target="_blank" rel="noopener" `
-  + `title="在新标签页打开「${kw.replace(/"/g, "&quot;")}」的百度百科词条">百度百科：${kw}</a>`
-  + `<span class="sd-ops-hint">未收录则列出搜索结果</span></div>`;
+  + `title="在新标签页打开「${kw.replace(/"/g, "&quot;")}」的百度百科（未收录则列出搜索结果）">百度百科：${kw}</a>`
+  + `<span class="sd-ops-hint">命中词条直接看正文，未收录则列出搜索结果</span></div>`;
 }
 
 function spotKey(name){
