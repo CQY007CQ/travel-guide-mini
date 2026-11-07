@@ -258,7 +258,9 @@ step "单测 门票清单布局 (逐字竖排防回潮)" "$NODE" tools/_test-tic
 step "单测 离线数据规模口径 (医院统计为 0 防回潮)" "$NODE" tools/_test-corpus.mjs
 # v1.20.0：网页版 —— 把小程序同一份源码（utils + 页面 JS + WXML + WXSS）编译到浏览器。
 # 核心保障是「同源」：任何改动都先构建再用引擎冒烟验证，网页端不会悄悄漂移。
-step "网页版 构建与引擎冒烟 (与小程序同源)" bash -c '"$NODE" tools/web/build.mjs >/dev/null && "$NODE" tools/web/smoke.mjs | tail -4'
+# NODE 是父 shell 局部变量（未 export），bash -c 子 shell 里取不到 → 曾报 "bash: : command not found"；
+# 必须用位置参数传进去。管道必须开 pipefail，否则 smoke 失败会被 tail 的退出码吞掉，门禁假绿。
+step "网页版 构建与引擎冒烟 (与小程序同源)" bash -c 'set -o pipefail; "$1" tools/web/build.mjs >/dev/null && "$1" tools/web/smoke.mjs | tail -4' _ "$NODE"
 
 echo ""
 echo "══════════════════════════════════════════════════"

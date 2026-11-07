@@ -152,6 +152,19 @@ const checks = [
     const c = JSON.parse(read("project.config.json")).version;
     must(a && a === b && a === c, `版本不一致 src=${a} out=${b} ide=${c}`);
     return `v${a}`;
+  }],
+  ["回归链自身：网页版步骤不吃空 NODE / 不吞管道失败", () => {
+    const sh = read("allcheck.sh");
+    const line = (sh.match(/^step "网页版 构建与引擎冒烟[^\n]*/m) || [])[0] || "";
+    must(line, "allcheck.sh 缺少「网页版 构建与引擎冒烟」步骤");
+    // NODE 是父 shell 局部变量、未 export：写进 bash -c 的单引号脚本体会取到空串，
+    // 症状是 "bash: : command not found"（v1.20.0 夜间全量回归实测）。
+    must(/"\$1"/.test(line) && /_ "\$NODE"/.test(line),
+      "网页版步骤未用位置参数传 NODE，子 shell 里 $NODE 为空");
+    must(!/bash -c '[^']*"\$NODE/.test(line), "网页版步骤仍在 bash -c 脚本体内引用 $NODE");
+    // 管道 smoke.mjs | tail -4 不开 pipefail 时退出码取 tail，smoke 失败也会假绿。
+    must(/set -o pipefail/.test(line), "网页版步骤未开 pipefail，smoke 失败会被 tail 吞掉");
+    return "NODE 显式传参 + pipefail";
   }]
 ];
 

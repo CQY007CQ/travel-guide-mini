@@ -16,6 +16,7 @@
 
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { compilePage } from "./wxml.mjs";
 
@@ -197,8 +198,28 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
 {
   const src = path.join(ROOT, "images");
   const dst = path.join(ROOT, "web/images");
-  fs.rmSync(dst, { recursive: true, force: true });
-  fs.cpSync(src, dst, { recursive: true });
+  // 增量同步，**不要整目录 rmSync**：宿主的 node-safe-delete shim 会拦截一次删除
+  // 50+ 文件的操作（全量回归实测：SAFE_DELETE_BULK_CONFIRM_REQUIRED, count:66 > threshold:50），
+  // 单跑因为计数没累积能过、全量跑到最后一步必炸，症状极具误导性。
+  const relFiles = (base) => {
+    const out = [];
+    (function walk(d, pre) {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const rel = pre ? pre + "/" + e.name : e.name;
+        if (e.isDirectory()) walk(path.join(d, e.name), rel); else out.push(rel);
+      }
+    })(base, "");
+    return out;
+  };
+  if (fs.existsSync(dst)) {
+    const srcSet = new Set(relFiles(src));
+    let removed = 0;
+    for (const rel of relFiles(dst)) {
+      if (!srcSet.has(rel)) { fs.unlinkSync(path.join(dst, rel)); removed++; }
+    }
+    if (removed) console.log("静态资源：清理 " + removed + " 个已下线图片");
+  }
+  fs.cpSync(src, dst, { recursive: true, force: true });
   let n = 0, bytes = 0;
   (function cnt(d) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -212,11 +233,23 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
 /* ───────────── 8. 缓存破除 ───────────── */
 // 静态站点最常见的坑：改了 css/js 但浏览器还在用旧缓存，排查时极度误导
 // （本次就出现「rpx 基准已修，页面尺寸没变」）。这里给 index.html 的资源引用统一打版本号。
+// 版本号必须由「产物内容」算出来，不能用 Date.now()：否则每次跑 allcheck 都会改写
+// index.html、把工作区弄脏（实测 v1.20.0 夜间回归后 git status 多出一个无意义改动）。
+// 内容不变 → 戳不变（构建幂等）；内容变了 → 戳变化（浏览器缓存自动失效）。
 {
   const idxPath = path.join(ROOT, "web/index.html");
   let html = fs.readFileSync(idxPath, "utf8");
-  const v = Date.now().toString(36);
+  const deps = [
+    "web/lib/modules.js", "web/lib/data.js", "web/lib/tpl.js", "web/lib/app.css",
+    "web/lib/runtime.js", "web/app.js", "web/shell.css",
+  ];
+  const h = crypto.createHash("sha1");
+  for (const rel of deps) {
+    const p = path.join(ROOT, rel);
+    if (fs.existsSync(p)) h.update(fs.readFileSync(p));
+  }
+  const v = h.digest("hex").slice(0, 8);
   html = html.replace(/(src|href)="((?:lib\/[^"?]+|shell\.css|app\.js))(?:\?v=[^"]*)?"/g, (m, a, f) => a + '="' + f + "?v=" + v + '"');
   fs.writeFileSync(idxPath, html, "utf8");
-  console.log("资源引用已打版本号 v=" + v);
+  console.log("资源引用已打版本号 v=" + v + "（内容 hash，构建幂等）");
 }
