@@ -247,6 +247,8 @@ step "演示质量门禁 (Console 告警防回潮)" "$NODE" tools/check-demo-qua
 step "单测 换景点分批 (换一批真的会变)" "$NODE" tools/_test-swap-batch.mjs
 # v1.19.199：「生成分享图」真机稳定失败，固化为运行时回归
 step "单测 分享图导出 (生成失败防回潮)" "$NODE" tools/_test-share-img.mjs
+# v1.19.200：美食页对象方法裸调用导致整页假空态，固化为运行时 + 全仓静态回归
+step "单测 美食页渲染 (假空态防回潮)" "$NODE" tools/_test-food-render.mjs
 
 echo ""
 echo "══════════════════════════════════════════════════"

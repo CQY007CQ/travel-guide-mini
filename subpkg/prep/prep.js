@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕
 // prep：出行准备（票价/预约渠道 可勾跟踪 / 酒店比价 / 团队分工）
 // 每个景点的「已订 / 预约日期 / 备注」按 城市·景点名 记本机，回来再看不丢
 const T = require("../../utils/travel.js");
@@ -51,6 +52,8 @@ Page(SafePage({
     try {
       this.refresh();
     } catch (e) {
+      try { console.error("[prep] 渲染失败", e); } catch (_) {}
+      try { EL.push("prep._renderShow", e); } catch (_) {}
       this.setData({ hasPlan: false, tickets: [], duties: [] });
       wx.showToast({ title: "行前清单加载异常，已重置", icon: "none" });
     }

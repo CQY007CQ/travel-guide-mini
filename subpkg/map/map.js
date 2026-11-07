@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕
 // map：原生地图 + 真实坐标标点 + 编号连线 + 图层（景点 / 美食 / 住宿）
 const T = require("../../utils/travel.js");
 const app = getAppSafe();
@@ -97,6 +98,8 @@ Page(SafePage({
       }
       this._renderDay(plan, dayIdx);
     } catch (e) {
+      try { console.error("[map] 渲染失败", e); } catch (_) {}
+      try { EL.push("map._renderShow", e); } catch (_) {}
       try { this.setData({ hasPlan: false, markers: [], polyline: [], list: [], foodList: [] }); } catch (_) {}
     }
   },

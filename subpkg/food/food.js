@@ -5,6 +5,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // v1.20.x：必吃清单的每个菜名可点 —— 点「北京烤鸭」直接筛出做这道菜的店（utils/food-map.js）
 const T = require("../../utils/travel.js");
 const FM = require("../utils/food-map.js");
+const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕，不再静默伪装成「没生成攻略」
 const app = getAppSafe();
 
 Page(SafePage({
@@ -37,11 +38,13 @@ Page(SafePage({
     this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } });
   },
   _renderShow() {
+    let entered = false;   // 是否确已确认「有行程」并进入渲染
     try {
       this._theme();
       const plan = app.globalData && app.globalData.plan;
       // v1.17.10：省域行程的 plan 没有 cityName（只有 province），旧判断直接把美食页判成空态
       if (!plan || (!plan.cityName && !plan.isProv)) { this.setData({ hasPlan: false }); return; }
+      entered = true;
       const isProv = !!plan.isProv;
       const provCities = isProv ? (T.citiesOf(plan.province) || []).map(c => c.name).filter(Boolean) : [];
       // 多站：segs 提供可切换城市列表；省域：用省内城市列表；单城保持原样
@@ -60,7 +63,17 @@ Page(SafePage({
       const fallbackCity = isProv ? (provCities[0] || plan.province) : plan.cityName;
       this._renderCity(segs.length ? segs[fIdx].name : fallbackCity, plan.budget || "mid");
     } catch (e) {
-      try { this.setData({ hasPlan: false }); } catch (_) {}
+      // v1.19.200：旧版把所有渲染异常都吞掉并 setData({hasPlan:false})，
+      // 真机上表现为「行程页有攻略、美食页却说先去生成攻略」，且没有任何提示可查。
+      // 现在：留痕 + 可见反馈；已确认有行程时保留 hasPlan，绝不回退成假空态。
+      try { console.error("[food] 渲染失败", e); } catch (_) {}
+      try { EL.push("food._renderShow", e); } catch (_) {}
+      if (entered) {
+        try { this.setData({ hasPlan: true }); } catch (_) {}
+        try { wx.showToast({ title: "加载失败，请重试", icon: "none" }); } catch (_) {}
+      } else {
+        try { this.setData({ hasPlan: false }); } catch (_) {}
+      }
     }
   },
 
@@ -102,7 +115,10 @@ Page(SafePage({
         // v1.21：菜单 / 口碑 / 编辑点评（试点热门城市；非试点店无这些字段，UI 优雅回退）
         menu: Array.isArray(s.menu) ? s.menu : [],
         rep: s.rep || "",
-        repKey: _repClass(s.rep),
+        // v1.19.200：_repClass 是 Page 配置里的对象方法，对象方法简写不会在词法作用域
+        // 创建同名绑定，旧版裸调用必抛 ReferenceError，被 _renderShow 吞掉后整页变空态。
+        // map 是箭头函数，this 继承 _renderCity 的页面实例，故用 this._repClass。
+        repKey: this._repClass(s.rep),
         note: s.note || ""
       }, { slot: T.mealSlotOf((s.food || "") + " " + (s.shop || "")) });
       // 副标题预计算：food 字段全库几乎为空，直接拼会渲染出「 · 地址」这种多一个点的情况
