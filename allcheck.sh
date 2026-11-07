@@ -249,6 +249,8 @@ step "单测 换景点分批 (换一批真的会变)" "$NODE" tools/_test-swap-b
 step "单测 分享图导出 (生成失败防回潮)" "$NODE" tools/_test-share-img.mjs
 # v1.19.200：美食页对象方法裸调用导致整页假空态，固化为运行时 + 全仓静态回归
 step "单测 美食页渲染 (假空态防回潮)" "$NODE" tools/_test-food-render.mjs
+# v1.19.201：推荐引擎月份漂移 + 考核材料数字口径漂移，固化为「动态真值 vs 材料文本」门禁
+step "材料口径一致性 (版本/回归项/单测数/榜单)" "$NODE" tools/check-doc-consistency.mjs
 
 echo ""
 echo "══════════════════════════════════════════════════"

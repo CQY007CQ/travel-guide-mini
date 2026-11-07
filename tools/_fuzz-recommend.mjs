@@ -16,7 +16,9 @@ let bugs = 0;
 function bad(msg) { bugs++; console.log("  ✗ BUG: " + msg); }
 function okLine(msg) { console.log("  ✓ " + msg); }
 
-const NOW = { month: 10, topN: 5 };
+// v1.19.201：不再硬编码 10 月——fuzz 也必须跑在运行时真实月份上，
+// 否则「模糊测试通过」并不能说明现场那个月没问题。
+const NOW = { month: new Date().getMonth() + 1, topN: 5 };
 
 /* ── ① 每个标签单独 + 两两组合 ── */
 console.log("【标签单跑与两两组合】");

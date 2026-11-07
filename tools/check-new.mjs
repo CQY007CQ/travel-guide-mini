@@ -896,6 +896,8 @@ console.log("== 35. v1.19.175 · 推荐解析出行月份 ==");
   const ep6 = R.extractPrefs("随便逛逛", {});
   assert("无月份→回退当前月(" + cur + ")", ep6.month === cur, String(ep6.month));
   // 显式 month 选项优先于文本解析（既有调用方契约：测试/UI 选月不被动覆盖）
+  // 固定输入样本：此处刻意同时给出「三月」文本与用户选的 10 月，
+  // 断言的是「显式选择覆盖文本月份」，不是时令排序，故不跟随运行时当前月。
   const ep7 = R.extractPrefs("三月去，但选了10月", { month: 10 });
   assert("显式 month 优先于文本", ep7.month === 10, String(ep7.month));
   // 解析出的月份要真正流进推荐引擎（季节匹配据此生效）

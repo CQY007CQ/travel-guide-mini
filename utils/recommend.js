@@ -60,9 +60,21 @@ const W = {
   hitBonus: 2,       // 命中 ≥4 处的"含量高"奖励
   hitBonusAt: 4,
   promMax: 6,        // 成熟度先验上限（刻意远低于相关性）
-  seasonHit: 12,     // 正值最佳季节
-  seasonMiss: -5,    // 非最佳季节
-  seasonAllYear: 6,  // 四季皆宜
+  // 季节只做「同主题城市之间的时令微调」，绝不能压过主题命中差距。
+  // v1.19.201：原 +12/-5（摆幅 17）大于强弱命中的相关性差，导致 11 月
+  //「沙漠戈壁 摄影 四天」把南昌/张家口推上榜首、敦煌掉到第 7（现场演示风险）。
+  seasonHit: 6,         // 正值最佳季节（有主题诉求时还会按命中强度缩放）
+  seasonMiss: -2,       // 非最佳季节
+  seasonAllYear: 3,     // 四季皆宜
+  // 无意图（"随便逛逛"）时季节本就是主排序信号之一，保留原幅度，
+  // 否则 Top5 会因通用分过于集中而全部取整成同一个分数（11 月实测全 41 分）。
+  seasonHitIdle: 12,
+  seasonMissIdle: -5,
+  seasonAllYearIdle: 6,
+  noHitPenalty: -12,    // 有主题诉求但零命中 → 不得靠成熟度/热度挤进 Top
+  weakHitDensity: 0.03, // 核心标签命中密度低于此值 → 疑似字面误命中
+  weakHitCombo: 0.30,   // 且 combo 低于此值（双门槛，避免误伤小而精目的地）
+  weakHitPenalty: -8,   // 「仅零星提及」降权
   budgetMatch: 7,
   budgetNear: 2,
   budgetMiss: -7,
@@ -454,16 +466,35 @@ function scoreCity(city, prefs, month) {
     }
   }
 
-  /* ② 季节匹配：复用既有 bestMonths */
+  /* ② 季节匹配：复用既有 bestMonths
+   * v1.19.201 护栏：用户明确说出主题（沙漠/古镇/海边…）时，季节不该成为主排序信号。
+   *   · 正值最佳季节的加成按「主题命中强度」缩放 —— 只零星提到关键词的城市
+   *     不能靠「这个月去正好」拿满额加分；
+   *   · 无意图（"随便逛逛"）时 tagKeys 为空，季节仍是综合热度榜的有效信号，不缩放；
+   *   · 非最佳季节只失去加成、轻微扣分，不再倒扣到把真目的地挤出榜单。
+   */
+  const hasTheme = tagKeys.length > 0;
+  const relStrength = hasTheme
+    ? Math.min(1, (rel.sum + relST.sum) / W.relevanceNorm)
+    : 1;
+  const HIT = hasTheme ? W.seasonHit : W.seasonHitIdle;
+  const MISS = hasTheme ? W.seasonMiss : W.seasonMissIdle;
+  const ALLY = hasTheme ? W.seasonAllYear : W.seasonAllYearIdle;
   let seasonNote = "";
   if (expCount > 0) {
     const months = safeCall(function () { return T.bestMonths(city.best); }, null);
     if (months && months.length) {
-      if (months.indexOf(m) >= 0) { raw += W.seasonHit; push("正值最佳季节", W.seasonHit, m + " 月在其最佳月 " + months.join("/") + " 内"); }
-      else { raw += W.seasonMiss; push("非最佳季节", W.seasonMiss, "最佳月：" + months.join("/")); }
+      if (months.indexOf(m) >= 0) {
+        const bonus = Math.round(HIT * relStrength);
+        raw += bonus;
+        push("正值最佳季节", bonus, m + " 月在其最佳月 " + months.join("/") + " 内");
+      } else {
+        raw += MISS; push("非最佳季节", MISS, "最佳月：" + months.join("/"));
+      }
       seasonNote = "最佳 " + months.join("/") + " 月";
     } else {
-      raw += W.seasonAllYear; push("四季皆宜", W.seasonAllYear, "无明显季节限制");
+      const bonus = Math.round(ALLY * relStrength);
+      raw += bonus; push("四季皆宜", bonus, "无明显季节限制");
       seasonNote = "四季皆宜";
     }
   }
@@ -514,6 +545,40 @@ function scoreCity(city, prefs, month) {
     const pen = W.missWeight * missingReq;
     raw += pen;
     push("核心条件不全", pen, "缺少 " + missingReq + " 项你明确要的要素");
+  }
+
+  /* ⑬ 核心标签「仅零星提及 / 字面误命中」降权（v1.19.201）
+   * 语料里存在「厚田沙漠」「大观区沙漠洲生态公园」「洋沙山海滨乐园」这类
+   * 名字含关键词、但整城并非该主题目的地的景点。此前仅凭 1–2 处弱命中
+   * 就能拿主题分 + 满额时令加成，11 月「沙漠戈壁 摄影 四天」把南昌/安庆/
+   * 宁波推进 Top5，敦煌反而掉到第 7。
+   * 判据用「密度 + combo」双门槛：真正小而精的目的地（阿拉善盟密度 52%）
+   * 不受影响；只有两个指标同时极低的字面巧合才降权，理由对用户可见。
+   */
+  if (hasTheme) {
+    let weakRequired = 0;
+    for (let i = 0; i < rel.detail.length; i++) {
+      const d = rel.detail[i];
+      const def = tagOf(d.key);
+      if (!def || def.w < W.missTagMin) continue;   // 只约束用户明确要的核心要素
+      if (d.density < W.weakHitDensity && d.combo < W.weakHitCombo) weakRequired++;
+    }
+    if (weakRequired > 0) {
+      const pen = W.weakHitPenalty * weakRequired;
+      raw += pen;
+      push("仅零星提及", pen, "有 " + weakRequired + " 项核心要素只在个别景点名中出现，非典型目的地");
+    }
+  }
+
+  /* ⑭ 有主题诉求但「零命中」的城市不得靠通用分挤进榜（v1.19.201）
+   * 50 维词库意图（秋天/红叶/免费/海岛…）的相关性上限只有 14，低于
+   * 成熟度 + 热度的通用分。11 月「秋天 看红叶 小众 五天」Top5 全是零命中的
+   * 「综合热度」城，本溪（真有秋季适宜内容）反而掉出榜。这里给零命中城一个
+   * 可解释的降权，让命中的城回到榜上；无意图路径（tagKeys 为空）不受影响。
+   */
+  if (hasTheme && (rel.sum + relST.sum) <= 0) {
+    raw += W.noHitPenalty;
+    push("未命中偏好", W.noHitPenalty, "未找到与你描述相符的内容，按综合热度兜底");
   }
 
   /* 城市名锚点：query 显式提到该城 → 强提权（用户想要它或「像它」的城）。

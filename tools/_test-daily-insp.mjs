@@ -26,6 +26,8 @@ ok("bestMonths 单月「10月」→ [10]",
   JSON.stringify(T.bestMonths("10月最美")) === JSON.stringify([10]));
 
 // ---- 2. dailyInspire 基本属性 ----
+// 固定输入样本：这里要验证「相邻三天的灵感不重复」，必须锚定一个确定日期；
+// 断言与季节/月份无关，故不跟随运行时当前月（口径门禁豁免）。
 const now = new Date(2026, 9, 15);   // 10 月 15 日
 const a = T.dailyInspire(3, now);
 const b = T.dailyInspire(3, now);
