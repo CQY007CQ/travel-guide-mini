@@ -11,8 +11,14 @@
  *  ④ 绘制后立刻导出，部分安卓 GPU 未提交。
  * 另外三个失败阶段原本都 toast 同一句「生成失败」，无法定位。
  *
+ * v1.19.202 追加第 ⑤ 类回归（用户模拟器截图报障）：修 ③ 时把画布从视口外挪到 left:0，
+ * 却保留了 600×2400px 的 CSS 尺寸。canvas type="2d" 属同层渲染原生组件，部分基础库 /
+ * 模拟器不服从 opacity 与负 z-index；_ensureShareCard() 在有行程时自动绘制 750×600 分享卡，
+ * 位图被 CSS 拉伸后铺满视口 → 每日行程页整屏被深蓝卡片盖住、居中品牌名在右缘被裁。
+ * 修复是把 CSS 尺寸收到 1×1px（节点仍可查询、导出仍走显式矩形），此处固化为尺寸护栏。
+ *
  * 断言（vm 抽 onShareImg 真代码跑）：显式导出矩形 / dpr 钳位 / 节点重试 / 导出三档降级 /
- * 分阶段提示 / 成功链路，加上 wxml、wxss、_ensureShareCard 与版本一致性静态护栏。
+ * 分阶段提示 / 成功链路，加上 wxml、wxss 画布尺寸、_ensureShareCard 与版本一致性静态护栏。
  */
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -198,6 +204,20 @@ ok("wxss 规则块不再把画布放到 -10000rpx 视口外", !!canvasRule && !/
 ok("wxss 规则块用 left:0 让节点留在视口内", /left:\s*0\s*;/.test(canvasRule));
 ok("wxss 保留 z-index:-1 与极低透明度（节点参与渲染但不可见）",
   /z-index:\s*-1/.test(canvasRule) && /opacity:\s*0\.01/.test(canvasRule));
+// v1.19.202：可见性回归防回潮。CSS 尺寸只负责「节点在视口内、参与渲染」，
+// 绘制与导出一律走 canvas.width/height，绝不能再把画布撑到视口级别。
+const cssW = Number((canvasRule.match(/width:\s*([\d.]+)px/) || [])[1] || NaN);
+const cssH = Number((canvasRule.match(/height:\s*([\d.]+)px/) || [])[1] || NaN);
+ok("离屏画布 CSS 宽高均为 1px（同层渲染下也不遮挡页面）",
+  cssW === 1 && cssH === 1, cssW + "×" + cssH);
+ok("离屏画布绝不回潮到 600×2400 等视口级尺寸",
+  !/width:\s*(?:[3-9]\d{2,}|\d{4,})px/.test(canvasRule)
+  && !/height:\s*(?:[3-9]\d{2,}|\d{4,})px/.test(canvasRule), canvasRule);
+ok("离屏画布仍固定在视口内且不拦截点击",
+  /position:\s*fixed/.test(canvasRule) && /pointer-events:\s*none/.test(canvasRule));
+ok("绘制/导出与 CSS 尺寸解耦（显式矩形 + 显式目标尺寸）",
+  fnShare.includes("width: m.W") && fnShare.includes("destWidth: m.W * dpr")
+  && srcCard.includes("destWidth: m.W * dpr"));
 ok("onShareImg 源码含显式 destWidth 与等一帧导出",
   fnShare.includes("destWidth") && fnShare.includes("requestAnimationFrame"));
 ok("onShareImg 源码含分阶段日志", fnShare.includes("EL.push"));

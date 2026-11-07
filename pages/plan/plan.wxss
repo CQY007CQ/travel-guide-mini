@@ -786,14 +786,23 @@
 
 /* v1.19.76：分享长图离屏画布 —— 不参与布局也不触发滚动
    v1.19.199：原 left:-10000rpx 把节点放到视口外，部分安卓真机会做渲染剔除，
-   fields({node:true}) 拿不到节点 → 稳定「生成失败」。改为视口内 z-index:-1 垫底，
-   用 0.01 透明度保持节点参与渲染（页面根背景不透明，肉眼不可见）。 */
+   fields({node:true}) 拿不到节点 → 稳定「生成失败」。改为视口内 z-index:-1 垫底。
+   ⚠️ v1.19.202 可见性回归根治（用户模拟器截图报障：每日行程页整屏被深蓝黑金卡片盖住）：
+   v1.19.199 只挪了位置，却把 600×2400px 的 CSS 尺寸一起留在视口内。canvas type="2d"
+   是同层渲染的原生组件，部分基础库 / 模拟器不服从 opacity 与负 z-index —— 画布照常
+   绘制到最上层。_ensureShareCard() 在页面有行程时会自动画 750×600 分享卡（深蓝渐变 +
+   品牌名 + 金线），位图被 CSS 拉伸成 600×2400 后正好铺满视口，行程内容全被遮住，
+   居中文字又落在屏幕右缘被裁掉一半 —— 即截图所见。
+   修复：CSS 尺寸收到 1×1px。节点仍在视口内、仍参与渲染（查询不会失败），但即使
+   opacity/z-index 完全失效也只占左上角 1 像素，绝无可能遮挡页面。绘制与导出走
+   canvas.width/height（由 _posterModel / _shareCardModel 决定），与 CSS 尺寸解耦；
+   canvasToTempFilePath 已显式给出 x/y/width/height/destWidth/destHeight，不受影响。 */
 .share-canvas {
   position: fixed;
   left: 0;
   top: 0;
-  width: 600px;
-  height: 2400px;
+  width: 1px;
+  height: 1px;
   opacity: 0.01;
   pointer-events: none;
   z-index: -1;
