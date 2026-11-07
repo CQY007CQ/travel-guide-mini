@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.197";
+const APP_VER = "1.19.198";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -5658,7 +5658,7 @@ function planCheckup(plan) {
 }
 
 // 一键换景点：找到与指定景点同标签、同城、坐标相近的替代景点名（返回名称数组，不落盘）
-function swapSpotFor(plan, spotName, cityName) {
+function swapSpotFor(plan, spotName, cityName, offset, limit) {
   const cn = cityName || (plan && plan.cityName) || "";
   const target = String(spotName || "").trim();
   if (!cn || !target) return [];
@@ -5667,14 +5667,27 @@ function swapSpotFor(plan, spotName, cityName) {
     const pool = poolOfCity(findCity(cn) || { name: cn });
     const used = new Set();
     (Array.isArray(plan && plan.days) ? plan.days : []).forEach(d => (d.items || []).forEach(it => used.add(String(it.name || ""))));
-    const out = [];
+    // v1.19.198：先收集全部同类候选，再按批次轮转。旧实现收集到 5 条即 break，
+    // 导致「换一批」按钮用同样参数重算、结果永远不变，用户以为按钮失灵。
+    const all = [];
     for (const n of pool) {
       if (!n || n === target || used.has(n)) continue;
       const t2 = spotTagOf(n, cn);
       const shared = tags.some(t => t2.indexOf(t) >= 0) || t2.some(t => tags.indexOf(t) >= 0);
       if (!shared) continue;
-      out.push({ name: n, tags: t2, note: "同类替代 · " + t2.slice(0, 2).join(" / ") });
-      if (out.length >= 5) break;
+      all.push({ name: n, tags: t2, note: "同类替代 · " + t2.slice(0, 2).join(" / ") });
+    }
+    if (!all.length) return [];
+    // offset / limit 省略时与旧版「取前 5 条」完全一致，旧调用方（行程问答、fuzz）不受影响。
+    const lim = Math.max(1, Number(limit) || 5);
+    const off = Math.max(0, Number(offset) || 0);
+    const start = (off * lim) % all.length;
+    const out = [], seen = new Set();
+    for (let i = 0; i < all.length && out.length < lim; i++) {
+      const it = all[(start + i) % all.length];
+      if (seen.has(it.name)) continue;
+      seen.add(it.name);
+      out.push(it);
     }
     return out;
   } catch (e) { return []; }

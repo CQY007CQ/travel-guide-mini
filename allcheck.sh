@@ -243,6 +243,8 @@ step "发布安全门禁 (数据必随包发布)" "$NODE" tools/verify-release.m
 # setData undefined、recents 重复 wx:key、分包专用 JS 滞留主包、三处版本号不一致。
 # 这些本地编译 + 原有门禁都发现不了，只在开发者工具 Console / 代码质量面板暴露。
 step "演示质量门禁 (Console 告警防回潮)" "$NODE" tools/check-demo-quality.mjs
+# v1.19.198：「换一批」曾因算法确定性而点了没反应，固化为运行时回归
+step "单测 换景点分批 (换一批真的会变)" "$NODE" tools/_test-swap-batch.mjs
 
 echo ""
 echo "══════════════════════════════════════════════════"
