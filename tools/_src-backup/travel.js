@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.194";
+const APP_VER = "1.19.195";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -2442,6 +2442,14 @@ function themePref() {
 }
 function setThemePref(p) { store.set(THEME_KEY, p === "dark" ? "dark" : "light"); }
 function sysTheme() {
+  // v1.19.195：迁移已废弃的 getSystemInfoSync → getAppBaseInfo（theme 在此处）；
+  // 保留旧接口兜底，兼容低基础库版本。彻底消除「wx.getSystemInfoSync is deprecated」告警。
+  try {
+    if (typeof wx !== "undefined" && wx.getAppBaseInfo) {
+      const b = wx.getAppBaseInfo() || {};
+      if (b.theme === "dark") return "dark";
+    }
+  } catch (e) {}
   try {
     if (typeof wx !== "undefined" && wx.getSystemInfoSync) {
       const i = wx.getSystemInfoSync() || {};
@@ -2511,14 +2519,26 @@ const FONT_KEY = "miniFontScaleV1";
 // v1.19.181：首次进入时跟随系统字号 —— 在微信「设置 → 字体大小」里调大的用户（多为长辈），
 // 不再强制从「标准」开始看小字。用户一旦在本应用内选过字号，就以选择为准，不再被系统覆盖。
 function _sysFontLevel() {
+  // v1.19.195：迁移已废弃的 getSystemInfoSync → getSystemSetting（fontSizeSetting 在此处）；
+  // 保留旧接口兜底，兼容低基础库版本。彻底消除「wx.getSystemInfoSync is deprecated」告警。
+  let s = null;
   try {
-    const s = (typeof wx !== "undefined" && wx.getSystemInfoSync) ? wx.getSystemInfoSync() : null;
-    const v = s && Number(s.fontSizeSetting);
-    if (!isFinite(v) || v <= 0) return 0;
-    if (v >= 20) return 3;
-    if (v >= 18) return 2;
-    return 1;
-  } catch (e) { return 0; }
+    if (typeof wx !== "undefined" && wx.getSystemSetting) {
+      s = wx.getSystemSetting() || null;
+    }
+  } catch (e) {}
+  if (!s || s.fontSizeSetting == null) {
+    try {
+      if (typeof wx !== "undefined" && wx.getSystemInfoSync) {
+        s = wx.getSystemInfoSync() || null;
+      }
+    } catch (e) {}
+  }
+  const v = s && Number(s.fontSizeSetting);
+  if (!isFinite(v) || v <= 0) return 0;
+  if (v >= 20) return 3;
+  if (v >= 18) return 2;
+  return 1;
 }
 function fontScale() {
   const n = Number(store.get(FONT_KEY, 0));
