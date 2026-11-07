@@ -2,6 +2,7 @@ const { getAppSafe, SafePage } = require("../../utils/app.js");
 // assistant：本地攻略速查（离线 · 本地规则库 · 零网络）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
+const EL = require("../../utils/errlog.js");   // v1.19.205：候选/收藏读取失败留痕，不再静默清空
 const app = getAppSafe();
 
 // 保留旧 key 名（兼容老用户数据，不影响审核）
@@ -58,7 +59,7 @@ Page(SafePage({
         if (out.length >= 30) break;
       }
       this.setData({ planSpots: out });
-    } catch (e) { this.setData({ planSpots: [] }); }
+    } catch (e) { try { EL.push("assistant.planSpots", e); } catch (_) {} this.setData({ planSpots: [] }); }
   },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
@@ -89,7 +90,7 @@ Page(SafePage({
     try {
       const k = S.getArr(KEEP_KEY);
       this.setData({ keepN: (k && k.length) || 0, keeps: (k || []).slice(-KEEP_MAX).reverse() });
-    } catch (e) { this.setData({ keepN: 0, keeps: [] }); }
+    } catch (e) { try { EL.push("assistant.syncKeeps", e); } catch (_) {} this.setData({ keepN: 0, keeps: [] }); }
   },
 
   onInput(e) { this.setData({ input: e.detail.value }); },

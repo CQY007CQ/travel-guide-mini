@@ -1,6 +1,7 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 const T = require("../../utils/travel.js");
+const EL = require("../../utils/errlog.js");      // v1.19.205：读取存档失败留痕，不再伪装成空列表
 const app = getAppSafe();
 
 // v1.19.179 「我的攻略」本地库：复用既有行程存档(miniPlansV1，上限 10 份，同 sig 自动覆盖)，
@@ -11,6 +12,9 @@ Page(SafePage({
     td: false,
     list: [],
     empty: true,
+    // v1.19.205：把「确实没有存档」和「读存档失败」分开。旧版 catch 一律 list:[] + empty:true，
+    // 存储读不出来时页面显示「还没有收藏的攻略」——用户会以为存档丢了，真机极难定位。
+    loadErr: false,
   },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
@@ -31,9 +35,14 @@ Page(SafePage({
         this._plans[x.id] = x;
         return { id: x.id, title: x.name, sub: x.sub || "", dateText: this._fmt(x.ts) };
       });
-      this.setData({ list, empty: list.length === 0 });
-    } catch (e) { this.setData({ list: [], empty: true }); }
+      this.setData({ list, empty: list.length === 0, loadErr: false });
+    } catch (e) {
+      try { EL.push("myguides._load", e); } catch (_) {}
+      this.setData({ list: [], empty: true, loadErr: true });
+    }
   },
+  // 读取失败时给用户一个可重试入口（不必杀进程重进）
+  reload() { this._load(); },
   _fmt(ts) {
     if (!ts) return "";
     const d = new Date(ts);

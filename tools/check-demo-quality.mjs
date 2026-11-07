@@ -101,6 +101,25 @@ const checks = [
     must(read("tools/_test-foodmap.mjs").includes("../subpkg/utils/food-map.js"), "foodmap 单测路径未更新");
     must(read("tools/_test-spotsearch.mjs").includes("./subpkg/utils/spotsearch.js"), "spotsearch 单测路径未更新");
   }],
+  ["异常兜底不得伪装成空态（我的攻略 / 助手候选）", () => {
+    // v1.19.200 教训：catch 把渲染异常吞掉并置「无数据」状态，页面就变成「你还没生成过」。
+    // v1.19.205 同类：我的攻略读取存档失败时显示「还没有收藏的攻略」，用户会以为存档丢了。
+    const g = read("pages/myguides/myguides.js");
+    const w = read("pages/myguides/myguides.wxml");
+    must(/loadErr\s*:\s*false/.test(g), "myguides 缺少 loadErr 初始状态");
+    must(/EL\.push\(\s*"myguides\._load"/.test(g), "myguides 读取失败未留痕到 errlog");
+    must(/loadErr\s*:\s*true/.test(g), "myguides 读取失败未标记 loadErr");
+    must(/reload\s*\(\s*\)/.test(g), "myguides 未提供重试入口");
+    must(/wx:if="\{\{loadErr\}\}"/.test(w), "myguides.wxml 未区分「读取失败」与「没有存档」");
+    must(/bindtap="reload"/.test(w), "myguides.wxml 缺少重试按钮");
+    // 旧写法（catch 里直接 list:[] + empty:true 且无 loadErr）不得回潮
+    must(!/catch\s*\(e\)\s*\{\s*this\.setData\(\{\s*list:\s*\[\],\s*empty:\s*true\s*\}\s*\);\s*\}/.test(g),
+      "myguides 回潮：catch 又把失败伪装成空列表");
+    const a = read("subpkg/assistant/assistant.js");
+    must(/EL\.push\(\s*"assistant\.planSpots"/.test(a), "assistant 候选读取失败未留痕");
+    must(/EL\.push\(\s*"assistant\.syncKeeps"/.test(a), "assistant 收藏读取失败未留痕");
+    return "2 页 4 处已留痕";
+  }],
   ["使用指南：字号单一真源 + 版本动态显示 + 直达链接有效", () => {
     const g = read("subpkg/guide/guide.js");
     const w = read("subpkg/guide/guide.wxml");
