@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.202";
+const APP_VER = "1.19.203";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -5236,6 +5236,52 @@ function ticketBookHint(name) {
   if (!t.book) return "门票 " + t.price + "，一般现场可买";
   return "需预约：" + (t.where || "官网/小程序") + "，票 " + t.price;
 }
+// 51b) v1.19.203：票价拆成「主值 + 补充说明」
+//   数据里 4617 条门票有 3889 条带括号补充（「¥30（联票¥60）」「免费（多数公园免费开放…）」）。
+//   整串塞进票价列时，该列 flex-shrink:0 且无宽度上限 → 吃掉整行宽度，
+//   左侧景点名/说明被压到 1 字宽，逐字竖排（用户截图报障）。
+//   主值只留价格本体（免费 / ¥数字 / 数字起），其余进 note；主值过长按标点断，
+//   避免把「旺季(4-10月)60 / 淡季…」切成半个数字。展示层另有 max-width + 省略号兜底。
+function splitTicketPrice(raw, where) {
+  const s = String(raw == null ? "" : raw).trim() || "—";
+  const tail = (t) => String(t || "")
+    .replace(/^[\s,，;；、:：]+/, "").replace(/^[（(]+/, "")
+    .replace(/[）)]+$/, "").replace(/[（()）]/g, "").trim();
+  // 最长公共子串长度：判断补充说明与 where 是不是在说同一件事
+  const overlap = (a, b) => {
+    const A = String(a || ""), B = String(b || "");
+    let best = 0;
+    for (let i = 0; i < A.length; i++) {
+      for (let j = 0; j < B.length; j++) {
+        let k = 0;
+        while (i + k < A.length && j + k < B.length && A[i + k] === B[j + k]) k++;
+        if (k > best) best = k;
+      }
+    }
+    return best;
+  };
+  const num = s.match(/^(免费|[¥￥]?\s*\d+(?:\.\d+)?\s*(?:元)?\s*起?)/);
+  let price = "", note = "";
+  if (num) {
+    price = num[1].replace(/\s+/g, "");
+    note = tail(s.slice(num[0].length));
+  } else {
+    const i = s.search(/[（(]/);
+    price = (i > 0 ? s.slice(0, i) : s).trim();
+    note = tail(i > 0 ? s.slice(i) : "");
+  }
+  if (price.length > 12) {
+    const head = price.slice(0, 12);
+    const br = Math.max(head.lastIndexOf("；"), head.lastIndexOf("，"), head.lastIndexOf("、"), head.lastIndexOf("/"));
+    const rest = br >= 4 ? price.slice(br + 1) : price.slice(12);
+    price = br >= 4 ? price.slice(0, br) : head;
+    note = (rest.trim() + (note ? "；" + note : "")).trim();
+  }
+  // 长补充说明与 where 说的是同一件事（公园免费条款一类），同屏说两遍反而吵，丢弃。
+  // 只按「文本重叠」判定，不能只按长度 —— 否则「旺季/淡季分价」这类与 where 无关的关键数字会被误删。
+  if (note && where && note.length > 14 && overlap(note, where) >= 5) note = "";
+  return { price: price || s, note: note };
+}
 // 53) 免费景点清单（某城）
 function freeSpotList(cityName) {
   const c = findCity(cityName);
@@ -6009,7 +6055,7 @@ module.exports = {
   peakSeasonHint, offSeasonHint, tempRangeOf, humidityHint, weatherPackList,
   mealPlanOf, foodBudgetOf, spicyLevelOf, vegHint,
   // v1.12.0 · 100 项新功能（第3批：预算 + 安全健康）
-  ticketPriceOf, ticketBookHint, freeSpotList, paidSpotList, ticketTotal,
+  ticketPriceOf, ticketBookHint, splitTicketPrice, freeSpotList, paidSpotList, ticketTotal,
   hotelBudgetOf, transportBudgetOf, budgetPieOf, saveTipsOf, splurgeTipOf,
   valueScoreOf, altitudeOf, altitudeRisk, sunBlockHint, insectHint, scamAlertOf,
   emergencyOf, medKitList, insuranceHint, waterHint, foodSafeHint, nightSafeHint,

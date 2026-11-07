@@ -84,9 +84,18 @@ Page(SafePage({
       // 多站行程：按当天归属城市记（原取 d.segName，逐日对象上没有该字段 → 全部落到整串城市名）
       const keyCity = T.segCityOfDay(plan, di) || plan.cityName;
       const t = track[T.tkKeyOf(keyCity, n)] || {};
+      // ⚠️ v1.19.203：票价字段大量带括号补充说明（4617 条里 3889 条 >8 字，如
+      // 「¥30（联票¥60）」「免费（多数公园免费开放，个别象征性收费，以现场为准）」）。
+      // 整串塞进 .tk-price 会因该列 flex-shrink:0 且无宽度上限而吃掉整行，
+      // .tk-main 被压到 1 字宽 → 景点名与说明逐字竖排（用户截图报障）。
+      // 拆分逻辑收敛到 T.splitTicketPrice 单一真源，便于单测覆盖全量数据；
+      // 长说明与 where 重复时由该函数丢弃第二个参数传 where 即可。
+      const whereTx = (info.where && info.where !== "—") ? info.where : "";
+      const sp = T.splitTicketPrice(info.p || "—", whereTx);
+      const price = sp.price, priceNote = sp.note;
       tickets.push({
-        name: n, price: info.p || "—", book: !!info.book,
-        where: (info.where && info.where !== "—") ? info.where : "",
+        name: n, price, priceNote, book: !!info.book,
+        where: whereTx,
         url: info.url || "",   // 官方预约/购票链接（有则显示「复制预约链接」）
         keyCity, seg: isMulti ? keyCity : "",
         done: !!t.done, date: t.date || "", dateTx: (t.date || "").slice(5), note: t.note || ""

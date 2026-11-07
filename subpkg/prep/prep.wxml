@@ -31,6 +31,7 @@
               <text wx:if="{{item.book}}" class="tk-book">需预约</text>
             </view>
             <text wx:if="{{item.where}}" class="tk-where">{{item.where}}</text>
+            <text wx:if="{{item.priceNote}}" class="tk-pnote">票价说明 · {{item.priceNote}}</text>
           </view>
           <text class="tk-price">{{item.price}}</text>
         </view>

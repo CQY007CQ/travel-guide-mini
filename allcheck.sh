@@ -251,6 +251,8 @@ step "单测 分享图导出 (生成失败防回潮)" "$NODE" tools/_test-share-
 step "单测 美食页渲染 (假空态防回潮)" "$NODE" tools/_test-food-render.mjs
 # v1.19.201：推荐引擎月份漂移 + 考核材料数字口径漂移，固化为「动态真值 vs 材料文本」门禁
 step "材料口径一致性 (版本/回归项/单测数/榜单)" "$NODE" tools/check-doc-consistency.mjs
+# v1.19.203：门票清单长票价把景点名挤成逐字竖排，固化为「全量数据拆分 + CSS 限宽」回归
+step "单测 门票清单布局 (逐字竖排防回潮)" "$NODE" tools/_test-ticket-layout.mjs
 
 echo ""
 echo "══════════════════════════════════════════════════"

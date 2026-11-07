@@ -21,7 +21,14 @@
 .tk-seg { font-size: calc(18rpx * var(--fs, 1)); color: var(--green, #b9cdc0); background: rgba(96,192,140,.16); border-radius: 6rpx; padding: 2rpx 10rpx; margin-left: 10rpx; }
 .tk-book { font-size: calc(19rpx * var(--fs, 1)); color: var(--red, #e56a6a); border: 1rpx solid rgba(229,106,106,.4); border-radius: 99rpx; padding: 2rpx 12rpx; margin-left: 10rpx; }
 .tk-where { display: block; font-size: calc(21rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 6rpx; }
-.tk-price { font-size: calc(25rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); font-weight: 700; margin-left: 20rpx; flex-shrink: 0; }
+/* v1.19.203：票价列必须限宽 —— 曾经只写 flex-shrink:0，长票价（含括号说明）会吃掉整行，
+   把 .tk-main 压到 1 字宽，景点名/说明逐字竖排。限宽 + 不换行 + 省略号三重兜底，
+   无论数据里塞进多长的价格串，都不会再挤压左侧主区。 */
+.tk-price { font-size: calc(25rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); font-weight: 700;
+  margin-left: 20rpx; flex: 0 0 auto; max-width: 34%; text-align: right;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-pnote { display: block; font-size: calc(19rpx * var(--fs, 1)); color: var(--t3, #8fa3bc);
+  margin-top: 4rpx; line-height: 1.5; }
 .tk-ops { display: flex; flex-wrap: wrap; align-items: center; margin: 12rpx 0 0 60rpx; gap: 12rpx; }
 .tk-op { font-size: calc(21rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); border: 1rpx solid rgba(var(--ln-rgb, 148,163,184),.3); border-radius: 99rpx; padding: 4rpx 18rpx; }
 .tk-op:active { opacity: .7; }
