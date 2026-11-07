@@ -4,7 +4,7 @@ const AN = require("../../utils/analytics.js");
 // 由 utils/spotsearch.js 的倒排索引 + IDF 加权检索，从用户目标词条高效精确锁定景点。
 const T = require("../../utils/travel.js");
 const ST = require("../../utils/spot-tags.js");
-const SS = require("../../utils/spotsearch.js");
+const SS = require("../utils/spotsearch.js");
 const app = getAppSafe();
 
 const DIM_ORDER = ["theme", "activity", "audience", "season", "mood", "duration", "price"];

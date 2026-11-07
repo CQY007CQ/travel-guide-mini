@@ -2,7 +2,7 @@
 // 内容为随分包下发的离线文本（由团队人工整理，非实时 AI 生成），
 // 票价、班次、开放时间以官方渠道当日公告为准。
 const A = require("../../utils/aicontent.js");
-const AD = require("../../utils/ad.js");
+const AD = require("../utils/ad.js");
 
 // 打包提示：内容文件与本页同属 subai 分包，用静态字面量 require 一次，
 // 确保 ignoreUploadUnusedFiles 开启时也不会被当成未使用文件剔除。

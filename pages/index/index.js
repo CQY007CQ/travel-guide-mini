@@ -21,6 +21,19 @@ function iso(t) {
   return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
 }
 
+// v1.19.197：「最近玩过」按城市唯一。历史 storage 里可能已存在同城多条
+// （旧 pushRecent 把 days/depart 也纳入去重键），而首页 recents 用
+// wx:key="city" 渲染，重复 city 会触发微信「Do not set same key」告警。
+function _uniqRecent(list) {
+  const seen = Object.create(null), out = [];
+  for (const r of (Array.isArray(list) ? list : [])) {
+    const k = r && String(r.city || "");
+    if (!k || seen[k]) continue;
+    seen[k] = 1; out.push(r);
+  }
+  return out;
+}
+
 Page(SafePage({
   data: {
     fz: 1,
@@ -115,7 +128,7 @@ Page(SafePage({
         depart: iso(new Date(new Date().getTime() + 7 * 86400000)),
         departMin: iso(new Date()),
         hasOld: !!(app.globalData && app.globalData.plan && app.globalData.plan.days),
-        recents: T.getRecent(),
+        recents: _uniqRecent(T.getRecent()),
         favs: T.getFavs(),
         pickOnly: T.getWish() && this._pickOnlyStored(),
         guideSeen: !!(S.get("miniGuideSeenV1", 0))
@@ -282,11 +295,17 @@ Page(SafePage({
   /* ---- 目的地省 / 市 ---- */
   _fillProv(idx, pickCity) {
     const provs = T.provinces();
-    const prov = provs[idx];
+    // v1.19.197 修复：idx 可能来自草稿 / 深链 / 历史记录，越界或 NaN 会让
+    // provName 变成 undefined，触发「Setting data field "provName" to
+    // undefined is invalid」并把省份选择器打空。此处统一钳制并给空串兜底
+    // （与 _rebuildFromData 里的 prov || "" 保持一致）。
+    let i = Number(idx);
+    if (!isFinite(i) || i < 0 || i >= provs.length) i = 0;
+    const prov = provs[i] || "";
     const cities = T.citiesOf(prov);
     let cityIdx = 0;
-    if (pickCity) { const i = cities.findIndex(c => c.name === pickCity); if (i >= 0) cityIdx = i; }
-    this.setData({ provinces: provs, cities, provIdx: idx, provName: prov, cityIdx });
+    if (pickCity) { const k = cities.findIndex(c => c.name === pickCity); if (k >= 0) cityIdx = k; }
+    this.setData({ provinces: provs, cities, provIdx: i, provName: prov, cityIdx });
     this._applyCity(cityIdx);
   },
   onProvChange(e) {
@@ -811,7 +830,7 @@ Page(SafePage({
   },
   delRecent(e) {
     const i = Number(e.currentTarget.dataset.i);
-    this.setData({ recents: T.delRecent(i) });
+    this.setData({ recents: _uniqRecent(T.delRecent(i)) });
   },
 
   fillExample() {
@@ -906,7 +925,7 @@ Page(SafePage({
           bias
         });
         T.pushRecent({ province: route[0].province, city: route[0].name, days: out.totalDays, depart: this.data.depart });
-        this.setData({ recents: T.getRecent() });
+        this.setData({ recents: _uniqRecent(T.getRecent()) });
       } else if (this.data.provMode) {
         // 全省 · 省内精华游：目的地 = 整省（跨城串联，酒店随城市变动；镜像网页版 __all）
         const provName = this.data.provName;
@@ -985,7 +1004,7 @@ Page(SafePage({
           bias
         });
         T.pushRecent({ province: this.data.provName, city: c.name, days: daysArr.length, depart: this.data.depart });
-        this.setData({ recents: T.getRecent() });
+        this.setData({ recents: _uniqRecent(T.getRecent()) });
       }
       // v1.13.1：新行程落地前重置行李清单勾选（上一程的打包进度不带进新程）
       // v1.15.3：换目的地后，订往返票/订酒店/过流程/请假 等「绑定本次行程」的准备项一并重置
@@ -1327,7 +1346,7 @@ Page(SafePage({
     if (!cfg) return;
     if (cfg.provMode) {
       const pIdx = Math.max(0, (this.data.provinces || []).indexOf(cfg.provName));
-      this.setData({ provIdx: pIdx, provName: cfg.provName, prevCity: null });
+      this.setData({ provIdx: pIdx, provName: cfg.provName || "", prevCity: null });
       this._enterProv(null);
       this._syncProv();
     } else if (cfg.multiMode) {

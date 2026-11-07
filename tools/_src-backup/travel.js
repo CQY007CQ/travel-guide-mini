@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.19.196";
+const APP_VER = "1.19.197";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -1225,7 +1225,11 @@ function getRecent() { return store.get(RECENT_KEY, []); }
 function pushRecent(item) {
  // v1.11：脏入参不该写进「最近玩过」（会把 undefined 顶到首页回填里）
  if (!item || typeof item !== "object" || !item.city) return getRecent();
- const r = store.getArr(RECENT_KEY).filter(x => !(x && x.city === item.city && x.days === item.days && x.depart === item.depart));
+ // v1.19.197 修复：旧去重键包含 days/depart，同城换个天数或改出发日期就会
+ // 多出一条记录；首页 recents 用 wx:key="city" 渲染，重复 city 会稳定触发
+ // 「Do not set same key "北京" in wx:key」告警，且 UI 出现两个一样的城市 chip。
+ // 「最近玩过」按城市唯一即可，新的天数/日期覆盖旧记录。
+ const r = store.getArr(RECENT_KEY).filter(x => !(x && String(x.city || "") === String(item.city)));
  r.unshift({
   city: String(item.city), province: item.province || (D.CITY2PROV && D.CITY2PROV[item.city]) || "",
   days: Number(item.days) || 0, depart: String(item.depart || "")
@@ -2442,18 +2446,21 @@ function themePref() {
 }
 function setThemePref(p) { store.set(THEME_KEY, p === "dark" ? "dark" : "light"); }
 function sysTheme() {
-  // v1.19.195：迁移已废弃的 getSystemInfoSync → getAppBaseInfo（theme 在此处）；
-  // 保留旧接口兜底，兼容低基础库版本。彻底消除「wx.getSystemInfoSync is deprecated」告警。
+  // v1.19.197 修复：旧实现只在 dark 时 return，浅色主题会继续掉进
+  // getSystemInfoSync 兜底分支 —— 每次冷启动都稳定触发两条
+  // 「wx.getSystemInfoSync is deprecated」告警（开发者工具 Console 实测）。
+  // 新逻辑：新接口一旦成功返回即定案（dark/light 都立即返回），
+  // 仅当新接口不存在或抛错时才回退旧接口，兼顾低基础库兼容与零告警。
   try {
     if (typeof wx !== "undefined" && wx.getAppBaseInfo) {
       const b = wx.getAppBaseInfo() || {};
-      if (b.theme === "dark") return "dark";
+      return b.theme === "dark" ? "dark" : "light";
     }
   } catch (e) {}
   try {
     if (typeof wx !== "undefined" && wx.getSystemInfoSync) {
       const i = wx.getSystemInfoSync() || {};
-      if (i.theme === "dark") return "dark";
+      return i.theme === "dark" ? "dark" : "light";
     }
   } catch (e) {}
   return "light";
@@ -2522,12 +2529,16 @@ function _sysFontLevel() {
   // v1.19.195：迁移已废弃的 getSystemInfoSync → getSystemSetting（fontSizeSetting 在此处）；
   // 保留旧接口兜底，兼容低基础库版本。彻底消除「wx.getSystemInfoSync is deprecated」告警。
   let s = null;
+  let hasNew = false;
   try {
     if (typeof wx !== "undefined" && wx.getSystemSetting) {
       s = wx.getSystemSetting() || null;
+      hasNew = !!s;
     }
   } catch (e) {}
-  if (!s || s.fontSizeSetting == null) {
+  // v1.19.197：仅当新接口整体不可用才回退旧接口；新接口存在但没给
+  // fontSizeSetting 时按标准字号处理，绝不再调用废弃 API。
+  if (!hasNew) {
     try {
       if (typeof wx !== "undefined" && wx.getSystemInfoSync) {
         s = wx.getSystemInfoSync() || null;

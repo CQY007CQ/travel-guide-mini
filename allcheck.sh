@@ -239,6 +239,11 @@ step "体积预算门禁 (data≤1950KB / utils≤1000KB)" bash -c '
 # 最危险的静默灾难型 footgun 从「上传后人工盯尺寸表」升级为 fail-fast。详见 tools/verify-release.mjs。
 step "发布安全门禁 (数据必随包发布)" "$NODE" tools/verify-release.mjs
 
+# 【v1.19.197 新增】演示质量 / Console 告警防回潮：废弃 API 误调用、跨分包同步 require、
+# setData undefined、recents 重复 wx:key、分包专用 JS 滞留主包、三处版本号不一致。
+# 这些本地编译 + 原有门禁都发现不了，只在开发者工具 Console / 代码质量面板暴露。
+step "演示质量门禁 (Console 告警防回潮)" "$NODE" tools/check-demo-quality.mjs
+
 echo ""
 echo "══════════════════════════════════════════════════"
 echo " allcheck 汇总"

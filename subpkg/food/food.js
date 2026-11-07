@@ -4,7 +4,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // 多站行程：顶部城市切换条，逐站看美食（默认定位到今天所在站）
 // v1.20.x：必吃清单的每个菜名可点 —— 点「北京烤鸭」直接筛出做这道菜的店（utils/food-map.js）
 const T = require("../../utils/travel.js");
-const FM = require("../../utils/food-map.js");
+const FM = require("../utils/food-map.js");
 const app = getAppSafe();
 
 Page(SafePage({

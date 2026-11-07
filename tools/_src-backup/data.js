@@ -461,6 +461,14 @@ function resolveChunkPaths() {
   if (typeof process !== "undefined" && process.env && process.env.DATA_CHUNKS) {
     return process.env.DATA_CHUNKS.split(",").map(s => s.trim()).filter(Boolean);
   }
+  // v1.19.197 修复：旧实现在模块加载期无条件跨分包同步 require manifest，
+  // 开发者工具报「Requires ... without a callback may fail in production,
+  // since they are in different subPackages」——生产环境有数据读取失败风险。
+  // 实际上微信端 initData() 走的是静态字面量 require.async，根本用不到
+  // CHUNK_PATHS；故只在 Node/测试态读 manifest，微信端直接返回默认单块。
+  if (typeof require.async === "function") {
+    return ["../subdata/data/data-packed.js"];
+  }
   try {
     const manifest = require("../subdata/data/_manifest.js");
     if (Array.isArray(manifest) && manifest.length) return manifest;

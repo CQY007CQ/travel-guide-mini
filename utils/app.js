@@ -80,12 +80,43 @@ const LIFECYCLE = {
   onCollocation: 1, onSaveExitState: 1
 };
 
+// v1.19.197：setData 写入 undefined 时微信会告警，而且该字段实际不会更新。
+// 草稿 / 深链 / 历史回填等动态配置很容易拼出 undefined 字段（如 provName），
+// 逐个调用点补兜底治标不治本，故在 SafePage 这一全页面统一入口做顶层清洗：
+// 丢弃值为 undefined 的键，语义与微信原本行为等价，但告警彻底消失。
+function __stripUndefined(data) {
+  if (!data || typeof data !== "object") return data;
+  const out = {};
+  for (const k in data) {
+    if (Object.prototype.hasOwnProperty.call(data, k) && data[k] !== undefined) out[k] = data[k];
+  }
+  return out;
+}
+
+function __patchSetData(ctx) {
+  try {
+    if (!ctx || typeof ctx.setData !== "function" || ctx.__safeSetData) return;
+    const orig = ctx.setData;
+    ctx.__safeSetData = true;
+    ctx.setData = function (data, cb) {
+      try { return orig.call(this, __stripUndefined(data), cb); }
+      catch (e) { return orig.call(this, data, cb); }
+    };
+  } catch (e) { /* 测试沙盒无 setData 时静默跳过，绝不阻断页面注册 */ }
+}
+
 // 3a) Page 包裹：仅包裹事件类 handler（非生命周期函数），返回改造后的 config 供 Page() 注册。
 function SafePage(config) {
   if (config && typeof config === "object") {
     for (const k in config) {
       if (typeof config[k] === "function" && !LIFECYCLE[k]) config[k] = __wrapFn(config[k], "Page." + k);
     }
+    // 在 onLoad 最前面接一次 setData 清洗（覆盖所有页面，含 subpkg 分包页）
+    const origOnLoad = config.onLoad;
+    config.onLoad = function (...args) {
+      __patchSetData(this);
+      return typeof origOnLoad === "function" ? origOnLoad.apply(this, args) : undefined;
+    };
   }
   return config;
 }

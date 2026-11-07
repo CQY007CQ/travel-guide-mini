@@ -6,7 +6,7 @@
  */
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const FM = require("../utils/food-map.js");
+const FM = require("../subpkg/utils/food-map.js");
 
 let n = 0, bad = 0;
 function ok(desc, cond, detail) {

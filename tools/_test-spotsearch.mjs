@@ -10,7 +10,7 @@ import { createRequire } from "module";
 const req = createRequire(process.cwd() + "/");
 const D = req("./utils/data.js");
 const ST = req("./utils/spot-tags.js");
-const SS = req("./utils/spotsearch.js");
+const SS = req("./subpkg/utils/spotsearch.js");
 
 let fail = 0;
 const ok = (n, c) => { console.log((c ? "  ✓ " : "  ✗ FAIL: ") + n); if (!c) fail++; };
