@@ -6,6 +6,7 @@ const W = require("../../utils/weather.js");
 const A = require("../../utils/aicontent.js");
 const R = require("../../utils/remind.js");
 const PP = require("../../utils/plan-poster.js");   // v1.19.109：分享海报/卡片绘制隔离到独立模块
+const EL = require("../../utils/errlog.js");        // v1.19.199：分享图失败分阶段留痕（真机可回溯）
 const app = getAppSafe();
 
 function isFrame(n) { return T.isFrameName(n); }
@@ -1209,36 +1210,91 @@ Page(SafePage({
   },
 
   // v1.19.76：朋友圈/群分享长图 —— 把行程渲染成一张精美卡片，可转发图片或存相册发朋友圈
+  // v1.19.199 真机「生成失败」修复（用户实机截图报障）：
+  //   ① 旧版导出完全交给默认参数：canvas.width/height 已按 dpr 放大（如 1800×3936），
+  //      而 wx.canvasToTempFilePath 的 destWidth/destHeight 默认还会再乘一次像素密度，
+  //      高 dpr 安卓机直接申请超大图 → fail；同时画布 CSS 尺寸(600×2400) 与实际绘制
+  //      逻辑尺寸(600×H) 不一致，默认导出区域越界。现显式给出导出矩形并把 dpr 钳到 2。
+  //   ② 画布原放在 left:-10000rpx 视口外，部分真机渲染剔除导致 fields({node:true}) 拿不到节点。
+  //   ③ 绘制后立刻导出，部分安卓 GPU 尚未提交会拿到空画布；现等一帧再导出。
+  //   ④ 三个失败阶段全部 toast 同一句「生成失败」，无法定位；现分阶段日志 + 区分提示。
   onShareImg() {
     const that = this;
+    const log = (stage, detail) => {
+      try { console.warn("[shareImg] " + stage, detail || ""); } catch (e) {}
+      try { EL.push("plan.onShareImg." + stage, detail); } catch (e) {}
+    };
+    const done = () => { that.__posterBusy = false; };
+    const fail = (stage, detail, title) => {
+      log(stage, detail); done();
+      wx.hideLoading();
+      wx.showToast({ title: title || "生成失败，请重试", icon: "none" });
+    };
     wx.showLoading({ title: "生成中…" });
-    wx.createSelectorQuery().in(this).select("#shareCanvas").fields({ node: true, size: true }).exec((res) => {
-      if (!res || !res[0] || !res[0].node) { wx.hideLoading(); wx.showToast({ title: "生成失败", icon: "none" }); return; }
+    that.__posterBusy = true;
+
+    // 节点查询：首帧可能还没渲染出离屏 canvas，重试 3 次；最后一次不带 .in 兜底
+    const findCanvas = (left) => {
+      const q = wx.createSelectorQuery();
+      const sq = left > 0 && q.in ? q.in(that) : q;
+      sq.select("#shareCanvas").fields({ node: true, size: true }).exec((res) => {
+        const node = res && res[0] && res[0].node;
+        if (node) return draw(node);
+        if (left > 0) {
+          const later = () => findCanvas(left - 1);
+          if (typeof setTimeout === "function") setTimeout(later, 120); else later();
+          return;
+        }
+        fail("node", "select #shareCanvas returned no node", "画布未就绪，请重试");
+      });
+    };
+
+    const draw = (canvas) => {
       try {
-        const canvas = res[0].node;
-        const dpr = (wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2;
+        // 高 dpr(3) 会让像素画布与输出图过大，钳到 2 兼顾清晰度与真机内存
+        let dpr = 2;
+        try { dpr = Math.min(2, Number((wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2) || 2); } catch (e) {}
         const m = that._posterModel();
         canvas.width = m.W * dpr; canvas.height = m.H * dpr;
         const ctx = canvas.getContext("2d");
-        ctx.scale(dpr, dpr);
+        if (!ctx) return fail("draw", "getContext(2d) returned null", "绘图失败，请重试");
+        // setTransform 而非 scale：共用节点时避免残留变换叠加
+        if (ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0); else ctx.scale(dpr, dpr);
         that._drawPoster(ctx, m.W, m);
-        wx.canvasToTempFilePath({
-          canvas,
-          success(r) {
-            wx.hideLoading();
-            const save = () => wx.saveImageToPhotosAlbum({
-              filePath: r.tempFilePath,
-              success() { wx.showToast({ title: "已存相册，去朋友圈发吧", icon: "none" }); },
-              fail() { wx.previewImage({ urls: [r.tempFilePath], showmenu: true }); }
-            });
-            if (wx.showShareImageMenu) {
-              wx.showShareImageMenu({ path: r.tempFilePath, fail: save });
-            } else { save(); }
-          },
-          fail() { wx.hideLoading(); wx.showToast({ title: "生成失败", icon: "none" }); }
-        });
-      } catch (e) { wx.hideLoading(); wx.showToast({ title: "生成失败", icon: "none" }); }
-    });
+        // 导出参数三档降级，兼容基础库对 width/height 的两种单位口径（逻辑 px / 物理 px）
+        const variants = [
+          { x: 0, y: 0, width: m.W, height: m.H, destWidth: m.W * dpr, destHeight: m.H * dpr },
+          { x: 0, y: 0, width: canvas.width, height: canvas.height, destWidth: canvas.width, destHeight: canvas.height },
+          {}
+        ];
+        const exportAt = (i) => {
+          if (i >= variants.length) return fail("export", "all canvasToTempFilePath variants failed", "导出失败，请重试");
+          wx.canvasToTempFilePath(Object.assign({
+            canvas,
+            fileType: "png",
+            success(r) {
+              done(); wx.hideLoading();
+              const path = r && r.tempFilePath;
+              if (!path) return exportAt(i + 1);
+              const save = () => wx.saveImageToPhotosAlbum({
+                filePath: path,
+                success() { wx.showToast({ title: "已存相册，去朋友圈发吧", icon: "none" }); },
+                fail() { wx.previewImage({ urls: [path], showmenu: true }); }
+              });
+              if (wx.showShareImageMenu) wx.showShareImageMenu({ path: path, fail: save });
+              else save();
+            },
+            fail(e) { log("export.variant" + i, (e && (e.errMsg || e.message)) || e); exportAt(i + 1); }
+          }, variants[i]));
+        };
+        const next = () => exportAt(0);
+        if (canvas.requestAnimationFrame) {
+          try { canvas.requestAnimationFrame(next); } catch (e) { setTimeout(next, 30); }
+        } else if (typeof setTimeout === "function") { setTimeout(next, 30); } else { next(); }
+      } catch (e) { fail("draw", e, "绘图失败，请重试"); }
+    };
+
+    findCanvas(2);
   },
 
   /* ---- v1.19.88：转发卡片（5:4 黑金卡） ----
@@ -1255,6 +1311,11 @@ Page(SafePage({
   _ensureShareCard() {
     const plan = app.globalData.plan;
     if (!plan || !plan.days || !plan.days.length) return;
+    // v1.19.199：与「生成分享图」共用同一 canvas，海报绘制中让一让，避免互相覆盖
+    if (this.__posterBusy) {
+      if (typeof setTimeout === "function") setTimeout(() => { try { this._ensureShareCard(); } catch (e) {} }, 600);
+      return;
+    }
     const stamp = (plan.savedAt || 0) + "|" + (plan.cityName || "") + "|" + plan.days.length;
     if (this.__shareStamp === stamp && this.__shareImg) return;   // 行程没变不重画
     this.__shareStamp = stamp;
@@ -1263,17 +1324,36 @@ Page(SafePage({
       if (!res || !res[0] || !res[0].node) return;
       try {
         const canvas = res[0].node;
-        const dpr = (wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2;
+        let dpr = 2;
+        try { dpr = Math.min(2, Number((wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2) || 2); } catch (e) {}
         const m = that._shareCardModel();
         canvas.width = m.W * dpr; canvas.height = m.H * dpr;
         const ctx = canvas.getContext("2d");
-        ctx.scale(dpr, dpr);
+        if (ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0); else ctx.scale(dpr, dpr);
         that._drawShareCard(ctx, m.W, m);
-        wx.canvasToTempFilePath({
+        // v1.19.199：显式导出矩形（同 onShareImg 根因），失败再按物理像素口径降级一次
+        const exp = () => wx.canvasToTempFilePath({
           canvas,
+          x: 0, y: 0,
+          width: m.W, height: m.H,
+          destWidth: m.W * dpr, destHeight: m.H * dpr,
+          fileType: "png",
           success(r) { that.__shareImg = r.tempFilePath; },
-          fail() { that.__shareImg = null; }
+          fail() {
+            wx.canvasToTempFilePath({
+              canvas,
+              x: 0, y: 0,
+              width: canvas.width, height: canvas.height,
+              destWidth: canvas.width, destHeight: canvas.height,
+              fileType: "png",
+              success(r2) { that.__shareImg = r2.tempFilePath; },
+              fail() { that.__shareImg = null; }
+            });
+          }
         });
+        if (canvas.requestAnimationFrame) {
+          try { canvas.requestAnimationFrame(exp); } catch (e) { exp(); }
+        } else { exp(); }
       } catch (e) { /* 静默：回退纯文字卡片 */ }
     });
   },

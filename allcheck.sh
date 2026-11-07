@@ -245,6 +245,8 @@ step "发布安全门禁 (数据必随包发布)" "$NODE" tools/verify-release.m
 step "演示质量门禁 (Console 告警防回潮)" "$NODE" tools/check-demo-quality.mjs
 # v1.19.198：「换一批」曾因算法确定性而点了没反应，固化为运行时回归
 step "单测 换景点分批 (换一批真的会变)" "$NODE" tools/_test-swap-batch.mjs
+# v1.19.199：「生成分享图」真机稳定失败，固化为运行时回归
+step "单测 分享图导出 (生成失败防回潮)" "$NODE" tools/_test-share-img.mjs
 
 echo ""
 echo "══════════════════════════════════════════════════"

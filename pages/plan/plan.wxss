@@ -784,14 +784,17 @@
 
 .limited-notice .ln-ic { flex: none; margin-top: 2rpx; font-weight: 800; color: var(--chip-tx, #d4a94e); }
 
-/* v1.19.76：分享长图离屏画布 —— 固定在视口外，不参与布局也不触发滚动 */
+/* v1.19.76：分享长图离屏画布 —— 不参与布局也不触发滚动
+   v1.19.199：原 left:-10000rpx 把节点放到视口外，部分安卓真机会做渲染剔除，
+   fields({node:true}) 拿不到节点 → 稳定「生成失败」。改为视口内 z-index:-1 垫底，
+   用 0.01 透明度保持节点参与渲染（页面根背景不透明，肉眼不可见）。 */
 .share-canvas {
   position: fixed;
-  left: -10000rpx;
+  left: 0;
   top: 0;
   width: 600px;
   height: 2400px;
-  opacity: 0;
+  opacity: 0.01;
   pointer-events: none;
   z-index: -1;
 }

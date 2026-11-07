@@ -116,8 +116,9 @@ ok("真源 swapSpotFor 保留 offset/limit 签名",
   /function swapSpotFor\(plan,\s*spotName,\s*cityName,\s*offset,\s*limit\)/.test(src));
 ok("真源按 (offset * limit) % 候选数轮转", /\(\s*off\s*\*\s*lim\s*\)\s*%\s*all\.length/.test(src));
 const ver = (s) => (s.match(/APP_VER\s*=\s*"([^"]+)"/) || [])[1];
-ok("真源 / 产物 / project.config.json 版本一致且为 1.19.198",
-  ver(src) === "1.19.198" && ver(out) === "1.19.198" && ide === "1.19.198",
+// 以 IDE 配置为期望值动态比对，避免每次升版都要改测试（v1.19.199 教训）
+ok("真源 / 产物 / project.config.json 版本一致",
+  !!ide && ver(src) === ide && ver(out) === ide,
   [ver(src), ver(out), ide].join(" / "));
 
 console.log("  换一批分批回归: " + (n - fail) + "/" + n + " 通过（覆盖 " + covered + " 城，"
