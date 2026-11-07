@@ -84,7 +84,7 @@
     },
     "pages/plan/plan": {
       "network": "wifi",
-      "packages": ["subpkg", "subdata", "subai"]
+      "packages": ["subdata"]
     }
   }
 }

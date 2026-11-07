@@ -212,6 +212,10 @@ step "导航死链审计 (按键跳转)" "$NODE" tools/_nav-audit.mjs
 # 累加成一个数去比对 2MB → 必然误报。改为按 app.json 主包+各分包逐包核算（tools/check-pkgsize.mjs）。
 step "分包体积体检 (每包 2MB 红线)" "$NODE" tools/check-pkgsize.mjs
 
+# 【v1.19.196 新增】preloadRule 任一页面预下载分包「源码体积」合计不得超 2MB，否则上传报
+# 系统错误 80058（本地编译/真机调试都发现不了，只在上传时由微信平台校验），故固化为 fail-fast。
+step "预下载体积门禁 (preloadRule ≤ 2MB)" "$NODE" tools/check-preload.mjs
+
 # 【v1.19.182 体积预算门禁】把「数据分包被静默撑爆 / 主包逻辑膨胀」从「上传后盯尺寸表」升级为 fail-fast。
 # data-packed.js 硬红线：v1.19.182 初设为 1800KB（留 180KB 余量给 1980KB 自动拆分阈值）；
 #   v1.19.191 起放宽到 1950KB —— 合法数据增长（部分东北/华东团队采集 + 富信息 P2②）已把单块顶到 ~1826KB，
