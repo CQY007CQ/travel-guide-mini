@@ -270,7 +270,11 @@ step "合并门禁 (utils 与 _src-backup 一致)" bash -c '
   for f in utils/travel.js utils/planner.js utils/weather.js utils/store.js utils/geo.js utils/corpus.js utils/pako-inflate.js utils/toolkit-groups.js; do
     if ! cmp -s "$f" "/tmp/mg106/$(basename "$f").before"; then echo "  ✗ $f 构建前后不一致（漏跑 build-min，或手改了 utils 应改 tools/_src-backup）"; BAD=1; fi
   done
-  [ $BAD -eq 0 ] && echo "  ✓ utils 与 _src-backup 一致"
+  # 手写双源（keys.js / data.js 经 cp 同步，非 build-min 产物）：与 _src-backup 字节一致，否则「改了 _src-backup 忘 cp」会静默漂移
+  for f in utils/keys.js utils/data.js; do
+    if ! cmp -s "$f" "tools/_src-backup/$(basename "$f")"; then echo "  ✗ $f 与 tools/_src-backup/$(basename "$f") 不一致（手写双源漂移：改了 _src-backup 忘 cp 到 utils）"; BAD=1; fi
+  done
+  [ $BAD -eq 0 ] && echo "  ✓ utils 与 _src-backup 一致（含手写 keys.js/data.js）"
   exit $BAD
 ' _ "$NODE"
 
@@ -278,6 +282,8 @@ step "合并门禁 (utils 与 _src-backup 一致)" bash -c '
 # 核心保障是「同源」：任何改动都先构建再用引擎冒烟验证，网页端不会悄悄漂移。
 # NODE 是父 shell 局部变量（未 export），bash -c 子 shell 里取不到 → 曾报 "bash: : command not found"；
 # 必须用位置参数传进去。管道必须开 pipefail，否则 smoke 失败会被 tail 的退出码吞掉，门禁假绿。
+step "审计整改防回潮断言 (#1/#19/#56/#81 不回潮)" "$NODE" tools/_test-audit-guards.mjs
+
 step "网页版 构建与引擎冒烟 (与小程序同源)" bash -c 'set -o pipefail; "$1" tools/web/build.mjs >/dev/null && "$1" tools/web/smoke.mjs | tail -4' _ "$NODE"
 
 echo ""
