@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.1";
+const APP_VER = "1.20.2";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -3649,6 +3649,32 @@ function spotNoteInCity(rawName, cityName) {
   }
   return "";
 }
+// v1.20.x：运行时类型化兜底简介 —— 长尾 obscure 景点（扁平 SPOT_DETAILS / by-city 都没有、本市 experiences 也没有 note）按「类型」给客观描述，
+// 绝不编具体史实 / 票价 / 年代 / 评级。命中通用类型词才返回；框架行（isFrameName）、合并名（X + Y）、短于 2 字一律返回空，交由上层显示「暂无介绍」。
+// 目的：把「暂无介绍」从大面积出现压到几乎为零，同时守住「不编造假内容」红线。
+function typeBasedIntro(rawName) {
+  const n = cleanSpotName(rawName) || String(rawName || "");
+  if (!n || n.length < 2) return "";
+  if (isFrameName(n)) return "";
+  // 合并名（行程内 X + Y）不是单点，不强行套类型
+  if (n.indexOf(" + ") >= 0 || n.indexOf("→") >= 0 || n.indexOf("／") >= 0 || n.indexOf("｜") >= 0) return "";
+  const RULES = [
+    { re: /博物馆|纪念馆|展览馆|美术馆|科技馆|文化馆|文史馆|陈列馆|档案?馆/, t: "本地文博场馆，多陈列与当地历史、自然或艺术相关的展品，是安静了解一方文化的去处；开放时间多在日间，部分场馆周一闭馆，出行前建议确认当日开放情况。" },
+    { re: /寺|庙|庵|观|教堂|清真寺|道观|佛堂/, t: "本地宗教或信仰场所，多为历史建筑，环境清幽，可感受人文与建筑之美；入内请保持安静、尊重当地习俗，部分场所需着装得体。" },
+    { re: /塔|阁|楼|宫|殿|王府|府邸|行宫|庄园|古建筑|古建|牌坊|古城墙|遗址|旧址|陵|墓|园陵/, t: "本地历史建筑类景点，承载一方过往记忆，多为登高望远或寻古探幽的去处；具体来历、开放与票价以现场或百科查询为准。" },
+    { re: /公园|植物园|动物园|园林|绿地|湿地公园|雕塑公园/, t: "本地城市绿地或园林，适合散步、休闲与放松，四季景致各有不同；多免费或低票价开放，是调节行程节奏的好选择。" },
+    { re: /山|峰|岭|谷|峡|森林公园|自然保?护?区|草原|森林/, t: "自然山水类目的地，以山林、峰峦或溪谷景观为主，适合徒步与呼吸新鲜空气；登山请留意天气与自身体力，备好饮水与合适鞋履。" },
+    { re: /湖|河|江|溪|水乡|海滨|沙滩|湾/, t: "亲水类目的地，可赏水景、散步或乘船；水边活动请注意安全，留意当日风浪与开放区域，带好防晒与替换衣物。" },
+    { re: /古村|古镇|古寨|村寨|村落|屯|老街|古巷/, t: "本地传统村落或古镇，多保留乡土建筑与生活方式，适合慢逛、拍照与体验在地烟火气；具体看点建议现场或百科查询。" },
+    { re: /街|商圈|步行街|美食街|夜市|广场|中心|市场/, t: "本地商业或休闲街区，聚集餐饮、购物与夜生活，适合逛吃与感受城市日常；价格随店而异，按需理性消费。" },
+    { re: /乐园|游乐园|主题公园|水上乐园|海洋馆|度假区/, t: "亲子或游乐类目的地，项目丰富、互动性强，适合带娃或与朋友同游；门票与具体项目以现场公示为准。" },
+    { re: /温泉|汤泉|spa|洗浴|康养/, t: "温泉或康养类目的地，适合放松泡汤、舒缓旅途疲劳；泡池、价格与禁忌人群以现场为准，注意水温与单次时长。" },
+    { re: /书院|学院|学堂|学府|学校|大学/, t: "本地文教场所，多承载读书育才的历史，建筑雅致、氛围安静，适合静心参观，部分仍在使用中请注意不扰教学。" },
+    { re: /城墙|城门|关|隘|烽火|长城/, t: "本地历史军事或城防遗迹，可直观感受古代工程与过往边塞气象；多为露天开放，建议结合史料或讲解理解。" }
+  ];
+  for (let i = 0; i < RULES.length; i++) { if (RULES[i].re.test(n)) return RULES[i].t; }
+  return "";
+}
 function spotLookup(rawName, cityName) {
   const name = (rawName || "").trim();
   if (!name) return { found: false };
@@ -3674,14 +3700,19 @@ function spotLookup(rawName, cityName) {
   }
   const tk = ticketPriceOf(name);
   const bt = bookingTipOf(name);
-  // 最后兜底：本市 experiences 的 note（城市维度，绝不跨城误配；纯本地、零数据成本覆盖全部景点）
+  // 兜底链（仅当扁平 / by-city 均无策展真实文案时）：① 本市 experiences 的 note；② 运行时类型化客观描述。
+  // 二者都不编具体史实 / 票价 / 年代，只给「按类型」的中性说明，覆盖长尾 obscure 景点，避免大面积「暂无介绍」。
   let note = "";
   if (!det && cityName) note = spotNoteInCity(name, cityName);
+  let typeIntro = "";
+  if (!det && !note) typeIntro = typeBasedIntro(name);
   const matchedCity = fromCity || !!note;
+  // intro 优先级：策展真实文案（det） → 本市 note → 类型化客观兜底（typeIntro）。plan.js 只认 lookup.intro，故把三者统一收口到此字段。
+  const intro = det ? (det.intro || "") : (note || typeIntro || "");
   return {
-    found: !!(det || tk.known || bt || note),
+    found: !!(det || tk.known || bt || note || typeIntro),
     name: detKey || name, city: matchedCity ? cityName : "",
-    intro: det ? (det.intro || "") : "",
+    intro: intro,
     how: det ? (det.how || "") : "",
     route: det ? (det.route || "") : "",
     ticket: tk, booking: bt || "",

@@ -497,8 +497,12 @@ function initData() {
       // 微信端：分包异步化。↓↓↓ 每条都必须是静态字面量（勿用变量）↓↓↓
       // v1.19.64：先给每条挂 applyPacked（无论多晚拿到都应用，绝不丢数据），
       // 再用 Promise.race 限时推进 —— 分包慢/卡时也不至于让 ready() 永不 resolve（黑屏）。
+      // v1.20.x 多数据分包：数据超过单块 ~1.95MB 上限时 pack-data 会切成 data-packed2.js / data-packed3.js，
+      // 此处必须逐条静态写出「每一个」分块（与 _manifest.js 一致），否则该分块永不加载、数据残缺（首页白屏/攻略缺景点）。
+      // 分块数变化（pack-data 提示「切成 N 块」）时，须同步增删下面这些字面量；pack-data 内置断言会 fail-fast 校验。
       const _jobs = [
-        require.async("../subdata/data/data-packed.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; })
+        require.async("../subdata/data/data-packed.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; }),
+        require.async("../subdata2/data/data-packed2.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; })
       ];
       await Promise.race([Promise.all(_jobs), _sleep(9000)]);
     } else {

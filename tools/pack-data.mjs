@@ -20,7 +20,10 @@ const D = req("./utils/data.js");
 // 若检出越界，说明出现了「未被 SPOT_COORD_FIX 覆盖的新坐标回归」——直接中止打包，
 // 强制开发者先加入 SPOT_COORD_FIX 再重打包，把坐标回归从「上线后告警」前移到「打包即拦截」。
 {
-  const _bad = D.checkCoordIntegrity();
+  // v1.20.x：_apply-safe.mjs 会先把「合并全部分块 + vNN 补丁」的数据写成纯 JSON 落到 utils/data.js，
+  // 此时该文件还不是加载器（无 checkCoordIntegrity）。本门禁只在「加载器就位」时生效；
+  // 接收到纯 JSON 数据（_apply-safe → pack-data 流程）时跳过，交由 data.js 加载期同款门禁兜底。
+  const _bad = (typeof D.checkCoordIntegrity === "function") ? D.checkCoordIntegrity() : 0;
   if (_bad > 0) {
     console.error("❌ 打包期坐标完整性门禁失败：发现 " + _bad + " 个越界坐标（未被 SPOT_COORD_FIX 覆盖的新回归），请修正数据或补充 SPOT_COORD_FIX 后重打包");
     process.exit(1);
