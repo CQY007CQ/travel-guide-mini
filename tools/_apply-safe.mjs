@@ -677,6 +677,76 @@ if (hotelNotes && Object.keys(hotelNotes).length) {
   console.log("§9.9 SPOT_DETAILS_BY_CITY 新增:", added, "| 城市数:", Object.keys(BYC).length, capped ? "(达体积上限截断)" : "");
 }
 
+// §9.10 真实景点资料卡（SPOT_CARDS_BY_CITY）—— v1.20.6 离线资料扩容
+// 目标：把散在 6 张表里的「同一景点真实字段」聚合成一条可直接展示的档案，
+//       让行程页「百科」从「一句短标签 + 两家不相关名店」升级为「看点 + 省份城市 + 评分 + 门票 + 坐标」。
+// 真实性铁律：
+//   · 字段一律取自本包已入库的真实数据（experiences.note / SPOT_INFO.rating / SPOT_TICKETS.p / SPOT_COORDS / CITY2PROV）；
+//   · 绝不生成任何新事实、绝不把 §9.9 的类型化模板文案（SPOT_DETAILS_BY_CITY）写进资料卡；
+//   · 通用名按「城市 → 景点」索引，杜绝跨城误配；行程合并名（X + Y）不是单点，排除。
+// 形状：CARDS[城市][景名] = [note, rating, price, lat, lon]，缺失字段用 ""。
+// 体积：按「每城轮转」稳定取 CARD_LIMIT 条，保证全国 400+ 城均匀覆盖，不撑爆数据分包。
+{
+  base.SPOT_CARDS_BY_CITY = {};
+  const CARDS = base.SPOT_CARDS_BY_CITY;
+  const CARD_LIMIT = 6000;                 // 用户要求 ≥5000，留 1000 余量
+  const isMergedCard = (nm) => nm.indexOf(" + ") >= 0 || nm.indexOf("→") >= 0 || nm.indexOf("／") >= 0 || nm.indexOf("｜") >= 0;
+  // 坐标索引：城市 → 景名 → [lat, lon]
+  const coordIdx = {};
+  for (const cn in (base.SPOT_COORDS || {})) {
+    const m = {};
+    for (const e of (base.SPOT_COORDS[cn] || [])) {
+      if (!Array.isArray(e) || typeof e[0] !== "string") continue;
+      if (typeof e[1] === "number" && typeof e[2] === "number" && e[1] && e[2]) m[e[0]] = [e[1], e[2]];
+    }
+    if (Object.keys(m).length) coordIdx[cn] = m;
+  }
+  const TICKETS = base.SPOT_TICKETS || {}, INFO = base.SPOT_INFO || {};
+  // §9.9 的类型化模板文案不是真实看点，绝不写进资料卡（门禁会复扫）
+  const CARD_TPL = /结合周边景点串成一条线|可乘地铁或公交至邻近站点|用地图导航到景区入口最稳妥|适合慢逛|避开高峰更舒服|建议预留半天/;
+  // 每城候选，按「真实结构化字段数」降序（同分保持原始顺序，保证幂等）
+  const buckets = [];
+  for (const c of base.CITIES) {
+    const cn = c.name;
+    const bucket = [];
+    for (const e of (c.experiences || [])) {
+      const nm = String((e && e.name) || "").trim();
+      if (!nm || nm.length < 2 || isMergedCard(nm)) continue;
+      const note0 = String((e && e.note) || "").trim();
+      const note = CARD_TPL.test(note0) ? "" : note0;
+      const rating = String((INFO[nm] && INFO[nm].rating) || "").trim();
+      const tk = TICKETS[nm];
+      const price = String((tk && (tk.p || tk.text)) || "").trim();
+      const cd = (coordIdx[cn] || {})[nm];
+      if (!rating && !price && !cd) continue;   // 必须至少一项结构化真实字段，杜绝空壳卡
+      // 已有策展正文的具名景点加权优先入卡（它们信息价值最高，不该被 round-robin 截断漏掉）
+      const curated = (base.SPOT_DETAILS && base.SPOT_DETAILS[nm]) ? 2 : 0;
+      const weight = (note ? 1 : 0) + (rating ? 2 : 0) + (price ? 2 : 0) + (cd ? 2 : 0) + curated;
+      if (weight < 2) continue;
+      bucket.push({ nm, w: weight, card: [note, rating, price, cd ? cd[0] : "", cd ? cd[1] : ""] });
+    }
+    if (bucket.length) {
+      bucket.sort((a, b) => b.w - a.w);
+      buckets.push({ cn, list: bucket, i: 0 });
+    }
+  }
+  // round-robin：每轮从每城取 1 条，直到达到上限 → 全国均匀，不会只堆热门城市
+  let addedCard = 0;
+  for (let round = 0; round < 1000 && addedCard < CARD_LIMIT; round++) {
+    let progressed = false;
+    for (const b of buckets) {
+      if (addedCard >= CARD_LIMIT) break;
+      if (b.i >= b.list.length) continue;
+      const it = b.list[b.i++];
+      if (!CARDS[b.cn]) CARDS[b.cn] = {};
+      CARDS[b.cn][it.nm] = it.card;
+      addedCard++; progressed = true;
+    }
+    if (!progressed) break;
+  }
+  console.log("§9.10 SPOT_CARDS_BY_CITY 真实资料卡:", addedCard, "| 覆盖城市:", Object.keys(CARDS).length);
+}
+
 // 7) 写出
 const json = JSON.stringify(base);
 fs.writeFileSync("utils/data.js", "// 由 _apply-safe.mjs 生成（base=data-packed.js 11,690 + 增量补丁）\nmodule.exports = " + json + ";\n");

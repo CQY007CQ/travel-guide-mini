@@ -895,7 +895,7 @@ function baikeFactText(name) {
  return "";
 }
 function baikeInfo(name, cityName) {
- const empty = { has: false, title: "", intro: "", extras: [], text: "" };
+ const empty = { has: false, title: "", intro: "", extras: [], text: "", card: false };
  const keys = baikeAliasKeys(name);
  if (!keys.length) return empty;
  const title = keys[0];
@@ -921,6 +921,40 @@ function baikeInfo(name, cityName) {
   if (tk.known && (tk.text || tk.p)) facts.push("门票 " + (tk.text || tk.p));
   if (lk.how) facts.push("怎么去 " + lk.how);   // lk.how 只在策展 det 存在时非空
  } catch (e) {}
+ // v1.20.6 真实景点资料卡：把散在 6 张表的同一景点真实字段聚合成一行，
+ // 让百科弹窗从「一句短标签」升级为「看点 + 省份城市 + 评分 + 门票 + 坐标」。
+ // 只按「本市 → 景名」查，通用名绝不跨城误配；子串匹配要求键长 ≥3（防 2 字短名张冠李戴）。
+ let cardText = "", cardHit = false;
+ try {
+  const CM = D.SPOT_CARDS_BY_CITY || {};
+  const cm = cityName && CM[cityName];
+  if (cm) {
+   let card = null;
+   for (const k of keys) { if (cm[k]) { card = cm[k]; break; } }
+   if (!card) {
+    for (const k of keys) {
+     if (k.length < 3) continue;
+     for (const s in cm) { if (s.length >= 3 && (s.indexOf(k) >= 0 || k.indexOf(s) >= 0) && cm[s]) { card = cm[s]; break; } }
+     if (card) break;
+    }
+   }
+   if (card) {
+    cardHit = true;
+    const cf = [];
+    const prov = (D.CITY2PROV || {})[cityName];
+    if (prov && prov !== cityName) cf.push(prov + "·" + cityName);
+    else if (cityName) cf.push(cityName);       // 直辖市不写「北京·北京」
+    const hasRating = facts.some(f => f.indexOf("评分") >= 0) || /评分/.test(note);
+    const hasTicket = facts.some(f => f.indexOf("门票") >= 0);
+    if (card[1] && !hasRating) cf.push("评分 " + card[1]);
+    if (card[2] && !hasTicket) cf.push("门票 " + card[2]);
+    if (card[3] !== "" && card[4] !== "") cf.push("坐标 " + card[3] + "," + card[4]);
+    if (cf.length) cardText = cf.join(" · ");
+    if (!intro && !note && card[0]) note = String(card[0]).trim();
+   }
+  }
+ } catch (e) {}
+ if (cardText) facts.push("随包资料 " + cardText);
  // ↓ 地点级真实内容决定「是否收录」；以下城市级附加信息不参与 has 判定
  const has = !!(intro || note || facts.length);
  if (!has) return empty;
@@ -938,7 +972,7 @@ function baikeInfo(name, cityName) {
   facts.length ? "已收录信息：" + facts.join("；") : "",
   extras.length ? "同城参考：" + extras.join("；") : ""]
   .filter(Boolean).join("\n\n").slice(0, 380);
- return { has: true, title, intro: intro || note, extras, text };
+ return { has: true, title, intro: intro || note, extras, text, card: cardHit };
 }
 function baikeKeyword(name) {
  let n = String(name || "").trim();

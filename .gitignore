@@ -65,3 +65,5 @@ project.private.config.json
 # ---------- 7. 本地临时脚本（下划线开头的一次性脚本不入库） ----------
 tools/_tmp-*
 tools/_scratch-*
+# 官方名录抓取缓存（可随时用 --fetch 重建，候选池 candidates.json 已进 git 且自带来源 URL）
+tools/official-roster/cache/

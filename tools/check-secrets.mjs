@@ -37,6 +37,10 @@ const MAX_SIZE = 2.5 * 1024 * 1024;   // 数据块跳过（内含 base64，一�
 
 // 本机凭据池：不进包、不进 git。允许存在，但纳入「是否被误提交」的断言。
 const LOCAL_POOLS = ["tools/geocode.keys", "tools/geocode.key"];
+// 外部官方页面抓取缓存（tools/_collect-official-roster.mjs --fetch 的只读原文）：
+// 政府站点 HTML 自带 32 位资源哈希/会话串，不是本仓凭据；但它是外部内容，不能无条件信任，
+// 故豁免同时强制「被 .gitignore 覆盖 + 未进入 git index」，且只豁免这一个目录。
+const EXTERNAL_CACHE = "tools/official-roster/cache";
 
 const ALLOW_URL = [
   "https://devapi.qweather.com",  // 和风天气（已备案，request 合法域名可过审）
@@ -59,7 +63,7 @@ function collect(dir, rel, out) {
   for (const e of entries) {
     const r = rel ? rel + "/" + e.name : e.name;
     if (e.isDirectory()) {
-      if (SKIP.has(e.name) || SKIP.has(r)) continue;
+      if (SKIP.has(e.name) || SKIP.has(r) || r === EXTERNAL_CACHE) continue;
       collect(path.join(dir, e.name), r, out);
     } else if (e.isFile()) {
       if (!TEXT_EXT.test(e.name)) continue;
@@ -94,6 +98,19 @@ const problems = [];
 let shippedCount = 0;
 let urlHashSkipped = 0;
 const poolNotes = [];
+
+// 外部抓取缓存豁免的双向护栏：必须被忽略、必须未被跟踪，否则立刻判失败。
+{
+  const gi = fs.existsSync(path.join(ROOT, ".gitignore"))
+    ? fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8") : "";
+  if (!gi.includes(EXTERNAL_CACHE + "/")) problems.push(EXTERNAL_CACHE + " → 抓取缓存未被 .gitignore 覆盖");
+  const dir = path.join(ROOT, EXTERNAL_CACHE);
+  if (fs.existsSync(dir)) {
+    for (const f of fs.readdirSync(dir)) {
+      if (trackedInIndex(EXTERNAL_CACHE + "/" + f)) problems.push(EXTERNAL_CACHE + "/" + f + " → 外部抓取原文已被 git 跟踪");
+    }
+  }
+}
 
 for (const rel of all) {
   const abs = path.join(ROOT, rel);
