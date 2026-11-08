@@ -168,3 +168,26 @@ input::placeholder, textarea::placeholder { color: var(--shell-tx3); }
   background: rgba(148, 163, 184, .08); color: var(--shell-tx);
 }
 .w-picker-select { display: none; }
+
+/* ── 网页版地图占位 ──
+   合规红线：离线零 key，不内嵌任何在线地图 SDK / 底图。
+   但空 div 会让用户以为页面坏了，所以用文字讲清「这里不画底图、下面照常能用」。
+   app.css 里的 .the-map 有 [data-page] 前缀，本文件后加载且同特异性，故能覆盖。 */
+[data-page="subpkg/map/map"] .the-map {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; text-align: center; padding: 20px; box-sizing: border-box;
+  background:
+    radial-gradient(circle at 22% 28%, rgba(212, 169, 78, .14), transparent 42%),
+    radial-gradient(circle at 78% 72%, rgba(125, 211, 252, .10), transparent 46%),
+    rgba(148, 163, 184, .06);
+  border: 1px dashed var(--shell-line);
+  box-shadow: none;
+}
+[data-page="subpkg/map/map"] .the-map::before {
+  content: "网页版不加载在线地图底图";
+  color: var(--shell-tx); font-size: 15px; font-weight: 700; letter-spacing: .5px;
+}
+[data-page="subpkg/map/map"] .the-map::after {
+  content: "下方点位清单、顺路度评分与逐条导航照常可用\A 点任意一行会打开高德地图查看位置";
+  white-space: pre-line; color: var(--shell-tx3); font-size: 12px; line-height: 1.9;
+}

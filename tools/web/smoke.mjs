@@ -108,5 +108,32 @@ if (T) {
   ok("17 个模板均可在空数据下渲染不抛错", rendered === pages.length, renderErrs.join(" ｜ "));
 }
 
+/* ── 7. 浏览器降级能力 + 两端同源文案（静态护栏） ──
+   runtime.js 依赖 DOM，node 里跑不起来；但「静默 fail」「点了没反应」这类倒退
+   完全可以从源码形状拦住。网页版优化后这些能力必须真实存在，不许回潮。 */
+console.log("== 7. 浏览器降级能力（静态护栏） ==");
+{
+  const rt = fs.readFileSync(path.join(LIB, "runtime.js"), "utf8");
+  const css = fs.readFileSync(path.join(ROOT, "web/shell.css"), "utf8");
+  const plan = fs.readFileSync(path.join(ROOT, "pages/plan/plan.js"), "utf8");
+  ok("addPhoneCalendar 不再静默 fail，走 .ics 导出",
+    /addPhoneCalendar:\s*function/.test(rt) && /downloadICS\(o\)/.test(rt) && !/addPhoneCalendar:\s*function\s*\(\s*o\s*\)\s*\{\s*o\s*&&\s*o\.fail/.test(rt));
+  ok(".ics 是标准 VCALENDAR / VEVENT / VALARM",
+    ["BEGIN:VCALENDAR", "BEGIN:VEVENT", "DTSTART:", "DTEND:", "BEGIN:VALARM", "END:VCALENDAR"].every((k) => rt.includes(k)));
+  ok("重复日程导出带 RRULE", /RRULE:FREQ=/.test(rt) && /repeat:\s*true/.test(rt));
+  ok("createMapContext 已实现（地图页不再缺 API）",
+    /createMapContext:\s*function/.test(rt) && /function webMapContext/.test(rt) && /includePoints: noop/.test(rt));
+  ok("地图占位说明：讲清不画底图、下方照常可用",
+    css.includes("网页版不加载在线地图底图") && css.includes("逐条导航") && css.includes("data-page"));
+  ok("订阅消息不支持时有可见提示", /requestSubscribeMessage:\s*function[\s\S]{0,220}showToast/.test(rt));
+  ok("图片下载后有成功反馈", rt.includes("图片已保存到下载目录"));
+  ok("日历文案两端分流：网页版不承诺「已加入手机日历」",
+    plan.includes("已下载日历文件（.ics）") && /getAccountInfoSync/.test(plan));
+  // 只扫代码行：注释里解释「不再甩暂无介绍」也会被字面命中（项目踩过同款误伤）
+  const planCode = plan.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+  ok("详情无简介时给出已收录信息，不再甩「暂无介绍」",
+    !planCode.includes("暂无介绍") && plan.includes("已收录标签") && plan.includes("hasRealDetail = false"));
+}
+
 console.log("\n结果：" + pass + " 通过 / " + fail + " 失败");
 if (fail) process.exit(1);

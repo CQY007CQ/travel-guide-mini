@@ -434,24 +434,48 @@
       img.src = o.src;
     },
     saveImageToPhotosAlbum: function (o) {
-      // 浏览器端：直接触发下载
+      // 浏览器端直接触发下载；原来没有可见反馈，用户点了像「分享图生成失败」
+      o = o || {};
       try {
         var a = document.createElement("a");
         a.href = o.filePath; a.download = "travel-plan-" + Date.now() + ".png";
-        a.click();
-        o.success && o.success(ok("saveImageToPhotosAlbum"));
-      } catch (e) { o.fail && o.fail({ errMsg: "saveImageToPhotosAlbum:fail" }); }
+        document.body.appendChild(a); a.click(); a.remove();
+        showToast({ title: "图片已保存到下载目录", icon: "success" });
+        var r = ok("saveImageToPhotosAlbum");
+        o.success && o.success(r); o.complete && o.complete(r);
+      } catch (e) { o.fail && o.fail({ errMsg: "saveImageToPhotosAlbum:fail " + (e && e.message) }); }
     },
     showShareImageMenu: function (o) {
-      // 浏览器端没有系统分享面板，降级为下载
+      // 浏览器端没有系统分享面板，降级为下载（带 toast）
       wx.saveImageToPhotosAlbum(o);
     },
     openSetting: function (o) { o && o.success && o.success({ authSetting: {} }); },
     authorize: function (o) { o && o.success && o.success(ok("authorize")); },
     getSetting: function (o) { o && o.success && o.success({ authSetting: {} }); },
-    requestSubscribeMessage: function (o) { o && o.fail && o.fail({ errMsg: "requestSubscribeMessage:fail web" }); },
-    addPhoneCalendar: function (o) { o && o.fail && o.fail({ errMsg: "addPhoneCalendar:fail web" }); },
-    addPhoneRepeatCalendar: function (o) { o && o.fail && o.fail({ errMsg: "addPhoneRepeatCalendar:fail web" }); },
+    // 没有模板消息许可，但不能静默失败：给一句去向说明，再让调用方走既有降级
+    requestSubscribeMessage: function (o) {
+      showToast({ title: "网页版暂不支持消息提醒，可在小程序中开启", icon: "none" });
+      o && o.fail && o.fail({ errMsg: "requestSubscribeMessage:fail web" });
+      o && o.complete && o.complete({ errMsg: "requestSubscribeMessage:fail web" });
+    },
+    // 浏览器等价能力：导出标准 .ics 文件下载。原来直接 fail，页面会退回「复制一大段
+    // .ics 文本」，用户还得自己存成文件；现在拿到的是可直接导入日历的文件。
+    // 成功提示由页面 success 回调负责（它会按平台显示不同文案），避免双重 toast。
+    addPhoneCalendar: function (o) {
+      o = o || {};
+      try {
+        downloadICS(o);
+        var r = ok("addPhoneCalendar");
+        o.success && o.success(r); o.complete && o.complete(r);
+      } catch (e) {
+        o.fail && o.fail({ errMsg: "addPhoneCalendar:fail " + (e && e.message) });
+      }
+    },
+    addPhoneRepeatCalendar: function (o) {
+      wx.addPhoneCalendar(Object.assign({}, o || {}, { repeat: true }));
+    },
+    // 地图页 onReady/_fitDay 会取上下文；网页版地图是文字占位，但 API 必须存在
+    createMapContext: function () { return webMapContext(); },
     reportAnalytics: function () {},
     reportEvent: function () {},
     cloud: null,
@@ -486,6 +510,85 @@
     ta.select();
     try { document.execCommand("copy"); } catch (e) {}
     ta.remove();
+  }
+
+  /* ── 浏览器等价能力：日历 .ics 导出 / 地图上下文 ──
+   * 小程序用 wx.addPhoneCalendar 直接写系统日历，网页版没有该 API；
+   * 但同一份日程可以导出为标准 .ics 文件，用户下载后双击即可导入日历，
+   * 比原来静默 fail → 退回「复制一大段 .ics 文本」可用得多。
+   * 刻意不引入任何在线地图 SDK：项目红线是「离线零 key」，地图区域只给
+   * 文字说明，点位清单与逐条导航（openLocation→高德）保持可用。
+   */
+  function icsEscape(s) {
+    return String(s == null ? "" : s)
+      .replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,")
+      .replace(/\r?\n/g, "\\n");
+  }
+  function icsDate(ts) {
+    var n = Number(ts);
+    if (!isFinite(n) || n <= 0) n = Date.now() / 1000;
+    if (n > 1e11) n = n / 1000;              // 兼容误传毫秒
+    return new Date(n * 1000).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  }
+  function downloadICS(o) {
+    o = o || {};
+    var title = icsEscape(o.title || "旅行行程");
+    var lines = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Travel Guide//Web Calendar//CN",
+      "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+      "UID:" + Date.now() + "@travel-guide-web",
+      "DTSTAMP:" + icsDate(Date.now() / 1000),
+      "DTSTART:" + icsDate(o.startTime),
+      "DTEND:" + icsDate(o.endTime),
+      "SUMMARY:" + title,
+    ];
+    if (o.description) lines.push("DESCRIPTION:" + icsEscape(o.description));
+    if (o.address || o.location) lines.push("LOCATION:" + icsEscape(o.address || o.location));
+    if (o.repeat) {
+      var freq = ({ day: "DAILY", week: "WEEKLY", month: "MONTHLY", year: "YEARLY" })[o.repeatInterval] || "DAILY";
+      lines.push("RRULE:FREQ=" + freq + (o.repeatEndTime ? ";UNTIL=" + icsDate(o.repeatEndTime) : ""));
+    }
+    if (o.alarm) {
+      lines.push("BEGIN:VALARM", "TRIGGER:-PT" + Math.max(1, Math.round(Number(o.alarmOffset || 3600) / 60)) + "M",
+        "ACTION:DISPLAY", "DESCRIPTION:" + title, "END:VALARM");
+    }
+    lines.push("END:VEVENT", "END:VCALENDAR");
+    var blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/calendar;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "旅行行程-" + new Date().toISOString().slice(0, 10) + ".ics";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  /** 网页版没有原生 map 组件，但页面 JS 会在 onReady/_fitDay 里取上下文。
+   *  返回一套 no-op 上下文，让地图页不因缺 API 静默失效（视野数据仍由 setData 维护）。 */
+  function webMapContext() {
+    var noop = function (o) {
+      var r = ok("mapContext");
+      if (o && o.success) o.success(r);
+      if (o && o.complete) o.complete(r);
+    };
+    var query = function (o, data) {
+      var r = ok("mapContext", data);
+      if (o && o.success) o.success(r);
+      if (o && o.complete) o.complete(r);
+    };
+    return {
+      moveToLocation: noop, includePoints: noop, setCenterOffset: noop,
+      translateMarker: noop, addMarkers: noop, removeMarkers: noop,
+      initMarkerCluster: noop, setLocMarkerIcon: noop, on: noop,
+      getCenterLocation: function (o) { query(o, { latitude: 39.9, longitude: 116.4 }); },
+      getRegion: function (o) { query(o, { southwest: { latitude: 0, longitude: 0 }, northeast: { latitude: 0, longitude: 0 } }); },
+      getScale: function (o) { query(o, { scale: 12 }); },
+      getRotate: function (o) { query(o, { rotate: 0 }); },
+      getSkew: function (o) { query(o, { skew: 0 }); },
+      toScreenLocation: function (o) { query(o, { x: 0, y: 0 }); },
+      fromScreenLocation: function (o) { query(o, { latitude: 39.9, longitude: 116.4 }); },
+    };
   }
 
   global.wx = wx;

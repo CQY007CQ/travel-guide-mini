@@ -722,7 +722,13 @@ Page(SafePage({
     endTime: mk(endD, 21),
     alarm: true,
     alarmOffset: 3600,
-    success: () => wx.showToast({ title: "已加入手机日历", icon: "success" }),
+    // 网页版把同一份日程导出成 .ics 文件下载（runtime 的 addPhoneCalendar），
+    // 文案不能承诺「已加入手机日历」；用 getAccountInfoSync 区分，不碰废弃 API。
+    success: () => {
+     let isWeb = false;
+     try { isWeb = !!(wx.getAccountInfoSync && wx.getAccountInfoSync().miniProgram.appId === "web"); } catch (e) {}
+     wx.showToast({ title: isWeb ? "已下载日历文件（.ics）" : "已加入手机日历", icon: "success" });
+    },
     fail: () => this._icsCopy(plan)
    });
    return;
@@ -809,26 +815,36 @@ Page(SafePage({
   if (this.data.open === ix + di * 100) { this.setData({ open: -1, detailText: "", detailName: "", timing: null, offlineHow: "" }); return; }
   // 多站行程：详情按当天归属城市取（否则整串「北京 → 西安」查不到介绍）
   const city = T.segCityOfDay(plan, di) || plan.cityName;
+  // v1.15：详情展示景点标签，点标签可换一个同标签的当地景点
+  const detailTags = it.custom ? [] : T.spotTagOf(it.name, city);
+  // v1.16：地图 POI 返回的真实开放时间/评分/人均/地址（没有就不显示，不编造）
+  const infoTx = it.custom ? "" : (T.spotInfoText(it.name) || "");
+  const timing = it.custom ? null : T.spotTiming(it.name);
   // 离线百科（SPOT_DETAILS）：spotDetailText 没有时，用离线简介兜底，避免大量经典景点只剩「点百科看更多」
   const lookup = it.custom ? null : T.spotLookup(it.name, city);
   // 自己加的点（库里没有）不编百科式介绍，避免「随便输一个也有介绍」的假内容
-  let txt, offlineHow = "";
+  let txt, offlineHow = "", hasRealDetail = true;
   if (it.custom) {
     txt = "这是你自己加的点，暂未收录介绍。点「百科」可搜索，或换成本市经典景点。";
   } else {
     const base = T.spotDetailText(it.name, city);
     if (base) txt = base;
     else if (lookup && lookup.intro) { txt = lookup.intro; offlineHow = lookup.how || ""; }
-    else txt = "暂无介绍，点百科看更多";
+    else {
+      // v1.20.1：没文字简介时别只甩一句「暂无介绍」——展开面板里其实还有标签、
+      // 最佳时段、评分/人均，把它们点出来，用户才知道下一步能做什么。
+      const bits = [];
+      if (detailTags.length) bits.push("已收录标签 " + detailTags.slice(0, 3).join(" / "));
+      if (timing && timing.best) bits.push("建议 " + timing.best + " 去");
+      txt = bits.length
+        ? "这个点还没收录文字简介，先给你已有的实用信息：" + bits.join("；") + "。点「百科」可搜索更多，或点标签换同类景点。"
+        : "这个点还没收录文字简介。点「百科」可搜索更多，也可以点「换一个」换成同市经典景点。";
+      hasRealDetail = false;
+    }
   }
-  // v1.15：详情展示景点标签，点标签可换一个同标签的当地景点
-  const detailTags = it.custom ? [] : T.spotTagOf(it.name, city);
-  // v1.16：地图 POI 返回的真实开放时间/评分/人均/地址（没有就不显示，不编造）
-  let infoTx = it.custom ? "" : (T.spotInfoText(it.name) || "");
-  const hasRealDetail = !!txt && txt.indexOf("暂无介绍") < 0;
   this.setData({
     open: ix + di * 100, detailText: txt, detailName: it.name, detailTags,
-    infoTx, showInfo: !!infoTx, hasRealDetail, timing: T.spotTiming(it.name), offlineHow
+    infoTx, showInfo: !!infoTx, hasRealDetail, timing, offlineHow
   });
  },
 
