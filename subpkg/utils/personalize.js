@@ -1,4 +1,8 @@
-// utils/personalize.js —— 个性化目的地推荐（数据驱动的「AI」层）
+// subpkg/utils/personalize.js —— 个性化目的地推荐（数据驱动的「AI」层）
+//
+// v1.20.3：从主包迁到分包（仅 more 页用到），主包瘦身绕开微信 1.5M 代码质量软线。
+// 与同目录的 insights.js 同属「more 页本地洞察/个性化」能力，二者同分包内互相引用（合法）。
+// recommend / travel 仍留在主包，分包同步引用主包模块（合法：分包可 require 主包）。
 //
 // 思路：把「本机数据洞察」得到的真实用户画像，转成底层推荐引擎的专属查询，
 // 再叠加一层「来自你自己的数据」的加分与理由。整套不联网、不上传，
@@ -6,8 +10,8 @@
 //
 // 注意：本文件只做「编排 + 个性化加成」，复杂的相关度打分全部复用 recommend.js，
 // 不重复造轮子，也不改动 recommend 的既有断言。
-const R = require("./recommend.js");
-const T = require("./travel.js");
+const R = require("../../utils/recommend.js");
+const T = require("../../utils/travel.js");
 const INS = require("./insights.js");
 
 // 把真实画像映射成推荐查询词（让底层引擎跑「用户专属」候选集）

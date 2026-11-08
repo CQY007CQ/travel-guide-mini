@@ -5,8 +5,8 @@
 // stamp 短路 + 失败静默、onShareAppMessage 有图接 imageUrl / 无图回退。
 import { readFileSync } from "fs";
 import vm from "vm";
-// v1.19.109：行程页分享绘制已抽到 utils/plan-poster.js，本测试沙盒需注入该模块（否则 PP 未定义）
-import planPoster from "../utils/plan-poster.js";
+// v1.19.109：行程页分享绘制已抽到 utils/plan-poster.js（v1.20.3 迁到分包 subpkg/utils），本测试沙盒需注入该模块（否则 PP 未定义）
+import planPoster from "../subpkg/utils/plan-poster.js";
 const PP = planPoster;
 
 let fail = 0;

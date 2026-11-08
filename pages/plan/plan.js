@@ -4,8 +4,19 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const W = require("../../utils/weather.js");
 const A = require("../../utils/aicontent.js");
-const R = require("../../utils/remind.js");
-const PP = require("../../utils/plan-poster.js");   // v1.19.109：分享海报/卡片绘制隔离到独立模块
+// v1.20.3：remind / plan-poster 仅在特定用户操作（设提醒 / 生成分享图）才用到，
+// 已从主包迁到分包 subpkg/utils，按需异步加载 —— 主包瘦身绕开微信「代码质量」1.5M 软线。
+// 微信端走静态字面量 require.async；Node（allcheck / 单测）无 require.async，回退同步 require，保证回归照常。
+let R = null, PP = null;
+function _preloadSubMods() {
+  if (typeof require.async === "function") {
+    require.async("../../subpkg/utils/remind.js").then((m) => { R = m; }).catch(() => {});
+    require.async("../../subpkg/utils/plan-poster.js").then((m) => { PP = m; }).catch(() => {});
+  } else {
+    try { R = require("../../subpkg/utils/remind.js"); } catch (e) {}
+    try { PP = require("../../subpkg/utils/plan-poster.js"); } catch (e) {}
+  }
+}
 const EL = require("../../utils/errlog.js");        // v1.19.199：分享图失败分阶段留痕（真机可回溯）
 const app = getAppSafe();
 
@@ -65,7 +76,7 @@ Page(SafePage({
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：onShow 是行程页唯一入口，任何异常都不得导致白屏（无数据时优雅回首页）
-  onLoad() { this.__boot = T.ready().catch(() => null); },
+  onLoad() { this.__boot = T.ready().catch(() => null); _preloadSubMods(); },
   onShow() {
     try { AN.pageView("plan"); } catch (e) {}
     this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },

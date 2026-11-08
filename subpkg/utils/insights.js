@@ -1,9 +1,11 @@
-// utils/insights.js —— 本机旅行数据洞察（离线 / 隐私优先）
+// subpkg/utils/insights.js —— 本机旅行数据洞察（离线 / 隐私优先）
+//
+// v1.20.3：从主包迁到分包（仅 more 页用到），主包瘦身绕开微信 1.5M 代码质量软线。
 //
 // 全部从本机真实记录（记账 / 存档行程 / 足迹）聚合得出：不联网、不上传、不造数。
 // 这是 product 内最贴近「大数据 / 智能分析」的实质模块 —— 结论来自用户自己的行为数据，
 // 而非静态模板。所有函数纯计算、可被 check-insights 单测覆盖。
-const T = require("./travel.js");
+const T = require("../../utils/travel.js");   // 分包同步引用主包模块（合法：分包可 require 主包）
 
 // v1.19.139：记忆化。insights() 会被 more 页与 personalized() 多次调用，
 // 真实记录未变时直接返回同一份聚合结果（避免重复计算 + 跨调用读数不一致）。

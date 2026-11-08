@@ -10,8 +10,8 @@ global.wx = {
 import { createRequire } from "module";
 const req = createRequire(process.cwd() + "/");
 const T = req("./utils/travel.js");
-const INS = req("./utils/insights.js");
-const PZ = req("./utils/personalize.js");
+const INS = req("./subpkg/utils/insights.js");
+const PZ = req("./subpkg/utils/personalize.js");
 const R = req("./utils/recommend.js");
 const D = T.D;
 
