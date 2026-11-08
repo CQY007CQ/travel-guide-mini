@@ -129,6 +129,35 @@ inject("utils/hotel-areas.js", "TEAM_HOTEL_START", "TEAM_HOTEL_END", "TEAM_HOTEL
 inject("utils/hotel-areas.js", "TEAM_HOTEL_LIST_START", "TEAM_HOTEL_LIST_END", "TEAM_HOTEL_LIST_ENRICH", agg.hotelList);
 inject("utils/emergency-data.js", "TEAM_HOSP_START", "TEAM_HOSP_END", "TEAM_HOSP_ENRICH", agg.hospitals);
 
+// v1.19.205：团队医院并入后，从 APPROX 剔除已具名医院城，严守 v1.19.191「两集合不重叠」红线。
+// 任一分区（含本机/分支板）给某城补了具名医院，该城就不再走「仅城心降级」路径，须移出 APPROX，
+// 否则 allcheck 的 emergency / 离线数据规模口径 会判重叠失败。此步让合并幂等且自愈。
+function objKeys(file, name) {
+  const s = readFileSync(file, "utf8");
+  const m = s.match(new RegExp("const " + name + " = \\{([\\s\\S]*?)\\n\\};"));
+  if (!m) return [];
+  return [...m[1].matchAll(/"([^"]+)":\s*\[/g)].map((x) => x[1]);
+}
+function pruneApprox(file, hospCities) {
+  let s = readFileSync(file, "utf8");
+  const m = s.match(/const APPROX = (\{[\s\S]*?\n\});/);
+  if (!m) { W("找不到 APPROX 块，跳过剔除"); return; }
+  let obj;
+  try { obj = Function("return " + m[1] + ";")(); } catch (e) { W("APPROX 解析失败：" + e.message); return; }
+  const removed = [];
+  for (const c of hospCities) if (obj[c] !== undefined) { delete obj[c]; removed.push(c); }
+  if (!removed.length) return;
+  const ser = JSON.stringify(obj, null, 2);
+  s = s.replace(m[0], "const APPROX = " + ser + ";");
+  writeFileSync(file, s, "utf8");
+  console.log("  ✓ APPROX 剔除已具名医院城 " + removed.length + " 城：" + removed.join(", "));
+}
+{
+  const staticHosp = objKeys("utils/emergency-data.js", "HOSPITALS");
+  const hospCities = new Set([...staticHosp, ...Object.keys(agg.hospitals)]);
+  pruneApprox("utils/emergency-data.js", hospCities);
+}
+
 // 3) cp + 打包
 console.log("\n同步 utils/data.js ...");
 execSync("cp tools/_src-backup/data.js utils/data.js", { stdio: "inherit" });
