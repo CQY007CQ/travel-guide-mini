@@ -13,6 +13,38 @@
 
 ---
 
+## 〇·五、整改状态追踪（2026-11-09 续，基于本会话已落地提交）
+
+> 本审计初稿（108 项）提交于 `85cf4e2`，此后本会话已落地 `3963cd0`、`6133f09` 等修复提交，对初稿中若干条目产生影响。下文以"状态"标注，避免与条目正文冲突；条目正文保留原始问题描述作为历史记录。
+
+### ✅ 本会话已修复（对应 commit 3963cd0 / 6133f09，版本 v1.20.3）
+
+| 条目 | 原问题 | 修复方式 | 当前证据 |
+| --- | --- | --- | --- |
+| #2 | 账本 200 上限静默丢数据 | `addLedger` 截断前 `wx.showToast` 提示"已达上限，建议导出备份" | `tools/_src-backup/travel.js:934-937`（LEDGER_CAP） |
+| #4 | more 页 onShow 重复读账本 | `refresh()` 提 `const ledgerLen = T.getLedger().length` 复用 | `pages/more/more.js:155` |
+| #6 | 全角数字"３２"解析失败 | `parseQuickBill` 入口全角→半角归一（FEE0） | `tools/_src-backup/travel.js:1871` |
+| #12 | 删账后 6s 内离页导致照片残留 | 清理定时器改**模块作用域** `_billImgCleanups`，不随页面 `onUnload` 销毁 | `subpkg/ledger/ledger.js:18,385-398`（v1.20.3） |
+| #61 | 账单列表 `wx:key="i"` 不稳定下标 | 改为 `wx:key="_id"`（账单稳定 id） | `subpkg/ledger/ledger.wxml:83` |
+| #71 | `del` 的 `this._undoT` 定时器随页面销毁 | 同 #12，模块作用域定时器，与 `onUnload` 解耦 | `subpkg/ledger/ledger.js`（见 #12） |
+
+### 🔧 条目行号 / 事实更正
+
+- **#22（innerHTML）**：原文行号 `3723/4463/4547` 为旧版产物，当前 `web/lib/runtime.js` 实际 `innerHTML` 拼接位于 **126 / 141 / 157 / 180 / 199 / 691 / 706 / 808 / 813**（toast / loading / modal / 预览 / 错误兜底）。风险判定（中危）与"统一 `esc()` 转义"建议不变。
+- **#32（document.write）**：在当前 `web/lib/runtime.js` 未检索到 `document.write`；网页导出仅见 `navigator.clipboard.writeText`（281）与 `global.open` 跳转高德（304）。该条目疑似旧版打印逻辑已重构移除，建议复核后降级为低危或关闭。
+
+### 📌 仍待处理（高 / 中危，非代码自动可解部分）
+
+- **#1 / #19 密钥明文进公开仓库**：设计决策待用户拍板（清空 `DEFAULT` 会让"未注入 Key 时天气失效"）。`utils/keys.js` 已支持 `setKeys()` 运行时注入，仅待把 `DEFAULT` 明文改为空串。
+- **#20 eval / #21 execSync**：仅影响本地构建工具（非生产包），优先级中，建议随构建工具重构时一并改 `JSON.parse` / `fetch` + `URL`。
+- **#24 备份 / 协作包输入上限校验**：`importBackup`（`tools/_src-backup/travel.js:1463`）解析后未做字段数量 / 长度上限，建议加 `days ≤ 60`、`ledger ≤ 200` 等校验。
+- **#28 生产包 console.warn**：`utils/data.js` 仍有 14 处 `console.warn`，建议 `__DEV__` 守卫或汇总进 `errlog`。
+- **#56 onShow 样板 / #58·#77 双源 / #81 store 统一 / #82 CI 断言 / #106 合并门禁**：架构类，建议列为下一里程碑整改项。
+
+> 说明：本审计"已具备的强项"第 4 条已记录凭证照片修复；上表 #12 / #61 / #71 为其代码级落地，二者一致。
+
+---
+
 ## 一、数据真实性与有效性（18 条）
 
 **第 1 条**
@@ -171,7 +203,7 @@
 
 **第 22 条**
 - 类型：安全
-- 位置：`web/lib/runtime.js`（多处 `innerHTML =` 拼接，如 3723、4463、4547 等）
+- 位置：`web/lib/runtime.js`（多处 `innerHTML =` 拼接，当前位于 126 / 141 / 157 / 180 / 199 / 691 / 706 / 808 / 813，详见 〇·五 状态追踪）
 - 问题描述：网页版 PWA 用 `el.innerHTML = \`<div>...${data.x}...</div>\`` 渲染，data 来自 App 自有结构化数据（城市名/景点名），当前无用户输入注入点，但若未来接入用户自定义文本（如手记/备注）会触发 XSS。
 - 严重程度：中
 - 优化建议：对动态文本字段统一 `textContent` 或转义函数；建立 `esc()` 工具，禁止把用户可见文本直接进 innerHTML。
@@ -241,7 +273,7 @@
 
 **第 32 条**
 - 类型：安全
-- 位置：`web/lib/runtime.js:791-799` `document.write`（导出一页行程）
+- 位置：`web/lib/runtime.js`（原记录 `791-799` `document.write` 导出一页行程；2026-11-09 复核当前版本未检索到 `document.write`，疑似旧版打印逻辑已重构移除，详见 〇·五 状态追踪，建议降级/关闭）
 - 问题描述：`w.document.write(\`<html>...\`) ` 用 `document.write` 开新窗口打印，内容含城市名等，若城市名含 HTML 特殊字符会破坏结构（当前数据无，但无转义）。
 - 严重程度：低
 - 优化建议：打印内容用 `textContent` 或 `esc()` 转义后再拼。
