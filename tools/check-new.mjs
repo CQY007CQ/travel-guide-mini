@@ -915,6 +915,29 @@ console.log("== 35. v1.19.175 · 推荐解析出行月份 ==");
   assert("解析月份流进 recommend.prefs.month", rec.prefs && rec.prefs.month === 3, String(rec.prefs && rec.prefs.month));
 }
 
+console.log("== 39. v1.20.4 · 预算/节奏否定前缀识别 ==");
+// 真实 bug：此前「别特种兵」被 indexOf 命中 → pace=speed（恰好相反）；
+// 「不便宜 / 别豪华 / 不要省钱」也会误判为对应偏好。否定前缀应使该意图不生效，
+// 同句里的正面表述仍正常识别（如「别豪华，省钱为主」→ low）。
+const nb1 = R.extractPrefs("别特种兵，轻松点", {});
+assert("「别特种兵」不误判为 speed", nb1.pace !== "speed", nb1.pace);
+assert("「别特种兵」→ leisure", nb1.pace === "leisure", nb1.pace);
+const nb2 = R.extractPrefs("不便宜也想玩好", {});
+assert("「不便宜」不误判为 low 预算", nb2.budget !== "low", nb2.budget);
+const nb3 = R.extractPrefs("别豪华，省钱为主", {});
+assert("「别豪华」不误判为 high 预算", nb3.budget !== "high", nb3.budget);
+assert("「省钱为主」→ low 预算（同句正面词仍生效）", nb3.budget === "low", nb3.budget);
+const nb4 = R.extractPrefs("不要省钱，要高端体验", {});
+assert("「不要省钱」不误判为 low 预算", nb4.budget !== "low", nb4.budget);
+assert("「要高端体验」→ high 预算", nb4.budget === "high", nb4.budget);
+// 回归守卫：正面表述仍正常识别（不被新增逻辑误伤）
+const nb5 = R.extractPrefs("省钱穷游", {});
+assert("回归：省钱 → low", nb5.budget === "low", nb5.budget);
+const nb6 = R.extractPrefs("舒适中档就行", {});
+assert("回归：舒适 → mid", nb6.budget === "mid", nb6.budget);
+const nb7 = R.extractPrefs("特种兵式暴走多玩", {});
+assert("回归：特种兵 → speed", nb7.pace === "speed", nb7.pace);
+
 console.log("== 36. v1.19.183 · 个性化『可二刷』基于真实打卡城市 ==");
 // 旧实现 T.isVisited(city.name) 查的是「同名景点」，城市名几乎不可能等于景点名，
 // 导致『可二刷』理由永不触发。新实现用 footStats().cityList（真实打卡城市集合）判定。

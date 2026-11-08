@@ -147,6 +147,29 @@ function parseMonthFromText(s) {
   return 0;
 }
 
+/* 否定前缀识别（仅作用于预算/节奏这种直接翻转打分权重的软意图）：
+ * 关键词紧邻前 1–2 字构成否定时，视为「用户未表达该意图」。
+ * 真实 bug：「别特种兵」当前会被 indexOf("特种兵") 命中 → pace=speed（恰好相反）；
+ * 「不便宜 / 别豪华 / 不要省钱」也会误判为对应偏好。这里纠正。
+ * 说明：仅覆盖最常见的紧邻否定（1–2 字）；"不喜欢便宜"等否定词离关键词更远的情况暂不处理，
+ * 属已知残余边界，留待后续（避免过度扩大改动面）。quiet 标签的「不挤」是正向"人少"信号，不在这里否定。 */
+const NEG_PREFIX = ["不", "别", "勿", "莫", "不想", "不愿", "不要", "别去", "千万别"];
+function hasIntentWord(s, w) {
+  let i = s.indexOf(w);
+  while (i >= 0) {
+    const prev1 = i >= 1 ? s.charAt(i - 1) : "";
+    const prev2 = i >= 2 ? s.slice(i - 2, i) : "";
+    let neg = false;
+    for (let k = 0; k < NEG_PREFIX.length; k++) {
+      const n = NEG_PREFIX[k];
+      if (n.length === 1 ? prev1 === n : prev2 === n) { neg = true; break; }
+    }
+    if (!neg) return true; // 首个非否定命中即视作有效意图
+    i = s.indexOf(w, i + w.length); // 否则跳到下一处（处理"不要便宜但省钱"之类的极端输入）
+  }
+  return false;
+}
+
 /* ── 语料缓存：每座城市只拼一次 ── */
 const _corpusCache = new Map();
 function corpusOf(city) {
@@ -291,12 +314,12 @@ function extractPrefs(text, opts) {
   }
   let budget = "";
   for (const k in BUDGET_WORDS) {
-    for (let i = 0; i < BUDGET_WORDS[k].length; i++) if (s.indexOf(BUDGET_WORDS[k][i]) >= 0) { budget = k; break; }
+    for (let i = 0; i < BUDGET_WORDS[k].length; i++) if (hasIntentWord(s, BUDGET_WORDS[k][i])) { budget = k; break; }
     if (budget) break;
   }
   let pace = "balance";
   for (const k in PACE_WORDS) {
-    for (let i = 0; i < PACE_WORDS[k].length; i++) if (s.indexOf(PACE_WORDS[k][i]) >= 0) { pace = k; break; }
+    for (let i = 0; i < PACE_WORDS[k].length; i++) if (hasIntentWord(s, PACE_WORDS[k][i])) { pace = k; break; }
     if (pace !== "balance") break;
   }
   // 月份来源优先级：调用方显式给的 month > 文本里解析出的月份 > 当前月。

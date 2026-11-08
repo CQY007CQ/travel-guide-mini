@@ -5,6 +5,7 @@ import { createRequire } from "module";
 import { readFileSync } from "fs";
 const req = createRequire(process.cwd() + "/");
 const W = req("./utils/weather.js");
+const KEYS = req("./utils/keys.js");
 
 let fail = 0;
 const ok = (n, c) => { console.log((c ? "  ✓ " : "  ✗ FAIL: ") + n); if (!c) fail++; };
@@ -93,11 +94,13 @@ const savedWx = global.wx;
 global.wx = { request() { reqCalled = true; } }; // 有 wx
 W.fetchPlanWeather(plan, (list, err) => { noKeyErr = err; });
 global.wx = savedWx;
-let builtForTest = "";
-try { builtForTest = readFileSync(process.cwd() + "/utils/weather.js", "utf8"); } catch (e) {}
-const keyPlaceholder = /QW_KEY\s*=\s*"在此填写和风天气Key"/.test(builtForTest);
-if (keyPlaceholder) {
-  ok("有 wx 但 Key 占位符 → err.type=no_key（明确提示需配置，不误发请求）", !!noKeyErr && noKeyErr.type === "no_key");
+// v1.20.4：Key 自 v1.19.184 起统一收敛到 keys.js 单出口（明文移出仓库、运行时注入），
+//   原测试到 weather.js 找 QW_KEY 占位符的判据已失效 —— 仓库里 QW_KEY 早迁走，
+//   导致该用例恒定走「真实 Key」分支、要求发起 wx.request，而仓库默认无 Key 必失败。
+//   改为以 KEYS.qweatherConfigured() 为分支真值，与 fetchPlanWeather 门控同源，消除误报。
+const configured = KEYS.qweatherConfigured();
+if (!configured) {
+  ok("无真实 Key（未配置）→ err.type=no_key（明确提示需配置，不误发请求）", !!noKeyErr && noKeyErr.type === "no_key");
 } else {
   ok("填入真实 Key 时不短路 → 发起 wx.request 且不报 no_key", reqCalled === true && !(noKeyErr && noKeyErr.type === "no_key"));
 }

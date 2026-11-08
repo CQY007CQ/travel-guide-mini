@@ -121,6 +121,30 @@ function SafePage(config) {
   return config;
 }
 
+// v1.20.4 #56：收敛 onShow 样板（字体缩放 + 等启动完成 + 调 _renderShow + 失败轻提示）。
+// 用法：
+//   onShow() { onShowRender(this, "plan"); }
+//   onShow() { onShowRender(this, "index", () => this._ensureForm(), () => this.maybeShowGuideModal()); }
+// —— splash / myguides / help / spotsearch 因无 boot / 无 _renderShow，保持各自自定义 onShow，不强制收敛。
+// T / AN 延迟到调用时 require（utils/app.js 不提前耦合 travel / analytics，避免加载顺序与循环依赖）。
+function onShowRender(ctx, name, before, after) {
+  let T = null, AN = null;
+  try { T = require("./travel.js"); } catch (e) {}
+  try { AN = require("./analytics.js"); } catch (e) {}
+  try { if (AN && AN.pageView && name) AN.pageView(name); } catch (e) {}
+  try { if (ctx && ctx.setData) ctx.setData({ fz: (T && T.fontScale) ? T.fontScale() : 1 }); } catch (e) {}
+  const boot = (ctx && ctx.__boot) ? ctx.__boot : Promise.resolve();
+  boot.then(function () {
+    try {
+      if (typeof before === "function") before.call(ctx);
+      if (ctx && typeof ctx._renderShow === "function") ctx._renderShow();
+      if (typeof after === "function") after.call(ctx);
+    } catch (e) {
+      try { if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {}
+    }
+  });
+}
+
 // 3b) Component 包裹：包裹 methods 里的事件 handler（当前工程无 Component 页面，预留）。
 function SafeComponent(config) {
   if (config && typeof config === "object" && config.methods && typeof config.methods === "object") {
@@ -131,4 +155,4 @@ function SafeComponent(config) {
   return config;
 }
 
-module.exports = { getAppSafe, currentPlan, safe: __wrapFn, SafePage, SafeComponent };
+module.exports = { getAppSafe, currentPlan, safe: __wrapFn, SafePage, SafeComponent, onShowRender };
