@@ -133,6 +133,10 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
   const planCode = plan.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
   ok("详情无简介时给出已收录信息，不再甩「暂无介绍」",
     !planCode.includes("暂无介绍") && plan.includes("已收录标签") && plan.includes("hasRealDetail = false"));
+  // 网页端「更丰富跳转」：首页磁贴真源须含酒店/百科入口，防回潮
+  const travel = fs.readFileSync(path.join(ROOT, "tools/_src-backup/travel.js"), "utf8");
+  ok("首页磁贴含酒店住宿入口", /k:\s*"hotel"/.test(travel) && /"酒店住宿"/.test(travel));
+  ok("首页磁贴含景点百科入口", /k:\s*"baike"/.test(travel) && /"景点百科"/.test(travel));
 }
 
 console.log("\n结果：" + pass + " 通过 / " + fail + " 失败");

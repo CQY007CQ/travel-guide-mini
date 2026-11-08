@@ -2770,6 +2770,10 @@ const TILES_KEY = "miniTilesV1";
 const HOME_TILES = [
   { k: "map", t: "路线地图", ic: "map", url: "/subpkg/map/map" },
   { k: "food", t: "必吃美食", ic: "food", url: "/subpkg/food/food" },
+  // 网页端「更丰富跳转」——酒店/百科原本只内嵌在行程页，无直达入口；
+  // 这里补成首页磁贴，网页端与小程序端共用，经 goTile→route 直达 plan 宿主页。
+  { k: "hotel", t: "酒店住宿", ic: "home", url: "/pages/plan/plan" },
+  { k: "baike", t: "景点百科", ic: "book", url: "/pages/plan/plan" },
   { k: "ledger", t: "旅行账本", ic: "bill", url: "/subpkg/ledger/ledger" },
   { k: "prep", t: "出行准备", ic: "luggage", url: "/subpkg/prep/prep" },
   { k: "spotsearch", t: "按标签找景点", ic: "target", url: "/subpkg/spotsearch/spotsearch" },
