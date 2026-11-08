@@ -937,11 +937,19 @@ function spotDetailCore(name, cityName){
  if(!d){ for(const k in SPOT_DETAILS){ if(name.includes(k) && SPOT_DETAILS[k]){ d = SPOT_DETAILS[k]; break; } } }
  if(d){
   const open = spotOpenNote(name, cityName, true); // fromDetail=true：跳过内部递归
-  return `<div class="sd-intro">${d.intro}</div>
-   <div class="sd-sec">怎么去</div><div class="sd-how">${d.how}</div>
-   <div class="sd-sec">推荐游览线路</div>
-   <div class="sd-route">${d.route.map((r,i)=>`<span class="sd-node">${i+1}. ${r}</span>${i<d.route.length-1?'<span class="sd-arrow">→</span>':''}`).join("")}</div>
-   <div class="sd-sec">⏱ 游玩时长</div><div class="sd-how">预计 ${spotHours(name)} 小时${spotHours(name)>=8 ? "（大景点，建议独占一天深度游览）" : ""}${open ? " · " + open : ""}；具体以当日人流与个人节奏为准。</div>` + spotDetailExtras(name, cityName);
+  // v1.20.2 修复：SPOT_DETAILS 含大量「仅 intro」的离线策展条目（v209/v210），
+  // 这些条目没有 how/route（路线描述需按城市单独核实，不编造）。原逻辑直接 d.route.map(...)
+  // 会因 d.route 为 undefined 抛 TypeError，被 spotDetailText 的 try/catch 吞掉返回空，
+  // 导致 699 条简介在详情页全部渲染失败（仍显示「暂无介绍」）。改为缺失字段时跳过对应小节。
+  let html = `<div class="sd-intro">${d.intro || ""}</div>`;
+  if (d.how) {
+    html += `\n   <div class="sd-sec">怎么去</div><div class="sd-how">${d.how}</div>`;
+  }
+  if (Array.isArray(d.route) && d.route.length) {
+    html += `\n   <div class="sd-sec">推荐游览线路</div><div class="sd-route">${d.route.map((r,i)=>`<span class="sd-node">${i+1}. ${r}</span>${i<d.route.length-1?'<span class="sd-arrow">→</span>':''}`).join("")}</div>`;
+  }
+  html += `\n   <div class="sd-sec">⏱ 游玩时长</div><div class="sd-how">预计 ${spotHours(name)} 小时${spotHours(name)>=8 ? "（大景点，建议独占一天深度游览）" : ""}${open ? " · " + open : ""}；具体以当日人流与个人节奏为准。</div>`;
+  return html + spotDetailExtras(name, cityName);
  }
  // v1.15：无真实 SPOT_DETAILS 时不输出模板拼凑介绍（避免“以峰林/峡谷见长”“门票10元内”这类虚构/雷同文案），
  // 由前端统一显示「暂无介绍，点百科看更多」。
