@@ -41,7 +41,8 @@ const LOCAL_POOLS = ["tools/geocode.keys", "tools/geocode.key"];
 const ALLOW_URL = [
   "https://devapi.qweather.com",  // 和风天气（已备案，request 合法域名可过审）
   "qweatherapi.com",              // 和风自定义域名（部分账号分配 xxx.qweatherapi.com）
-  "https://baike.baidu.com",      // 景点百科外链
+  // v1.20.5：百科外链域名白名单已移除。任何 baike.baidu.com / www.baidu.com/s 若再回到随包代码，
+  // 由「未登记外链」规则直接判失败（实测这些入口 403 / 图形验证码，不能再给用户）。
 ];
 
 // 前后都要求「非 hex 字符」：64 位 sha256 摘要因此不会被切成两把 32 位 key

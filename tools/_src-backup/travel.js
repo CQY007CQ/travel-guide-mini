@@ -853,16 +853,92 @@ function navTarget(name, cityName) {
  }
  return { type: "search", name: n, keyword: (cityName ? cityName : "") + n };
 }
-function baikeUrl(name) {
+/* ---------- 百科（纯离线；v1.20.5 起零外链） ---------- */
+// 2026-11-09 用户反馈「显示有百科、复制链接去网页却打不开」。实测：
+//   baike.baidu.com/item/*、/search/word?word=* → 403「百度安全验证」；
+//   baike.baidu.com/search?word=* → 200 但只回百科首页壳（word 参数被忽略）；
+//   www.baidu.com/s?wd=* → 首访 200 有结果，重复请求即 302 到 wappass 图形验证码。
+// 「复制到浏览器」没有任何一种入口能保证可用，故彻底移除百科外链：
+//   · 随包有该地点真实收录 → 小程序内弹窗展示（不跳网页、不复制任何链接）；
+//   · 随包无该地点收录     → 明确提示「该地点暂未收录百科」。
+// has 只由「地点级真实内容」决定：策展简介 / 本市真实 note / 评分地址 / 真实票价 / 策展 how。
+// 城市级信息（同城医院、名店）只作附加展示，绝不单独把 has 抬成 true；
+// 类型化兜底（typeBasedIntro）与 SPOT_DETAILS_BY_CITY 通用模板不算百科收录。
+function baikeAliasKeys(name) {
  const kw = baikeKeyword(name);
- if (!kw) return "";
- // v1.19.207：改走百科「站内搜索」入口，不再直拼 /item/ 词条页。
- // 实测（2026-11-07）直接建 /item/校尉营关帝庙博物馆 是 403/空白页 —— 行程里
- // 大量景点名带「博物馆 / 旧址馆 / 遗址公园」这类后缀，与百科词条名并不完全一致，
- // 用户复制过去等于拿不到任何内容（就是这个「有些景点点百科没网址」）。
- // search/word 的行为是：命中词条 302 到正文，未命中 302 到搜索结果页，
- // 两种都有内容。实测故宫博物院 / 晋阳湖公园 均 302 到 /item/ 正文本体。
- return "https://baike.baidu.com/search/word?word=" + encodeURIComponent(kw).replace(/'/g, "%27");
+ if (!kw) return [];
+ const keys = [kw];
+ const push = (s) => { const t = String(s || "").trim(); if (t.length >= 2 && keys.indexOf(t) < 0) keys.push(t); };
+ const n = kw.replace(/[（(【].*?[)）】]/g, "").trim();
+ push(n);
+ push(n.replace(/^[\u4e00-\u9fa5]{2,4}(?:市|县|区|州|旗)/, ""));
+ push(n.replace(/(?:风景名胜区|风景区|旅游度假区|旅游区|景区|度假区|遗址公园|博物馆|纪念馆|公园)$/u, ""));
+ return keys;
+}
+// SPOT_INFO 有 58 个 2 字短键（豫园/西湖/…），spotInfoText 的子串匹配会误配，
+// 故这里按别名逐个精确查，且只接受 dict 键长度 ≥3 的子串命中。
+function baikeFactText(name) {
+ try {
+  const dict = D.SPOT_INFO || {};
+  for (const k of baikeAliasKeys(name)) {
+   const v = dict[k];
+   if (v && (v.openTime || v.rating || v.cost || v.addr)) return spotInfoText(k);
+  }
+  for (const k of baikeAliasKeys(name)) {
+   if (k.length < 3) continue;
+   for (const s in dict) {
+    if (s.length >= 3 && (s.indexOf(k) >= 0 || k.indexOf(s) >= 0) && dict[s]
+      && (dict[s].openTime || dict[s].rating || dict[s].cost || dict[s].addr)) return spotInfoText(s);
+   }
+  }
+ } catch (e) {}
+ return "";
+}
+function baikeInfo(name, cityName) {
+ const empty = { has: false, title: "", intro: "", extras: [], text: "" };
+ const keys = baikeAliasKeys(name);
+ if (!keys.length) return empty;
+ const title = keys[0];
+ const SD = D.SPOT_DETAILS || {};
+ let intro = "";
+ // ① 精确（含别名）→ ② 子串：只认策展真实文案，不把模板/类型化兜底冒充百科
+ for (const k of keys) { if (SD[k] && SD[k].intro) { intro = String(SD[k].intro).trim(); break; } }
+ if (!intro) {
+  for (const k of keys) {
+   if (k.length < 3) continue;
+   for (const s in SD) { if (s.length >= 3 && (s.indexOf(k) >= 0 || k.indexOf(s) >= 0) && SD[s].intro) { intro = String(SD[s].intro).trim(); break; } }
+   if (intro) break;
+  }
+ }
+ // 本市 experiences 里该景点自己的 note（按城市取，绝不跨城误配）
+ let note = "";
+ if (!intro && cityName) { try { note = String(spotNoteInCity(title, cityName) || "").trim(); } catch (e) {} }
+ const facts = [];
+ try { const t = baikeFactText(title); if (t) facts.push(t); } catch (e) {}
+ try {
+  const lk = spotLookup(title, cityName) || {};
+  const tk = lk.ticket || {};
+  if (tk.known && (tk.text || tk.p)) facts.push("门票 " + (tk.text || tk.p));
+  if (lk.how) facts.push("怎么去 " + lk.how);   // lk.how 只在策展 det 存在时非空
+ } catch (e) {}
+ // ↓ 地点级真实内容决定「是否收录」；以下城市级附加信息不参与 has 判定
+ const has = !!(intro || note || facts.length);
+ if (!has) return empty;
+ const extras = [];
+ try {
+  const E = require("./emergency-data.js");
+  const hs = cityName && E.HOSPITALS && E.HOSPITALS[cityName];
+  if (hs && hs.length) extras.push("同城应急 " + hs.slice(0, 2).map(h => h.n).filter(Boolean).join(" / "));
+ } catch (e) {}
+ try {
+  const fs = cityName && D.FOOD_SPOTS && D.FOOD_SPOTS[cityName];
+  if (fs && fs.length) extras.push("同城名店 " + fs.slice(0, 2).map(x => x.shop || x.name).filter(Boolean).join(" / "));
+ } catch (e) {}
+ const text = [intro || note,
+  facts.length ? "已收录信息：" + facts.join("；") : "",
+  extras.length ? "同城参考：" + extras.join("；") : ""]
+  .filter(Boolean).join("\n\n").slice(0, 380);
+ return { has: true, title, intro: intro || note, extras, text };
 }
 function baikeKeyword(name) {
  let n = String(name || "").trim();
@@ -6126,7 +6202,7 @@ module.exports = {
  customBudgetObj, budgetTotalObj,
  isFrameName, isDetailable, stripHtml, spotDetailText, spotNoteDisp, spotInfo, spotInfoText,
  normalizeDayItems,
- cleanSpotName, navTarget, baikeUrl, baikeKeyword,
+ cleanSpotName, navTarget, baikeKeyword, baikeInfo, baikeAliasKeys,
  todayState, currentPeriodOrder, daySpots, nextActivity,
  LEDGER_KEY, getLedger, addLedger, delLedger, todaySpent, totalSpent, budgetPerDay, exportLedgerCSV,
  PREP_KEY, getPrepChecks, togglePrepCheck, resetPackChecks, resetTripPrep, prepPhaseList, PACK_LIST,

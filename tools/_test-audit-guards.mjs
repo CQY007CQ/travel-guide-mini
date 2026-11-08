@@ -194,6 +194,43 @@ guard("加固运行时单测挂在已有门禁步（不新增 step）", () => {
   return [s.indexOf("_test-hardening.mjs") >= 0 && /_test-audit-guards\.mjs &&/.test(s)];
 });
 
+// ── 2026-11-09 百科零外链防回潮 ──────────────────────────────────────
+// 用户反馈「显示有百科、复制链接到浏览器打不开」。实测 /item/ 与 /search/word 403「安全验证」，
+// 通用搜索页重复请求 302 到 wappass 图形验证码。任何外链都不可靠，改为纯离线 + 无收录提示。
+// 门禁断言查字面量会被本轮「历史说明注释」误伤 → 统一先滤注释行再匹配。
+const codeOnly = (s) => s.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+guard("三处百科入口均零外链（403/验证码域名不得回潮）", () => {
+  const files = ["tools/_src-backup/travel.js", "tools/_src-backup/planner.js", "pages/plan/plan.js"];
+  const bad = files.filter((f) => /baike\.baidu\.com|www\.baidu\.com\/s/.test(codeOnly(readSrc(f))));
+  return [bad.length === 0, "回潮文件=" + (bad.join(",") || "无")];
+});
+guard("travel.baikeUrl 已移除且不再导出", () => {
+  const s = codeOnly(readSrc("tools/_src-backup/travel.js"));
+  return [s.indexOf("function baikeUrl(") < 0 && !/navTarget,\s*baikeUrl,/.test(s), "baikeUrl 仍存在"];
+});
+guard("baikeInfo.has 只由地点级真实内容决定", () => {
+  const s = codeOnly(readSrc("tools/_src-backup/travel.js"));
+  const at = s.indexOf("const has = !!(intro || note || facts.length);");
+  const cityAt = s.indexOf("const extras = [];", at);
+  return [at >= 0 && cityAt > at && /if \(!has\) return empty;/.test(s.slice(at, cityAt)),
+    "has 定义位置=" + at + " / 城市级 extras=" + cityAt];
+});
+guard("onBaike 零剪贴板 + 无收录明确提示", () => {
+  const s = codeOnly(readSrc("pages/plan/plan.js"));
+  const i = s.indexOf("onBaike(e)");
+  const body = s.slice(i, i + 1400);
+  return [i >= 0 && body.indexOf("该地点暂未收录百科") >= 0
+    && body.indexOf("setClipboardData") < 0 && body.indexOf("baikeUrl") < 0
+    && /showCancel:\s*false/.test(body), "onBaike body 检查失败"];
+});
+guard("planner.spotBaikeBar 无 <a href> 且保留 sd-ops 识别前缀", () => {
+  const s = codeOnly(readSrc("tools/_src-backup/planner.js"));
+  const i = s.indexOf("function spotBaikeBar(");
+  const body = s.slice(i, i + 900);
+  return [i >= 0 && body.indexOf("<a ") < 0 && body.indexOf('class="sd-ops"') >= 0
+    && body.indexOf("本页不提供外链") >= 0, "spotBaikeBar body 检查失败"];
+});
+
 console.log("");
 if (fail > 0) {
   console.log("审计整改防回潮断言失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");

@@ -71,6 +71,10 @@
       ]
     },
     {
+      "root": "subdata2",
+      "pages": []
+    },
+    {
       "root": "subai",
       "pages": [
         "deep/deep"
@@ -80,7 +84,7 @@
   "preloadRule": {
     "pages/index/index": {
       "network": "all",
-      "packages": ["subpkg"]
+      "packages": ["subpkg", "subdata2"]
     },
     "pages/plan/plan": {
       "network": "wifi",

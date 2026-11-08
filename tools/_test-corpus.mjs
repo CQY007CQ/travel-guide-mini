@@ -72,8 +72,10 @@ if (s) {
     HC.every((k) => Array.isArray(ED.HOSPITALS[k]) && ED.HOSPITALS[k].length > 0));
 
   /* ---------- 4. headline 不得出现 0 ---------- */
-  ok("headline 不含「0 家」", !/0\s*家/.test(s.headline), s.headline);
-  ok("headline 不含「0 城」", !/(?:覆盖|另)\s*0\s*城/.test(s.headline), s.headline);
+  // v1.20.5：医院数由 195 → 220 后，裸 /0\s*家/ 会把「220 家」的末位 0 当成「0 家」误报。
+  // 必须要求 0 前面不是数字，才是真正的「零家」。
+  ok("headline 不含「0 家」", !/(?:^|[^0-9])0\s*家/.test(s.headline), s.headline);
+  ok("headline 不含「0 城」", !/(?:^|[^0-9])0\s*城/.test(s.headline), s.headline);
   ok("headline 含真实医院数", s.headline.includes(String(s.hospitals)), s.headline);
   ok("headline 含真实覆盖城数", s.headline.includes(String(s.hospitalCities)), s.headline);
   ok("headline 标明降级口径（走地图搜索）", s.headline.includes("地图搜索"), s.headline);

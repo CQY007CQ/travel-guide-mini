@@ -72,12 +72,12 @@ function makeT(over = {}) {
 
 function makeCtx(T) {
   const app = { globalData: { plan: null }, setPlan(p) { this.globalData.plan = p; } };
-  const wxCalls = { toasts: [], clipboard: null, openLocation: null, modals: 0, copy: 0 };
+  const wxCalls = { toasts: [], clipboard: null, openLocation: null, modals: 0, modalOpts: null, copy: 0 };
   const wx = {
     showToast: (o) => wxCalls.toasts.push(o && o.title),
     setClipboardData: (o) => { wxCalls.clipboard = o && o.data; wxCalls.copy++; if (o && o.success) o.success(); },
     openLocation: (o) => { wxCalls.openLocation = o; },
-    showModal: (o) => { wxCalls.modals++; if (o && o.success) o.success({ confirm: true }); },
+    showModal: (o) => { wxCalls.modals++; wxCalls.modalOpts = o; if (o && o.success) o.success({ confirm: true }); },
     vibrateShort: () => {},
   };
   return { app, wx, wxState: wxCalls, T, isFrame, console, setTimeout, Math, JSON, Object, Array, String, Number, Boolean };
@@ -152,13 +152,24 @@ const noThrow = (name, fn) => { try { fn(); ck(name, true); } catch (e) { ck(nam
   ck("onNav·有坐标则 openLocation", !!ctx.wxState.openLocation && ctx.wxState.openLocation.name === "兵马俑");
 }
 
-/* ============ 4. onBaike：有链接 → 复制剪贴板 ============ */
+/* ============ 4. onBaike：v1.20.5 零外链纯离线 ============ */
+// ① 老桩（无 baikeInfo）② has:false → 只提示「该地点暂未收录百科」；③ 有收录 → 只弹窗展示。
+// 三种分支都必须零剪贴板：旧版无条件复制 403 / 验证码死链，是用户明确要求根除的问题。
 {
-  const T = makeT();
-  const { run, ctx } = makeFn("onBaike");
-  const page = makePage(ctx, planOf());
-  run(page, ev(0, 0));
-  ck("onBaike·复制百科链接", ctx.wxState.copy === 1 && /baike\.example/.test(ctx.wxState.clipboard || ""));
+  const a = makeFn("onBaike");
+  a.run(makePage(a.ctx, planOf()), ev(0, 0));
+  const b = makeFn("onBaike", makeT({ baikeInfo: () => ({ has: false, title: "", text: "" }) }));
+  b.run(makePage(b.ctx, planOf()), ev(0, 0));
+  const c = makeFn("onBaike", makeT({ baikeInfo: () => ({ has: true, title: "兵马俑", text: "随包离线介绍" }) }));
+  c.run(makePage(c.ctx, planOf()), ev(0, 0));
+  const diag = JSON.stringify([a.ctx.wxState, b.ctx.wxState, c.ctx.wxState]);
+  ck("onBaike·零外链：未收录只提示 / 有收录只弹窗，三分支均不复制",
+    [a, b, c].every(x => x.ctx.wxState.copy === 0 && x.ctx.wxState.clipboard === null)
+    && a.ctx.wxState.modals === 0 && b.ctx.wxState.modals === 0 && c.ctx.wxState.modals === 1
+    && [a, b].every(x => x.ctx.wxState.toasts.join("|").indexOf("该地点暂未收录百科") >= 0)
+    && c.ctx.wxState.toasts.length === 0
+    && c.ctx.wxState.modalOpts && c.ctx.wxState.modalOpts.showCancel === false
+    && c.ctx.wxState.modalOpts.content === "随包离线介绍", diag);
 }
 
 /* ============ 5. onWish：未想玩 → 加入，触发 _render ============ */

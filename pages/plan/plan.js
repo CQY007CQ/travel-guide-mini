@@ -942,10 +942,20 @@ Page(SafePage({
   const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
   const plan = app.globalData && app.globalData.plan;
   if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items || !plan.days[di].items[ix]) return;
-  const url = T.baikeUrl(plan.days[di].items[ix].name);
-  // v1.19.207：景点名为空/整段被清洗掉时，不能什么都不发生（用户点了没反应）
-  if (!url) { wx.showToast({ title: "这条没有可搜的景点名", icon: "none" }); return; }
-  wx.setClipboardData({ data: url, success: () => wx.showToast({ title: "百科链接已复制，到浏览器打开", icon: "none" }) });
+  const it = plan.days[di].items[ix];
+  const city = (T.segCityOfDay ? T.segCityOfDay(plan, di) : "") || plan.cityName || "";
+  const info = T.baikeInfo ? T.baikeInfo(it.name, city) : null;
+  // v1.20.5：百科彻底离线化。百度百科 /item/ 与 /search/word 实测 403，通用搜索页
+  // 重复请求会跳 wappass 图形验证码 —— 「复制链接到浏览器」没有任何一种入口能保证可用。
+  // 故：随包有该地点真实收录就在小程序内弹窗展示；没有就明确提示。零剪贴板、零外链。
+  if (!info || info.has === false || !info.text) {
+   wx.showToast({ title: "该地点暂未收录百科", icon: "none" });
+   return;
+  }
+  wx.showModal({
+   title: info.title || it.name, content: info.text,
+   confirmText: "知道了", showCancel: false
+  });
  },
  onWish(e) {
   const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);

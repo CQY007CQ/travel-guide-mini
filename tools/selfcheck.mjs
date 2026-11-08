@@ -38,24 +38,31 @@ const nav2 = T.navTarget("某个未收录小众点", "北京");
 assert("未收录点走城锚兜底", nav2 && nav2.type === "city" && nav2.city === "北京" && typeof nav2.lat === "number", JSON.stringify(nav2));
 assert("baikeKeyword 组合名取主段", T.baikeKeyword("天安门广场 + 故宫博物院") === "天安门广场");
 
-// v1.19.207：百科入口改走「站内搜索」。
-// 实测（2026-11-07）直拼 /item/ 词条页在词条名与行程景点名不一致时是空白/403
-// （「校尉营关帝庙博物馆」就是这种情况），用户复制到浏览器拿不到任何内容；
-// search/word 命中词条 302 到正文、未命中 302 到搜索结果页，两种都有内容。
-const _bk = T.baikeUrl("校尉营关帝庙博物馆");
-assert("baikeUrl 走站内搜索入口", _bk.indexOf("baike.baidu.com/search/word?word=") >= 0, _bk);
-assert("baikeUrl 不再直拼词条页 /item/", _bk.indexOf("/item/") < 0, _bk);
-assert("baikeUrl 中文已编码", _bk.indexOf(encodeURIComponent("校尉营关帝庙博物馆")) > 0, _bk);
-assert("baikeUrl 空名返回空串", T.baikeUrl("") === "" && T.baikeUrl(null) === "");
-assert("baikeUrl 组合名只取主段",
-  T.baikeUrl("天安门广场 + 故宫博物院").indexOf(encodeURIComponent("天安门广场")) > 0);
-assert("baikeUrl 单引号不裸奔", T.baikeUrl("O'Brien 故居").indexOf("'") < 0);
-// planner 侧同款入口（平面详情 HTML 里的百科按钮），防止两处分叉
+// v1.20.5 百科彻底离线化：实测 baike.baidu.com/item/* 与 /search/word?word=* 均 403「安全验证」，
+// /search?word=* 只回首页壳，www.baidu.com/s?wd=* 首访 200 但重复请求 302 到 wappass 图形验证码。
+// 「复制链接到浏览器」没有任何入口能保证可用 → 零外链；有收录弹窗展示，无收录明确提示。
+const _planSrc = req("fs").readFileSync("pages/plan/plan.js", "utf8");
 const _plannerSrc = req("fs").readFileSync("tools/_src-backup/planner.js", "utf8");
-assert("planner.spotBaikeBar 同样走站内搜索入口",
-  _plannerSrc.indexOf("baike.baidu.com/search/word?word=") >= 0);
-assert("planner 不再出现 /item/ 词条直链",
-  _plannerSrc.indexOf("baike.baidu.com/item/") < 0);
+assert("baikeUrl 已移除，不再生成任何百科外链", typeof T.baikeUrl === "undefined");
+assert("行程页 onBaike 零剪贴板且未收录明确提示",
+  _planSrc.indexOf("百科链接已复制") < 0 && !/onBaike\([\s\S]{0,900}?setClipboardData/.test(_planSrc)
+  && _planSrc.indexOf("该地点暂未收录百科") >= 0 && _planSrc.indexOf("showCancel: false") >= 0);
+assert("planner.spotBaikeBar 不再生成 <a href> 外链",
+  _plannerSrc.indexOf("www.baidu.com/s") < 0 && _plannerSrc.indexOf("baike.baidu.com") < 0);
+// 门禁查字面量会被「历史说明注释」误伤（旧注释里就写着 /item/），先滤注释行再匹配
+const _plannerCode = _plannerSrc.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+assert("planner 不再出现 403 的百科站内入口",
+  _plannerCode.indexOf("search/word") < 0 && _plannerCode.indexOf("/item/") < 0
+  && _plannerCode.indexOf("www.baidu.com") < 0);
+const _bi1 = T.baikeInfo("故宫博物院", "北京");
+assert("baikeInfo 有策展收录 → has=true", _bi1 && _bi1.has === true, JSON.stringify(_bi1));
+assert("baikeInfo 返回纯离线文本且不含 url 字段",
+  !!(_bi1 && _bi1.text) && !("url" in _bi1) && !/https?:\/\//.test(_bi1.text));
+const _bi2 = T.baikeInfo("我自己加的一个完全虚构的地点XYZ", "西安");
+assert("baikeInfo 无地点级收录 → has=false（同城医院/名店不得抬升）",
+  _bi2 && _bi2.has === false && _bi2.text === "", JSON.stringify(_bi2));
+assert("baikeInfo 空名/组合名不崩且空名无收录",
+  T.baikeInfo("", "北京").has === false && T.baikeInfo("天安门广场 + 故宫博物院", "北京").has === true);
 
 console.log("== 3. 今天状态 ==");
 const mkPlan = off => { const d = new Date(DEP); const p = JSON.parse(JSON.stringify({ cityName: "北京", days, depart: DEP })); p.days.forEach(x => { const dt = new Date(DEP); dt.setDate(dt.getDate() + off + (x.date ? 0 : 0)); }); return p; };

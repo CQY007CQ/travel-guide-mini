@@ -2160,13 +2160,14 @@ function dedupSpots(list){
 function spotBaikeBar(name){
  const kw = baikeKeyword(name);
  if(!kw) return "";
- // v1.19.207：与 travel.baikeUrl 保持一致，走 search/word 而不是 /item/。
- // 原来的 hint 已经写着「未收录则列出搜索结果」，但 URL 拼的是词条页 ——
- // 文案与行为不一致，词条不存在时用户点开是空白页。
- const url = "https://baike.baidu.com/search/word?word=" + uriEnc(kw);
- return `<div class="sd-ops"><a class="sd-baike" href="${url}" target="_blank" rel="noopener" `
-  + `title="在新标签页打开「${kw.replace(/"/g, "&quot;")}」的百度百科（未收录则列出搜索结果）">百度百科：${kw}</a>`
-  + `<span class="sd-ops-hint">命中词条直接看正文，未收录则列出搜索结果</span></div>`;
+ // v1.20.5：与行程页同步，百科彻底离线化。百度百科 /item/ 与 /search/word 实测 403「安全验证」，
+ // 通用搜索页重复请求会 302 到 wappass 图形验证码 —— 任何外链都不能保证用户打得开。
+ // 故这里只留一行说明，不生成 <a href>，从根上消除「显示有百科、点开打不开」。
+ // 保留 <div class="sd-ops"> 前缀：travel.spotDetailText 靠它判断「无正文，只有操作条」。
+ const label = kw.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+ return `<div class="sd-ops"><span class="sd-baike">「${label}」· 随包离线介绍</span>`
+  + `<span class="sd-ops-hint">本页不提供外链，更多资料请自行在搜索引擎查询</span></div>`;
 }
 
 function spotKey(name){
