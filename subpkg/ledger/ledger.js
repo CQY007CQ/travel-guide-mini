@@ -11,6 +11,12 @@ const CAT_COLORS = {
   "住宿": "#c4b5fd", "购物": "#f9a8d4", "其他": "#94a3b8"
 };
 
+// v1.20.3 修复：删除账单的照片清理定时器放在「模块作用域」，而非页面实例 this 上。
+// 原因：微信在页面 onUnload 时会销毁该页面挂起的 setTimeout；若用户删账后 6 秒内离开记账页，
+// 挂在 this 上的清文件定时器被一并取消 → 照片文件与存储条目永久残留（即「项目删除后照片还存在」）。
+// 模块级定时器随小程序进程存活，不受单页卸载影响；且按账单 id 各挂一个，互不清退。
+const _billImgCleanups = {};
+
 Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
@@ -374,21 +380,22 @@ Page(SafePage({
     this._lastDelIdx = row._src;
     this._lastDelId = removedId;
     this._lastDelImg = removedImg;
-    const self = this;
     // 先弹撤销胶囊，再刷新列表（任何渲染问题都不影响可撤销性）
     this.setData({ undoRow: { name: removed.name || "这笔账", amt: Math.round(Number(removed.amt) || 0) } });
-    clearTimeout(this._undoT);
+    // v1.20.3：清理定时器放到模块作用域（见顶部 _billImgCleanups），不受页面卸载影响
+    clearTimeout(_billImgCleanups[removedId]);
     // v1.19.204：删除后照片并不立即删文件，等 6 秒撤销窗口结束再清，确保撤销可恢复且不残留
-    this._undoT = setTimeout(() => {
+    _billImgCleanups[removedId] = setTimeout(() => {
       try { T.delBillImg(removedId, removedImg); } catch (e) {}
-      self.setData({ undoRow: null });
+      delete _billImgCleanups[removedId];
     }, 6000);
     this._sync();
   },
   undoDel() {
     const o = this._lastDel;
     if (!o) { this.setData({ undoRow: null }); return; }
-    clearTimeout(this._undoT);
+    clearTimeout(_billImgCleanups[this._lastDelId]);
+    delete _billImgCleanups[this._lastDelId];
     const list = T.getLedger();
     list.splice(Math.min(this._lastDelIdx || 0, list.length), 0, o);
     if (!S.set(T.LEDGER_KEY, list)) { wx.showToast({ title: "保存失败，请清理存储后重试", icon: "none" }); return; }

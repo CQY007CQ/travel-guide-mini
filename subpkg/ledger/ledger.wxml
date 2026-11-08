@@ -80,7 +80,7 @@
     </view>
     <view class="kw-n" wx:if="{{kw || catFilter}}">筛出 {{filteredN}} / {{allN}} 笔</view>
     <view wx:if="{{!items.length}}" class="dim u-padc">还没有账单，记下第一笔吧</view>
-    <view class="lg-row" wx:for="{{items}}" wx:key="i">
+    <view class="lg-row" wx:for="{{items}}" wx:key="_id">
       <image wx:if="{{item.img}}" class="lg-thumb" src="{{item.img}}" mode="aspectFill" data-i="{{index}}" catchtap="pickBillImg"/>
       <view wx:else class="lg-cam" data-i="{{index}}" catchtap="pickBillImg"><image class="ic ic-sm" src="/images/icons/camera.png"/></view>
       <view class="lg-main">
