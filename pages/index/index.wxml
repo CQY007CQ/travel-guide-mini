@@ -25,7 +25,7 @@
       <text class="qb-h-c">{{quickCollapsed ? '展开' : '收起'}}<text class="arrow">{{quickCollapsed ? '▾' : '▴'}}</text></text>
     </view>
     <view class="qb-grid" wx:if="{{!quickCollapsed}}">
-      <view class="qb-item" wx:for="{{tiles}}" wx:key="k" data-url="{{item.url}}" bindtap="goTile">
+      <view class="qb-item" wx:for="{{tiles}}" wx:key="k" data-url="{{item.url}}" data-focus="{{item.focus}}" bindtap="goTile">
         <image class="qb-ic" src="/images/icons/{{item.ic}}.png"/>
         <text class="qb-t">{{item.t}}</text>
       </view>

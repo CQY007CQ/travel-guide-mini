@@ -70,6 +70,8 @@ Page(SafePage({
     try { AN.pageView("plan"); } catch (e) {}
     this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
   _renderShow() {
+   // v1.20.3：消费首页磁贴的定位意图（酒店/百科/天气），在任何分支前先读并清除，避免空行程回首页后残留再误触发
+   this._applyFocus();
    try { this._theme(); } catch (e) {}
    try {
     const plan = app.globalData && app.globalData.plan;
@@ -474,6 +476,50 @@ Page(SafePage({
    if (!r) return;
    const top = (v && v.scrollTop || 0) + r.top - 130;
    wx.pageScrollTo({ scrollTop: Math.max(0, top), duration: 260 });
+  });
+ },
+
+ // v1.20.3：首页磁贴「酒店/百科/天气」直达后自动定位到行程页对应区块。
+ // 用「存储意图」而非 query（runtime.cleanUrl 会吞掉 ?focus=x，且不想污染共享路由解析）。
+ // 读后即清除，避免来回切 tab 重复触发。
+ _applyFocus() {
+  let f = "";
+  try { f = (wx.getStorageSync("miniFocusV1") || "").toString().trim(); } catch (e) {}
+  if (!f) return;
+  try { wx.setStorageSync("miniFocusV1", ""); } catch (e) {}   // 消费即清除
+  const self = this;
+  // 等 WXML 把新数据画完再滚动/展开，避免节点还没生成就 scrollTo 失效
+  setTimeout(() => {
+    try {
+      if (f === "hotel") {
+        self._scrollTo(".bf-hotel, .hotelPortals");
+      } else if (f === "weather") {
+        self._scrollTo(".wx-card, .wx-off");
+      } else if (f === "baike") {
+        // 百科是逐景点详情面板：打开首日第一条真实景点的详情，并滚到当天
+        const plan = app.globalData && app.globalData.plan;
+        let di = 0, ix = -1;
+        if (plan && plan.days && plan.days[0] && plan.days[0].items) {
+          for (let k = 0; k < plan.days[0].items.length; k++) {
+            if (!isFrame(plan.days[0].items[k].name)) { ix = k; break; }
+          }
+        }
+        if (ix >= 0) { try { self.onToggle({ currentTarget: { dataset: { di: 0, ix: ix } } }); } catch (_) {} }
+        self._scrollTo("#d0");
+      }
+    } catch (e) {}
+  }, 360);
+ },
+ // 复用 onJumpDay 的滚动算法（createSelectorQuery 在微信端和网页端 shim 下语义一致）
+ _scrollTo(sel) {
+  const q = wx.createSelectorQuery().in(this);
+  q.select(sel).boundingClientRect();
+  q.selectViewport().scrollOffset();
+  q.exec(res => {
+    const r = res && res[0], v = res && res[1];
+    if (!r) return;
+    const top = (v && v.scrollTop || 0) + r.top - 110;
+    if (wx.pageScrollTo) wx.pageScrollTo({ scrollTop: Math.max(0, top), duration: 300 });
   });
  },
 

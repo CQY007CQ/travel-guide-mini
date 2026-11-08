@@ -1249,6 +1249,9 @@ Page(SafePage({
     const ds = (e && e.currentTarget && e.currentTarget.dataset) ||
                (e && e.target && e.target.dataset) || {};
     const url = ds.url;
+    const focus = ds.focus;
+    // v1.20.3：磁贴带定位意图时先写入存储，plan 页 onShow 读后自动滚动/展开对应区块
+    if (focus) { try { wx.setStorageSync("miniFocusV1", String(focus)); } catch (_) {} }
     if (!url) { wx.showToast({ title: "该入口暂不可用", icon: "none" }); return; }
     const isTab = ["/pages/plan/plan", "/pages/today/today", "/pages/more/more"].indexOf(url) >= 0;
     if (isTab) {

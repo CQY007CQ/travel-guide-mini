@@ -380,14 +380,17 @@ assert("6 月最贵分类 门票", lm.months[0].top === "门票", lm.months[0].t
 
 console.log("== 18. 首页入口 / 收藏多站 ==");
 const tl = T.homeTileList();
-assert("默认 9 个入口（地图/美食/酒店/百科 + 工具）", tl.length === 9, tl.length);
+assert("默认 10 个入口（地图/美食/酒店/百科/天气 + 工具）", tl.length === 10, tl.length);
 const tlKeys = tl.map(x => x.k);
 assert("默认含酒店住宿入口", tlKeys.indexOf("hotel") >= 0, tlKeys);
 assert("默认含景点百科入口", tlKeys.indexOf("baike") >= 0, tlKeys);
-const _hotel = tl.find(x => x.k === "hotel"), _baike = tl.find(x => x.k === "baike");
+assert("默认含天气参考入口", tlKeys.indexOf("weather") >= 0, tlKeys);
+const _hotel = tl.find(x => x.k === "hotel"), _baike = tl.find(x => x.k === "baike"), _wx = tl.find(x => x.k === "weather");
 assert("酒店入口指向 plan 宿主页", _hotel && /\/pages\/plan\/plan$/.test(_hotel.url), _hotel && _hotel.url);
 assert("百科入口指向 plan 宿主页", _baike && /\/pages\/plan\/plan$/.test(_baike.url), _baike && _baike.url);
-assert("酒店/百科图标非空", !!(_hotel && _hotel.ic) && !!(_baike && _baike.ic));
+assert("天气入口指向 plan 宿主页", _wx && /\/pages\/plan\/plan$/.test(_wx.url), _wx && _wx.url);
+assert("酒店/百科/天气图标非空", !!(_hotel && _hotel.ic) && !!(_baike && _baike.ic) && !!(_wx && _wx.ic));
+assert("酒店/百科/天气带定位意图", !!(_hotel && _hotel.focus === "hotel") && !!(_baike && _baike.focus === "baike") && !!(_wx && _wx.focus === "weather"));
 T.setHomeTiles(["map", "food"]);
 assert("自定义后剩 2 个", T.homeTiles().length === 2, T.homeTiles());
 assert("列表跟随自定义", T.homeTileList().length === 2);
