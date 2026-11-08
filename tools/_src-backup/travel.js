@@ -36,7 +36,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.0";
+const APP_VER = "1.20.1";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -919,10 +919,12 @@ function nextActivity(day) {
 /* ---------- 记账 ---------- */
 const LEDGER_KEY = "miniLedgerV1";
 function getLedger() { return store.get(LEDGER_KEY, []); }
+function _genBillId() { return "b" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
 function addLedger(amt, cat, name, payer, share, date, trip) {
  const list = getLedger();
  const d = (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))) ? String(date) : store.fmtLocalDate(new Date());
  list.unshift({
+  id: _genBillId(),
   date: d,
   cat, name: name || "行程中随手记",
   amt, payer: payer || "0",
@@ -2944,22 +2946,82 @@ function isNightHour() {
 }
 
 /* ---------- 11. 消费凭证图片 ---------- */
+// 关键修复（v1.19.204）：照片不再按「日期#数组下标」存储。
+// 旧方案在删除任意账单后，后续条目下标整体前移，导致照片串到别的账单（误给其他项目），
+// 且删除账单时不清理磁盘文件与存储条目，照片永久残留。
+// 现改为按账单稳定 id 存储；删除走「延迟 6s 后清文件」，与删除撤销窗口一致；载入时清理孤儿照片。
 const IMG_DIR = "bill_imgs";
+function _billFs() { return (typeof wx !== "undefined" && wx.getFileSystemManager) ? wx.getFileSystemManager() : null; }
+function _billUnlink(p) { try { const fs = _billFs(); if (fs && p) fs.unlinkSync(p); } catch (e) {} }
 function billImgPath(id) {
   const base = (typeof wx !== "undefined" && wx.env && wx.env.USER_DATA_PATH) ? wx.env.USER_DATA_PATH : "";
   return base ? (base + "/" + IMG_DIR + "/" + id + ".png") : "";
 }
-function setBillImg(date, idx, path) {
+function setBillImg(id, path) {
+  if (!id) return store.get("miniBillImgV1", {});
   const o = store.get("miniBillImgV1", {});
-  o[date + "#" + idx] = path;
+  o[id] = path;
   store.set("miniBillImgV1", o);
   return o;
 }
-function getBillImg(date, idx) {
+function getBillImg(id) {
   const o = store.get("miniBillImgV1", {});
-  return o[date + "#" + idx] || "";
+  return (id && o[id]) || "";
 }
 function billImgMap() { return store.get("miniBillImgV1", {}); }
+
+// 旧格式键（"日期#下标"）一次性迁移到账单 id；并清理所有残留旧格式键
+function migrateBillImgs() {
+  const list = getLedger();
+  let changed = false;
+  // 1) 给缺失 id 的旧账单补 id（向后兼容），并落库
+  if (list.some(b => !b.id)) {
+    list.forEach(b => { if (!b.id) b.id = _genBillId(); });
+    store.set(LEDGER_KEY, list);
+  }
+  // 2) 把旧「日期#下标」键重映射到当前账单 id
+  const o = store.get("miniBillImgV1", {});
+  list.forEach((b, j) => {
+    const oldKey = String(b.date).slice(0, 10) + "#" + j;
+    if (o[oldKey] && b.id && !o[b.id]) { o[b.id] = o[oldKey]; delete o[oldKey]; changed = true; }
+  });
+  // 3) 删除任何残留的旧格式键（下标已不可信，留着只会串图）
+  Object.keys(o).forEach(k => { if (k.indexOf("#") >= 0) { delete o[k]; changed = true; } });
+  if (changed) store.set("miniBillImgV1", o);
+  return o;
+}
+
+// 清理孤儿照片：存储里存在、但当前账本没有对应 id 的条目（含残留旧格式键）一律删文件 + 删条目
+function purgeOrphanBillImgs() {
+  const list = getLedger();
+  const ids = {};
+  list.forEach(b => { if (b.id) ids[b.id] = 1; });
+  const o = store.get("miniBillImgV1", {});
+  let changed = false;
+  Object.keys(o).forEach(k => {
+    if (k.indexOf("#") >= 0) { delete o[k]; changed = true; return; } // 残留旧格式键
+    if (!ids[k]) { _billUnlink(o[k]); delete o[k]; changed = true; }  // 账本里已无此账单
+  });
+  if (changed) store.set("miniBillImgV1", o);
+  return o;
+}
+
+// 删除某账单的照片（撤销窗口结束后调用）：删存储条目 + 删磁盘文件
+function delBillImg(id, path) {
+  const o = store.get("miniBillImgV1", {});
+  let changed = false;
+  if (id && o[id]) { delete o[id]; changed = true; }
+  _billUnlink(path);
+  if (changed) store.set("miniBillImgV1", o);
+}
+
+// 撤销删除时，把照片存储条目重新接回账单 id（文件尚未删除，无需重拷）
+function relinkBillImg(id, path) {
+  if (!id || !path) return;
+  const o = store.get("miniBillImgV1", {});
+  o[id] = path;
+  store.set("miniBillImgV1", o);
+}
 // 展示层具名演出兜底：老行程/缓存里若存着「看一场本地演出」「夜场脱口秀/演出」这类
 // 无场馆无剧目的泛条目，渲染时换成该城市「具体场馆+演出」（planner 的 SHOW_TIPS）。
 // 不改存储与 clean 名，避免影响换景点/打卡/想玩匹配；未收录城市保持原文。
@@ -3593,23 +3655,22 @@ function spotLookup(rawName, cityName) {
   const n = cleanSpotName(name) || name;
   const SD = D.SPOT_DETAILS || {};
   const SDC = (cityName && D.SPOT_DETAILS_BY_CITY && D.SPOT_DETAILS_BY_CITY[cityName]) || null;
-  // 城市维度优先（通用名安全，不跨城）：本市精确 / 子串命中
+  // v1.20.x：策展真实文案（扁平 SPOT_DETAILS）永远压过城市维度通用模板（SPOT_DETAILS_BY_CITY）。
+  // 后者由 §9.9 对「塔/楼/阁/公园/博物馆…」等通用名自动生成，属填充文案；前者为人工/AI 整理的真实简介，
+  // 且均为唯一性强的具体景点（如「广州塔」「晋祠」），扁平命中即代表该城该点已有权威文案，不应被模板覆盖。
+  // 优先级：① 扁平精确 → ② 扁平子串 → ③ 城市精确 → ④ 城市子串（模板，最后兜底，绝不跨城）。
   let detKey = null, det = null, fromCity = false;
-  if (SDC) {
+  if (SD[n]) { detKey = n; det = SD[n]; }
+  else if (SD[name]) { detKey = name; det = SD[name]; }
+  else if (n.length >= 2) {
+    for (const k in SD) { if (k && (k.indexOf(n) >= 0 || n.indexOf(k) >= 0)) { detKey = k; det = SD[k]; break; } }
+  }
+  if (!det && SDC) {
     if (SDC[n]) { detKey = n; det = SDC[n]; fromCity = true; }
     else if (SDC[name]) { detKey = name; det = SDC[name]; fromCity = true; }
     else if (n.length >= 2) {
       for (const k in SDC) { if (k && (k.indexOf(n) >= 0 || n.indexOf(k) >= 0)) { detKey = k; det = SDC[k]; fromCity = true; break; } }
     }
-  }
-  // 扁平全局兜底（已审唯一名，含子串容错）—— 原有行为保持不变
-  if (!det) {
-    if (SD[n]) detKey = n;
-    else if (SD[name]) detKey = name;
-    else if (n.length >= 2) {
-      for (const k in SD) { if (k && (k.indexOf(n) >= 0 || n.indexOf(k) >= 0)) { detKey = k; break; } }
-    }
-    det = detKey ? SD[detKey] : null;
   }
   const tk = ticketPriceOf(name);
   const bt = bookingTipOf(name);
@@ -6008,7 +6069,7 @@ module.exports = {
   TILES_KEY, HOME_TILES, homeTiles, setHomeTiles, homeTileList,
   spotTiming, DOC_ITEMS, docItems, docDone,
   inspire, bestMonths, dailyInspire, nightCfg, setNightCfg, isNightHour,
-  billImgPath, setBillImg, getBillImg, billImgMap,
+  billImgPath, setBillImg, getBillImg, billImgMap, migrateBillImgs, purgeOrphanBillImgs, delBillImg, relinkBillImg,
   APP_VER,
   // v1.8.4 档一 / 档二
   dateHintOf, dateHintsForPlan,
