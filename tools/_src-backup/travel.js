@@ -1081,8 +1081,18 @@ function budgetLabel(budget) {
 }
 // 名店按预算排序：贴合当前档价位的店排前面（与网页版同规则：经济→平价主推、舒适→平价+中档、高端→中档+高档）
 // withTag=true 时给每家店附加 bandName（平价/中档/高档）与 hit（是否贴合预算）
+// v1.20.3：美食排序缓存（审计 第35/52 条）。foodSpotsFor 返回的店铺数组是静态常量
+// （D.FOOD_SPOTS[city]），运行时不变，故按「店铺数组引用 + 预算档 + 是否带标签」缓存排序结果，
+// 地图页每次切天 / 美食页每次渲染不再全量重排。WeakMap 以店铺数组为 key，绝不持有过期数据。
+const _foodFirstCache = typeof WeakMap !== "undefined" ? new WeakMap() : null;
 function budgetFoodFirst(shops, budgetKey, withTag) {
  try {
+  const ck = (budgetKey || "mid") + "|" + (withTag ? 1 : 0);
+  if (_foodFirstCache && shops && typeof shops === "object") {
+   let m = _foodFirstCache.get(shops);
+   if (!m) { m = new Map(); _foodFirstCache.set(shops, m); }
+   if (m.has(ck)) return m.get(ck);
+  }
   const list = Array.isArray(shops) ? shops : [];
   const key = (D.BUDGETS && D.BUDGETS[budgetKey || "mid"]) ? (budgetKey || "mid") : "mid";
   const st = (D.BUDGET_STYLE || {})[key];
@@ -1092,11 +1102,13 @@ function budgetFoodFirst(shops, budgetKey, withTag) {
   const meta = s => { try { return P.shopBand(s.price) || { n: 999, band: "mid" }; } catch (e) { return { n: 999, band: "mid" }; } };
   const rows = list.map((s, i) => { const m = meta(s); return { s, i, r: compat.includes(m.band) ? 0 : 1, d: Math.abs(m.n - tg), band: m.band }; });
   rows.sort((a, b) => a.r - b.r || a.d - b.d || a.i - b.i);
-  return rows.map(x => {
+  const result = rows.map(x => {
    const o = Object.assign({}, x.s);
    if (withTag) { o.bandName = x.band === "low" ? "平价" : (x.band === "high" ? "高档" : "中档"); o.hit = x.r === 0; }
    return o;
   });
+  if (_foodFirstCache && shops && typeof shops === "object") _foodFirstCache.get(shops).set(ck, result);
+  return result;
  } catch (e) { return Array.isArray(shops) ? shops.slice() : []; }
 }
 

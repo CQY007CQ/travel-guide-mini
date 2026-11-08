@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"/>
 <meta name="theme-color" content="#0d0d0d"/>
 <title>旅行攻略生成器 · 网页版</title>
-<link rel="stylesheet" href="lib/app.css?v=430ebcd8"/>
-<link rel="stylesheet" href="shell.css?v=430ebcd8"/>
+<link rel="stylesheet" href="lib/app.css?v=411f8ae3"/>
+<link rel="stylesheet" href="shell.css?v=411f8ae3"/>
 </head>
 <body>
   <!-- 启动遮罩：数据包解压需要一点时间，避免白屏 -->
@@ -28,10 +28,68 @@
     <a class="tb" data-p="pages/more/more"><img alt="更多"/><span>更多</span></a>
   </nav>
 
-  <script src="lib/modules.js?v=430ebcd8"></script>
-  <script src="lib/data.js?v=430ebcd8"></script>
-  <script src="lib/tpl.js?v=430ebcd8"></script>
-  <script src="lib/runtime.js?v=430ebcd8"></script>
-  <script src="app.js?v=430ebcd8"></script>
+  <script src="lib/modules.js?v=411f8ae3"></script>
+  <script src="lib/data.js?v=411f8ae3"></script>
+  <script src="lib/tpl.js?v=411f8ae3"></script>
+  <script src="lib/runtime.js?v=411f8ae3"></script>
+  <script src="app.js?v=411f8ae3"></script>
+
+  <!-- 网页版数据互通：导出 / 导入备份文件（与小程序同 schema，可跨端迁移数据） -->
+  <div id="webDataBar">
+    <button id="webExport" type="button">导出数据</button>
+    <button id="webImport" type="button">导入数据</button>
+    <input id="webImpFile" type="file" accept="application/json,.json" hidden/>
+  </div>
+  <style>
+    #webDataBar{position:fixed;right:10px;bottom:64px;z-index:9998;display:flex;flex-direction:column;gap:8px}
+    #webDataBar button{font:13px/1 -apple-system,system-ui,sans-serif;color:#e8eef7;background:rgba(28,32,40,.92);
+      border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:9px 12px;cursor:pointer;backdrop-filter:blur(6px);
+      box-shadow:0 4px 14px rgba(0,0,0,.35)}
+    #webDataBar button:active{transform:scale(.96)}
+    @media(min-width:720px){#webDataBar{bottom:18px}}
+  </style>
+  <script>
+  (function () {
+    function T() { try { return window.__require("__entry__", "./utils/travel.js"); } catch (e) { return null; } }
+    function toast(msg) {
+      var d = document.createElement("div");
+      d.textContent = msg;
+      d.style.cssText = "position:fixed;left:50%;top:18px;transform:translateX(-50%);background:rgba(18,20,26,.94);" +
+        "color:#fff;padding:9px 14px;border-radius:9px;font:13px/1.4 -apple-system,system-ui,sans-serif;z-index:9999;max-width:82vw;text-align:center";
+      document.body.appendChild(d);
+      setTimeout(function () { d.remove(); }, 2800);
+    }
+    var ex = document.getElementById("webExport"), im = document.getElementById("webImport"), fi = document.getElementById("webImpFile");
+    if (ex) ex.onclick = function () {
+      var t = T(); if (!t) { toast("数据尚未就绪，请稍候"); return; }
+      var json; try { json = t.exportBackup(); } catch (e) { toast("导出失败"); return; }
+      if (!json) { toast("暂无可导出数据"); return; }
+      var blob = new Blob([json], { type: "application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "travel-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      toast("已导出备份文件（" + json.length + " 字符）");
+    };
+    if (im) im.onclick = function () { if (fi) fi.click(); };
+    if (fi) fi.onchange = function () {
+      var f = fi.files && fi.files[0]; if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        var t = T(); if (!t) { toast("数据尚未就绪，请稍候"); return; }
+        try {
+          var r = t.importBackup(String(rd.result || ""));
+          // 网页端等价「app.setPlan」：plan 页读 app.globalData.plan，必须同步否则刷新不显示
+          if (window.__APP_CONFIG && r.plan) window.__APP_CONFIG.globalData.plan = r.plan;
+          toast("已恢复 " + r.count + " 组数据" + (r.hasPlan ? "（含行程）" : ""));
+          if (window.__webRefresh) window.__webRefresh();
+        } catch (e) { toast("文件不是有效备份"); }
+        fi.value = "";
+      };
+      rd.readAsText(f);
+    };
+  })();
+  </script>
 </body>
 </html>
