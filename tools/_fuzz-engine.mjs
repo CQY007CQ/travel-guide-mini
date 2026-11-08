@@ -34,13 +34,23 @@ function extractSpots(name) {
   return out;
 }
 
-function checkDays(days, ctx, reqDays) {
+function checkDays(plan, ctx, reqDays) {
+  // buildPlan/buildProvPlan 直接返回 days 数组；buildMultiPlan 返回 {days, segments, evaluation, ...} 包装对象。
+  // 统一在此解包，避免把包装对象误判为 EMPTY_PLAN。
+  const days = Array.isArray(plan) ? plan : (plan && plan.days);
+  const ev = Array.isArray(plan) ? plan.evaluation : (plan && plan.evaluation);
   if (!Array.isArray(days) || !days.length) { bump({ type: "EMPTY_PLAN", ...ctx, detail: "days 空或非数组" }); return; }
   if (reqDays && days.length < reqDays) bump({ type: "DAY_TRUNC", ...ctx, detail: `请求 ${reqDays} 天，实出 ${days.length} 天` });
   const overReq = reqDays && ctx.cap && reqDays > ctx.cap; // 超上限请求导致的空天属预期，不计 bug
   days.forEach((d, di) => {
     if (typeof d.spotCount !== "number" || d.spotCount < 0) bump({ type: "BAD_SPOTCOUNT", ...ctx, detail: `day${di} spotCount=${d.spotCount}` });
-    if (d.spotCount === 0 && !overReq && di > 0) bump({ type: "EMPTY_DAY", ...ctx, detail: `day${di} 整天空天 (spotCount=0)` });
+    if (d.spotCount === 0 && !overReq && di > 0) {
+      // 多站路线的「抵达/中转/返程/自由活动」日本就无景点（spotCount=0 属预期），不计 bug；
+      // 仅当某天既无景点、又不含任何交通/入住/自由活动标记时才视为真实空天。
+      const names = (d.items || []).map(i => i.name || "").join(" ");
+      const intentional = /抵达|前往|返程|中转|自由活动|入住|退房|寄存|休整/.test(names);
+      if (!intentional) bump({ type: "EMPTY_DAY", ...ctx, detail: `day${di} 整天空天 (spotCount=0)` });
+    }
     if (!Array.isArray(d.items) || !d.items.length) bump({ type: "NO_ITEMS", ...ctx, detail: `day${di} 无 items` });
     (d.items || []).forEach(it => {
       scanText(it.name, "name", ctx); scanText(it.note, "note", ctx);
@@ -53,7 +63,6 @@ function checkDays(days, ctx, reqDays) {
     });
   });
   // evaluation
-  const ev = days.evaluation;
   if (ev) {
     if (typeof ev.score !== "number" || ev.score < 0 || ev.score > 100) bump({ type: "SCORE_OOB", ...ctx, detail: `score=${ev.score}` });
     if (ev.detail) {
