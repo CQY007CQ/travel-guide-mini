@@ -410,20 +410,20 @@ T.setNightCfg({ on: true, from: 22, to: 7 });
 assert("默认配置回写", T.nightCfg().from === 22 && T.nightCfg().to === 7);
 
 console.log("== 20. 凭证图片 + 备份往返 ==");
-T.setBillImg("2026-06-01", 0, "/tmp/a.png");
-assert("凭证可存可读", T.getBillImg("2026-06-01", 0) === "/tmp/a.png");
-assert("未存返回空串", T.getBillImg("2026-06-01", 9) === "");
+T.setBillImg("t20_a", "/tmp/a.png");
+assert("凭证可存可读", T.getBillImg("t20_a") === "/tmp/a.png");
+assert("未存返回空串", T.getBillImg("t20_missing") === "");
 T.setHomeTiles(["map", "food", "ledger"]);
 T.setNightCfg({ on: true, from: 23, to: 6 });
 const bak = JSON.parse(T.exportBackup());
 assert("备份含 tiles", Array.isArray(bak.tiles) && bak.tiles.length === 3, bak.tiles);
 assert("备份含 night", bak.night && bak.night.on === true);
-assert("备份含 billImg", bak.billImg && bak.billImg["2026-06-01#0"] === "/tmp/a.png");
+assert("备份含 billImg", bak.billImg && bak.billImg["t20_a"] === "/tmp/a.png");
 T.setHomeTiles([]); T.setNightCfg({ on: false });
 T.importBackup(JSON.stringify(bak));
 assert("恢复 tiles", T.homeTiles().length === 3, T.homeTiles());
 assert("恢复 night", T.nightCfg().on === true && T.nightCfg().from === 23);
-assert("恢复 billImg", T.getBillImg("2026-06-01", 0) === "/tmp/a.png");
+assert("恢复 billImg", T.getBillImg("t20_a") === "/tmp/a.png");
 
 console.log("== 21. 具名演出（晚间兜底不再泛化）==");
 const SL = T.P && T.P.showListOf ? T.P.showListOf : null;
@@ -517,11 +517,11 @@ T.delIou(1);
 assert("删除后 1 条", T.iouList().length === 1);
 
 console.log("== 28. v1.8.4 A7 凭证浏览 ==");
-T.setBillImg("2026-10-01", 0, "/tmp/recv.jpg");
-T.setBillImg("2026-10-01", 1, "/tmp/recv2.jpg");
-assert("凭证设置与读取", T.getBillImg("2026-10-01", 1) === "/tmp/recv2.jpg");
-assert("map 有 2 张", Object.keys(T.billImgMap()).length >= 1);
-T.setBillImg("2026-10-01", 1, "");
+T.setBillImg("t28_a", "/tmp/recv.jpg");
+T.setBillImg("t28_b", "/tmp/recv2.jpg");
+assert("凭证设置与读取", T.getBillImg("t28_b") === "/tmp/recv2.jpg");
+assert("map 有 2 张", Object.keys(T.billImgMap()).length >= 2);
+T.setBillImg("t28_b", "");
 
 console.log("== 29. v1.8.4 A8 盲盒 / B16 协作包 ==");
 const pk2 = T.inspirePicks(3);

@@ -61,6 +61,9 @@ Page(SafePage({
     this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
   _renderShow() {
     try { this._theme(); } catch (e) {}
+    // v1.19.204：凭证照片迁移（旧「日期#下标」键 → 账单 id）并清理孤儿照片，杜绝串图与残留
+    try { T.migrateBillImgs(); } catch (e) {}
+    try { T.purgeOrphanBillImgs(); } catch (e) {}
     // v1.8.5 C7：默认分类记忆上次
     try {
       const lc = S.get("miniLedgerLastCatV1", "");
@@ -118,10 +121,11 @@ Page(SafePage({
       return {
         i: idx,
         _src: all.indexOf(x),
+        _id: x.id || "",
         date: String(x.date).slice(5).replace("-", "/"),
         rdate: String(x.date).slice(0, 10),
         cat: x.cat, name: x.name, amt, payer: x.payer || "我", share, per,
-        img: T.getBillImg(String(x.date).slice(0, 10), all.indexOf(x)) || ""
+        img: T.getBillImg(x.id) || ""
       };
     });
     // 分类占比（按当前行程账本口径；不看日期/关键词筛选，看该账本结构）
@@ -363,23 +367,34 @@ Page(SafePage({
     const all = T.getLedger();
     const removed = all[row._src];
     if (!removed) return;
+    const removedId = removed.id;
+    const removedImg = T.getBillImg(removedId);
     T.delLedger(row._src);
     this._lastDel = removed;
     this._lastDelIdx = row._src;
+    this._lastDelId = removedId;
+    this._lastDelImg = removedImg;
     const self = this;
     // 先弹撤销胶囊，再刷新列表（任何渲染问题都不影响可撤销性）
     this.setData({ undoRow: { name: removed.name || "这笔账", amt: Math.round(Number(removed.amt) || 0) } });
     clearTimeout(this._undoT);
-    this._undoT = setTimeout(() => self.setData({ undoRow: null }), 6000);
+    // v1.19.204：删除后照片并不立即删文件，等 6 秒撤销窗口结束再清，确保撤销可恢复且不残留
+    this._undoT = setTimeout(() => {
+      try { T.delBillImg(removedId, removedImg); } catch (e) {}
+      self.setData({ undoRow: null });
+    }, 6000);
     this._sync();
   },
   undoDel() {
     const o = this._lastDel;
     if (!o) { this.setData({ undoRow: null }); return; }
+    clearTimeout(this._undoT);
     const list = T.getLedger();
     list.splice(Math.min(this._lastDelIdx || 0, list.length), 0, o);
     if (!S.set(T.LEDGER_KEY, list)) { wx.showToast({ title: "保存失败，请清理存储后重试", icon: "none" }); return; }
-    this._lastDel = null;
+    // v1.19.204：撤销删除时把照片条目接回账单 id（文件尚未删除，无需重拷）
+    try { if (this._lastDelId && this._lastDelImg) T.relinkBillImg(this._lastDelId, this._lastDelImg); } catch (e) {}
+    this._lastDel = null; this._lastDelId = null; this._lastDelImg = null;
     this.setData({ undoRow: null });
     this._sync();
     wx.showToast({ title: "已恢复这笔记账", icon: "success" });
@@ -435,7 +450,7 @@ Page(SafePage({
           try { fs.mkdirSync(dir, true); } catch (e) {}
           const dst = dir + "/" + Date.now() + "_" + Math.floor(Math.random() * 1000) + ".png";
           fs.copyFileSync(tmp, dst);
-          T.setBillImg(it.rdate || it.date, it._src != null ? it._src : it.i, dst);
+          T.setBillImg(it._id, dst);
           self._sync();
           wx.showToast({ title: "凭证已存", icon: "success" });
         } catch (err) {
