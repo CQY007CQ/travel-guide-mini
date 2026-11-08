@@ -787,6 +787,11 @@ Page(SafePage({
     this.setData({ pickKw2: "" });
     this._filterPool();
   },
+  // 180ms 防抖定时器在页面卸载后仍会触发 _filterPool → 对已卸载实例 setData，
+  // 小程序报「setData on unloaded page」，网页版则会多一次无谓的整页重绘。
+  onUnload() {
+    if (this._kwTimer) { clearTimeout(this._kwTimer); this._kwTimer = null; }
+  },
   // v1.15：想玩池按标签筛选（再次点击取消）
   onPoolTag(e) {
     const tag = String(e.currentTarget.dataset.tag || "");

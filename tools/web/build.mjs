@@ -201,23 +201,34 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
   // 增量同步，**不要整目录 rmSync**：宿主的 node-safe-delete shim 会拦截一次删除
   // 50+ 文件的操作（全量回归实测：SAFE_DELETE_BULK_CONFIRM_REQUIRED, count:66 > threshold:50），
   // 单跑因为计数没累积能过、全量跑到最后一步必炸，症状极具误导性。
-  const relFiles = (base) => {
-    const out = [];
+  // 目录感知：旧版只收集文件，整个子目录下线后会留下空目录；更糟的是
+  // 「源是文件、目标残留同名目录」时 cpSync 会抛 EISDIR/ENOTEMPTY 让整个构建失败。
+  const relTree = (base) => {
+    const files = [], dirs = [];
     (function walk(d, pre) {
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const rel = pre ? pre + "/" + e.name : e.name;
-        if (e.isDirectory()) walk(path.join(d, e.name), rel); else out.push(rel);
+        if (e.isDirectory()) { dirs.push(rel); walk(path.join(d, e.name), rel); }
+        else files.push(rel);
       }
     })(base, "");
-    return out;
+    return { files, dirs };
   };
   if (fs.existsSync(dst)) {
-    const srcSet = new Set(relFiles(src));
+    const srcTree = relTree(src), dstTree = relTree(dst);
+    const srcFiles = new Set(srcTree.files), srcDirs = new Set(srcTree.dirs);
     let removed = 0;
-    for (const rel of relFiles(dst)) {
-      if (!srcSet.has(rel)) { fs.unlinkSync(path.join(dst, rel)); removed++; }
+    for (const rel of dstTree.files) {
+      if (!srcFiles.has(rel)) { fs.unlinkSync(path.join(dst, rel)); removed++; }
     }
-    if (removed) console.log("静态资源：清理 " + removed + " 个已下线图片");
+    // 从深到浅删「源里已不存在的目录」，也顺手消解文件↔目录类型冲突
+    // （目录内多余文件上一步已 unlink，故用 rmdirSync 即可；不做递归删除，
+    //  避免宿主 safe-delete-shim 的 50+ 批量删除拦截）。
+    for (const rel of dstTree.dirs.slice().sort((a, b) => b.length - a.length)) {
+      if (srcDirs.has(rel)) continue;
+      try { fs.rmdirSync(path.join(dst, rel)); removed++; } catch (e) { /* 非空则留待下次 */ }
+    }
+    if (removed) console.log("静态资源：清理 " + removed + " 个已下线项（含残留目录）");
   }
   fs.cpSync(src, dst, { recursive: true, force: true });
   let n = 0, bytes = 0;

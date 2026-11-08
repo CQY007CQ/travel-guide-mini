@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"/>
 <meta name="theme-color" content="#0d0d0d"/>
 <title>旅行攻略生成器 · 网页版</title>
-<link rel="stylesheet" href="lib/app.css?v=18b7dbc1"/>
-<link rel="stylesheet" href="shell.css?v=18b7dbc1"/>
+<link rel="stylesheet" href="lib/app.css?v=4d28915a"/>
+<link rel="stylesheet" href="shell.css?v=4d28915a"/>
 </head>
 <body>
   <!-- 启动遮罩：数据包解压需要一点时间，避免白屏 -->
@@ -28,11 +28,11 @@
     <a class="tb" data-p="pages/more/more"><img alt="更多"/><span>更多</span></a>
   </nav>
 
-  <script src="lib/modules.js?v=18b7dbc1"></script>
-  <script src="lib/data.js?v=18b7dbc1"></script>
-  <script src="lib/tpl.js?v=18b7dbc1"></script>
-  <script src="lib/runtime.js?v=18b7dbc1"></script>
-  <script src="app.js?v=18b7dbc1"></script>
+  <script src="lib/modules.js?v=4d28915a"></script>
+  <script src="lib/data.js?v=4d28915a"></script>
+  <script src="lib/tpl.js?v=4d28915a"></script>
+  <script src="lib/runtime.js?v=4d28915a"></script>
+  <script src="app.js?v=4d28915a"></script>
 
   <!-- 网页版数据互通：导出 / 导入备份文件（与小程序同 schema，可跨端迁移数据） -->
   <div id="webDataBar">
@@ -75,8 +75,13 @@
     if (im) im.onclick = function () { if (fi) fi.click(); };
     if (fi) fi.onchange = function () {
       var f = fi.files && fi.files[0]; if (!f) return;
+      // 先挡超大文件，避免 readAsText 把整份读进内存后才被 importBackup 的长度守卫拒绝
+      if (f.size > 2 * 1024 * 1024) { toast("文件过大（上限 2MB）"); fi.value = ""; return; }
       var rd = new FileReader();
+      rd.onerror = rd.onabort = function () { toast("文件读取失败，请重试"); fi.value = ""; };
       rd.onload = function () {
+        // 立刻清空：任何提前 return 的分支之后都还能重选同一个文件（否则 onchange 不再触发）
+        fi.value = "";
         var t = T(); if (!t) { toast("数据尚未就绪，请稍候"); return; }
         try {
           var r = t.importBackup(String(rd.result || ""));
@@ -84,8 +89,7 @@
           if (window.__APP_CONFIG && r.plan) window.__APP_CONFIG.globalData.plan = r.plan;
           toast("已恢复 " + r.count + " 组数据" + (r.hasPlan ? "（含行程）" : ""));
           if (window.__webRefresh) window.__webRefresh();
-        } catch (e) { toast("文件不是有效备份"); }
-        fi.value = "";
+        } catch (e) { toast("导入失败：" + (e && e.message ? String(e.message).slice(0, 40) : "文件不是有效备份")); }
       };
       rd.readAsText(f);
     };

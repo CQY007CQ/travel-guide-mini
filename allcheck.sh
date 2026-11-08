@@ -50,7 +50,10 @@ step "JS 语法检查" bash -c '
   err=0
   while IFS= read -r f; do
     if ! '"$NODE"' --check "$f" 2>/dev/null; then echo "语法错误: $f"; err=1; fi
-  done < <(find app.js utils pages -name "*.js" -o -name "*.mjs" | sort)
+  # 补齐 subpkg/ 与网页版手写源码。原先只扫 app.js/utils/pages，
+  # web/app.js 与 web/lib/runtime.js 有语法错误时回归链仍全绿，直到打开网页白屏才发现。
+  # 只显式加这两个手写文件，不要把 lib/modules.js|data.js|tpl.js（MB 级生成产物）纳入。
+  done < <(find app.js utils pages subpkg web/app.js web/lib/runtime.js -name "*.js" -o -name "*.mjs" | sort)
   for f in tools/*.mjs tools/*.js tools/*.cjs; do
     if ! '"$NODE"' --check "$f" 2>/dev/null; then echo "语法错误: $f"; err=1; fi
   done

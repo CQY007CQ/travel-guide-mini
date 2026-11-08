@@ -92,7 +92,7 @@ const afterNames = sp.days[sdi].items.map(x => x.name).join("|");
 assert("新景点进入当天安排", afterNames.includes(sw.name), afterNames.slice(0, 60));
 assert("原景点已不在当天", !afterNames.includes(T.cleanSpotName(before)) || T.cleanSpotName(before) === sw.name);
 assert("换完仍为同一天数", sp.days.length === 3, sp.days.length);
-assert("框架条目不可换", T.swapCandidates(sp, 0, 0).length === 0 || !T.isFrameName(sp.days[0].items[0].name) || true);
+assert("框架条目不可换", T.swapCandidates(sp, 0, 0).length === 0 || !T.isFrameName(sp.days[0].items[0].name));
 // 重复换到池空：不应崩，返回 null
 let guard = 0;
 while (guard++ < 60) {
@@ -819,7 +819,7 @@ if (realIx.length >= 2) {
   const blanks = (pB.days[0].items || []).filter(it => /自由活动|留白/.test(String(it.name || "")));
   assert("F9 一天最多一个留白", blanks.length <= 1, "留白数=" + blanks.length);
 }
-assert("F9 留白逻辑可执行", true);
+assert("F9 留白逻辑可执行", !!(pB && pB.days && pB.days.length) && realIx.length >= 2, "可删真实景点数=" + realIx.length);
 
 // F10 换目的地后，绑定行程的准备项必须重置（订票/订酒店/过流程/请假），通用随身项保留
 ["p_ticket", "p_hotel", "p_plan", "p_leave", "p_id", "p_money"].forEach(k => T.togglePrepCheck(k));

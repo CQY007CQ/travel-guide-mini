@@ -71,6 +71,9 @@
     // 输入类元素做焦点保持编号
     if (tag === "input" || tag === "textarea" || tag === "select") {
       el.__fkey = "f" + (inputSeq++);
+      // paint() 用 [data-fkey="fN"] 选择器恢复焦点，只写 JS 属性 el.__fkey 是找不到的，
+      // 必须同步写 DOM 属性，否则每次输入触发整页重建后输入框都会失焦。
+      el.setAttribute("data-fkey", el.__fkey);
       if (props.value !== undefined && el.value !== props.value) el.value = props.value;
       if (props.placeholder && tag !== "select") el.placeholder = props.placeholder;
     }
@@ -101,6 +104,7 @@
       input.className = "w-picker-input";
       input.value = String(value || "");
       input.__fkey = "f" + (inputSeq++);
+      input.setAttribute("data-fkey", input.__fkey);  // 同上：picker 输入框也要能被焦点恢复找到
       wrap.appendChild(el);
       wrap.appendChild(input);
       return wrap;

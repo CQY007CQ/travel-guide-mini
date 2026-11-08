@@ -17,8 +17,10 @@ async function main() {
     const srcPath = path.join("tools", "_src-backup", name + ".js");
     const dstPath = path.join("utils", name + ".js");
     if (!fs.existsSync(srcPath)) {
-      console.log("跳过（无备份源码）:", name);
-      continue;
+      // fail-fast：源缺失时若静默跳过，合并门禁 cmp 会看到「构建前后字节一致」而误判通过，
+      // 真源丢失将无人察觉。必须非零退出，由门禁转红。
+      console.error("备份源码缺失，构建中止:", srcPath, "（请从 git 恢复，勿手改 " + dstPath + "）");
+      process.exit(1);
     }
     const src = fs.readFileSync(srcPath, "utf8");
     const res = await terser.minify(src, { compress: true, mangle: true, format: { comments: false } });
