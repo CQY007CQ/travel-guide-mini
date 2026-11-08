@@ -931,7 +931,12 @@ function addLedger(amt, cat, name, payer, share, date, trip) {
   share: Math.max(1, parseInt(share, 10) || 1),
   trip: trip || ""
  });
- store.set(LEDGER_KEY, list.slice(0, 200));
+ const LEDGER_CAP = 200;
+ if (list.length > LEDGER_CAP) {
+  list.length = LEDGER_CAP; // 丢弃最旧记录（静默截断会丢数据，故下方提示）
+  try { if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: "账本已达 " + LEDGER_CAP + " 条上限，最旧记录已丢弃，建议导出备份", icon: "none" }); } catch (e) {}
+ }
+ store.set(LEDGER_KEY, list);
  return list;
 }
 function delLedger(i) {
@@ -1860,8 +1865,10 @@ function guessCat(name) {
 }
 // 从自由文本里抠出第一个金额 + 剩下的说明，自动猜分类
 function parseQuickBill(str) {
-  const s = String(str || "").trim();
-  if (!s) return null;
+  const raw = String(str || "").trim();
+  if (!raw) return null;
+  // 全角数字/小数点归一（修复「打车３２元」因全角数字无法被 \d 识别而解析失败）
+  const s = raw.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[．]/g, ".");
   const all = [...s.matchAll(/(\d+(?:\.\d{1,2})?)(元|块|￥|¥|RMB|rmb)?/g)];
   if (!all.length) return null;
   // 金额识别（修复「第3天 早餐15元」被解析成 3 元 的 bug）：

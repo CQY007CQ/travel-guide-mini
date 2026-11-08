@@ -152,8 +152,9 @@ Page(SafePage({
     const curSig = hasPlan ? ((p.cityName || "") + "|" + p.days.length + "|" + (p.days[0] && p.days[0].date ? String(p.days[0].date).slice(0, 10) : "")) : "";
     const savedPlans = T.listSavedPlans().filter(x => x.sig !== curSig);
     const foot = T.footStats();
+    const ledgerLen = T.getLedger().length; // 同一渲染周期内只取一次账本，避免重复反序列化
     // v1.8.5 C14：本地数据积累提示（备份入口文案随数据量变化）
-    const bkTip = (savedPlans.length || (foot && (foot.spots || foot.cities)) || T.getNotes().length || wish.length || T.getLedger().length)
+    const bkTip = (savedPlans.length || (foot && (foot.spots || foot.cities)) || T.getNotes().length || wish.length || ledgerLen)
       ? "已积累本地数据，换机 / 卸载前导出一份更安心" : "行程/账本/想玩/待办 全量导出";
     this.setData({
       dark: T.themeMode() === "dark",
