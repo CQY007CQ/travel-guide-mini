@@ -1,4 +1,4 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // 旅行百宝箱：灵感 / 体检 / 文案 / 打包，一键生成（v1.10 功能落地页）
 const T = require("../../utils/travel.js");
@@ -36,9 +36,7 @@ Page(SafePage({
    try { this.refresh(); } catch (e) {}
  },
  _theme() { try { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); } catch (e) {} },
- onShow() {
-    try { AN.pageView("toolkit"); } catch (e) {}
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "toolkit"); },
  _renderShow() {
    try {
      this._theme();

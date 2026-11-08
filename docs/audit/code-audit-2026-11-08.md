@@ -9,7 +9,7 @@
 
 ## 〇、总体评价
 
-项目工程化水平明显高于同体量个人小程序：错误边界（SafePage / app.onError）、存储抽象（store.js）、本地错误日志（errlog.js）、密钥 fail-closed、坐标自检、全量回归门禁（allcheck 59 步 + check-new 431 断言）都已就位。真正的高危问题集中在**密钥明文进公开仓库**与**少量绕开存储抽象的裸读写**；中低危主要是性能重复计算、魔法数字、页面样板重复。下面按维度逐条列出，每条含位置、问题、严重程度、可执行方案。
+项目工程化水平明显高于同体量个人小程序：错误边界（SafePage / app.onError）、存储抽象（store.js）、本地错误日志（errlog.js）、密钥 fail-closed、坐标自检、全量回归门禁（allcheck 60 步 + check-new 431 断言）都已就位。真正的高危问题集中在**密钥明文进公开仓库**与**少量绕开存储抽象的裸读写**；中低危主要是性能重复计算、魔法数字、页面样板重复。下面按维度逐条列出，每条含位置、问题、严重程度、可执行方案。
 
 ---
 
@@ -17,7 +17,7 @@
 
 > 本审计初稿（108 项）提交于 `85cf4e2`，此后本会话已落地 `3963cd0`、`6133f09` 等修复提交，对初稿中若干条目产生影响。下文以"状态"标注，避免与条目正文冲突；条目正文保留原始问题描述作为历史记录。
 
-### ✅ 本会话已修复（v1.20.3：commit 3963cd0 / 6133f09；v1.20.4：下列 #20/#21/#24/#28）
+### ✅ 本会话已修复（v1.20.3：commit 3963cd0 / 6133f09；v1.20.4：#1/#19/#20/#21/#24/#28/#56/#81/#106）
 
 | 条目 | 原问题 | 修复方式 | 当前证据 |
 | --- | --- | --- | --- |
@@ -31,6 +31,10 @@
 | #21 | 构建脚本 `execSync('curl ...')` 拼接 URL | 抽 `getJSON()`（`fetch` + `AbortController` 12s 超时）替代；4 个脚本同步改造（v1.20.4） | `tools/_food-geocode.mjs` / `_emergency-verify.mjs` / `_emergency-geocode2.mjs` / `add-key.mjs` |
 | #24 | 备份/协作包导入无结构校验 | `importBackup` 解析后校验 plan/ledger 结构与 `days≤60`，脏数据抛明确错误（v1.20.4，已 build 至 `utils/travel.js`） | `tools/_src-backup/travel.js` importBackup |
 | #28 | 生产包 `data.js` 残留 13 处 `console.warn` | 抽 `_dw()` 并以 `wx.getAccountInfoSync().miniProgram.envVersion!=="release"` 为门禁，正式版屏蔽（v1.20.4） | `tools/_src-backup/data.js` + `utils/data.js` |
+| #1 / #19 | 密钥明文进公开仓库（和风 Key + 域名 + AMap Key 写死 `DEFAULT`） | `utils/keys.js` 清空 `DEFAULT` 明文（qweatherKey/qweatherHost/amapKey 置空），改运行时 `setKeys()` 注入；源码无明文残留（v1.20.4） | `tools/_src-backup/keys.js` + `utils/keys.js`：DEFAULT 三字段空串；fail-closed 仍靠 setKeys 注入 |
+| #56 | 10 个页面 onShow 样板重复（字体/埋点/渲染兜底散落） | 收敛到 `onShowRender(ctx,name,before,after)`（utils/app.js），延迟 require travel/analytics 防循环依赖；10 页 onShow 单行调用（v1.20.4） | `utils/app.js:onShowRender` + 10 个页面 onShow |
+| #81 | store 裸读写散落（JSON.parse/setStorageSync 直调） | `utils/store.js` 加 `getJSON/setJSON`，收口 analytics/errlog/remind/ad/plan/index/help 共 7 处 + `build-min` 重建（v1.20.4） | `utils/store.js` + `tools/_src-backup/store.js` |
+| #106 | 缺合并门禁（`utils` 与 `_src-backup` 易漂移） | `allcheck.sh` 新增"合并门禁"步：build-min 前后 cmp 8 个压缩产物，不一致即失败；`check-doc-consistency` 同步 59→60 口径（v1.20.4） | `allcheck.sh` 合并门禁步 |
 
 ### 🔧 条目行号 / 事实更正
 
@@ -39,11 +43,8 @@
 
 ### 📌 仍待处理（高 / 中危，非代码自动可解部分）
 
-- **#1 / #19 密钥明文进公开仓库**：设计决策待用户拍板（清空 `DEFAULT` 会让"未注入 Key 时天气失效"）。`utils/keys.js` 已支持 `setKeys()` 运行时注入，仅待把 `DEFAULT` 明文改为空串。
-- **#20 eval / #21 execSync**：仅影响本地构建工具（非生产包），优先级中，建议随构建工具重构时一并改 `JSON.parse` / `fetch` + `URL`。
-- **#24 备份 / 协作包输入上限校验**：`importBackup`（`tools/_src-backup/travel.js:1463`）解析后未做字段数量 / 长度上限，建议加 `days ≤ 60`、`ledger ≤ 200` 等校验。
-- **#28 生产包 console.warn**：`utils/data.js` 仍有 14 处 `console.warn`，建议 `__DEV__` 守卫或汇总进 `errlog`。
-- **#56 onShow 样板 / #58·#77 双源 / #81 store 统一 / #82 CI 断言 / #106 合并门禁**：架构类，建议列为下一里程碑整改项。
+- **#58·#77 双源一致性**：审计建议项，仍待评估是否合并数据源，降低 `_src-backup` 与产物漂移风险。
+- **#82 CI 断言**：审计建议项，建议补充更多 CI 断言覆盖核心逻辑回归。
 
 > 说明：本审计"已具备的强项"第 4 条已记录凭证照片修复；上表 #12 / #61 / #71 为其代码级落地，二者一致。
 
@@ -443,7 +444,7 @@
 **第 55 条**
 - 类型：性能
 - 位置：`allcheck.sh` 全量回归
-- 问题描述：59 步串行，含全省多城生成，单次跑数分钟；无并行/无增量（仅改 tools 也要全跑）。
+- 问题描述：60 步串行，含全省多城生成，单次跑数分钟；无并行/无增量（仅改 tools 也要全跑）。
 - 严重程度：低
 - 优化建议：按改动范围选择性跑（如只改页面就跳过全省生成步）。
 
@@ -810,7 +811,7 @@
 - 位置：`git` 协作（7 人分布式）
 - 问题描述：分支机协作者通过 PAT 加为 collaborator，但缺 PR/分支保护/CI 门禁强制，主干易进未回归代码（尤其双源 `_src-backup` 易错）。
 - 严重程度：中
-- 优化建议：加 `allcheck.sh` 作为合并门禁（CI 跑），PR 需过 59 步；`utils/*.js` 与 `_src-backup` 一致性断言。
+- 优化建议：加 `allcheck.sh` 作为合并门禁（CI 跑），PR 需过 60 步；`utils/*.js` 与 `_src-backup` 一致性断言。（#106 已落地：allcheck.sh 新增"合并门禁"步，build-min 前后 cmp 8 个压缩产物，不一致即失败）
 
 **第 107 条**
 - 类型：架构
@@ -836,7 +837,7 @@
 3. **密钥 fail-closed**：`utils/keys.js` 单一出口 + 占位符/格式非法回落 null，天气缺失静默降级不阻断。
 4. **凭证照片修复（本次）**：已把照片从"日期#下标"改为按账单稳定 `id`，并加迁移/孤儿清理/延迟删除，杜绝串图与残留。
 5. **坐标完整性自检**：`utils/data.js` `checkCoordIntegrity` 加载期只读自检 + 打包期 fail-fast，越界>0 即拦截。
-6. **回归门禁**：`allcheck.sh` 59 步 + `check-new.mjs` 431 断言 + 多份 `_test-*.mjs`，覆盖核心逻辑。
+6. **回归门禁**：`allcheck.sh` 60 步 + `check-new.mjs` 431 断言 + 多份 `_test-*.mjs`，覆盖核心逻辑。
 7. **导航防御**：`app.js` 全局包裹 navigateTo/switchTab/reLaunch，失败可见 + 栈满回退 redirectTo。
 8. **隐私优先**：无服务端上报、无第三方 SDK 埋点，数据全本机，符合个人主体合规边界。
 

@@ -256,6 +256,24 @@ step "单测 门票清单布局 (逐字竖排防回潮)" "$NODE" tools/_test-tic
 # v1.19.204：帮助页离线规模统计把医院读成 0（数据真源在 emergency-data 而非 data.js），
 #             固化为「统计 vs 真源逐项一致 + 帮助页渲染 + 指南无静态数字」回归
 step "单测 离线数据规模口径 (医院统计为 0 防回潮)" "$NODE" tools/_test-corpus.mjs
+# 【v1.20.4 #106 合并门禁】本仓 utils/*.js（travel/planner/weather/store/geo/corpus/pako-inflate/toolkit-groups）
+# 是 tools/build-min.mjs 的压缩产物，不是手改文件。若「改了 tools/_src-backup 漏跑 build-min」或
+# 「手改了 utils 应改 _src-backup」，随包上线的 utils 就会与源码不一致（静默 footgun）。
+# 做法：构建前把 8 个目标快照到 /tmp，跑 build-min 后再逐文件 cmp；任一不一致即说明漏构建 / 改错文件。
+step "合并门禁 (utils 与 _src-backup 一致)" bash -c '
+  mkdir -p /tmp/mg106
+  for f in utils/travel.js utils/planner.js utils/weather.js utils/store.js utils/geo.js utils/corpus.js utils/pako-inflate.js utils/toolkit-groups.js; do
+    cp "$f" "/tmp/mg106/$(basename "$f").before" 2>/dev/null
+  done
+  "$1" tools/build-min.mjs >/dev/null 2>&1 || { echo "  ✗ build-min 执行失败"; exit 1; }
+  BAD=0
+  for f in utils/travel.js utils/planner.js utils/weather.js utils/store.js utils/geo.js utils/corpus.js utils/pako-inflate.js utils/toolkit-groups.js; do
+    if ! cmp -s "$f" "/tmp/mg106/$(basename "$f").before"; then echo "  ✗ $f 构建前后不一致（漏跑 build-min，或手改了 utils 应改 tools/_src-backup）"; BAD=1; fi
+  done
+  [ $BAD -eq 0 ] && echo "  ✓ utils 与 _src-backup 一致"
+  exit $BAD
+' _ "$NODE"
+
 # v1.20.0：网页版 —— 把小程序同一份源码（utils + 页面 JS + WXML + WXSS）编译到浏览器。
 # 核心保障是「同源」：任何改动都先构建再用引擎冒烟验证，网页端不会悄悄漂移。
 # NODE 是父 shell 局部变量（未 export），bash -c 子 shell 里取不到 → 曾报 "bash: : command not found"；

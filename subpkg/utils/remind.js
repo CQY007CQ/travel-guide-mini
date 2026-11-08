@@ -22,20 +22,17 @@
 //   · 未配置 → 订阅入口自动隐藏，只保留日历，**绝不弹一个没用的授权框**
 //   · 任何读写异常都不抛给页面（try 包死），提醒是辅助功能
 
+const S = require("../../utils/store.js");   // v1.20.4 #81：统一存储出口
 const KEY = "remindQueueV1";
 const USE_CLOUD = false;            // 未开通云开发前保持 false
 const CLOUD_FN = "sendRemind";      // 云函数名，需与 tools/cloud/sendRemind 对应
 const TMPL_IDS = [];                // ← 开通后填一次性订阅模板 ID（最多 3 个）
 
 function _read() {
-  try {
-    const s = wx.getStorageSync(KEY);
-    const a = s ? JSON.parse(s) : null;
-    return Array.isArray(a) ? a : [];
-  } catch (e) { return []; }
+  return S.getJSON(KEY, []);
 }
 function _write(a) {
-  try { wx.setStorageSync(KEY, JSON.stringify(a)); } catch (e) {}
+  S.setJSON(KEY, a);
   return a;
 }
 

@@ -1,4 +1,4 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕
 // prep：出行准备（票价/预约渠道 可勾跟踪 / 酒店比价 / 团队分工）
 // 每个景点的「已订 / 预约日期 / 备注」按 城市·景点名 记本机，回来再看不丢
@@ -43,8 +43,7 @@ Page(SafePage({
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
   onLoad() { this.__boot = T.ready().catch(() => null); },
-  onShow() {
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "prep"); },
   _renderShow() {
     this._theme();
     // v1.10.1：refresh 内有多处对 plan/dict 的解引用，一旦脏数据抛错会整页白屏；

@@ -1,4 +1,4 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕
 // map：原生地图 + 真实坐标标点 + 编号连线 + 图层（景点 / 美食 / 住宿）
 const T = require("../../utils/travel.js");
@@ -79,8 +79,7 @@ Page(SafePage({
   _theme() { try { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); } catch (e) {} },
   // v1.11：地图页依赖行程数据 + 坐标库，任一步抛错都会白屏；整体包异常兜底留空态
   // v1.19.60：原独立 onLoad() 已合并进上方（解析 di + 启动数据就绪守卫二合一）
-  onShow() {
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "map"); },
   _renderShow() {
     try {
       this._theme();

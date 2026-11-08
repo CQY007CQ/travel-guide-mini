@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const S = require("../../utils/store.js");   // v1.20.4 #81：统一存储出口
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // help：旅途应急（受伤 / 突发不适）—— 分诊常识 + 就近医疗机构
 // 边界：只给「该挂什么科」与「就近有哪些医院」，不给诊疗结论、不评价医院优劣
@@ -59,7 +60,7 @@ Page(SafePage({
       const p = getApp().globalData.plan;
       if (p && p.city) c = p.city;
     } catch (e) {}
-    if (!c) { try { c = wx.getStorageSync("lastCityName") || ""; } catch (e) {} }
+    if (!c) { try { c = S.get("lastCityName", "") || ""; } catch (e) {} }
     const list = E.cities();
     if (!c || list.indexOf(c) < 0) {
       // 默认落到首个「有具名医院」的城市，避免一进来就是降级态

@@ -1,4 +1,5 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
+const S = require("../../utils/store.js");   // v1.20.4 #81：统一存储出口
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // plan：每日行程浏览 + 详情 + 导航/百科/想玩 + 手动调整 + 按想玩重新生成
 const T = require("../../utils/travel.js");
@@ -77,9 +78,7 @@ Page(SafePage({
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：onShow 是行程页唯一入口，任何异常都不得导致白屏（无数据时优雅回首页）
   onLoad() { this.__boot = T.ready().catch(() => null); _preloadSubMods(); },
-  onShow() {
-    try { AN.pageView("plan"); } catch (e) {}
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "plan"); },
   _renderShow() {
    // v1.20.3：消费首页磁贴的定位意图（酒店/百科/天气），在任何分支前先读并清除，避免空行程回首页后残留再误触发
    this._applyFocus();
@@ -495,9 +494,9 @@ Page(SafePage({
  // 读后即清除，避免来回切 tab 重复触发。
  _applyFocus() {
   let f = "";
-  try { f = (wx.getStorageSync("miniFocusV1") || "").toString().trim(); } catch (e) {}
+  try { f = (S.get("miniFocusV1", "") || "").toString().trim(); } catch (e) {}
   if (!f) return;
-  try { wx.setStorageSync("miniFocusV1", ""); } catch (e) {}   // 消费即清除
+  try { S.set("miniFocusV1", ""); } catch (e) {}   // 消费即清除
   const self = this;
   // 等 WXML 把新数据画完再滚动/展开，避免节点还没生成就 scrollTo 失效
   setTimeout(() => {

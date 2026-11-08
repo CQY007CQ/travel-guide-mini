@@ -1,4 +1,4 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // index：目的地选择 → 生成攻略
 // 对齐网页版：城市搜索选择器 / 出行模式 / 想玩景点池自选 / 收藏目的地 / 总预算语义
@@ -1037,15 +1037,7 @@ Page(SafePage({
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
 
-  onShow() {
-    try { AN.pageView("index"); } catch (e) {}
-    this.setData({ fz: T.fontScale() });
-    (this.__boot || Promise.resolve()).then(() => {
-      try { this._ensureForm(); } catch (e) {}
-      try { this._renderShow(); } catch (e) {}
-      try { this.maybeShowGuideModal(); } catch (e) {}
-    });
-  },
+  onShow() { onShowRender(this, "index", () => this._ensureForm(), () => this.maybeShowGuideModal()); },
 
   // v1.19.60：数据就绪自愈 —— onLoad 内的省/市填充是同步执行的，若冷启动分包数据尚未到位
   // （或上次加载被吞错），选择器会渲染为空且 onShow._renderShow 不重填 → 永久空白误判白屏。
@@ -1251,7 +1243,7 @@ Page(SafePage({
     const url = ds.url;
     const focus = ds.focus;
     // v1.20.3：磁贴带定位意图时先写入存储，plan 页 onShow 读后自动滚动/展开对应区块
-    if (focus) { try { wx.setStorageSync("miniFocusV1", String(focus)); } catch (_) {} }
+    if (focus) { S.set("miniFocusV1", String(focus)); }
     if (!url) { wx.showToast({ title: "该入口暂不可用", icon: "none" }); return; }
     const isTab = ["/pages/plan/plan", "/pages/today/today", "/pages/more/more"].indexOf(url) >= 0;
     if (isTab) {

@@ -15,6 +15,7 @@
 //   2) 广告位管理 → 新建「激励视频」广告位 → 复制 adUnitId
 //   3) 把下面 AD_UNIT_ID 填进去，ENABLED 改成 true，重新上传即可生效
 
+const S = require("../../utils/store.js");   // v1.20.4 #81：统一存储出口
 const ENABLED = false;                 // 广告总开关（未开通前保持 false = 全免费全解锁）
 const AD_UNIT_ID = "";                 // ← 开通后填激励视频广告位 ID（形如 adunit-xxxxxxxx）
 const UNLOCK_KEY = "adUnlockV1";       // 本地解锁状态
@@ -26,10 +27,7 @@ function _todayKey() {
 }
 
 function _readRaw() {
-  try {
-    const s = wx.getStorageSync(UNLOCK_KEY);
-    return s ? JSON.parse(s) : null;
-  } catch (e) { return null; }
+  return S.getJSON(UNLOCK_KEY, null);
 }
 
 /** 激励视频是否真的可用（未开通 / 未填 ID / 环境不支持 → false → 调用方放行） */
@@ -48,9 +46,7 @@ function unlocked() {
 }
 
 function _markUnlocked() {
-  try {
-    wx.setStorageSync(UNLOCK_KEY, JSON.stringify({ t: Date.now(), day: _todayKey() }));
-  } catch (e) {}
+  S.setJSON(UNLOCK_KEY, { t: Date.now(), day: _todayKey() });
 }
 
 let _ad = null;

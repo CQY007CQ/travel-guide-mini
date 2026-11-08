@@ -1,4 +1,4 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 // assistant：本地攻略速查（离线 · 本地规则库 · 零网络）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
@@ -65,8 +65,7 @@ Page(SafePage({
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
 
   onLoad() { this.__boot = T.ready().catch(() => null); },
-  onShow() {
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); if (this.data.mode === "spot") this._computePlanSpots(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "assistant", null, () => { if (this.data.mode === "spot") this._computePlanSpots(); }); },
   _renderShow() {
     try { this._theme(); this.refresh(); }
     catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} }

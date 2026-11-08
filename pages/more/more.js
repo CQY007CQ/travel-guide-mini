@@ -1,4 +1,4 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // more：功能聚合（分组）+ 想玩清单（内嵌可管理）
 const T = require("../../utils/travel.js");
@@ -28,9 +28,7 @@ Page(SafePage({
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
   onLoad() { this.__boot = T.ready().catch(() => null); _preloadMoreMods(); },
-  onShow() {
-    try { AN.pageView("more"); } catch (e) {}
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "more"); },
   _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
 
   /* ---------- v1.7 ---------- */

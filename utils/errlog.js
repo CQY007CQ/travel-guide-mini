@@ -1,15 +1,15 @@
 // utils/errlog.js —— 本地错误回溯（无后端）：把被 SafePage 兜住 / app.onError 捕获的异常留存到 storage 环形缓冲，
 // 便于真机 / 审核环境定位「按了没反应」类问题（错误不再无声消失）。
 // 设计：纯 CommonJS；所有 wx 访问都带 typeof 守卫，Node 测试环境下 push 直接跳过，绝不抛错。
+const S = require("./store.js");   // v1.20.4 #81：统一存储出口
 const KEY = "errlogV1";
 const CAP = 30;
 
 function _get() {
-  try { return (typeof wx !== "undefined" && wx && wx.getStorageSync) ? (wx.getStorageSync(KEY) || []) : []; }
-  catch (e) { return []; }
+  try { return S.getArr(KEY); } catch (e) { return []; }
 }
 function _set(v) {
-  try { if (typeof wx !== "undefined" && wx && wx.setStorageSync) wx.setStorageSync(KEY, v); } catch (e) {}
+  try { S.set(KEY, v); } catch (e) {}
 }
 
 function push(label, err) {
