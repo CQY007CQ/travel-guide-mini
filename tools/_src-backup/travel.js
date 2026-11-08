@@ -922,12 +922,15 @@ function getLedger() { return store.get(LEDGER_KEY, []); }
 function _genBillId() { return "b" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
 function addLedger(amt, cat, name, payer, share, date, trip) {
  const list = getLedger();
+   // 审计 #14：amt 原先原样入库，Infinity / NaN / 负数 / 字符串会污染账本与导出。
+   const a = Math.round(Number(amt) * 100) / 100;
+   if (!isFinite(a) || a < 0 || a > 99999999) return list;
  const d = (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))) ? String(date) : store.fmtLocalDate(new Date());
  list.unshift({
   id: _genBillId(),
   date: d,
   cat, name: name || "行程中随手记",
-  amt, payer: payer || "0",
+  amt: a, payer: payer || "0",
   share: Math.max(1, parseInt(share, 10) || 1),
   trip: trip || ""
  });
@@ -966,14 +969,22 @@ function budgetPerDay(plan) {
 function exportLedgerCSV() {
  const list = getLedger();
  if (!list || !list.length) return ""; // 空账本不产出「只有表头」的假 CSV，页面守卫据此提示暂无数据
- const header = "日期,分类,说明,金额(元),付款人,AA人数,人均(元)";
- const lines = list.map(x => {
-  const amt = Number(x.amt) || 0;
-  const share = Math.max(1, parseInt(x.share, 10) || 1);
-  const per = (amt / share).toFixed(2);
-  return [x.date, x.cat || "", (x.name || "").replace(/,/g, "，"),
-   amt.toFixed(2), x.payer || "", share, per].join(",");
- });
+   const header = "日期,分类,说明,金额(元),付款人,AA人数,人均(元)";
+   // 审计 #16：标准 CSV 转义（双引号包裹 + 内部引号翻倍），并阻断 Excel/WPS 公式注入。
+   // 原先只替换半角逗号：备注里带引号/换行会串列，以 = + - @ 开头会被当公式执行。
+   const cell = v => {
+    let s = String(v == null ? "" : v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+   };
+   const lines = list.map(x => {
+    const amt = Number(x.amt) || 0;
+    const share = Math.max(1, parseInt(x.share, 10) || 1);
+    const per = (amt / share).toFixed(2);
+    return [x.date, x.cat || "", x.name || "",
+     amt.toFixed(2), x.payer || "", share, per].map(cell).join(",");
+   });
+
  // 加 BOM 防止 Excel 读 UTF-8 中文乱码
  return "\uFEFF" + header + "\n" + lines.join("\n");
 }
@@ -1467,9 +1478,23 @@ function importBackup(json) {
  const o = JSON.parse(raw);
  if (!o || o.v !== 1) throw new Error("不是有效的备份内容");
  // v1.20.4：结构防御，避免脏数据写入后渲染期崩溃（审计 #24）
- if (o.plan && (typeof o.plan !== "object" || (o.plan.days && !Array.isArray(o.plan.days)))) throw new Error("备份中行程结构损坏");
- if (o.ledger && !Array.isArray(o.ledger)) throw new Error("备份中账本结构损坏");
- if (o.plan && o.plan.days && o.plan.days.length > 60) o.plan.days = o.plan.days.slice(0, 60);
+   if (o.plan && (typeof o.plan !== "object" || Array.isArray(o.plan) || (o.plan.days && !Array.isArray(o.plan.days)))) throw new Error("备份中行程结构损坏");
+   if (o.ledger && !Array.isArray(o.ledger)) throw new Error("备份中账本结构损坏");
+   // 审计 #15/#65：原先只校验顶层是数组，数组里塞字符串 / null / 超长文本都能写入，渲染期才崩。
+   // 这里逐条净化（丢弃非法条目、限量、限字段长度），不改变合法备份语义。
+   if (o.plan && Array.isArray(o.plan.days)) {
+    o.plan.days = o.plan.days.slice(0, 60).filter(d => d && typeof d === "object" && !Array.isArray(d));
+    o.plan.days.forEach(d => {
+     if (d.items && !Array.isArray(d.items)) d.items = [];
+     if (Array.isArray(d.items)) {
+      d.items = d.items.slice(0, 100).filter(it => it && typeof it === "object" && !Array.isArray(it));
+      d.items.forEach(it => { if (typeof it.name === "string") it.name = it.name.slice(0, 200); });
+     }
+    });
+   }
+   if (Array.isArray(o.ledger)) {
+    o.ledger = o.ledger.slice(0, 200).filter(r => r && typeof r === "object" && !Array.isArray(r));
+   }
  let n = 0;
  // v1.10.1：导入统一按各键容量上限裁剪，与运行时写入保持一致
  const CAP = {};
@@ -1887,7 +1912,8 @@ function parseQuickBill(str) {
     else chosen = all.slice().sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]))[0];
   }
   const amt = Math.round(parseFloat(chosen[1]) * 100) / 100;
-  if (!(amt > 0)) return null;
+   // 审计 #11/#12：Infinity / 1e999 能穿过 `> 0`（Infinity > 0 为真），入库后 CSV 显示 Infinity、AA 人均变 NaN。
+  if (!(amt > 0) || !isFinite(amt) || amt > 99999999) return null;
   const m = chosen;
   let name = (s.slice(0, m.index) + " " + s.slice(m.index + m[0].length))
     .replace(/[¥￥]/g, " ").replace(/块钱|块|元|rmb|RMB/gi, " ")

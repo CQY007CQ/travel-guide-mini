@@ -15,9 +15,12 @@ const BUDGET = (() => { const i = args.indexOf("--budget"); return i >= 0 ? pars
 const CITY_FILTER = (() => { const i = args.indexOf("--cities"); return i >= 0 ? args[i + 1].split(",").map(s => s.trim()).filter(Boolean) : null; })();
 const DRY = args.includes("--dry");
 
-// 7 把高德 key
-const keys = fs.readFileSync("tools/geocode.keys", "utf8").split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith("#"));
-if (!keys.length) { console.error("无可用 key（tools/geocode.keys）"); process.exit(1); }
+// key 池：只接受 28~40 位字母数字整行（与其它 geocode 脚本同一规则）。
+// 旧版仅过滤 # 开头的行，任何非注释的说明文字都会被当成 key 发出请求；
+// 空池时也必须 fail-closed（非 0 退出、零网络请求）。
+const keys = (() => { try { return fs.readFileSync("tools/geocode.keys", "utf8"); } catch (e) { return ""; } })().split(/\r?\n/).map(s => s.trim())
+  .filter(s => /^[a-zA-Z0-9]{28,40}$/.test(s));
+if (!keys.length) { console.error("无可用 key（tools/geocode.keys）：请检查 key 池，勿发出空 key 请求"); process.exit(1); }
 let ki = 0; const nextKey = () => keys[(ki++) % keys.length];
 
 // base：以 data-packed.js 的 SPOT_COORDS / CITY_COORDS 判断已覆盖

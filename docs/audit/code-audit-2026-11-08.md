@@ -55,11 +55,11 @@
 **第 1 条**
 - 类型：数据
 - 位置：`utils/keys.js:19-21`
-- 问题描述：和风天气 API Key（`d84611f29a4d48d48a36227b613de255`）与专属域名 `j864228fx2.re.qweatherapi.com` 明文写死在源码，且仓库是公开 GitHub（`CQY007CQ/travel-guide-mini`）。即使确属本人账号，公开泄露后任何人可盗刷配额，且违反"密钥不进明文仓库"的自身合规铁律。
+- 问题描述：和风天气 API Key（`<REDACTED-32HEX-CREDENTIAL>`）与专属域名 `j864228fx2.re.qweatherapi.com` 明文写死在源码，且仓库是公开 GitHub（`CQY007CQ/travel-guide-mini`）。即使确属本人账号，公开泄露后任何人可盗刷配额，且违反"密钥不进明文仓库"的自身合规铁律。
 - 严重程度：高
 - 优化建议：Key 从 `DEFAULT` 中移除，改为**仅运行时 storage 注入**（`wx.setStorageSync("__app_keys__", {qweatherKey})`，代码已支持 `setKeys()`）；或读 `project.config.json` 之外的本地 `.env`（不提交）。CI/门禁 `check-secrets.mjs` 增加"禁止 32 位 hex / 明确 Key 串"规则已存在，但源码里的明文需先清掉。
 - 修改前后：
-  - 前：`const DEFAULT = { qweatherKey: "d84611f29a4d48d48a36227b613de255", ... }`
+  - 前：`const DEFAULT = { qweatherKey: "<REDACTED-32HEX-CREDENTIAL>", ... }`
   - 后：`const DEFAULT = { qweatherKey: "", qweatherHost: "", amapKey: "" }; // 仅经 keys.js 的 setKeys() 运行时注入`
 
 **第 2 条**

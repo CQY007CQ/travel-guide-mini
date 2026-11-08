@@ -63,8 +63,9 @@ step "JS 语法检查" bash -c '
 
 # 依赖完整性：任何相对 require/import 都必须可解析（防"移文件移断管线"，见 check-v112 事故）
 step "依赖完整性 (相对引用可解析)" "$NODE" tools/check-deps.mjs
-# 凭据泄露：随包目录不得出现明文 key / 高德接口 / 未登记外链（自检发现该检查只存在于手工脚本，故固化）
-step "凭据泄露 (随包无明文 key)" "$NODE" tools/check-secrets.mjs
+# 凭据泄露：全仓（含 docs/ 与 tools/）不得出现明文 key；随包额外查高德接口 / 未登记外链。
+# 2026-11-09 修正：旧版只扫随包目录，公开仓库 docs/ 里的明文 key 因此整轮漏检。
+step "凭据泄露 (全仓无明文 key)" "$NODE" tools/check-secrets.mjs
 # 图片引用：缺失不会编译报错，只会在特定主题下显示破图（深色 tabBar 图标曾整组缺失）
 step "图片引用 (无缺失图标)" "$NODE" tools/check-assets.mjs
 step "JSON 合法性" bash -c '
@@ -285,7 +286,8 @@ step "合并门禁 (utils 与 _src-backup 一致)" bash -c '
 # 核心保障是「同源」：任何改动都先构建再用引擎冒烟验证，网页端不会悄悄漂移。
 # NODE 是父 shell 局部变量（未 export），bash -c 子 shell 里取不到 → 曾报 "bash: : command not found"；
 # 必须用位置参数传进去。管道必须开 pipefail，否则 smoke 失败会被 tail 的退出码吞掉，门禁假绿。
-step "审计整改防回潮断言 (#1/#19/#56/#81 不回潮)" "$NODE" tools/_test-audit-guards.mjs
+# 审计加固的运行时单测串在同一 step 里跑，不新增 step —— 61 步口径与考核材料无需跟着改
+step "审计整改防回潮断言 (#1/#19/#56/#81 不回潮)" bash -c '"$1" tools/_test-audit-guards.mjs && "$1" tools/_test-hardening.mjs' _ "$NODE"
 
 step "网页版 构建与引擎冒烟 (与小程序同源)" bash -c 'set -o pipefail; "$1" tools/web/build.mjs >/dev/null && "$1" tools/web/smoke.mjs | tail -4' _ "$NODE"
 

@@ -2,7 +2,7 @@
 // 只用高德 geocode/geo（独立配额，合规）；输出 tools/v202-hubei-cities.js 补丁
 import fs from "fs";
 
-const KEYS = fs.readFileSync("tools/geocode.keys", "utf8")
+const KEYS = (() => { try { return fs.readFileSync("tools/geocode.keys", "utf8"); } catch (e) { return ""; } })()
   .split(/\r?\n/).map(s => s.trim()).filter(s => /^[a-zA-Z0-9]{28,40}$/.test(s));
 if (!KEYS.length) { console.error("无可用 key"); process.exit(1); }
 

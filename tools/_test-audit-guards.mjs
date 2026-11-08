@@ -124,6 +124,76 @@ guard("网页版增量同步目录感知", () => {
   return [/relTree/.test(s) && /rmdirSync/.test(s)];
 });
 
+// ── 2026-11-09 P0 凭据止血防回潮 ──────────────────────────────────────
+// 起因：旧门禁只扫「会打进包」的目录，文件头注释还写着「tools/ 与 docs/ 不扫」，
+// 结果公开仓库 docs/audit/ 里的明文 key 整轮发版都没被拦。泄露面是 git 跟踪面，不是包体面。
+const HEX32_RE = /(?<![0-9a-fA-F])[0-9a-fA-F]{32}(?![0-9a-fA-F])/;
+
+guard("凭据门禁扫描全仓而非仅随包目录", () => {
+  const s = readSrc("tools/check-secrets.mjs");
+  // 门禁断言查字面量会被「历史说明注释」误伤，先滤掉注释行再匹配
+  const code = s.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+  return [/collect\(ROOT,\s*"",\s*all\)/.test(code) && !/tools\/ 与 docs\/ 不扫/.test(code)];
+});
+guard("allcheck 凭据步口径为全仓", () => [
+  /凭据泄露 \(全仓无明文 key\)/.test(readSrc("allcheck.sh"))
+]);
+guard("32hex 正则带前后 hex 边界（sha256 摘要不误报）", () => {
+  const s = readSrc("tools/check-secrets.mjs");
+  return [/\(\?<!\[0-9a-fA-F\]\)/.test(s) && /\(\?!\[0-9a-fA-F\]\)/.test(s)];
+});
+guard("公开仓库审计文档已脱敏且无明文回潮", () => {
+  const s = readSrc("docs/audit/code-audit-2026-11-08.md");
+  return [!HEX32_RE.test(s) && /<REDACTED-32HEX-CREDENTIAL>/.test(s)];
+});
+guard("封禁 KEY 黑名单用 sha256 摘要而非明文", () => {
+  const s = readSrc("tools/_amap-compliance.mjs");
+  return [/REVOKED_KEY_SHA256/.test(s) && !HEX32_RE.test(s)];
+});
+guard("本地凭据池有 gitignore 与 git index 双断言", () => {
+  const s = readSrc("tools/check-secrets.mjs");
+  const gi = readSrc(".gitignore");
+  return [/trackedInIndex\(rel\)/.test(s) && /LOCAL_POOLS/.test(s) && /geocode\.keys/.test(gi)];
+});
+guard("读 key 池脚本一律格式校验 + 友好空池 fail-closed", () => {
+  const dir = path.join(ROOT, "tools");
+  const bad = [];
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".mjs"))) {
+    if (f === "_test-audit-guards.mjs") continue;   // 断言脚本自身含该字面量，不能算作读 key 池脚本
+    const s = fs.readFileSync(path.join(dir, f), "utf8");
+    if (s.indexOf('readFileSync("tools/geocode.keys"') < 0) continue;
+    const fmt = /\[a-zA-Z0-9\]\{28,40\}/.test(s);
+    const exit = /无可用 key/.test(s) && /process\.exit\(1\)/.test(s);
+    const safe = /catch \(e\) \{ return ""; \}/.test(s) || /try \{ raw = fs\.readFileSync/.test(s);
+    if (!fmt || !exit || !safe) bad.push(f + "(fmt=" + fmt + ",exit=" + exit + ",safe=" + safe + ")");
+  }
+  return [bad.length === 0, bad.join(",")];
+});
+
+// ── 2026-11-09 审计加固（#11/#12/#14/#16/#15/#65/#44/#46）防回潮 ──
+guard("金额解析有限性与上限守卫", () => {
+  const s = readSrc("tools/_src-backup/travel.js");
+  return [/!isFinite\(amt\)/.test(s) && /99999999/.test(s) && /if \(!isFinite\(a\)/.test(s)];
+});
+guard("CSV 标准转义与公式注入防护", () => {
+  const s = readSrc("tools/_src-backup/travel.js");
+  return [/const cell =/.test(s) && /replace\(\/"\/g/.test(s)
+    && s.indexOf("/^[=+") >= 0 && s.indexOf('.replace(/,/g, "，")') < 0];
+});
+guard("导入备份逐条净化", () => {
+  const s = readSrc("tools/_src-backup/travel.js");
+  return [/filter\(d => d && typeof d === "object"/.test(s) && /slice\(0, 200\)\.filter/.test(s)];
+});
+guard("网页版 innerHTML 动态文本全部转义", () => {
+  const s = readSrc("web/lib/runtime.js");
+  return [/function escHtml/.test(s) && /\+ escHtml\(t\) \+/.test(s)
+    && /escHtml\(e && e\.message\)/.test(s) && s.indexOf("+ String(t) +") < 0];
+});
+guard("加固运行时单测挂在已有门禁步（不新增 step）", () => {
+  const s = readSrc("allcheck.sh");
+  return [s.indexOf("_test-hardening.mjs") >= 0 && /_test-audit-guards\.mjs &&/.test(s)];
+});
+
 console.log("");
 if (fail > 0) {
   console.log("审计整改防回潮断言失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");

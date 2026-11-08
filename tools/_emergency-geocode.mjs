@@ -5,8 +5,9 @@
 import fs from "fs";
 import { execSync } from "child_process";
 
-const keys = fs.readFileSync("tools/geocode.keys", "utf8")
+const keys = (() => { try { return fs.readFileSync("tools/geocode.keys", "utf8"); } catch (e) { return ""; } })()
   .split(/\r?\n/).map((s) => s.trim()).filter((s) => /^[a-zA-Z0-9]{28,40}$/.test(s));
+if (!keys.length) { console.error("无可用 key（tools/geocode.keys）：请检查 key 池，勿发出空 key 请求"); process.exit(1); }
 
 // 只收录「名称可确证」的大型综合/专科医院；等级拿不准的写「综合医院」而不硬标三甲
 const LIST = [

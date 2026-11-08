@@ -19,6 +19,15 @@
   var LS = global.localStorage;
   var toastTimer = null;
 
+  /* 审计 #44/#46：任何进入 innerHTML 的动态文本都必须转义。
+     导入的 JSON、URL hash、异常消息都可能携带标签，直接拼接等于 DOM 注入。 */
+  function escHtml(v) {
+    return String(v == null ? "" : v)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+
   /* ────────────────────────── 渲染原语 ────────────────────────── */
 
   var TEXT = "__t";
@@ -126,7 +135,7 @@
     if (old) old.remove();
     if (toastTimer) clearTimeout(toastTimer);
     var d = layer("w-toast");
-    var icon = o.icon && o.icon !== "none" ? '<i class="w-ti w-ti-' + o.icon + '"></i>' : "";
+    var icon = o.icon && o.icon !== "none" ? '<i class="w-ti w-ti-' + escHtml(o.icon) + '"></i>' : "";
     d.innerHTML = '<div class="w-toast-box">' + icon + '<span></span></div>';
     d.querySelector("span").textContent = o.title || "";
     d.style.display = "flex";
@@ -155,9 +164,9 @@
     o = o || {};
     var d = layer("w-modal");
     var btns = o.showCancel === false
-      ? '<button class="w-mb w-mb-ok">' + (o.confirmText || "确定") + "</button>"
-      : '<button class="w-mb w-mb-cancel">' + (o.cancelText || "取消") + "</button>" +
-        '<button class="w-mb w-mb-ok">' + (o.confirmText || "确定") + "</button>";
+      ? '<button class="w-mb w-mb-ok">' + escHtml(o.confirmText || "确定") + "</button>"
+      : '<button class="w-mb w-mb-cancel">' + escHtml(o.cancelText || "取消") + "</button>" +
+        '<button class="w-mb w-mb-ok">' + escHtml(o.confirmText || "确定") + "</button>";
     d.innerHTML = '<div class="w-modal-box"><div class="w-mtitle"></div><div class="w-mcontent"></div>' +
       '<div class="w-mbtns">' + btns + "</div></div>";
     d.querySelector(".w-mtitle").textContent = o.title || "提示";
@@ -179,7 +188,7 @@
     o = o || {};
     var d = layer("w-sheet");
     var items = (o.itemList || []).map(function (t, i) {
-      return '<button class="w-sh-item" data-i="' + i + '">' + String(t) + "</button>";
+      return '<button class="w-sh-item" data-i="' + i + '">' + escHtml(t) + "</button>";
     }).join("");
     d.innerHTML = '<div class="w-sh-box">' + items + '<button class="w-sh-cancel">取消</button></div>';
     d.addEventListener("click", function (e) {
@@ -692,7 +701,7 @@
     if (!current || !root) return;
     var tpl = global.__TPL && global.__TPL[current.__path];
     if (!tpl) {
-      root.innerHTML = '<div class="w-err">页面模板缺失：' + current.__path + "</div>";
+      root.innerHTML = '<div class="w-err">页面模板缺失：' + escHtml(current.__path) + "</div>";
       return;
     }
     // 记录焦点与滚动，重建后恢复（整页重建最怕输入框失焦）
@@ -707,7 +716,7 @@
       node = tpl(__h, __c, __t, __pick, scopeOf(current.data));
     } catch (e) {
       console.error("[web] 渲染异常", current.__path, e);
-      root.innerHTML = '<div class="w-err">渲染异常：' + (e && e.message) + "</div>";
+      root.innerHTML = '<div class="w-err">渲染异常：' + escHtml(e && e.message) + "</div>";
       return;
     }
     var kids = (node == null) ? [] : (Array.isArray(node) ? node : [node]);
@@ -809,12 +818,12 @@
         if (!PAGES[pagePath]) global.__require("__entry__", "./" + pagePath + ".js");
       } catch (e) {
         console.error("[web] 页面加载失败", pagePath, e);
-        root.innerHTML = '<div class="w-err">页面加载失败：' + pagePath + "<br/>" + (e && e.message) + "</div>";
+        root.innerHTML = '<div class="w-err">页面加载失败：' + escHtml(pagePath) + "<br/>" + escHtml(e && e.message) + "</div>";
         return;
       }
       LOADING = null;
       if (!PAGES[pagePath]) {
-        root.innerHTML = '<div class="w-err">页面未注册：' + pagePath + "</div>";
+        root.innerHTML = '<div class="w-err">页面未注册：' + escHtml(pagePath) + "</div>";
         return;
       }
       current = createInstance(pagePath);

@@ -8,8 +8,9 @@ import fs from "fs";
 import zlib from "zlib";
 import { execSync } from "child_process";
 
-const keys = fs.readFileSync("tools/geocode.keys", "utf8")
+const keys = (() => { try { return fs.readFileSync("tools/geocode.keys", "utf8"); } catch (e) { return ""; } })()
   .split(/\r?\n/).map((s) => s.trim()).filter((s) => /^[a-zA-Z0-9]{28,40}$/.test(s));
+if (!keys.length) { console.error("无可用 key（tools/geocode.keys）：请检查 key 池，勿发出空 key 请求"); process.exit(1); }
 
 function load(p) {
   const raw = fs.readFileSync(p, "utf8");
