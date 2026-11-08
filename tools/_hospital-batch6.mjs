@@ -29,7 +29,7 @@ const CITIES = PACK.CITIES || [];
 const file = "utils/emergency-data.js";
 const src = fs.readFileSync(file, "utf8");
 const m = src.match(/const HOSPITALS = (\{[\s\S]*?\n\});/);
-const cur = eval("(" + m[1] + ")");
+const cur = new Function("return (" + m[1] + ");")();
 
 function normCit(n) {
   let s = n.replace(/市$|地区$|盟$|县$/, "");

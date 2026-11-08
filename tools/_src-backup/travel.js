@@ -1466,6 +1466,10 @@ function importBackup(json) {
  if (raw.length > 1500000) throw new Error("备份内容过大（超过 1.5MB），已中止导入");
  const o = JSON.parse(raw);
  if (!o || o.v !== 1) throw new Error("不是有效的备份内容");
+ // v1.20.4：结构防御，避免脏数据写入后渲染期崩溃（审计 #24）
+ if (o.plan && (typeof o.plan !== "object" || (o.plan.days && !Array.isArray(o.plan.days)))) throw new Error("备份中行程结构损坏");
+ if (o.ledger && !Array.isArray(o.ledger)) throw new Error("备份中账本结构损坏");
+ if (o.plan && o.plan.days && o.plan.days.length > 60) o.plan.days = o.plan.days.slice(0, 60);
  let n = 0;
  // v1.10.1：导入统一按各键容量上限裁剪，与运行时写入保持一致
  const CAP = {};

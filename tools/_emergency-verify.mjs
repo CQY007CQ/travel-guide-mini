@@ -10,7 +10,16 @@
  */
 import fs from "fs";
 import zlib from "zlib";
-import { execSync } from "child_process";
+// v1.20.4：用原生 fetch 替代 execSync('curl ...')，避免 shell 拼接注入
+async function getJSON(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const resp = await fetch(url, { signal: ctrl.signal });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    return await resp.json();
+  } finally { clearTimeout(timer); }
+}
 
 const keys = fs.readFileSync("tools/geocode.keys", "utf8")
   .split(/\r?\n/).map((s) => s.trim()).filter((s) => /^[a-zA-Z0-9]{28,40}$/.test(s));
@@ -34,11 +43,11 @@ const km = (la1, lo1, la2, lo2) => {
 };
 
 let ki = 0;
-function query(q, city) {
+async function query(q, city) {
   const k = keys[ki++ % keys.length];
   const url = `https://restapi.amap.com/v3/geocode/geo?key=${k}&address=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`;
   try {
-    const res = JSON.parse(execSync(`curl -s --max-time 12 "${url}"`, { encoding: "utf8" }));
+    const res = await getJSON(url);
     const g = res.geocodes && res.geocodes[0];
     if (String(res.infocode) === "10000" && g && g.location) {
       const [lon, lat] = g.location.split(",").map(Number);
@@ -67,7 +76,7 @@ for (const h of raw) {
     const variants = [`${h.city}${h.name}`, `${h.name}总院`, `${h.name}本部`];
     for (const v of variants) {
       if (!why) break;
-      const rr = query(v, h.city);
+      const rr = await query(v, h.city);
       const w = judge(h, rr);
       if (!w) { r = rr; why = null; break; }
       await sleep(150);

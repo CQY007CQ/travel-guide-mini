@@ -17,7 +17,7 @@
 
 > 本审计初稿（108 项）提交于 `85cf4e2`，此后本会话已落地 `3963cd0`、`6133f09` 等修复提交，对初稿中若干条目产生影响。下文以"状态"标注，避免与条目正文冲突；条目正文保留原始问题描述作为历史记录。
 
-### ✅ 本会话已修复（对应 commit 3963cd0 / 6133f09，版本 v1.20.3）
+### ✅ 本会话已修复（v1.20.3：commit 3963cd0 / 6133f09；v1.20.4：下列 #20/#21/#24/#28）
 
 | 条目 | 原问题 | 修复方式 | 当前证据 |
 | --- | --- | --- | --- |
@@ -27,6 +27,10 @@
 | #12 | 删账后 6s 内离页导致照片残留 | 清理定时器改**模块作用域** `_billImgCleanups`，不随页面 `onUnload` 销毁 | `subpkg/ledger/ledger.js:18,385-398`（v1.20.3） |
 | #61 | 账单列表 `wx:key="i"` 不稳定下标 | 改为 `wx:key="_id"`（账单稳定 id） | `subpkg/ledger/ledger.wxml:83` |
 | #71 | `del` 的 `this._undoT` 定时器随页面销毁 | 同 #12，模块作用域定时器，与 `onUnload` 解耦 | `subpkg/ledger/ledger.js`（见 #12） |
+| #20 | 构建脚本 `eval` 解析外部片段 | 改 `new Function("return (" + m[1] + ");")()`，受限作用域解析（v1.20.4） | `tools/_hospital-batch5.mjs:24` / `_hospital-batch6.mjs:32` |
+| #21 | 构建脚本 `execSync('curl ...')` 拼接 URL | 抽 `getJSON()`（`fetch` + `AbortController` 12s 超时）替代；4 个脚本同步改造（v1.20.4） | `tools/_food-geocode.mjs` / `_emergency-verify.mjs` / `_emergency-geocode2.mjs` / `add-key.mjs` |
+| #24 | 备份/协作包导入无结构校验 | `importBackup` 解析后校验 plan/ledger 结构与 `days≤60`，脏数据抛明确错误（v1.20.4，已 build 至 `utils/travel.js`） | `tools/_src-backup/travel.js` importBackup |
+| #28 | 生产包 `data.js` 残留 13 处 `console.warn` | 抽 `_dw()` 并以 `wx.getAccountInfoSync().miniProgram.envVersion!=="release"` 为门禁，正式版屏蔽（v1.20.4） | `tools/_src-backup/data.js` + `utils/data.js` |
 
 ### 🔧 条目行号 / 事实更正
 

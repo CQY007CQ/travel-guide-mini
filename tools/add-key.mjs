@@ -18,7 +18,16 @@
  *   本脚本只做接入与验活，不包含任何规避风控的手段。
  */
 import fs from "fs";
-import { execSync } from "child_process";
+// v1.20.4：用原生 fetch 替代 execSync('curl ...')，避免 shell 拼接注入
+async function getJSON(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const resp = await fetch(url, { signal: ctrl.signal });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    return await resp.json();
+  } finally { clearTimeout(timer); }
+}
 
 const KEY = (process.argv[2] || "").trim();
 const NOTE = (process.argv[3] || "").trim();
@@ -40,10 +49,7 @@ if (s.indexOf(KEY) >= 0) {
 
 let j = {};
 try {
-  j = JSON.parse(execSync(
-    `curl -s --max-time 12 "${PROBE_URL}?key=${KEY}&address=${encodeURIComponent("大同")}"`,
-    { encoding: "utf8" }
-  ));
+  j = await getJSON(PROBE_URL + "?key=" + KEY + "&address=" + encodeURIComponent("大同"));
 } catch (e) {
   console.error("✗ 网络请求失败，未写入");
   process.exit(3);

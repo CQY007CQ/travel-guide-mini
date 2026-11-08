@@ -4,7 +4,16 @@
  * 输出 tools/_emergency-coords2.json，交由 _emergency-verify.mjs 做质量闸门
  */
 import fs from "fs";
-import { execSync } from "child_process";
+// v1.20.4：用原生 fetch 替代 execSync('curl ...')，避免 shell 拼接注入
+async function getJSON(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const resp = await fetch(url, { signal: ctrl.signal });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    return await resp.json();
+  } finally { clearTimeout(timer); }
+}
 
 const keys = fs.readFileSync("tools/geocode.keys", "utf8")
   .split(/\r?\n/).map((s) => s.trim()).filter((s) => /^[a-zA-Z0-9]{28,40}$/.test(s));
@@ -74,7 +83,7 @@ for (const h of LIST) {
   const url = `https://restapi.amap.com/v3/geocode/geo?key=${k}&address=${encodeURIComponent(h.name)}&city=${encodeURIComponent(h.city)}`;
   let res = {};
   try {
-    res = JSON.parse(execSync(`curl -s --max-time 12 "${url}"`, { encoding: "utf8" }));
+    res = await getJSON(url);
   } catch (e) {}
   const g = res.geocodes && res.geocodes[0];
   const ok = String(res.infocode) === "10000" && g && g.location;

@@ -8,6 +8,13 @@ const pako = require("./pako-inflate.js");
 let HA = {};
 try { HA = require("./hotel-areas.js"); } catch (e) { HA = {}; }
 
+// v1.20.4：正式版(release)小程序屏蔽数据自检日志；开发版/体验版/Node 工具链仍可见
+const __dataLog = (function () {
+  if (typeof wx === "undefined") return true;
+  try { return wx.getAccountInfoSync().miniProgram.envVersion !== "release"; } catch (e) { return true; }
+})();
+function _dw() { if (__dataLog && typeof console !== "undefined" && console.warn) console.warn.apply(console, arguments); }
+
 const DATA = {
   CITIES: [], SPOT_COORDS: {}, CITY_COORDS: {}, PROVINCE_CITIES: {}, PROVINCES: [],
   CITY2PROV: {}, SPOT_INFO: {}, FOOD_SPOTS: {}, GENERIC_SPOT_WORDS: [], BUDGETS: {}, BUDGET_STYLE: {},
@@ -70,7 +77,7 @@ function applySpotCoordAdd() {
     arr.push([name, lat, lon]);
     _spotCoordAdded++;
   }
-  if (_spotCoordAdded) console.warn("[data] 模糊 POI 坐标补录 " + _spotCoordAdded + " 个");
+  if (_spotCoordAdded) _dw("[data] 模糊 POI 坐标补录 " + _spotCoordAdded + " 个");
 }
 
 // v1.19.174 稀疏县景点补全：给数据稀疏、行程易出空天的旅游小城追加经公开权威核实的真实景点坐标。
@@ -101,7 +108,7 @@ function applySpotEnrich() {
     arr.push([name, lat, lon]);
     _spotEnriched++;
   }
-  if (_spotEnriched) console.warn("[data] 稀疏县景点补全 " + _spotEnriched + " 个");
+  if (_spotEnriched) _dw("[data] 稀疏县景点补全 " + _spotEnriched + " 个");
 }
 
 // v1.19.182 美食富信息扩城：把「非试点 20 城」的热门旅游城，补上经公开资料核验的
@@ -137,7 +144,7 @@ function applyFoodEnrich() {
     if (!shop.rep) shop.rep = rep;
     if (!shop.note) shop.note = note;
   }
-  if (_foodEnriched) console.warn("[data] 美食富信息扩城 " + _foodEnriched + " 家（增量合并）");
+  if (_foodEnriched) _dw("[data] 美食富信息扩城 " + _foodEnriched + " 家（增量合并）");
 }
 
 // v1.19.182 团队合并入口：由 tools/_merge-team-enrich.mjs 把 7 人分区采集结果注入 TEAM_FOOD_ENRICH。
@@ -166,7 +173,7 @@ function applyTeamFoodEnrich() {
       if (!shop.note) shop.note = sh.note;
     }
   }
-  if (_teamFoodAdded) console.warn("[data] 团队美食合并 " + _teamFoodAdded + " 家（增量合并）");
+  if (_teamFoodAdded) _dw("[data] 团队美食合并 " + _teamFoodAdded + " 家（增量合并）");
 }
 
 // v1.19.192 v206 美食坐标补全：11 家已入库美食店此前带 (0,0) 占位坐标（无真实可导航点），
@@ -194,7 +201,7 @@ function applyFoodCoordBackfill() {
       ex.lat = +e[1]; ex.lon = +e[2]; _foodCoordBackfilled++;
     }
   }
-  if (_foodCoordBackfilled) console.warn("[data] v206 美食坐标回写 " + _foodCoordBackfilled + " 家");
+  if (_foodCoordBackfilled) _dw("[data] v206 美食坐标回写 " + _foodCoordBackfilled + " 家");
 }
 
 // v1.19.167 景点去重：同城 SPOT_COORDS 内出现完全同名的重复副本（仙桃/天门/潜江 等，
@@ -215,7 +222,7 @@ function dedupeSpots() {
     }
     DATA.SPOT_COORDS[city] = out;
   }
-  if (_dedupRemoved) console.warn("[data] 同城重复景点去重移除 " + _dedupRemoved + " 条副本");
+  if (_dedupRemoved) _dw("[data] 同城重复景点去重移除 " + _dedupRemoved + " 条副本");
 }
 
 // v1.19.169 气候派生补齐 best 季节字段：打包基数据里部分城市缺 best（约 331 城），
@@ -240,7 +247,7 @@ function fillBestSeason() {
     const v = BEST_BY_CLIMATE[c.climate] || BEST_BY_CLIMATE["temperate"];
     if (v) { c.best = v; _bestFilled++; }
   }
-  if (_bestFilled) console.warn("[data] 气候派生补齐 best 季节字段 " + _bestFilled + " 城");
+  if (_bestFilled) _dw("[data] 气候派生补齐 best 季节字段 " + _bestFilled + " 城");
 }
 
 // v1.19.171 扩展酒店住宿区域：把 utils/hotel-areas.js 的 HOTEL_AREAS_EXTRA（约 60 个热门旅游城市，
@@ -265,7 +272,7 @@ function applyHotelAreasExtra() {
       }
     }
   }
-  if (_hotelAreasMerged) console.warn("[data] 扩展酒店住宿区域并入 " + _hotelAreasMerged + " 条");
+  if (_hotelAreasMerged) _dw("[data] 扩展酒店住宿区域并入 " + _hotelAreasMerged + " 条");
 }
 
 // v1.19.183 逐酒店 + 房型扩展：把 utils/hotel-areas.js 的 HOTEL_LIST_EXTRA（公开常识级具名真酒店种子）
@@ -309,7 +316,7 @@ function applyHotelListExtra() {
   };
   mergeFrom(SRC);
   mergeFrom(TEAM);
-  if (_hotelListMerged) console.warn("[data] 逐酒店+房型并入 " + _hotelListMerged + " 家");
+  if (_hotelListMerged) _dw("[data] 逐酒店+房型并入 " + _hotelListMerged + " 家");
 }
 
 function b64ToBytes(b64) {
@@ -389,16 +396,16 @@ function checkCoordIntegrity() {
       const lat = +row[1], lon = +row[2];
       if (!isFinite(lat) || !isFinite(lon)) continue;
       const dOwn = _hav(lat, lon, cc0[0], cc0[1]);
-      if (dOwn > 1200) { bad++; if (console && console.warn) console.warn("[data] 坐标疑似越界: " + city + "·" + row[0] + " 距城心" + Math.round(dOwn) + "km(>1200)"); continue; }
+      if (dOwn > 1200) { bad++; if (console && console.warn) _dw("[data] 坐标疑似越界: " + city + "·" + row[0] + " 距城心" + Math.round(dOwn) + "km(>1200)"); continue; }
       if (dOwn <= 300) continue; // 热路径：绝大多数景点在此退出，无需反查省份
       // 仅 300~1200km 的少数远景点才反查落点省份
       let prov = null, bd = 1e9;
       for (const [la, lo, p] of centers) { const d = _hav(lat, lon, la, lo); if (d < bd) { bd = d; prov = p; } }
-      if (prov && prov !== cityProv) { bad++; if (console && console.warn) console.warn("[data] 坐标疑似越界: " + city + "·" + row[0] + " 距城心" + Math.round(dOwn) + "km 落点省=" + prov + " 城市省=" + cityProv); }
+      if (prov && prov !== cityProv) { bad++; if (console && console.warn) _dw("[data] 坐标疑似越界: " + city + "·" + row[0] + " 距城心" + Math.round(dOwn) + "km 落点省=" + prov + " 城市省=" + cityProv); }
     }
   }
   _coordWarn += bad;
-  if (bad) console.warn("[data] 坐标完整性自检: 发现 " + bad + " 个疑似越界坐标，请核查 SPOT_COORD_FIX / pack-data 规则");
+  if (bad) _dw("[data] 坐标完整性自检: 发现 " + bad + " 个疑似越界坐标，请核查 SPOT_COORD_FIX / pack-data 规则");
   return bad;
 }
 
@@ -513,7 +520,7 @@ function initData() {
     }
     _loadErr = !!lastErr;
     DATA.__dataReady = true;
-    if (lastErr && typeof console !== "undefined" && console.warn) console.warn("[data] 数据分块加载失败:", lastErr && lastErr.message);
+    if (lastErr && typeof console !== "undefined" && console.warn) _dw("[data] 数据分块加载失败:", lastErr && lastErr.message);
     return DATA;
   })();
   return _ready;

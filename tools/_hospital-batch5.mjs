@@ -21,7 +21,7 @@ const CITY = PACK.CITY_COORDS || {};
 const file = "utils/emergency-data.js";
 const src = fs.readFileSync(file, "utf8");
 const m = src.match(/const HOSPITALS = (\{[\s\S]*?\n\});/);
-const cur = eval("(" + m[1] + ")");
+const cur = new Function("return (" + m[1] + ");")();
 
 const HOT = ["西安", "成都", "重庆", "北京", "杭州", "厦门", "大理", "桂林", "青岛", "敦煌"];
 
