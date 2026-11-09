@@ -96,6 +96,19 @@ try {
   const _f10 = _r10.FOOD_SPOTS_ADD || {};
   for (const _cn in _f10) { if (!foodShops[_cn]) foodShops[_cn] = []; foodShops[_cn] = foodShops[_cn].concat(_f10[_cn]); }
 } catch (e) { /* 无 v210 批次时跳过 */ }
+// v211 美食深度扩城（8 个 cluster 文件，FOOD_SPOTS_ADD，坐标齐备，WebSearch 逐店核实真实店）
+try {
+  const _v211files = [
+    "v211-food-c1.js", "v211-food-c2.js", "v211-food-c3.js",
+    "v211-food-c4a.js", "v211-food-c4b.js", "v211-food-c5.js",
+    "v211-food-c6.js", "v211-food-c7.js"
+  ];
+  for (const _f of _v211files) {
+    const _r = (req("./tools/" + _f) || {});
+    const _fa = _r.FOOD_SPOTS_ADD || {};
+    for (const _cn in _fa) { if (!foodShops[_cn]) foodShops[_cn] = []; foodShops[_cn] = foodShops[_cn].concat(_fa[_cn]); }
+  }
+} catch (e) { /* 无 v211 批次时跳过 */ }
 
 // 内联 cleanSpotName（避免 require utils/travel.js 触发 wx/微信全局，node 下崩溃）
 function cleanSpotName(name) {
