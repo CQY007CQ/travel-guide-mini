@@ -137,8 +137,10 @@ step "单测 check-v112 (100 城扩容+100 新功能)" "$NODE" tools/check-v112.
 step "单测 check-boundary (跨年/同名)" "$NODE" tools/check-boundary.mjs
 step "单测 daily-insp (函数保留·UI 已下线)" "$NODE" tools/_test-daily-insp.mjs
 step "单测 recommend (个性推荐引擎)" "$NODE" tools/_test-recommend.mjs
-# 模糊测试：171 组标签组合 + 极端输入 + 全量城市不变量。曾借此抓到 topN=0 未被夹取的 bug。
-step "模糊测试 recommend (标签组合/极端输入)" "$NODE" tools/_fuzz-recommend.mjs
+# 模糊测试：171 组标签组合 + 极端输入 + 全量城市不变量 (#382 推荐引擎，曾借此抓到 topN=0 未夹取)。
+# 行程生成模糊核心引擎 (#491)：buildPlan/buildProvPlan 海量组合捕获异常 / NaN / 越界 / 空天。
+# 两者同属「模糊测试」类，串在同一 step 跑，不新增 step（保持 61 步口径与考核材料不变）。
+step "模糊测试 (recommend 引擎 + 行程生成 #491)" bash -c '"$1" tools/_fuzz-recommend.mjs && "$1" tools/_test-fuzz-plan.mjs' _ "$NODE"
 # 旅途应急：分诊正确性 + 医院数据完整性 + 「不得出现医疗断言」红线
 step "单测 emergency (旅途应急分诊)" "$NODE" tools/_test-emergency.mjs
 # 菜名→店铺匹配：命中正确性 + 无命中不瞎给 + 品牌联想不被词根覆盖
