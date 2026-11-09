@@ -6,6 +6,17 @@
 
 ---
 
+## 审计概览索引（压缩导航：126 条 → 速查）
+
+- **条目总数**：126（维度一～五 + 网页版 109–126）。
+- **严重度分布**：高 8（含 1 已修复 / 1 业务约束）· 中 57 · 低 61。
+- **高严重度速查**：#12 #73 #77 #79 #91 #92 #95 #117（#117 和风 Key 为合规红线；#12 坐标基线）。
+- **已闭环**：7 条（#109/#110/#111/#113/#114/#118/#119，见各条 ✅ 标注）。
+- **未闭环中危（建议优先）**：#112 内联 HTML 习惯 · #115 出站 safeFetch（本轮 CSP connect-src 已收敛策略层）· #116 全量数据前端暴露 · #121 两端能力对齐（抽 utils/ai-core）· #122 双构建单改动 · #123 缺单测 · #124 美食 price 类型 · #125 SPOT_COORDS 置信度标注。
+- 详细条目见下文各维度。
+
+---
+
 ## 维度一 · 数据真实性与有效性（第 1–28 条）
 
 **第 1 条**
@@ -877,6 +888,7 @@
 - 严重程度：中
 - 优化建议：在 `<head>` 增加 `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">`（样式需 inline 故放行 style），并逐步把内联脚本改外部文件。
 - 修改前后对比：前 无 CSP；后 限定 self 源 + 逐步去内联。
+- 状态：**✅ 已闭环（2026-11-10）**：`web/index.html` 已加 `Content-Security-Policy` meta（default-src 'self'；script/style 暂放行 inline 因历史内联；connect-src 仅放行 `*.qweatherapi.com`/`*.amap.com`，可选大模型 api.openai.com 被拦后优雅回退离线助手；#115 出站门禁在策略层一并收敛）。
 
 **第 115 条**
 - 类型：安全
