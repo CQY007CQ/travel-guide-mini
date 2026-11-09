@@ -351,7 +351,7 @@
             <view wx:if="{{it.fnote && !it.f}}" class="tl-fnote">我评：{{it.fnote}}</view>
             <view wx:if="{{open === i + di * 100 && detailText}}" class="spot-detail">
               <view class="detail-acts">
-                <text wx:if="{{!it.f}}" class="d-btn d-btn-main" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onSwap">换一个</text>
+                <text wx:if="{{!it.f}}" class="d-btn d-btn-main" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onSwap">换一个 ▾</text>
                 <text wx:if="{{!it.f}}" class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onMoveTo">移到其他天</text>
                 <text wx:if="{{!it.f}}" class="d-btn d-btn-del" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onDelSpot">删掉</text>
                 <text class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onBaike">百科</text>

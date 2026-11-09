@@ -214,12 +214,15 @@ const noThrow = (name, fn) => { try { fn(); ck(name, true); } catch (e) { ck(nam
 /* ============ 8. onSwap / onTagSwap / onDelSpot / onDayAdd：分支命中 → _save + toast ============ */
 {
   // 2026-11-09：onSwap 改为「打开选择面板」，不再立即随机替换
-  const T = makeT();
-  const { run, ctx } = makeFn("onSwap");
+  const T = makeT({ getWish: () => [{ name: "同城点", city: "西安" }, { name: "外城点", city: "北京" }] });
+  const { run, ctx } = makeFn("onSwap", T);
   const page = makePage(ctx, planOf());
   run(page, ev(0, 0));
   ck("onSwap·打开换景点面板（不立即替换）", page.data && page.data.swapOpen === true && page._saved === undefined);
   ck("onSwap·面板带上当前景点名与候选", page.data && page.data.swapCur === "兵马俑" && Array.isArray(page.data.swapList));
+  // 地理一致性：想玩/收藏只列当天这座城，外城景点不得混入
+  const _wish = (page.data && page.data.swapWish) || [];
+  ck("onSwap·收藏只含同城景点（排除外城）", _wish.indexOf("同城点") >= 0 && _wish.indexOf("外城点") < 0, _wish.join("|"));
 }
 {
   // 面板里选中具体景点 → _applySwap 执行替换 + _save + toast

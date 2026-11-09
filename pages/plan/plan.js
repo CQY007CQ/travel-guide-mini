@@ -1086,7 +1086,14 @@ Page(SafePage({
   (plan.days || []).forEach(d => (d.items || []).forEach(x => { const k = T.cleanSpotName(x && x.name); if (k) used[k] = 1; }));
   let wish = [];
   try {
-   wish = (T.getWish() || []).map(x => String((x && x.name) || "").trim())
+   // 2026-11-09：只换「当天这座城」的想玩/收藏，避免把外城景点塞进当天（地理一致性）
+   const dayCity = (T.segCityOfDay ? T.segCityOfDay(plan, di) : "") || plan.cityName || "";
+   wish = (T.getWish() || [])
+    .filter(w => {
+     const wc = String((w && w.city) || "");
+     return !wc || !dayCity || wc === dayCity; // 老数据无 city 的保留（无法判定，别一刀切隐藏）
+    })
+    .map(w => String((w && w.name) || "").trim())
     .filter(n => n && T.cleanSpotName(n) !== curKey && !used[T.cleanSpotName(n)]);
   } catch (err) { wish = []; }
   this.setData({
