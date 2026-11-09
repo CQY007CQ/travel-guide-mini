@@ -221,7 +221,7 @@ Page(SafePage({
           title: "行前与账本",
           menus: [
             { key: "prep", icon: "ticket", t: "出行准备", d: "票价预约 / 酒店比价 / 团队分工" },
-            { key: "boost", icon: "sparkle", t: "行程增强", d: "体检 / 问答 / 一键换景点 / 成就" },
+            { key: "boost", icon: "sparkle", t: "行程增强", d: "体检 / 问答 / 动线 / 高光 / 成就" },
             { key: "ledger", icon: "wallet", t: "记账 · AA", d: "随手记一笔，对比预算" }
           ]
         },

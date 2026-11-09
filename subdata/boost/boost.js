@@ -1,5 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
-// 行程增强页：聚合新功能（体检/问答/换景点/动线/高光/错峰/行李/成就/年报/点亮/交通/记账/照片/复制）
+// 行程增强页：聚合新功能（体检/问答/动线/高光/错峰/行李/成就/年报/点亮/记账/照片/复制）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
 const app = getAppSafe();
@@ -12,8 +12,6 @@ Page(SafePage({
     checkup: { score: 0, items: [], tips: [] },
     question: "",
     qAns: "",
-    alts: [],
-    altPage: 0,
     routeTips: [],
     highs: [],
     crowd: { txt: "暂无行程日期" },
@@ -21,9 +19,6 @@ Page(SafePage({
     badges: [],
     yearTxt: "",
     liteTxt: "",
-    cityA: "",
-    cityB: "",
-    trans: "",
     amt: "",
     photoN: 0
   },
@@ -42,42 +37,26 @@ Page(SafePage({
     const plan = app.globalData && app.globalData.plan;
     this.setData({ hasPlan: !!(plan && plan.days && plan.days.length) });
     if (!plan || !plan.days) {
-      this.setData({ checkup: { score: 0, items: [], tips: [] }, alts: [], routeTips: [], highs: [] });
+      this.setData({ checkup: { score: 0, items: [], tips: [] }, routeTips: [], highs: [] });
       return;
     }
-    const pk = plan.cityName || (plan.days[0] && plan.days[0].cityName) || "";
     const ck = T.planCheckup(plan);
     const hs = T.highlightOf(plan);
     const rt = T.routeAdvicePlus(plan).map(x => "D" + x.day + " " + x.from + " → " + x.to + " " + x.km + "km：" + x.tip);
     const firstDate = String(((plan.days && plan.days[0]) || {}).date || "").slice(0, 10);
     const cr = T.crowdTipOf(firstDate);
     const pkExtra = T.packExtra(plan);
-    const alts = this._altsOf(plan, pk, this.data.altPage || 0);
     this.setData({
       checkup: ck,
       highs: hs.slice(0, 5),
       routeTips: rt.slice(0, 3),
       crowd: cr,
       packStr: pkExtra.join("、"),
-      alts: alts.slice(0, 4),
       badges: T.badgesOf(),
       yearTxt: this._yearTxt(),
       liteTxt: this._liteTxt(),
       photoN: (S.get("boostPhotosV1", []) || []).length
     });
-  },
-
-  _altsOf(plan, cn, page) {
-    try {
-      const d0 = plan.days && plan.days[0] && plan.days[0].items;
-      const first = (d0 || []).find(x => {
-        const n = String(x.name || "");
-        return n.length >= 3 && !/^(抵达|退房|返程|出发前往|前往|入住|回酒店|凌晨出发|深度游览|继续)/.test(n)
-          && !/自由活动|自由探索|休整|早餐|晚餐|馆子|夜市|小吃|美食|留白/.test(n);
-      });
-      // 每页 4 条，与卡片展示条数一致，避免批次间跳过候选
-      return first ? T.swapSpotFor(plan, first.name, cn, page || 0, 4) : [];
-    } catch (e) { return []; }
   },
 
   _yearTxt() {
@@ -98,35 +77,6 @@ Page(SafePage({
     if (!plan) { this.setData({ qAns: "先在首页生成一份行程" }); return; }
     const ans = T.askTrip(plan, this.data.question);
     this.setData({ qAns: ans ? ans.txt : "这个问题我还没学会，试试「第2天去哪 / 下雨怎么办 / 改成5天」" });
-  },
-
-  refreshAlts() {
-    const plan = app.globalData && app.globalData.plan;
-    const toast = (t) => { try { wx.showToast({ title: t, icon: "none", duration: 1000 }); } catch (e) {} };
-    if (!plan || !plan.days) { toast("先在首页生成行程"); return; }
-    const pk = plan.cityName || (plan.days[0] && plan.days[0].cityName) || "";
-    const next = (this.data.altPage || 0) + 1;
-    let list = [];
-    try { list = this._altsOf(plan, pk, next) || []; } catch (e) { list = []; }
-    if (!list.length) { toast("暂无同类替代景点"); return; }
-    const sig = list.map(x => x.name).join("|");
-    const prev = (this.data.alts || []).map(x => x.name).join("|");
-    if (sig === prev) {
-      // 候选已轮完一圈：回到第一批，保证每次点击都有可见反馈
-      const first = this._altsOf(plan, pk, 0) || [];
-      this.setData({ altPage: 0, alts: first });
-      toast("已看完，回到第一批");
-      return;
-    }
-    this.setData({ altPage: next, alts: list });
-    toast("第 " + (next + 1) + " 批");
-  },
-
-  onAInput(e) { this.setData({ cityA: e.detail.value }); },
-  onBInput(e) { this.setData({ cityB: e.detail.value }); },
-  calcTrans() {
-    const r = T.transportEstimate(this.data.cityA.trim(), this.data.cityB.trim());
-    this.setData({ trans: r ? (r.railText + "，" + r.price + "；" + r.hotel) : "暂未收录这对城市的出行数据" });
   },
 
   onAmtInput(e) { this.setData({ amt: e.detail.value }); },
@@ -167,6 +117,6 @@ Page(SafePage({
   },
 
   onShareAppMessage() {
-    return { title: "行程增强：体检、问答、一键换景点", path: "/pages/index/index" };
+    return { title: "行程增强：体检、问答、动线、高光", path: "/pages/index/index" };
   }
 }));

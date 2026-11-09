@@ -1,7 +1,7 @@
 <view class="page fz{{fz}}">
   <view class="hd">
     <text class="hd-title">行程增强</text>
-    <text class="hd-sub">体检 / 问答 / 换景点 / 动线 / 高光</text>
+    <text class="hd-sub">体检 / 问答 / 动线 / 高光 / 提醒</text>
   </view>
 
   <view class="card">
@@ -29,16 +29,6 @@
   </view>
 
   <view class="card">
-    <view class="card-head"><text class="card-title">一键换景点</text></view>
-    <view wx:for="{{alts}}" wx:key="name" class="row">
-      <text class="row-txt">{{item.name}} · {{item.tags}}</text>
-    </view>
-    <view wx:if="{{alts.length}}" class="btn-row">
-      <button size="mini" bindtap="refreshAlts">换一批</button>
-    </view>
-  </view>
-
-  <view class="card">
     <view class="card-head"><text class="card-title">动线与高光</text></view>
     <view wx:for="{{routeTips}}" wx:key="*this" class="tip">{{item}}</view>
     <view wx:for="{{highs}}" wx:key="name" class="row">
@@ -62,16 +52,6 @@
     </view>
     <view class="row"><text class="row-txt">今年：{{yearTxt}}</text></view>
     <view class="row"><text class="row-txt">点亮：{{liteTxt}}</text></view>
-  </view>
-
-  <view class="card">
-    <view class="card-head"><text class="card-title">交通</text></view>
-    <view class="qbar">
-      <input class="qinput" placeholder="出发城市" value="{{cityA}}" bindinput="onAInput" />
-      <input class="qinput" placeholder="到达城市" value="{{cityB}}" bindinput="onBInput" />
-      <button class="mini-btn" size="mini" bindtap="calcTrans">估</button>
-    </view>
-    <view wx:if="{{trans}}" class="ans">{{trans}}</view>
   </view>
 
   <view class="card">

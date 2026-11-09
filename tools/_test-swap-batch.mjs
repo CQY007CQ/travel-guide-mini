@@ -16,7 +16,7 @@
  *  2) 运行时：默认调用（省略 offset/limit）仍与旧版「取前 5 条」一致，旧调用方不受影响
  *  3) 运行时：批内无重复、字段完整、条数受 limit 约束
  *  4) 运行时：轮转若干批后能回到第一批，且空/脏参数不抛错
- *  5) 静态：boost.js 的 refreshAlts 不再只是 this.refresh()，wxml 仍绑定该 handler
+ *  5) 静态：boost 页已移除「一键换景点」（该卡只列候选、无法真正替换，用户反馈未实装）
  *  6) 静态：真源 swapSpotFor 仍保留 offset/limit 签名，三处版本一致
  */
 import { createRequire } from "module";
@@ -94,19 +94,17 @@ try {
 } catch (e) { robust = false; }
 ok("空 plan / 空名称 / 负 offset 均返回数组不抛错", robust);
 
-// ---------- 5. 静态：boost 页 handler 与按钮绑定 ----------
+// ---------- 5. 静态：boost 页已移除「一键换景点」（该卡只列候选、无法真正替换，用户反馈未实装）----------
 const boostJs = read("subdata/boost/boost.js");
 const boostWxml = read("subdata/boost/boost.wxml");
-const handler = boostJs.slice(boostJs.indexOf("refreshAlts()"), boostJs.indexOf("onAInput(e)"));
-ok("boost.js 存在 refreshAlts 方法", handler.length > 50);
-ok("refreshAlts 不再只是重复 this.refresh()", !/refreshAlts\(\)\s*\{\s*this\.refresh\(\);?\s*\}/.test(boostJs));
-ok("refreshAlts 递增 altPage 并写回", handler.includes("altPage") && handler.includes("setData"));
-ok("refreshAlts 按 next 页取候选", handler.includes("_altsOf(plan, pk, next)"));
-ok("refreshAlts 有可见 toast 反馈", handler.includes("showToast"));
-ok("boost.js 维护 altPage 初始状态", /altPage:\s*0/.test(boostJs));
-ok("_altsOf 把页码透传给 swapSpotFor", /T\.swapSpotFor\(plan,\s*first\.name,\s*cn,\s*page\s*\|\|\s*0,\s*4\)/.test(boostJs));
-ok("wxml 的换一批按钮仍绑定 refreshAlts", boostWxml.includes('bindtap="refreshAlts"'));
-ok("wxml 候选列表仍绑定 alts（换批会重渲染）", boostWxml.includes('wx:for="{{alts}}"'));
+ok("boost.wxml 不再有「一键换景点」卡片", !boostWxml.includes("一键换景点"));
+ok("boost.js 不再有 refreshAlts / _altsOf / altPage",
+  !/refreshAlts\s*\(/.test(boostJs) && !/_altsOf\s*\(/.test(boostJs) && !/altPage/.test(boostJs));
+ok("boost.wxml 不再绑定 alts / refreshAlts",
+  !boostWxml.includes("{{alts}}") && !boostWxml.includes('bindtap="refreshAlts"'));
+ok("boost.wxml 不再有「交通」估算卡", !boostWxml.includes("calcTrans"));
+ok("boost.js 不再有 calcTrans / cityA / cityB",
+  !/calcTrans\s*\(/.test(boostJs) && !/cityA/.test(boostJs) && !/cityB/.test(boostJs));
 
 // ---------- 6. 静态：真源签名与三处版本一致 ----------
 const src = read("tools/_src-backup/travel.js");
