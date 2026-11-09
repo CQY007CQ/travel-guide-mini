@@ -384,7 +384,9 @@ Page(SafePage({
      if (idx === 0) {
       R.addToCalendar(item).then((okd) => {
        R.add(Object.assign({}, item, { via: "calendar" }));
-       wx.showToast({ title: okd ? "已加入手机日历" : "日历写入失败，可改用自己手机日历手动添加", icon: "none" });
+       if (okd) { wx.showToast({ title: "已加入手机日历", icon: "none" }); return; }
+       // 2026-11-09：小程序没有写系统日历的 API → 直接给 .ics 文件（发送到聊天，点开即可导入）
+       this._shareICS(plan);
       });
      } else if (idx === 1) {
       R.requestSubscribe().then(() => {
@@ -794,11 +796,11 @@ Page(SafePage({
      try { isWeb = !!(wx.getAccountInfoSync && wx.getAccountInfoSync().miniProgram.appId === "web"); } catch (e) {}
      wx.showToast({ title: isWeb ? "已下载日历文件（.ics）" : "已加入手机日历", icon: "success" });
     },
-    fail: () => this._icsCopy(plan)
+    fail: () => this._shareICS(plan)
    });
    return;
   }
-  this._icsCopy(plan);
+  this._shareICS(plan);
  },
  // 兜底：旧版微信/不支持 addPhoneCalendar 时，退回「复制 .ics」
  _icsCopy(plan) {
@@ -812,6 +814,30 @@ Page(SafePage({
     showCancel: false, confirmText: "好的"
    })
   });
+ },
+
+ // 2026-11-09：小程序里没有 wx.addPhoneCalendar（写系统日历）→ 生成 .ics 并调起「发送到聊天」，
+  // 用户在手机上点开该文件即可导入系统日历。任何异常都退回「复制 .ics 文本」。
+ _shareICS(plan) {
+  let ics = "";
+  try { ics = T.exportICS(plan) || ""; } catch (e) { ics = ""; }
+  if (!ics) { wx.showToast({ title: "暂无行程可导出", icon: "none" }); return; }
+  try {
+   const fsm = wx.getFileSystemManager ? wx.getFileSystemManager() : null;
+   const dir = (wx.env && wx.env.USER_DATA_PATH) || "";
+   if (!fsm || !dir) return this._icsCopy(plan);
+   const path = dir + "/trip_" + Date.now() + ".ics";
+   fsm.writeFileSync(path, ics, "utf8");
+   if (typeof wx.shareFileMessage === "function") {
+    wx.shareFileMessage({
+     filePath: path,
+     fileName: "行程日历.ics",
+     fail: () => this._icsCopy(plan)
+    });
+   } else {
+    this._icsCopy(plan);
+   }
+  } catch (e) { this._icsCopy(plan); }
  },
 
  onEnd() {

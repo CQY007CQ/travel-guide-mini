@@ -143,6 +143,12 @@ await T.ready();
     _cs.climate.reduce((a, b) => a + b.n, 0) === _cs.cities && _cs.region.reduce((a, b) => a + b.n, 0) === _cs.cities);
 }
 
+// ── v1.20.6 日历：小程序无写系统日历 API → 失败要落到 .ics 文件（不能只弹一句提示）──
+{
+  const _planSrc2 = fs.readFileSync(path.join(ROOT, "pages/plan/plan.js"), "utf8");
+  ok("v1.20.6 日历写入失败时提供 .ics 文件", /_shareICS\(plan\)/.test(_planSrc2) && /shareFileMessage/.test(_planSrc2));
+}
+
 // ── v1.20.6 本机数据洞察：未加载不渲染空壳（回退 null）+ 分包模块到位后主动 refresh ──
 {
   const _moreSrc = fs.readFileSync(path.join(ROOT, "pages/more/more.js"), "utf8");
