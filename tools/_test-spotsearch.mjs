@@ -59,5 +59,14 @@ ok("范围限定哈尔滨：结果全部属于哈尔滨", rHb.results.length > 0
 const rGugong = SS.searchSpots({ text: "故宫", D, limit: 10 });
 ok("文本兜底「故宫」命中名称含故宫的景点", rGugong.results.length > 0 && rGugong.results.some(x => x.name.indexOf("故宫") >= 0));
 
+// 7) 结果行动作（2026-11-09）：找到景点可直接加入「想玩」（防回潮：按钮/接线不能掉）
+const fs = req("fs");
+const path = req("path");
+const sWxml = fs.readFileSync(path.join(process.cwd(), "subpkg/spotsearch/spotsearch.wxml"), "utf8");
+const sJs = fs.readFileSync(path.join(process.cwd(), "subpkg/spotsearch/spotsearch.js"), "utf8");
+ok("spotsearch.wxml 结果行绑定 onWant（加入想玩）", sWxml.includes('bindtap="onWant"') && sWxml.includes("rs.wished"));
+ok("spotsearch.js 用 isWished+toggleWish 且按行回写 wished",
+  sJs.includes("T.isWished(") && sJs.includes("T.toggleWish(") && sJs.includes("wished: added"));
+
 console.log(fail === 0 ? "\n✅ 全部通过" : "\n❌ 失败 " + fail + " 项");
 process.exit(fail === 0 ? 0 : 1);

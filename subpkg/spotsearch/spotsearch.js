@@ -143,8 +143,10 @@ Page(SafePage({
       D: D,
       limit: 80
     });
+    // 结果行带上「是否已在想玩」状态，供按钮显示 加入想玩 / 已想玩
+    const results = (r.results || []).map(x => Object.assign({}, x, { wished: T.isWished(x.name) }));
     this.setData({
-      results: r.results,
+      results: results,
       stat: r.mode === "empty" ? "" : (r.total ? ("为你锁定 " + r.total + " 个最贴合的景点") : ""),
       mode: r.mode,
       hint: r.hint,
@@ -172,6 +174,22 @@ Page(SafePage({
       success: () => wx.showToast({ title: "已复制：" + n, icon: "none" }),
       fail: () => wx.showToast({ title: "复制失败", icon: "none" })
     });
+  },
+
+  // 2026-11-09：找到景点后可直接加入「想玩」清单（出发页勾选即可排进行程），再点一次移出
+  onWant(e) {
+    const d = (e && e.currentTarget && e.currentTarget.dataset) || {};
+    const name = d.name || "";
+    if (!name) return;
+    let added = false;
+    try {
+      const was = T.isWished(name);          // toggleWish 返回数组而非布尔，需先查再切
+      T.toggleWish(name, d.city || "");
+      added = !was;
+    } catch (err) {}
+    const results = (this.data.results || []).map(x => x.name === name ? Object.assign({}, x, { wished: added }) : x);
+    this.setData({ results: results });
+    try { wx.showToast({ title: added ? "已加入想玩清单" : "已移出想玩清单", icon: "none" }); } catch (err) {}
   },
 
   onClear() {
