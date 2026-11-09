@@ -82,7 +82,11 @@ if (T) {
   console.log("== 6. 页面模板 ==");
   runFile("tpl.js");
   const pages = Object.keys(g.__TPL || {});
-  ok("模板数量 = 17", pages.length === 17, String(pages.length));
+  // 2026-11-09：模板数量改为跟随 app.json（主包 + 各分包页面数），以后新增页面不必再改测试
+  const _app = JSON.parse(fs.readFileSync(path.join(ROOT, "app.json"), "utf8"));
+  const _expect = (_app.pages || []).length
+    + (_app.subPackages || []).reduce((n, p) => n + ((p.pages || []).length), 0);
+  ok("模板数量 = app.json 页面数（" + _expect + "）", pages.length === _expect, String(pages.length));
   // 与 runtime 一致的作用域代理：WXML 里引用 data 中不存在的字段时必须返回 undefined，
   // 不能让 with 抛 ReferenceError（pages/splash 曾直接炸在 dark is not defined）
   const scopeOf = (d) => new Proxy(d, {
@@ -105,7 +109,7 @@ if (T) {
       if (renderErrs.length < 3) renderErrs.push(p + ": " + e.message);
     }
   }
-  ok("17 个模板均可在空数据下渲染不抛错", rendered === pages.length, renderErrs.join(" ｜ "));
+  ok(pages.length + " 个模板均可在空数据下渲染不抛错", rendered === pages.length, renderErrs.join(" ｜ "));
 }
 
 /* ── 7. 浏览器降级能力 + 两端同源文案（静态护栏） ──

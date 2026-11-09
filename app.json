@@ -72,7 +72,7 @@
     },
     {
       "root": "subdata2",
-      "pages": []
+      "pages": ["keep/keep"]
     },
     {
       "root": "subai",
