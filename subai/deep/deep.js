@@ -54,6 +54,7 @@ Page({
     curName: "",
     cur: null,
     msg: "",
+    notice: "",   // 「目标地未收录」的显式提示（与 msg 的加载错误分开）
     // 免费城（从行程页带进来的那座，永远免费）+ 广告位状态
     freeCity: "",
     adOn: false,
@@ -64,12 +65,21 @@ Page({
     const want = (q && q.city) ? String(q.city) : "";
     A.initDeep().then(() => {
       const cities = A.deepCities();
-      let curName = want;
-      if (!curName || !A.hasDeep(curName)) curName = cities[0] || "";
+      if (!cities.length) { this.setData({ ready: true, cities: [], curName: "", msg: "内容暂未就绪" }); return; }
+      // 目标地未收录：明确告知并给出已收录城市清单。
+      // 旧实现会静默换成 cities[0]，用户会误以为看到的就是自己目的地 → 不显示 ≠ 没有，改为显式提示。
+      if (want && !A.hasDeep(want)) {
+        this.setData({
+          ready: true, cities: cities, curName: "", cur: null, freeCity: want,
+          adOn: AD.available(), allUnlocked: AD.unlocked(), msg: "",
+          notice: "「" + want + "」暂未收录深度玩法"
+        });
+        return;
+      }
+      const curName = want || cities[0];
       this.setData({
         ready: true, cities: cities, curName: curName, freeCity: curName,
-        adOn: AD.available(), allUnlocked: AD.unlocked(),
-        msg: cities.length ? "" : "内容暂未就绪"
+        adOn: AD.available(), allUnlocked: AD.unlocked(), msg: "", notice: ""
       });
       if (curName) this._pick(curName);
     }).catch(() => {

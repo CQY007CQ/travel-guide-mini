@@ -11,6 +11,7 @@
  */
 import { createRequire } from "module";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
@@ -109,6 +110,14 @@ const _ty2 = T.findCity("太原"), _sh = T.findCity("上海"), _ls = T.findCity(
 ok("v1.20.6 太原(华北)11月按冬季（羽绒服）", !!_ty2 && T.dressForMonth(_ty2, "2026-11-09").season === "冬季出行");
 ok("v1.20.6 上海(华东)11月仍按秋季（不误伤南方）", !!_sh && T.dressForMonth(_sh, "2026-11-09").season === "秋季出行");
 ok("v1.20.6 拉萨(高原)11月按冬季", !!_ls && T.dressForMonth(_ls, "2026-11-09").season === "冬季出行");
+
+// ── v1.20.6 深度玩法：目标地未收录时显式提示（不再静默换成别的城市）──
+const DD = require(path.join(ROOT, "subai/data/ai-deep.js"));
+ok("v1.20.6 深度内容含太原（4 块）", !!(DD.cities && DD.cities["太原"] && (DD.cities["太原"].blocks || []).length === 4));
+ok("v1.20.6 深度内容含大同/晋中", !!(DD.cities && DD.cities["大同"] && DD.cities["晋中"]));
+const _deepSrc = fs.readFileSync(path.join(ROOT, "subai/deep/deep.js"), "utf8");
+ok("v1.20.6 深度页未收录显式提示（无静默换城）",
+  _deepSrc.includes("暂未收录深度玩法") && !/if \(!curName \|\| !A\.hasDeep\(curName\)\) curName = cities\[0\]/.test(_deepSrc));
 
 console.log("");
 if (fail > 0) {

@@ -16,14 +16,17 @@
         <view class="th-chip {{themePref==='light'?'on':''}}" data-m="light" bindtap="onThemePref">浅色</view>
         <view class="th-chip {{themePref==='dark'?'on':''}}" data-m="dark" bindtap="onThemePref">深色</view>
       </view>
-      <view class="menu" wx:for="{{g.menus}}" wx:key="key" data-k="{{item.key}}" bindtap="go">
-        <image class="m-ic" src="/images/icons/{{item.icon}}.png"/>
-        <view class="m-txt">
-          <view class="m-t">{{item.t}}</view>
-          <view class="m-d dim">{{item.d}}</view>
+      <block wx:for="{{g.menus}}" wx:key="key">
+        <!-- 深度玩法仅当「目标地」有收录时显示（deepOn 由 more.js 按行程城市异步判定） -->
+        <view class="menu" wx:if="{{item.key !== 'deep' || deepOn}}" data-k="{{item.key}}" bindtap="go">
+          <image class="m-ic" src="/images/icons/{{item.icon}}.png"/>
+          <view class="m-txt">
+            <view class="m-t">{{item.t}}</view>
+            <view class="m-d dim">{{item.d}}</view>
+          </view>
+          <text class="arrow">›</text>
         </view>
-        <text class="arrow">›</text>
-      </view>
+      </block>
     </view>
   </view>
 

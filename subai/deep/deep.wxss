@@ -16,6 +16,8 @@
 
 /* 城市切换 chips */
 .dp-cities { margin: 18rpx 0 4rpx; white-space: nowrap; }
+/* 未收录态：已收录城市清单换行铺开 */
+.dp-wrap { display: flex; flex-wrap: wrap; gap: 14rpx; padding: 4rpx 26rpx 10rpx; }
 .dp-row { display: inline-flex; gap: 14rpx; padding: 4rpx 2rpx 10rpx; }
 .dp-chip {
   flex: none; padding: 12rpx 26rpx; border-radius: 999rpx;

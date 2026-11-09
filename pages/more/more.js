@@ -5,6 +5,7 @@ const T = require("../../utils/travel.js");
 const EL = require("../../utils/errlog.js"); // v1.19.106：本地错误日志（被 SafePage / app.onError 兜住的异常）
 const KEYS = require("../../utils/keys.js"); // v1.19.188：第三方密钥统一出口（含运行时注入 setKeys）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
+const A = require("../../utils/aicontent.js"); // 深度玩法 holder（内容随 subai 分包异步下发，未加载/未收录都安全降级）
 // v1.20.3：insights 仅 more 页用到，已从主包迁到分包 subpkg/utils，按需异步加载（主包瘦身绕开微信 1.5M 软线）。
 // 微信端静态字面量 require.async；Node（allcheck / 单测）无 require.async，回退同步 require。
 let INS = null, PZ = null;
@@ -23,7 +24,7 @@ const app = getAppSafe();
 
 Page(SafePage({
   data: {
-    fz: 1, td: false, hasPlan: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0 },
+    fz: 1, td: false, hasPlan: false, deepOn: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0 },
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
@@ -133,6 +134,21 @@ Page(SafePage({
   refresh() {
     const p = app.globalData.plan;
     const hasPlan = !!(p && p.days && p.days.length);
+    // 深度玩法入口：仅当「目标地（主城或任一串联站）」收录了深度内容时才显示；
+    // 未收录（或没有行程）不占坑 —— 避免点进去发现不是自己的目的地。
+    const _deepCands = [];
+    try { if (p && p.cityName) _deepCands.push(String(p.cityName)); } catch (e) {}
+    try { ((p && p.segments) || []).forEach(function (s) { const c = s && (s.city || s.cityName || s.name); if (c) _deepCands.push(String(c)); }); } catch (e) {}
+    if (hasPlan) {
+      // 有行程才需要判断，避免无计划用户打开「更多」就触发 subai 分包下载
+      A.initDeep().then(() => {
+        let on = false;
+        try { on = _deepCands.some(function (c) { return A.hasDeep(c); }); } catch (e) {}
+        if (on !== this.data.deepOn) { try { this.setData({ deepOn: on }); } catch (e) {} }
+      }).catch(function () {});
+    } else if (this.data.deepOn) {
+      try { this.setData({ deepOn: false }); } catch (e) {}
+    }
     // v1.8.5 C11：想玩清单带状态（已排进当前行程 / 已打卡去过）
     const wish = T.wishStateMark(T.getWish(), p).map((x, i) => ({
       i, name: x.name, city: x.city || "", planned: !!x.planned, visited: !!x.visited
