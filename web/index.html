@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"/>
 <meta name="theme-color" content="#0d0d0d"/>
 <title>旅行攻略生成器 · 网页版</title>
-<link rel="stylesheet" href="lib/app.css?v=f6fd1cb4"/>
-<link rel="stylesheet" href="shell.css?v=f6fd1cb4"/>
+<link rel="stylesheet" href="lib/app.css?v=e6366e9e"/>
+<link rel="stylesheet" href="shell.css?v=e6366e9e"/>
+<link rel="stylesheet" href="ai-assistant.css?v=ai20261109"/>
 </head>
 <body>
   <!-- 启动遮罩：数据包解压需要一点时间，避免白屏 -->
@@ -28,11 +29,12 @@
     <a class="tb" data-p="pages/more/more"><img alt="更多"/><span>更多</span></a>
   </nav>
 
-  <script src="lib/modules.js?v=f6fd1cb4"></script>
-  <script src="lib/data.js?v=f6fd1cb4"></script>
-  <script src="lib/tpl.js?v=f6fd1cb4"></script>
-  <script src="lib/runtime.js?v=f6fd1cb4"></script>
-  <script src="app.js?v=f6fd1cb4"></script>
+  <script src="lib/modules.js?v=e6366e9e"></script>
+  <script src="lib/data.js?v=e6366e9e"></script>
+  <script src="lib/tpl.js?v=e6366e9e"></script>
+  <script src="lib/runtime.js?v=e6366e9e"></script>
+  <script src="app.js?v=e6366e9e"></script>
+  <script src="ai-assistant.js?v=ai20261109"></script>
 
   <!-- 网页版数据互通：导出 / 导入备份文件（与小程序同 schema，可跨端迁移数据） -->
   <div id="webDataBar">
@@ -41,7 +43,7 @@
     <input id="webImpFile" type="file" accept="application/json,.json" hidden/>
   </div>
   <style>
-    #webDataBar{position:fixed;right:10px;bottom:64px;z-index:9998;display:flex;flex-direction:column;gap:8px}
+    #webDataBar{position:fixed;left:10px;bottom:64px;z-index:9998;display:flex;flex-direction:column;gap:8px}
     #webDataBar button{font:13px/1 -apple-system,system-ui,sans-serif;color:#e8eef7;background:rgba(28,32,40,.92);
       border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:9px 12px;cursor:pointer;backdrop-filter:blur(6px);
       box-shadow:0 4px 14px rgba(0,0,0,.35)}

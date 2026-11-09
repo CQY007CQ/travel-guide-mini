@@ -39,18 +39,29 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 a { text-decoration: none; color: inherit; }
 button { font-family: inherit; }
 
-/* ── 网页版铺满整窗：不再居中成手机画布，宽屏下也占满宽度 ── */
+/* ── 网页版铺满整窗 + 自适应 ──
+   移动端/平板（<1024px）：100% 满宽铺满整窗，rpx 随视口缩放。
+   桌面端（≥1024px）：内容列收束到 1024px 居中 —— 与 --rpx 基准
+   (min(100vw,1024px)/750) 严格一致，消除「750rpx 元素左对齐、右侧大片空白」的错位；
+   两侧用氛围渐变托底，看起来是刻意的满屏沉浸式而非破版。 */
 #app {
   width: 100%;
-  max-width: none;
-  margin: 0;
+  max-width: 1024px;
+  margin: 0 auto;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--shell-bg);
   position: relative;
   overflow-x: hidden;
 }
-@media (min-width: 700px) {
-  body { background: var(--shell-bg); }
+@media (min-width: 1024px) {
+  body {
+    background:
+      radial-gradient(1200px 620px at 50% -12%, rgba(212, 169, 78, .12), transparent 60%),
+      radial-gradient(900px 500px at 110% 110%, rgba(125, 211, 252, .06), transparent 55%),
+      var(--shell-bg);
+  }
+  #app { box-shadow: 0 0 60px rgba(0, 0, 0, .10); }
 }
 
 /* ── 启动层 ── */
@@ -75,8 +86,8 @@ button { font-family: inherit; }
 
 /* ── tabBar ── */
 #tabbar {
-  position: fixed; left: 0; transform: none;
-  bottom: 0; width: 100%; max-width: none;
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 0; width: 100%; max-width: 1024px;
   display: flex; z-index: 900;
   background: rgba(13, 13, 13, .94);
   border-top: 1px solid rgba(255, 255, 255, .08);
