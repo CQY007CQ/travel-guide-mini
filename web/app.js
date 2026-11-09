@@ -75,7 +75,6 @@
   }
 
   window.addEventListener("load", function () {
-    var t0 = Date.now();
     try {
       // 1) 小程序 app.js —— 拿到 globalData / onLaunch（复用同一份，不另写）
       window.__require("__entry__", "./app.js");
@@ -101,7 +100,6 @@
           ready();
           // 数据回来后部分页面已渲染成空态，补刷一次
           if (window.__webCurrent && window.__webCurrent()) window.__webRefresh();
-          console.log("[web] 就绪，" + (Date.now() - t0) + "ms");
         }, 30);
       };
       if (T && typeof T.ready === "function") {

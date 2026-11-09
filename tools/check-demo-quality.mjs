@@ -165,6 +165,42 @@ const checks = [
     // 管道 smoke.mjs | tail -4 不开 pipefail 时退出码取 tail，smoke 失败也会假绿。
     must(/set -o pipefail/.test(line), "网页版步骤未开 pipefail，smoke 失败会被 tail 吞掉");
     return "NODE 显式传参 + pipefail";
+  }],
+  ["发布代码洁净度：无调试 console.log / debugger / eval / new Function", () => {
+    // 2026-11-09 代码质量检测前置：把「生产包残留调试语句 / 动态执行」固化为门禁防回潮。
+    // 只扫随包发布的手写与构建产物；不含工具链（tools/）与 MB 级生成产物（web/lib/{modules,data,tpl}.js）。
+    // console.error / console.warn 属有意错误留痕，不在禁止之列。
+    const files = [];
+    const push = (rel) => { if (has(rel)) files.push(rel); };
+    push("app.js"); push("web/app.js"); push("web/lib/runtime.js");
+    const walk = (dir) => {
+      const abs = path.join(ROOT, dir);
+      if (!fs.existsSync(abs)) return;
+      for (const ent of fs.readdirSync(abs, { withFileTypes: true })) {
+        const rel = dir.replace(/\/$/, "") + "/" + ent.name;
+        if (ent.isDirectory()) walk(rel);
+        else if (/\.js$/.test(ent.name)) files.push(rel);
+      }
+    };
+    walk("utils"); walk("pages"); walk("subpkg");
+    const PATS = [
+      [/\bconsole\.(log|debug|info)\s*\(/, "console.log"],
+      [/\bdebugger\b/, "debugger"],
+      [/\beval\s*\(/, "eval("],
+      [/\bnew\s+Function\s*\(/, "new Function("]
+    ];
+    const hits = [];
+    for (const f of files) {
+      const lines = read(f).split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const ln = lines[i];
+        if (/^\s*(\/\/|\*|\/\*)/.test(ln)) continue;   // 跳过纯注释行（历史注释常提到这些词）
+        for (const [rx, tag] of PATS) if (rx.test(ln)) { hits.push(f + ":" + (i + 1) + " " + tag); break; }
+      }
+      if (hits.length > 20) break;
+    }
+    must(!hits.length, "存在调试/动态执行残留: " + hits.slice(0, 8).join("；"));
+    return files.length + " 个发布 JS 洁净";
   }]
 ];
 
