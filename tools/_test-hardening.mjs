@@ -132,6 +132,15 @@ await T.ready();
   ok("v1.20.6 景点详情不含「同城参考」", (T.baikeInfo("八达岭", "北京").text || "").indexOf("同城参考") < 0);
 }
 
+// ── v1.20.6 数据规模卡：城市数已去重（不再把别名算成城市），且气候/区域分布合计=城市数 ──
+{
+  const _cp = require(path.join(ROOT, "utils/corpus.js"));
+  const _cs = _cp.corpusStats();
+  ok("v1.20.6 规模卡城市数已去重（< CITIES 条目数）", _cs.cities > 0 && _cs.cities < (T.D.CITIES || []).length, String(_cs.cities));
+  ok("v1.20.6 气候/区域分布合计=城市数",
+    _cs.climate.reduce((a, b) => a + b.n, 0) === _cs.cities && _cs.region.reduce((a, b) => a + b.n, 0) === _cs.cities);
+}
+
 // ── v1.20.6 本机数据洞察：未加载不渲染空壳（回退 null）+ 分包模块到位后主动 refresh ──
 {
   const _moreSrc = fs.readFileSync(path.join(ROOT, "pages/more/more.js"), "utf8");
