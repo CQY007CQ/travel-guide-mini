@@ -28,6 +28,13 @@ const { BIG_EXCLUDE, BIG_SPOT_DAYS, BUDGETS, BUDGET_STYLE, CAPITAL_COORDS, CITIE
 const { haversine } = require("./geo.js");
 // 跨模块纯函数单点真源（cleanSpotName / baikeKeyword），避免与 travel.js 各定义一份
 const { cleanSpotName, baikeKeyword } = require("./_shared.js");
+// 【#491 修复】省游候选池「填充行」过滤。planner.js 不能 require travel.js（会循环依赖），
+// 故此处内联一份与 travel.js isFrameName 第二段填充词表完全一致的判定；改动时两边须同步。
+// 背景：PROVINCE_LANDMARKS 里有「庙街夜市 / 士林夜市 / 古运河夜游」等具体名店，名字含 夜市/夜游
+// 会被 isFrameName 判为填充行；若它被单独排成一天，该天按「已填」口径即空天
+// （香港 7天 leisure D4、台湾 3天 leisure D2、江苏 10天 leisure D8 即此例）。
+const _FILLER_SPOT_RX = /自由活动|自由探索|留白|休整|当地美食|当地自由|早餐|晚餐|早点休息|看日出|下山|备选|夜市|小吃街|馆子|早点铺|街边摊|烧烤摊|菜市场|家常菜馆|面食小馆|苍蝇馆子|散步|吹风|慢走|慢逛|闲逛|夜游|溜达|夜灯|拼一顿/;
+const _isFillerSpotName = (n) => _FILLER_SPOT_RX.test(String(n || ""));
 
 // —— 晚间具名演出表：避免行程里出现「看一场本地演出」这类无场馆无剧目的泛安排 ——
 // 每个城市给「具体场馆 + 演出」，晚上空闲时段直接落到具名条目（在哪儿看什么）。
@@ -1252,6 +1259,7 @@ function buildProvincePlanDays(province, days, depart, budgetKey, style, stayMou
  const _seenSpot = new Set();
  ordered.forEach(c=>(groups[c]||[]).forEach(s=>{
   if(!s || _seenSpot.has(s)) return;
+  if(_isFillerSpotName(s)) return;   // 填充词景点（夜市/夜游…）不进池，避免被单独排成一天造成空天
   _seenSpot.add(s);
   allSpots.push({name:s, city:c});
  }));

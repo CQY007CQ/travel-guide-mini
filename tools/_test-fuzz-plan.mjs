@@ -40,7 +40,6 @@ const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
 
 let bugs = 0, builds = 0, errs = 0, emptyDays = 0, totalDays = 0, badCoords = 0, nanFields = 0;
 const RED = [];
-const EMPTY_RED = [];
 
 function isFrame(name) { try { return T.isFrameName(name); } catch (e) { return false; } }
 function dayFilled(day) {
@@ -74,10 +73,10 @@ function validatePlan(plan, label, cityName, limitedSet) {
     if (!day || !Array.isArray(day.items)) { bad(label + " D" + (i + 1) + ": items 非数组"); continue; }
     const effCity = day.cityName || cityName;
     const limited = limitedSet.has(effCity);
-    if (i >= 1 && !dayFilled(day)) {
+    // limited 城本就只有框架行，空天属预期（与 _scan-sparse 口径一致，跳过不计）
+    if (i >= 1 && !limited && !dayFilled(day)) {
       emptyDays++;
-      if (!limited) { if (RED.length < 30) RED.push(label + " D" + (i + 1)); }
-      else if (EMPTY_RED.length < 30) EMPTY_RED.push(label + " D" + (i + 1));
+      if (RED.length < 30) RED.push(label + " D" + (i + 1));
     }
     if (day.routeCoords) {
       for (const c of day.routeCoords) {
@@ -115,9 +114,11 @@ function validatePlan(plan, label, cityName, limitedSet) {
     const co = allCities.find((c) => c.name === city);
     const limited = !!(co && co.limited);
     for (let b = 0; b < 2; b++) {
-      let cap = 2; try { cap = T.cityDayCap(city, "balance"); } catch (e) { }
-      const days = Math.max(2, Math.min(pick(DAYS), cap));
+      // 关键：必须按「实际节奏」取 cap（speed 的 cap 系统性低于 balance），
+      // 否则用 balance cap 截断却按 speed 构建会超发、造出假空天（本 fuzz 自身踩过）。
       const pace = pick(PACES);
+      let cap = 2; try { cap = T.cityDayCap(city, pace); } catch (e) { }
+      const days = Math.max(2, Math.min(pick(DAYS), cap));
       const budget = pick(BUDGETS);
       const depart = pick(DEPARTS);
       builds++;
@@ -160,9 +161,8 @@ function validatePlan(plan, label, cityName, limitedSet) {
   }
 
   console.log("\n构建 " + builds + " 次 / 致命异常 " + errs + " / 总天数 " + totalDays +
-    " / 非limited空天 " + emptyDays + " / limited空天 " + EMPTY_RED.length + " / 坐标越界 " + badCoords + " / 数值异常 " + nanFields);
-  if (RED.length) console.log("非limited空天红榜(前30): " + RED.join("、"));
-  if (EMPTY_RED.length) console.log("limited空天红榜(前30): " + EMPTY_RED.join("、"));
+    " / 空天(非limited) " + emptyDays + " / 坐标越界 " + badCoords + " / 数值异常 " + nanFields);
+  if (RED.length) console.log("空天红榜(前30): " + RED.join("、"));
 
   const ok = (c, m) => { if (!c) { console.error("  ✗ " + m); bugs++; } else console.log("  ✓ " + m); };
   ok(errs === 0, "全部组合生成零异常（致命）");
