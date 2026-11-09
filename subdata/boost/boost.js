@@ -1,7 +1,6 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
-// 行程增强页：聚合新功能（体检/问答/动线/高光/错峰/行李/成就/年报/点亮/记账/照片/复制）
+// 行程增强页：聚合新功能（体检/问答/动线/高光/错峰/行李/成就/年报/点亮/记账）
 const T = require("../../utils/travel.js");
-const S = require("../../utils/store.js");
 const app = getAppSafe();
 
 Page(SafePage({
@@ -19,8 +18,7 @@ Page(SafePage({
     badges: [],
     yearTxt: "",
     liteTxt: "",
-    amt: "",
-    photoN: 0
+    amt: ""
   },
 
   onLoad() { this.__boot = T.ready().catch(() => null); },
@@ -54,8 +52,7 @@ Page(SafePage({
       packStr: pkExtra.join("、"),
       badges: T.badgesOf(),
       yearTxt: this._yearTxt(),
-      liteTxt: this._liteTxt(),
-      photoN: (S.get("boostPhotosV1", []) || []).length
+      liteTxt: this._liteTxt()
     });
   },
 
@@ -89,31 +86,6 @@ Page(SafePage({
       this.setData({ amt: "" });
       try { wx.showToast({ title: "已记一笔", icon: "none" }); } catch (_) {}
     } catch (e) { try { wx.showToast({ title: "记账失败", icon: "none" }); } catch (_) {} }
-  },
-
-  pickPhoto() {
-    try {
-      wx.chooseMedia({
-        count: 1, mediaType: ["image"],
-        success: () => {
-          const list = S.get("boostPhotosV1", []) || [];
-          list.unshift(new Date().toISOString());
-          if (list.length > 50) list.length = 50;
-          S.set("boostPhotosV1", list);
-          this.setData({ photoN: list.length });
-          try { wx.showToast({ title: "已添加到行程相册", icon: "none" }); } catch (_) {}
-        }
-      });
-    } catch (e) { try { wx.showToast({ title: "相册不可用", icon: "none" }); } catch (_) {} }
-  },
-
-  copyPlan() {
-    const plan = app.globalData && app.globalData.plan;
-    if (!plan) { try { wx.showToast({ title: "先生成行程", icon: "none" }); } catch (_) {} return; }
-    try {
-      const txt = T.copyPlanText(plan);
-      wx.setClipboardData({ data: txt, success: () => { try { wx.showToast({ title: "已复制攻略", icon: "none" }); } catch (_) {} } });
-    } catch (e) { try { wx.showToast({ title: "复制失败", icon: "none" }); } catch (_) {} }
   },
 
   onShareAppMessage() {

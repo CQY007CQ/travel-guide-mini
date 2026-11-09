@@ -64,12 +64,4 @@
     </view>
   </view>
 
-  <view class="card">
-    <view class="card-head"><text class="card-title">照片与分享</text></view>
-    <view class="btn-row">
-      <button size="mini" bindtap="pickPhoto">给行程加一张照片</button>
-      <button size="mini" bindtap="copyPlan">复制攻略文本</button>
-    </view>
-    <view wx:if="{{photoN}}" class="ans">已添加 {{photoN}} 张照片</view>
-  </view>
 </view>
