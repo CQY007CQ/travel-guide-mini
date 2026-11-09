@@ -289,6 +289,31 @@
     LS.setItem("wx:" + k, JSON.stringify(v === undefined ? "" : v));
   }
 
+  /* 本地演示用：允许通过 URL 参数一次性注入第三方 Key（**仅 localhost / 127.0.0.1 生效**）。
+     目的：仓库与代码里绝不含明文 Key（合规），但演示机可临时启用天气 / 高德。
+     用法： index.html?qwk=<和风Key>&qwh=<和风专属Host>
+     注入后写入 localStorage，之后的访问无需再带参数；生产域名下这段逻辑直接跳过。 */
+  (function () {
+    try {
+      var h = String((global.location && global.location.hostname) || "");
+      if (h !== "localhost" && h !== "127.0.0.1") return;
+      var qs = String((global.location && global.location.search) || "").replace(/^\?/, "");
+      if (!qs) return;
+      var p = {};
+      qs.split("&").forEach(function (kv) {
+        var i = kv.indexOf("=");
+        if (i < 0) return;
+        try { p[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1)); } catch (e) {}
+      });
+      if (!p.qwk) return;
+      var cur = lsGet("__app_keys__");
+      var next = (cur && typeof cur === "object") ? cur : {};
+      next.qweatherKey = p.qwk;
+      if (p.qwh) next.qweatherHost = p.qwh;
+      lsSet("__app_keys__", next);
+    } catch (e) {}
+  })();
+
   function ok(name, res) {
     return Object.assign({ errMsg: name + ":ok" }, res || {});
   }
