@@ -69,6 +69,9 @@ Page(SafePage({
   topDays: [], dsActive: -1,
   // v1.19.77：拖动排序（dragSh 为逐条预计算的 transform 字符串，WXML 只做数组取值）
   dragOn: false, dragDi: -1, dragI: -1, dragSh: [],
+  // 2026-11-09：换景点选择面板 / 移到其他天
+  swapOpen: false, swapDi: -1, swapIx: -1, swapCur: "", swapList: [], swapWish: [],
+  moveOpen: false, moveDi: -1, moveIx: -1, moveDays: [],
   // v1.19.78：城市深度玩法（随 subai 分包懒加载；未收录城市保持 null → UI 自动不显示）
   deep: null,
   // v1.19.179：「我的攻略」本地库——当前行程是否已保存到库（命中签名则回显「已保存」）
@@ -1062,21 +1065,100 @@ Page(SafePage({
   try { T.normalizeDayItems(items); } catch (e) {} // 移除后行文归一：防止「继续深度游览」等前缀悬在段首
   this._save();
  },
- /* ---- 换一个景点：同城池里挑一个本行程没排过的，替换后自动重排当天行文 ---- */
+ /* ---- 2026-11-09：换一个景点改为「弹面板选择」——本城候选 / 我的想玩收藏 / 随机 ---- */
  onSwap(e) {
   const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
   const plan = app.globalData.plan;
-  if (!plan || !plan.days[di]) return;
-  const cands = T.swapCandidates(plan, di, ix);
-  if (!cands.length) {
-   wx.showToast({ title: "这座城市的景点都排进来啦", icon: "none" });
-   return;
-  }
-  const r = T.swapSpot(plan, di, ix);
-  if (!r) { wx.showToast({ title: "这条换不了（抵达/返程等框架安排）", icon: "none" }); return; }
-  this.setData({ open: -1, detailText: "", detailName: "" }); // 重排后顺序会变，收起详情避免指错行
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items) return;
+  const it = plan.days[di].items[ix];
+  if (!it || isFrame(it.name)) { wx.showToast({ title: "这条换不了（抵达/返程等框架安排）", icon: "none" }); return; }
+  const cands = T.swapCandidates(plan, di, ix) || [];
+  const curKey = T.cleanSpotName(String(it.name || ""));
+  // 我的想玩/收藏：排除本行程已排过的与当前点，避免换出重复景点
+  const used = {};
+  (plan.days || []).forEach(d => (d.items || []).forEach(x => { const k = T.cleanSpotName(x && x.name); if (k) used[k] = 1; }));
+  let wish = [];
+  try {
+   wish = (T.getWish() || []).map(x => String((x && x.name) || "").trim())
+    .filter(n => n && T.cleanSpotName(n) !== curKey && !used[T.cleanSpotName(n)]);
+  } catch (err) { wish = []; }
+  this.setData({
+   swapOpen: true, swapDi: di, swapIx: ix,
+   swapCur: curKey || String(it.name || ""),
+   swapList: cands.slice(0, 80),
+   swapWish: Array.from(new Set(wish)).slice(0, 80)
+  });
+ },
+ closeSwap() { this.setData({ swapOpen: false, swapDi: -1, swapIx: -1, swapList: [], swapWish: [] }); },
+ onSwapRandom() {
+  const list = this.data.swapList || [];
+  if (!list.length) { wx.showToast({ title: "本城没有更多可换景点", icon: "none" }); return; }
+  this._applySwap(list[Math.floor(Math.random() * list.length)]);
+ },
+ onSwapPick(e) {
+  const name = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.name) || "");
+  if (name) this._applySwap(name);
+ },
+ // 真正执行替换：保留原条目的时段/结构，只换核心景点名（可来自本城候选或想玩收藏）
+ _applySwap(name) {
+  const plan = app.globalData.plan;
+  const di = this.data.swapDi, ix = this.data.swapIx;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items || !name) { this.closeSwap(); return; }
+  const it = plan.days[di].items[ix];
+  if (!it) { this.closeSwap(); return; }
+  const oldRaw = String(it.name || "");
+  const curKey = T.cleanSpotName(oldRaw);
+  const newName = (curKey && oldRaw.indexOf(curKey) >= 0) ? oldRaw.replace(curKey, name) : name;
+  plan.days[di].items[ix] = Object.assign({}, it, { name: newName });
+  try { T.normalizeDayItems(plan.days[di].items); } catch (err) {}
+  this.closeSwap();
+  this.setData({ open: -1, detailText: "", detailName: "" });
   this._save();
-  wx.showToast({ title: "已换成「" + r.name + "」" + (r.left > 0 ? " · 还有 " + r.left + " 个可换" : ""), icon: "none", duration: 1800 });
+  wx.showToast({ title: "已换成「" + name + "」", icon: "none", duration: 1800 });
+ },
+
+ /* ---- 2026-11-09：把这个点移到别的天（第2天 → 第3天） ---- */
+ onMoveTo(e) {
+  const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
+  const plan = app.globalData.plan;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items) return;
+  const it = plan.days[di].items[ix];
+  if (!it || isFrame(it.name)) { wx.showToast({ title: "这条移不了（抵达/返程等框架安排）", icon: "none" }); return; }
+  if ((plan.days || []).length < 2) { wx.showToast({ title: "只有一天，没法移动", icon: "none" }); return; }
+  const moveDays = [];
+  plan.days.forEach((d, i) => {
+   if (i === di) return;
+   moveDays.push({ i: i, label: "第" + (i + 1) + "天" + (d && d.date ? " · " + String(d.date).slice(5) : "") });
+  });
+  this.setData({ moveOpen: true, moveDi: di, moveIx: ix, moveDays: moveDays });
+ },
+ closeMove() { this.setData({ moveOpen: false, moveDi: -1, moveIx: -1, moveDays: [] }); },
+ onMovePick(e) {
+  const to = Number(e.currentTarget.dataset.i);
+  const plan = app.globalData.plan;
+  const di = this.data.moveDi, ix = this.data.moveIx;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[to] || di === to) { this.closeMove(); return; }
+  const src = plan.days[di], tgt = plan.days[to];
+  const it = src.items && src.items[ix];
+  if (!it) { this.closeMove(); return; }
+  src.items.splice(ix, 1);
+  const ords = ["上午", "下午", "晚上"];
+  const used = {};
+  try { (T.daySpots(tgt) || []).forEach(x => { const p = String((x && x.period) || ""); if (p) used[p] = 1; }); } catch (err) {}
+  let period = ords.find(p => !used[p]) || "下午";
+  const hasReturn = (tgt.items || []).some(x => /返程|前往/.test(String((x && x.name) || "")));
+  if (hasReturn && period === "晚上") period = "下午";
+  const newItem = Object.assign({}, it, { period: period });
+  let at = -1;
+  (tgt.items || []).forEach((x, i) => { if (!isFrame(x && x.name)) at = i; });
+  if (at >= 0) tgt.items.splice(at + 1, 0, newItem); else tgt.items.push(newItem);
+  try { T.normalizeDayItems(src.items); T.normalizeDayItems(tgt.items); } catch (err) {}
+  const sync = d => { try { const n = T.daySpots(d).length; d.spotCount = n; d.pace = n <= 2 ? "轻松" : (n <= 3 ? "适中" : "紧凑"); } catch (err) {} };
+  sync(src); sync(tgt);
+  this.closeMove();
+  this.setData({ open: -1, detailText: "", detailName: "" });
+  this._save();
+  wx.showToast({ title: "已把「" + (T.cleanSpotName(String(it.name || "")) || it.name) + "」移到第" + (to + 1) + "天", icon: "none", duration: 1800 });
  },
  /* ---- v1.15：详情里点标签 → 换一个同标签的当地景点 ---- */
  onTagSwap(e) {

@@ -119,6 +119,18 @@ const _deepSrc = fs.readFileSync(path.join(ROOT, "subai/deep/deep.js"), "utf8");
 ok("v1.20.6 深度页未收录显式提示（无静默换城）",
   _deepSrc.includes("暂未收录深度玩法") && !/if \(!curName \|\| !A\.hasDeep\(curName\)\) curName = cities\[0\]/.test(_deepSrc));
 
+// ── v1.20.6 行程编辑：删空某天后加景点要按 上午/下午/晚上 依次分配（不再堆同一时段）──
+await T.ready();
+{
+  const _dp = T.buildPlan({ city: "成都", days: 4, depart: "2027-04-05", budget: "mid", pace: "balance" });
+  const _pl = { cityName: "成都", days: _dp, depart: "2027-04-05", budget: "mid", people: 2, pace: "balance" };
+  let _g = 0;
+  while (_g++ < 20) { let last = -1; _pl.days[2].items.forEach((it, i) => { if (!T.isFrameName(it.name)) last = i; }); if (last < 0) break; T.dayRemoveSpot(_pl, 2, last); }
+  const _per = [];
+  for (let k = 0; k < 3; k++) { const c = T.dayAddCandidates(_pl, 2, ""); if (!c.length) break; const r = T.dayAddSpot(_pl, 2, c[0]); const it = _pl.days[2].items.find(x => x.name === r.name); _per.push(it && it.period); }
+  ok("v1.20.6 删空后加景点按时段依次分配", _per[0] === "上午" && _per[1] === "下午" && _per[2] === "晚上", _per.join("/"));
+}
+
 console.log("");
 if (fail > 0) {
   console.log("审计加固运行时单测失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");

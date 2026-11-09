@@ -352,6 +352,7 @@
             <view wx:if="{{open === i + di * 100 && detailText}}" class="spot-detail">
               <view class="detail-acts">
                 <text wx:if="{{!it.f}}" class="d-btn d-btn-main" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onSwap">换一个</text>
+                <text wx:if="{{!it.f}}" class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onMoveTo">移到其他天</text>
                 <text wx:if="{{!it.f}}" class="d-btn d-btn-del" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onDelSpot">删掉</text>
                 <text class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onBaike">百科</text>
                 <text class="d-btn {{it.wished ? 'd-wish-on' : ''}}" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onWish">{{it.wished ? '已在想玩' : '加想玩'}}</text>
@@ -444,4 +445,38 @@
 
   <!-- v1.19.76：分享长图离屏画布（不参与布局，仅用于生成分享图片） -->
   <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
+
+  <!-- 2026-11-09：换景点选择面板 —— 本城候选 / 我的想玩收藏 / 随机 -->
+  <view class="pmask" wx:if="{{swapOpen}}" catchtap="closeSwap"></view>
+  <view class="psheet" wx:if="{{swapOpen}}">
+    <view class="ps-h">
+      <text class="ps-t">换掉「{{swapCur}}」</text>
+      <text class="ps-x" catchtap="closeSwap">✕</text>
+    </view>
+    <view class="ps-ops">
+      <view class="ps-btn" catchtap="onSwapRandom">随机换一个</view>
+    </view>
+    <block wx:if="{{swapWish.length}}">
+      <view class="ps-sec">我的想玩 / 收藏</view>
+      <scroll-view scroll-y class="ps-list">
+        <view class="ps-li ps-li-wish" wx:for="{{swapWish}}" wx:key="*this" data-name="{{item}}" catchtap="onSwapPick">{{item}}</view>
+      </scroll-view>
+    </block>
+    <block wx:if="{{swapList.length}}">
+      <view class="ps-sec">本城可换（{{swapList.length}}）</view>
+      <scroll-view scroll-y class="ps-list">
+        <view class="ps-li" wx:for="{{swapList}}" wx:key="*this" data-name="{{item}}" catchtap="onSwapPick">{{item}}</view>
+      </scroll-view>
+    </block>
+    <view class="ps-empty" wx:if="{{!swapWish.length && !swapList.length}}">本城景点都排进来啦：可用下方「加个景点」，或先从「按标签找景点」加入想玩再回来换</view>
+  </view>
+
+  <!-- 2026-11-09：把这个点移到别的天 -->
+  <view class="pmask" wx:if="{{moveOpen}}" catchtap="closeMove"></view>
+  <view class="psheet" wx:if="{{moveOpen}}">
+    <view class="ps-h"><text class="ps-t">把这个点移到…</text><text class="ps-x" catchtap="closeMove">✕</text></view>
+    <scroll-view scroll-y class="ps-list">
+      <view class="ps-li" wx:for="{{moveDays}}" wx:key="i" data-i="{{item.i}}" catchtap="onMovePick">{{item.label}}</view>
+    </scroll-view>
+  </view>
 </view>

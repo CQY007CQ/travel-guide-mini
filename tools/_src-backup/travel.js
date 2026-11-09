@@ -2325,13 +2325,35 @@ function dayAddSpot(plan, di, name) {
   //          出现「傍晚返程 → 晚上再去某景点」的荒谬顺序。
   // 时段同理：当天已有返程/转场时，新景点跟随最后一个真实景点的时段（不晚于返程），
   // 避免出现「晚上景点 → 傍晚返程」这种时序倒挂。
-  const hasReturn = (day.items || []).some(it => /返程|前往/.test(String(it && it.name || "")));
-  let newPeriod = _dayPeriodAfter(day);
+  // 2026-11-09：只把「真正的返程/转场」当墙。「出发前往 / 出发去 / 凌晨出发，前往」是当日出发行，
+  // 若误判成返程会把新增景点的时段钉在上一个景点上（表现为"删空后连加都排上午"）。
+  const hasReturn = (day.items || []).some(it => {
+    const n = String((it && it.name) || "");
+    if (/返程/.test(n)) return true;
+    return /前往/.test(n) && !/出发/.test(n);
+  });
+  // 2026-11-09：优先落在「第一个空闲时段」，避免删空某天后连续加景点都堆在同一时段（用户反馈总在同一年时段）
+  const _ords = ["上午", "下午", "晚上"];
+  const _usedP = {};
+  daySpots(day).forEach(x => { const p = String((x && x.period) || ""); if (p) _usedP[p] = 1; });
+  let newPeriod = _ords.find(p => !_usedP[p]) || _dayPeriodAfter(day);
   if (hasReturn) {
-    const lastSpot = daySpots(day);
-    const lp = lastSpot.length ? String(lastSpot[lastSpot.length - 1].period || "") : "";
-    if (lp === "上午" || lp === "下午") newPeriod = lp;
-    else if (newPeriod === "晚上") newPeriod = "下午";
+    // 2026-11-09：用「返程/转场行的时段」作为上限，而不是把时段钉在最后一个景点上。
+    // 钉死会导致删空某天后连加都排同一时段；上限法既能避免「景点 → 返程 → 再景点」，又能依次填上午/下午。
+    const _ordOf = p => (D.PERIOD_ORDER && D.PERIOD_ORDER[p] != null ? D.PERIOD_ORDER[p] : 99);
+    let capOrd = 99;
+    (day.items || []).forEach(it => {
+      const n = String((it && it.name) || "");
+      const isRet = /返程/.test(n) || (/前往/.test(n) && !/出发/.test(n));
+      if (isRet) capOrd = Math.min(capOrd, _ordOf(it.period));
+    });
+    if (capOrd < 99) {
+      const allowed = _ords.filter(p => _ordOf(p) < capOrd);
+      if (allowed.length) {
+        const free = allowed.find(p => !_usedP[p]);
+        newPeriod = free || allowed[allowed.length - 1];
+      }
+    }
   }
   const newItem = {
     name: pick,

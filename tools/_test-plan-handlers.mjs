@@ -92,6 +92,9 @@ function makePage(ctx, plan) {
     setData(patch) { Object.assign(this.data, patch); },
     _render() { this._rendered = (this._rendered || 0) + 1; },
     _save() { this._saved = (this._saved || 0) + 1; ctx.app.setPlan({ ...ctx.app.globalData.plan, days: ctx.app.globalData.plan.days }); this._render(); },
+    // 真实 plan 页有这两个关闭方法；_applySwap / onMovePick 会调用，桩里补上
+    closeSwap() { this.setData({ swapOpen: false, swapDi: -1, swapIx: -1 }); },
+    closeMove() { this.setData({ moveOpen: false, moveDi: -1, moveIx: -1 }); },
   };
   return page;
 }
@@ -210,11 +213,31 @@ const noThrow = (name, fn) => { try { fn(); ck(name, true); } catch (e) { ck(nam
 
 /* ============ 8. onSwap / onTagSwap / onDelSpot / onDayAdd：分支命中 → _save + toast ============ */
 {
+  // 2026-11-09：onSwap 改为「打开选择面板」，不再立即随机替换
   const T = makeT();
   const { run, ctx } = makeFn("onSwap");
   const page = makePage(ctx, planOf());
   run(page, ev(0, 0));
-  ck("onSwap·换成候选 + _save", page._saved === 1 && (ctx.wxState.toasts.join("|")).indexOf("已换成") >= 0);
+  ck("onSwap·打开换景点面板（不立即替换）", page.data && page.data.swapOpen === true && page._saved === undefined);
+  ck("onSwap·面板带上当前景点名与候选", page.data && page.data.swapCur === "兵马俑" && Array.isArray(page.data.swapList));
+}
+{
+  // 面板里选中具体景点 → _applySwap 执行替换 + _save + toast
+  const T = makeT();
+  const { run, ctx } = makeFn("_applySwap");
+  const page = makePage(ctx, planOf());
+  page.data.swapDi = 0; page.data.swapIx = 0;
+  run(page, "替换景点");
+  ck("_applySwap·替换 + _save", page._saved === 1 && (ctx.wxState.toasts.join("|")).indexOf("已换成") >= 0);
+  ck("_applySwap·面板已关闭", page.data.swapOpen === false);
+}
+{
+  // 单日行程无法跨天移动 → 给出提示，不崩
+  const T = makeT();
+  const { run, ctx } = makeFn("onMoveTo");
+  const page = makePage(ctx, planOf());
+  run(page, ev(0, 0));
+  ck("onMoveTo·单日行程给出提示", (ctx.wxState.toasts.join("|")).indexOf("只有一天") >= 0);
 }
 {
   const T = makeT();
