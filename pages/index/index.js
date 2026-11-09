@@ -125,7 +125,9 @@ Page(SafePage({
     try {
       this._initFrom();
       this.setData({
-        depart: iso(new Date(new Date().getTime() + 7 * 86400000)),
+        // 2026-11-09：默认出发日从 +7 改为 +3 —— 和风免费档只有未来 7 天(today..+6)，
+        // 默认 +7 会让「按默认日期生成」的行程整段落在预报窗口外，天气卡永远显示不可用。
+        depart: iso(new Date(new Date().getTime() + 3 * 86400000)),
         departMin: iso(new Date()),
         hasOld: !!(app.globalData && app.globalData.plan && app.globalData.plan.days),
         recents: _uniqRecent(T.getRecent()),
@@ -141,7 +143,9 @@ Page(SafePage({
     } catch (e) {
       try {
         this.setData({
-          depart: iso(new Date(new Date().getTime() + 7 * 86400000)),
+          // 2026-11-09：默认出发日从 +7 改为 +3 —— 和风免费档只有未来 7 天(today..+6)，
+        // 默认 +7 会让「按默认日期生成」的行程整段落在预报窗口外，天气卡永远显示不可用。
+        depart: iso(new Date(new Date().getTime() + 3 * 86400000)),
           departMin: iso(new Date()),
           provinces: provs
         });
@@ -1223,7 +1227,8 @@ Page(SafePage({
     try {
       const c = T.findCity ? T.findCity("成都") : null;
       if (!c) { wx.showToast({ title: "示例城市暂未收录", icon: "none" }); return; }
-      const d = new Date(); d.setDate(d.getDate() + 7);
+      // 示例行程用 +2 出发：5 天正好落在和风 7 天预报窗口(today..+6)内，演示能直接看到天气
+      const d = new Date(); d.setDate(d.getDate() + 2);
       const pad = n => (n < 10 ? "0" + n : "" + n);
       const depart = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
       const oldPlan = app.globalData && app.globalData.plan;

@@ -196,7 +196,7 @@
   <view class="wx-off" wx:if="{{wxOff}}">
     <image class="ic ic-sm" src="/images/icons/cloud.png"/>
     <view class="wx-off-t">
-      <view class="wx-off-h">{{wxErrType === 'no_key' ? '天气服务未启用' : (wxErrType === 'window' ? '暂无可用预报' : '天气暂不可用')}}</view>
+      <view class="wx-off-h">{{wxErrType === 'no_key' ? '天气服务未启用' : (wxErrType === 'window' ? '出发日超出 7 天预报' : '天气暂不可用')}}</view>
       <view class="wx-off-d dim">{{wxErrMsg || '离线或超预报期 · 其他功能不受影响'}}</view>
     </view>
     <view class="wx-off-acts">
