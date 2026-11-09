@@ -1,7 +1,7 @@
 # 代码审计报告 · 旅行攻略生成器小程序（晨的旅行助手）
 
 > 审计目标：`outputs/miniprogram-travel/`（微信小程序，纯前端 JS，**无后端、无 SQL 数据库**）
-> 版本真值：APP_VER = `1.20.5`；真实逻辑源 `tools/_src-backup/*.js`；`utils/*.js` 为 terser 压缩产物；`utils/data.js`、`utils/keys.js` 为手写、`cp` 同步。
+> 版本真值：APP_VER = `1.20.8`（含 2026-11-09 晚新增网页版全屏自适应 + 内置 AI 助手）；真实逻辑源 `tools/_src-backup/*.js`；`utils/*.js` 为 terser 压缩产物；`utils/data.js`、`utils/keys.js` 为手写、`cp` 同步。
 > 说明：本栈没有数据库层，**「SQL 注入 / N+1 / 索引缺失」** 类条目已**如实映射为内存数据访问（Object/Set/数组遍历）的等价问题**，不虚构数据库结论。
 
 ---
@@ -819,6 +819,138 @@
 - 问题描述：跨页状态依赖 `app.globalData` 全局可变对象，无单向数据流，难追踪状态来源。
 - 严重程度：中
 - 优化建议：引入轻量 store（`utils/store.js` 已存在）承载全局态，页面通过订阅读取，减少 `globalData` 直写。
+
+---
+
+## 补充 · 网页版 AI 助手 + 全屏自适应专项审计（第 109–125 条，2026-11-09 晚）
+
+> 本轮新增 `web/ai-assistant.js`、`web/ai-assistant.css`、`web/shell.css` 全屏适配、`web/index.html` 引入。
+> 下列条目专门覆盖这些新增代码与尚未闭环的历史安全项；编号承接上文至 125 条（合计 ≥100）。
+
+**第 109 条**
+- 类型：安全
+- 位置：web/ai-assistant.js · llmCfg()/save handler（localStorage 键 `ai_llm_cfg_v1`）
+- 问题描述：可选大模型开关把用户的 API Key 以明文存进浏览器 localStorage，未加密；一旦页面存在任意 XSS（见 #36 CSP 缺失）或设备被本地访问，密钥即泄露。
+- 严重程度：中
+- 优化建议：Key 入 localStorage 前做轻量混淆（XOR + 随机前缀），并在设置面板明确提示「密钥仅存于本机浏览器」；或改为每次会话临时输入、不持久化。
+- 修改前后对比：前 明文存 `ai_llm_cfg_v1`；后 混淆存储 + 提示文案。
+
+**第 110 条**
+- 类型：安全
+- 位置：web/ai-assistant.js · callLLM()（`url = cfg.baseURL + "/chat/completions"` → `fetch(url,…)`）
+- 问题描述：大模型 baseURL 由用户自由填写并经 `fetch` 发起请求，等价于客户端请求伪造——用户若粘贴恶意/内网地址，浏览器会代发请求。
+- 严重程度：中
+- 优化建议：对 baseURL 做协议+域名校验（仅允许 `https://`，拒绝 `http://` 与内网段 127./10./192.168.；可选 LLM 域名白名单）；非白名单直接拒绝并 toast。
+- 修改前后对比：前 任意 URL 直发；后 协议 + 域名安全校验。
+
+**第 111 条**
+- 类型：安全
+- 位置：web/ai-assistant.js · send()（用户消息无长度上限）
+- 问题描述：用户消息未限制长度，超长输入会被推入对话历史并拼进 LLM messages，浪费 token 且可被用作长文本拒绝服务。
+- 严重程度：低
+- 优化建议：在 send() 前端做 `if (v.length > 2000) v = v.slice(0,2000) + "…"` 并 toast 提示。
+
+**第 112 条**
+- 类型：代码
+- 位置：web/ai-assistant.js · pushBot()/buildReply()（HTML 字符串拼装 → innerHTML）
+- 问题描述：助手消息通过 innerHTML 注入拼装好的 HTML 字符串，虽当前所有动态字段均经 `escapeHtml`，但「字符串拼 HTML」模式本身是 XSS 高危习惯，后续维护者多加一个未转义字段即破防。
+- 严重程度：中
+- 优化建议：改用 DOM 节点构建（`createElement` + `textContent`）或引入轻量模板引擎；至少把 `escapeHtml` 收口为唯一出口，并在 `allcheck` 增加「innerHTML 动态片段」扫描（呼应 #32）。
+- 修改前后对比：前 字符串拼 innerHTML；后 节点构建 / 统一转义出口。
+
+**第 113 条**
+- 类型：安全
+- 位置：web/ai-assistant.js · callLLM() 的 onErr（错误回退链路）
+- 问题描述：LLM 调用失败时把原始 `e.message` 直接 `pushBot("⚠️ " + err)`，错误信息可能含响应体片段；虽仅本地展示，但属未脱敏的异常透传。
+- 严重程度：低
+- 优化建议：回退文案固定为「大模型请求失败，已切换离线助手」，详细错误仅 errlog，不进对话气泡。
+- 修改前后对比：前 透传 message；后 固定文案 + 隐式 errlog。
+
+**第 114 条**
+- 类型：安全
+- 位置：web/index.html（仍无 CSP，#36 未闭环）
+- 问题描述：本轮新增 ai-assistant.js/css 与全屏样式，但 `index.html` 仍未加 `Content-Security-Policy`；配合内联脚本与 localStorage 密钥（#109），XSS 影响面被放大。
+- 严重程度：中
+- 优化建议：在 `<head>` 增加 `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">`（样式需 inline 故放行 style），并逐步把内联脚本改外部文件。
+- 修改前后对比：前 无 CSP；后 限定 self 源 + 逐步去内联。
+
+**第 115 条**
+- 类型：安全
+- 位置：web/lib/runtime.js · fetch 适配（#31 未闭环）+ ai-assistant 可选 LLM 任意 baseURL（#110）
+- 问题描述：天气/地理 `wx.request` 适配到 `fetch`，url 未经白名单校验；结合可选 LLM 的任意 baseURL，客户端出站请求面进一步扩大。
+- 严重程度：中
+- 优化建议：集中一个 `safeFetch(url, opts)`，对全部出站请求做域名白名单（api.qweather.com / restapi.amap.com / 用户显式声明的 LLM 域名），非白名单拒绝。
+- 修改前后对比：前 两处各自 fetch；后 统一 safeFetch 门禁。
+
+**第 116 条**
+- 类型：安全
+- 位置：web/lib/data.js（2.35MB 全量数据 base64，#45 未闭环）
+- 问题描述：网页版把 751 城 / 8852 店 / 24362 点全量打包进前端 bundle，任何人可拉取完整 POI 与医院库，数据资产暴露；亦拖累首屏（#57）。
+- 严重程度：中
+- 优化建议：热门城市首屏必需数据内联，其余按城市按需异步拉取（复用 `require.async` 分包机制）；或对数据接口加轻量签名防爬。
+
+**第 117 条**
+- 类型：安全（合规红线）
+- 位置：utils/keys.js `DEFAULT`/本地内置 和风 Key（未提交，仍在工作区）
+- 问题描述：和风 Key 以「本地内置」形式存在于工作区 `keys.js`/`_src-backup`，虽不进公开仓库，但属明文凭据；git 历史曾含明文（记忆 P0 项），泄露后无法远端回收。
+- 严重程度：高
+- 优化建议：升个体户/企业并认证后，将 key 收口到云函数/自有后端，前端仅持短期 token（呼应 #29）；在此之前轮换并清理工作区明文，改用运行期注入。
+
+**第 118 条**
+- 类型：性能
+- 位置：web/ai-assistant.js · whenReady()（setInterval 300ms × 20 兜底）
+- 问题描述：若离线数据始终未就绪，助手每 300ms 轮询 20 次（共 6s）才放弃；期间每次 send 都进轮询分支，存在无效轮询与轻微主线程占用。
+- 严重程度：低
+- 优化建议：轮询改为单次 `T.ready()` Promise 等待 + 一个 6s 超时，省去 setInterval；数据就绪后缓存 `ready=true` 标志避免重复等待。
+
+**第 119 条**
+- 类型：性能
+- 位置：web/ai-assistant.js · detectPlace()（`allCityNames()` 已缓存，但每次对 751 名 `indexOf` 扫描）
+- 问题描述：每条用户消息对 751 个城市名逐个 `indexOf` 扫描，虽名称数组已 `_cityCache` 缓存，但 O(n) 线性扫描在高频对话下仍有不必要开销；最长匹配优先逻辑依赖排序。
+- 严重程度：低
+- 优化建议：预构建单条正则 `(城市1|城市2|…)` 一次匹配，或建 Trie；命中后取最长匹配。名称数组变化极少，可在数据就绪时构建一次。
+
+**第 120 条**
+- 类型：代码
+- 位置：web/ai-assistant.js · openPanel() 欢迎语与离线状态
+- 问题描述：当 6s 轮询超时后数据仍未就绪，欢迎语不会触发，助手在「空数据」状态下仍可接收并作答（buildReply 对缺失数据返回兜底文案），无明确的「知识库未加载」提示，用户体验割裂。
+- 严重程度：低
+- 优化建议：whenReady 超时后向用户明确提示「离线知识库加载较慢，部分回答可能不完整」，而非静默兜底。
+
+**第 121 条**
+- 类型：架构
+- 位置：web/ai-assistant.js（仅网页版存在，小程序端无对应能力）
+- 问题描述：AI 助手作为新能力只在网页版实现，小程序端（主产品）反而不具备；与「一切以小程序为主」的定位相反，两端能力不对齐。
+- 严重程度：中
+- 优化建议：将助手的意图识别 + 离线问答核心抽为 `utils/ai-core.js`（纯函数、不依赖 DOM），网页版做 UI 壳、小程序端用同核做「对话式行程生成」，避免重复实现且对齐两端。
+
+**第 122 条**
+- 类型：架构
+- 位置：web/（第二构建目标，#96 未闭环）
+- 问题描述：网页版由小程序源码重编译，AI 助手、全屏样式等改动需同步维护两份产物；本轮仅改 web/，小程序端若后续要该能力需重新移植。
+- 严重程度：低
+- 优化建议：把 AI 核心与全屏适配（rpx/视口）做成可共享的构建宏/配置，单改动双目标产出（呼应 #96）。
+
+**第 123 条**
+- 类型：代码
+- 位置：web/ai-assistant.js（缺单测）
+- 问题描述：新模块无对应单测，意图识别/城市识别/价格拼接等逻辑回归无保障；与项目「审计护栏 + allcheck」文化脱节。
+- 严重程度：低
+- 优化建议：在 `tools/` 增加 `_test-ai-core.mjs`，对 `detectIntent/detectPlace/buildReply` 喂样例输入断言输出（如「成都吃什么」→ 回复含 `FOOD_SPOTS[成都]` 店铺名）。
+
+**第 124 条**
+- 类型：数据
+- 位置：utils/data.js `FOOD_SPOTS[city][].price`（#22 未闭环）
+- 问题描述：美食价格以字符串存储（如「人均约¥110」），类型不一致；本轮 ai-assistant 渲染端做了兼容处理，但底层类型混乱仍影响排序/区间筛选。
+- 严重程度：低
+- 优化建议：补 `priceNum`（数值）+ 单位分离，渲染端直接消费数值，杜绝字符串拼接歧义。
+
+**第 125 条**
+- 类型：数据
+- 位置：web/ai-assistant.js · getSpots()（SPOT_COORDS 为主源，CITY_LANDMARKS 稀疏）
+- 问题描述：景点作答改用 `SPOT_COORDS`（438 城/24362 点）后覆盖显著优于原 `CITY_LANDMARKS`，但 `SPOT_COORDS` 坐标精度与时效未向用户标注，可能误当权威景点库；且部分城市仅 APPROX 城心坐标（见 #13）。
+- 严重程度：低
+- 优化建议：景点作答底部统一标注「数据来源：离线知识库 · 坐标为城市/景点真实坐标，仅供参考」，置信度低时提示用 App 行程页核对。
 
 ---
 
