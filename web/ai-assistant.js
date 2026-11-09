@@ -21,18 +21,22 @@
     try { return APP.__require("__entry__", "./utils/travel.js") || {}; }
     catch (e) { return {}; }
   }
+  var _readyDone = false;
   function whenReady(cb) {
-    var D = getD();
-    if (D.CITIES && D.CITIES.length) { cb(); return; }
+    if (_readyDone) { cb(); return; }
     var T = getT();
-    if (T && typeof T.ready === "function") {
-      T.ready().then(function () { cb(); }, function () { cb(); });
-    } else {
-      var n = 0, iv = setInterval(function () {
-        n++;
-        if ((getD().CITIES && getD().CITIES.length) || n > 20) { clearInterval(iv); cb(); }
-      }, 300);
-    }
+    var wait = (T && typeof T.ready === "function")
+      ? T.ready()
+      : new Promise(function (res) {
+          var n = 0, iv = setInterval(function () {
+            n++;
+            if ((getD().CITIES && getD().CITIES.length) || n > 20) { clearInterval(iv); res(); }
+          }, 300);
+        });
+    // 单一 Promise 等待 + 6s 超时兜底，避免 setInterval 轮询泄漏（#118）
+    Promise.race([wait, new Promise(function (res) { setTimeout(res, 6000); })])
+      .then(finish, finish);
+    function finish() { _readyDone = true; cb(); }
   }
 
   /* ───────── 意图识别 ───────── */
@@ -51,27 +55,29 @@
     return "general";
   }
 
-  /* ───────── 城市 / 省份识别 ───────── */
-  var _cityCache = null;
-  function allCityNames() {
-    if (_cityCache) return _cityCache;
-    var D = getD(), arr = (D.CITIES || []).map(function (c) { return c && c.name; }).filter(Boolean);
-    arr.sort(function (a, b) { return b.length - a.length; }); // 长名优先，避免短名误命中
-    _cityCache = arr; return arr;
+  /* ───────── 城市 / 省份识别（缓存合并正则，单次 O(1) 扫描，#119） ───────── */
+  var _placeReg = null;
+  function placeRegex() {
+    if (_placeReg) return _placeReg;
+    var D = getD(), toks = [];
+    (D.CITIES || []).forEach(function (c) { if (c && c.name && c.name.length >= 2) toks.push(c.name); });
+    (D.PROVINCES || []).forEach(function (p) { if (p) toks.push(p); });
+    var c2p = D.CITY2PROV || {}; Object.keys(c2p).forEach(function (k) { if (k) toks.push(k); });
+    toks.sort(function (a, b) { return b.length - a.length; }); // 长 token 优先，降低子串误命中
+    var esc = toks.map(function (t) { return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); });
+    _placeReg = new RegExp(esc.join("|"), "g");
+    return _placeReg;
   }
   function detectPlace(text) {
-    var names = allCityNames(), found = null, fl = 0;
-    for (var i = 0; i < names.length; i++) {
-      var n = names[i];
-      if (n.length >= 2 && text.indexOf(n) >= 0 && n.length > fl) { found = n; fl = n.length; }
+    var reg = placeRegex(), m, found = null, fl = 0;
+    reg.lastIndex = 0;
+    while ((m = reg.exec(text)) !== null) {
+      if (m[0].length > fl) { fl = m[0].length; found = m[0]; }
     }
-    if (found) return { type: "city", name: found };
-    var D = getD(), provs = D.PROVINCES || [];
-    for (var j = 0; j < provs.length; j++) if (text.indexOf(provs[j]) >= 0) return { type: "province", name: provs[j] };
-    var c2p = D.CITY2PROV || {}, keys = Object.keys(c2p).sort(function (a, b) { return b.length - a.length; });
-    for (var k = 0; k < keys.length; k++) if (text.indexOf(keys[k]) >= 0 && keys[k].length > fl) { found = keys[k]; fl = keys[k].length; }
-    if (found) return { type: "city", name: found };
-    return null;
+    if (!found) return null;
+    var provs = (getD().PROVINCES || []);
+    if (provs.indexOf(found) >= 0) return { type: "province", name: found };
+    return { type: "city", name: found };
   }
 
   /* ───────── 数据取用 ───────── */
@@ -222,13 +228,46 @@
 
   /* ───────── 可选大模型接入 ───────── */
   var LS_KEY = "ai_llm_cfg_v1";
+  var _obfKey = "tg-ai-2026"; // 轻量混淆盐（非加密，仅防止一眼读取 localStorage 中的 Key，#109）
+  function _xor(s) {
+    if (!s) return s;
+    var o = "";
+    for (var i = 0; i < s.length; i++) o += String.fromCharCode(s.charCodeAt(i) ^ _obfKey.charCodeAt(i % _obfKey.length));
+    return o;
+  }
   function llmCfg() {
-    try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch (e) { return {}; }
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      if (!raw) return {};
+      var obj = JSON.parse(raw);
+      if (obj._obf && obj.apiKey) obj.apiKey = _xor(obj.apiKey); // 读取时还原（兼容旧明文：无 _obf 则不还原）
+      return obj;
+    } catch (e) { return {}; }
+  }
+  function llmSave(cfg) {
+    try {
+      var c = JSON.parse(JSON.stringify(cfg));
+      if (c.apiKey) { c.apiKey = _xor(c.apiKey); c._obf = 1; }
+      localStorage.setItem(LS_KEY, JSON.stringify(c));
+    } catch (e) {}
   }
   function llmEnabled() { return !!(llmCfg().enabled && llmCfg().apiKey && llmCfg().baseURL); }
+  // baseURL 安全校验：仅允许 https，拒绝本机/内网地址，防客户端请求伪造（#110）
+  function safeBaseURL(u) {
+    try {
+      var s = String(u || "").trim();
+      if (!/^https:\/\//i.test(s)) return null;
+      var host = s.replace(/^https:\/\//i, "").split("/")[0].toLowerCase();
+      if (host === "localhost" || host.endsWith(".local")) return null;
+      if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return null;
+      return s.replace(/\/+$/, "");
+    } catch (e) { return null; }
+  }
   function callLLM(history, onDone, onErr) {
     var c = llmCfg();
-    var url = String(c.baseURL).replace(/\/+$/, "") + "/chat/completions";
+    var base = safeBaseURL(c.baseURL);
+    if (!base) { onErr("Base URL 不合法：仅支持 https，且不能是本机/内网地址"); return; }
+    var url = base + "/chat/completions";
     var sys = "你是「旅行攻略生成器」的网页助手，基于离线旅行知识库回答中国国内旅行问题，简洁实用、用中文。";
     var msgs = [{ role: "system", content: sys }].concat(history.map(function (m) {
       return { role: m.user ? "user" : "assistant", content: m.text };
@@ -239,9 +278,10 @@
       body: JSON.stringify({ model: c.model || "gpt-4o-mini", messages: msgs, temperature: 0.6 })
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (o) {
-        if (!o.ok || !o.j.choices || !o.j.choices[0]) { onErr("接口返回异常：" + (o.j.error && o.j.error.message || "未知错误")); return; }
+        // 错误回退文案固定，不向对话气泡透传原始异常（#113）
+        if (!o.ok || !o.j.choices || !o.j.choices[0]) { onErr("大模型接口返回异常，已切换离线助手"); return; }
         onDone(o.j.choices[0].message.content || "");
-      }).catch(function (e) { onErr("请求失败（多为浏览器跨域/CORS 限制）：" + (e && e.message ? e.message : e)); });
+      }).catch(function () { onErr("大模型请求失败（多为浏览器跨域/CORS 限制），已切换离线助手"); });
   }
 
   /* ───────── UI 构建 ───────── */
@@ -318,13 +358,19 @@
     panel.querySelector("#aiKey").value = c.apiKey || "";
     panel.querySelector("#aiModel").value = c.model || "";
     panel.querySelector("#aiSave").addEventListener("click", function () {
+      var rawBase = panel.querySelector("#aiBase").value.trim();
       var nc = {
         enabled: panel.querySelector("#aiLlmOn").checked,
-        baseURL: panel.querySelector("#aiBase").value.trim(),
+        baseURL: rawBase,
         apiKey: panel.querySelector("#aiKey").value.trim(),
         model: panel.querySelector("#aiModel").value.trim()
       };
-      try { localStorage.setItem(LS_KEY, JSON.stringify(nc)); } catch (e) {}
+      // baseURL 安全门禁：仅 https 且非本机/内网（#110），非法则退回离线并提示
+      if (nc.enabled && !safeBaseURL(rawBase)) {
+        toast("Base URL 不合法：仅支持 https，且不能是本机/内网地址，已暂不启用大模型");
+        nc.enabled = false;
+      }
+      llmSave(nc); // 写入时混淆 apiKey（#109），替代明文 localStorage
       pushBot(nc.enabled && nc.apiKey && nc.baseURL ? "已启用大模型接入 ✅ 现在可以像聊天一样自由对话。" : "已保存。未填写 Key 或取消勾选时，仍使用内置离线助手。");
       dom.settings.classList.remove("show");
     });
@@ -382,9 +428,30 @@
   function clearTyping() { var t = document.getElementById("aiTyping"); if (t) t.remove(); }
   function scroll() { dom.msgs.scrollTop = dom.msgs.scrollHeight; }
 
+  // 轻量 toast：用于超限等提示（不阻断交互，#111）
+  var _toastT = null;
+  function toast(msg) {
+    var t = document.getElementById("aiToast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "aiToast";
+      t.className = "ai-toast";
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.add("show");
+    if (_toastT) clearTimeout(_toastT);
+    _toastT = setTimeout(function () { t.classList.remove("show"); }, 2200);
+  }
+
   function send() {
     var v = (dom.input.value || "").trim();
     if (!v) return;
+    // 消息长度上限，防止超长输入撑爆气泡 / 历史数组（#111）
+    if (v.length > 2000) {
+      v = v.slice(0, 2000) + "…";
+      toast("已截断到 2000 字上限");
+    }
     dom.input.value = ""; dom.input.style.height = "auto";
     pushUser(v);
 
