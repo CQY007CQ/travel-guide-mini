@@ -859,6 +859,12 @@
 .sc-sug-dot { color: var(--gold, #d4a94e); flex-shrink: 0; font-weight: 700; }
 .sc-sug-tx { flex: 1; min-width: 0; }
 
+/* 2026-11-09 #482：示例行程标识条（低调金色，不抢主信息） */
+.sample-bar { display: flex; align-items: center; gap: 10rpx; margin-top: 12rpx; padding: 14rpx 18rpx; border-radius: 14rpx; background: rgba(212, 169, 78, .12); border: 1rpx solid rgba(212, 169, 78, .28); }
+.sb-ic { color: var(--gold-tx, #d4a94e); font-weight: 700; }
+.sb-tx { flex: 1; min-width: 0; font-size: calc(23rpx * var(--fs, 1)); color: var(--gold-tx, #d4a94e); line-height: 1.5; }
+.sb-ar { color: var(--gold-tx, #d4a94e); font-weight: 700; }
+
 /* ═══ 2026-11-09：换景点 / 移到其他天 选择面板 ═══ */
 .pmask { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, .5); z-index: 998; }
 .psheet {

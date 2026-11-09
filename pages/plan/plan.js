@@ -277,6 +277,7 @@ Page(SafePage({
    })(),
    overview: ov,
    segs,
+   sampleTip: !!plan.isSample, // 2026-11-09（#482）：示例行程标识
    metaChips: chips, budgetLine, mixTxt,
    modeTxt: plan.travelMode ? MODE_LABEL[plan.travelMode] || "" : "",
    pickTxt: plan.pickOnly ? "本次按「只玩勾选」生成 · 未勾选的推荐已跳过" : "",
@@ -1214,6 +1215,8 @@ Page(SafePage({
   this._save();
   wx.showToast({ title: "已加入 D" + (di + 1) + "：" + r.name, icon: "none", duration: 1800 });
  },
+ // 2026-11-09（#482）：示例行程 → 回「出发」页生成自己的
+ onLeaveSample() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) {} },
  toggleBrief() { this.setData({ briefOpen: !this.data.briefOpen }); },
  // v1.18：天气卡 / 想玩未排上列表默认收起，点击标题展开
  toggleWx() { this.setData({ wxOpen: !this.data.wxOpen }); },

@@ -25,6 +25,13 @@
       <text class="chip" wx:for="{{metaChips}}" wx:key="*this">{{item}}</text>
     </view>
 
+    <!-- 2026-11-09（#482）：示例行程标识 —— 明确这不是你的行程，一键去生成自己的 -->
+    <view class="sample-bar" wx:if="{{sampleTip}}" bindtap="onLeaveSample">
+      <text class="sb-ic">✦</text>
+      <text class="sb-tx">这是示例行程（成都 5 天），点这里生成你自己的</text>
+      <text class="sb-ar">›</text>
+    </view>
+
     <!-- v1.8.4 A1：人流提示（公假 / 暑假 / 周末） -->
     <view class="hint-strip {{hint.lv}}" wx:for="{{hints}}" wx:key="date">
       <text class="hint-d">{{hint.dateTx}}</text>
