@@ -75,6 +75,10 @@
       "pages": ["keep/keep"]
     },
     {
+      "root": "subdata3",
+      "pages": ["keep/keep"]
+    },
+    {
       "root": "subai",
       "pages": [
         "deep/deep"

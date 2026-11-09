@@ -90,6 +90,12 @@ try {
   const _f8 = _r8.FOOD_SPOTS_ADD || {};
   for (const _cn in _f8) { if (!foodShops[_cn]) foodShops[_cn] = []; foodShops[_cn] = foodShops[_cn].concat(_f8[_cn]); }
 } catch (e) { /* 无 v208 批次时跳过 */ }
+// v210 美食扩城（72 城 × 真实老字号/代表餐饮，FOOD_SPOTS_ADD，坐标齐备）
+try {
+  const _r10 = (req("./tools/v210-food-deepcities.js") || {});
+  const _f10 = _r10.FOOD_SPOTS_ADD || {};
+  for (const _cn in _f10) { if (!foodShops[_cn]) foodShops[_cn] = []; foodShops[_cn] = foodShops[_cn].concat(_f10[_cn]); }
+} catch (e) { /* 无 v210 批次时跳过 */ }
 
 // 内联 cleanSpotName（避免 require utils/travel.js 触发 wx/微信全局，node 下崩溃）
 function cleanSpotName(name) {
