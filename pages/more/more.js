@@ -381,7 +381,7 @@ Page(SafePage({
   onSetKeys() {
     wx.showModal({
       title: "配置和风天气 Key",
-      content: "在 dev.qweather.com 申请免费 Key（须为你本人和风账号）。粘贴后天气即用你的 Key；留空则保持默认。",
+      content: "在 dev.qweather.com 申请免费 Key（须为你本人和风账号）。粘贴后天气即用你的 Key（存本机）；留空则不配置、天气卡不显示。",
       editable: true,
       placeholderText: "粘贴和风天气 Key",
       success: (r1) => {

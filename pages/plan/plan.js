@@ -552,6 +552,7 @@ Page(SafePage({
        if (err.type === "empty") msg = "暂无行程，先生成一份攻略";
        else if (err.type === "env") msg = "当前环境不支持天气加载";
        else if (err.type === "nocity") msg = "未识别到行程城市";
+       else if (err.type === "no_key") msg = "去「更多 → 合规与密钥」填入本人和风免费 Key，即时生效";
        else msg = "天气服务暂时异常";
      }
      // 仅「可能恢复」的失败（网络/额度/授权/服务异常/参数）才给重试；no_key/window/env/empty/nocity 重试无意义
@@ -633,6 +634,10 @@ Page(SafePage({
     this._wxSig = "";           // 强制重新拉取（失败未缓存，重试会真实发请求）
     this.setData({ wxOff: false });
     this._maybeLoadWx(plan);
+  },
+  // 2026-11-09：天气未配置时给出可操作入口 —— 切到「更多」页配置和风 Key（仓库不内置明文 Key）
+  goKeyConfig() {
+    try { wx.switchTab({ url: "/pages/more/more" }); } catch (e) {}
   },
 
   /* ---- v1.8.4 B17：城市打分 + 避坑小贴士（自存，下次来这座城会回显） ---- */

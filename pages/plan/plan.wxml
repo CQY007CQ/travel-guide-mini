@@ -200,6 +200,7 @@
       <view class="wx-off-d dim">{{wxErrMsg || '离线或超预报期 · 其他功能不受影响'}}</view>
     </view>
     <view class="wx-off-acts">
+      <view class="wx-retry" wx:if="{{wxErrType === 'no_key'}}" catchtap="goKeyConfig">填入 Key</view>
       <view class="wx-retry" wx:if="{{wxErrRetry}}" catchtap="onWxRetry">重试</view>
       <view class="wx-close" catchtap="closeWxOff">✕</view>
     </view>

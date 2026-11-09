@@ -373,8 +373,8 @@
     </view>
   </view>
 
-  <!-- 合规与密钥（v1.19.188）：主体一致铁律——第三方 Key 须本人账号申请；
-       默认已内置可用的和风免费 Key，如需换成你自己的 Key 可在此填入，无需改代码 / 重发版 -->
+  <!-- 合规与密钥（v1.19.188 / v1.20.4）：主体一致铁律——第三方 Key 须本人账号申请。
+       仓库不内置任何明文 Key（已做凭据清理），需在此填入本人账号的和风 Key，即时生效、无需重发版 -->
   <view class="group">
     <view class="group-title">合规与密钥</view>
     <view class="card group-card">
@@ -382,11 +382,11 @@
         <image class="m-ic" src="/images/icons/shield.png"/>
         <view class="m-txt">
           <view class="m-t">配置天气 / 地图密钥</view>
-          <view class="m-d dim">换成你本人账号申请的 Key（和风天气 / 高德）</view>
+          <view class="m-d dim">填入本人账号的和风 Key（默认未内置，天气需它才显示）</view>
         </view>
         <text class="arrow">›</text>
       </view>
-      <view class="m-note dim">小程序合规要求：第三方服务 Key 须注册在本人 / 本小程序主体下，严禁借用他人 Key。默认内置的和风 Key 请确认归属你本人和风账号；若你自备了 Key，点上方填入即可即时生效（无需重发版）。</view>
+      <view class="m-note dim">小程序合规要求：第三方服务 Key 须注册在本人 / 本小程序主体下，严禁借用他人 Key。仓库为安全起见不内置任何明文 Key：在 dev.qweather.com 用本人账号申请免费 Key，点上方填入即可即时生效（存在本机，无需重发版）。</view>
     </view>
   </view>
 
