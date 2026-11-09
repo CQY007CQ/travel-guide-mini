@@ -189,3 +189,15 @@ input::placeholder, textarea::placeholder { color: var(--shell-tx3); }
   content: "下方点位清单、顺路度评分与逐条导航照常可用\A 点任意一行会打开高德地图查看位置";
   white-space: pre-line; color: var(--shell-tx3); font-size: 12px; line-height: 1.9;
 }
+/* 网页版地图示意图（真实坐标散点 + 当天连线）：有示意图时收起文字占位，让 SVG 铺满 */
+[data-page="subpkg/map/map"] .the-map.map-schem {
+  display: block; position: relative; padding: 0; border: 1px solid var(--shell-line);
+  background: rgba(148, 163, 184, .05);
+}
+[data-page="subpkg/map/map"] .the-map.map-schem::before,
+[data-page="subpkg/map/map"] .the-map.map-schem::after { content: none; }
+[data-page="subpkg/map/map"] .the-map .map-svg { display: block; width: 100%; height: 100%; }
+[data-page="subpkg/map/map"] .the-map .map-schem-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; color: var(--shell-tx3); font-size: 13px; line-height: 1.9;
+}

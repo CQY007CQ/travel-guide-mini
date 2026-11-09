@@ -59,6 +59,53 @@
     return out;
   }
 
+  /* ── 网页版地图示意图 ──
+     合规红线：离线零 key，不加载任何在线地图 SDK / 底图。
+     但空 div 会让演示与用户以为页面坏了，故用真实经纬度把「编号标点 + 当天连线」
+     等距投影成 SVG 示意图（非底图），既保留合规又让地图页有内容、可讲解。
+     数据来源：WXML <map> 已被编译为 __h("div",{id:"map",class:"the-map",markers,polyline,...})。 */
+  function __schematic(props) {
+    var markers = Array.isArray(props && props.markers) ? props.markers : [];
+    var lines = Array.isArray(props && props.polyline) ? props.polyline : [];
+    var pts = [];
+    markers.forEach(function (m) { if (m && isFinite(m.latitude) && isFinite(m.longitude)) pts.push([+m.latitude, +m.longitude]); });
+    lines.forEach(function (l) { ((l && l.points) || []).forEach(function (q) { if (q && isFinite(q.latitude) && isFinite(q.longitude)) pts.push([+q.latitude, +q.longitude]); }); });
+    if (!pts.length) return '<div class="map-schem-empty">该天暂无精确坐标标点<br/>到当地后点下方列表行即可导航</div>';
+    var minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    pts.forEach(function (p) {
+      if (p[0] < minLat) minLat = p[0]; if (p[0] > maxLat) maxLat = p[0];
+      if (p[1] < minLon) minLon = p[1]; if (p[1] > maxLon) maxLon = p[1];
+    });
+    var W = 750, H = 470, PAD = 60, iw = W - 2 * PAD, ih = H - 2 * PAD;
+    var cosLat = Math.cos((minLat + maxLat) / 2 * Math.PI / 180) || 1;
+    var latS = Math.max(0.0025, maxLat - minLat), lonS = Math.max(0.0025, maxLon - minLon);
+    var s = Math.min(iw / (lonS * cosLat), ih / latS);
+    var cx = PAD + iw / 2, cy = PAD + ih / 2, midLat = (minLat + maxLat) / 2, midLon = (minLon + maxLon) / 2;
+    function X(lon) { return cx + (lon - midLon) * cosLat * s; }
+    function Y(lat) { return cy - (lat - midLat) * s; }
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" class="map-svg" xmlns="http://www.w3.org/2000/svg">';
+    for (var gx = PAD; gx <= W - PAD + 1; gx += iw / 4) svg += '<line x1="' + gx.toFixed(1) + '" y1="' + PAD + '" x2="' + gx.toFixed(1) + '" y2="' + (H - PAD) + '" stroke="rgba(148,163,184,.18)" stroke-width="1"/>';
+    for (var gy = PAD; gy <= H - PAD + 1; gy += ih / 4) svg += '<line x1="' + PAD + '" y1="' + gy.toFixed(1) + '" x2="' + (W - PAD) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(148,163,184,.18)" stroke-width="1"/>';
+    lines.forEach(function (l) {
+      var ps = ((l && l.points) || []).filter(function (q) { return q && isFinite(q.latitude) && isFinite(q.longitude); });
+      if (ps.length < 2) return;
+      var d = ps.map(function (q, i) { return (i ? "L" : "M") + X(+q.longitude).toFixed(1) + " " + Y(+q.latitude).toFixed(1); }).join(" ");
+      svg += '<path d="' + d + '" fill="none" stroke="' + escHtml(l.color || "#d4a94e") + '" stroke-width="' + (l.width || 3) + '" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>';
+    });
+    markers.forEach(function (m) {
+      if (!(m && isFinite(m.latitude) && isFinite(m.longitude))) return;
+      var x = X(+m.longitude), y = Y(+m.latitude);
+      var label = (m.callout && m.callout.content != null) ? String(m.callout.content) : "";
+      var isNum = /^\d+$/.test(label);
+      var fill = label.indexOf("美食") === 0 ? "#e07a5f" : (label.indexOf("住") === 0 ? "#3d7eff" : "#d4a94e");
+      svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (isNum ? 13 : 8) + '" fill="' + fill + '" stroke="#fff" stroke-width="2"/>';
+      if (isNum) svg += '<text x="' + x.toFixed(1) + '" y="' + (y + 4.5).toFixed(1) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">' + escHtml(label) + "</text>";
+      else if (label) svg += '<text x="' + x.toFixed(1) + '" y="' + (y - 14).toFixed(1) + '" text-anchor="middle" font-size="11" fill="#3b4657">' + escHtml(label.slice(0, 12)) + "</text>";
+    });
+    svg += '<text x="' + (W - PAD) + '" y="' + (H - 16) + '" text-anchor="end" font-size="11" fill="rgba(120,132,150,.75)">示意图 · 真实坐标 · 不加载在线底图</text>';
+    return svg + "</svg>";
+  }
+
   var inputSeq = 0;
   function __h(tag, props, children) {
     if (tag === "#text") return __t(props);
@@ -95,6 +142,10 @@
         // 静态文本被编译成裸字符串（JSON.stringify），这里兜底成文本节点
         el.appendChild(document.createTextNode(String(c)));
       }
+    }
+    // 网页版地图：把编译后的 map 占位 div 换成「真实坐标示意图」（散点+连线，非底图）。
+    if (tag === "div" && el.classList && el.classList.contains("the-map") && props && props.id === "map") {
+      try { el.classList.add("map-schem"); el.innerHTML = __schematic(props); } catch (e) { /* 任何异常都退回原占位，不影响页面 */ }
     }
     return el;
   }

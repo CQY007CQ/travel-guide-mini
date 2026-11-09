@@ -125,6 +125,8 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
     /createMapContext:\s*function/.test(rt) && /function webMapContext/.test(rt) && /includePoints: noop/.test(rt));
   ok("地图占位说明：讲清不画底图、下方照常可用",
     css.includes("网页版不加载在线地图底图") && css.includes("逐条导航") && css.includes("data-page"));
+  ok("地图：真实坐标示意图（散点+连线，替代空占位）",
+    rt.includes("function __schematic") && rt.includes("map-schem") && css.includes("the-map.map-schem"));
   ok("订阅消息不支持时有可见提示", /requestSubscribeMessage:\s*function[\s\S]{0,220}showToast/.test(rt));
   ok("图片下载后有成功反馈", rt.includes("图片已保存到下载目录"));
   ok("日历文案两端分流：网页版不承诺「已加入手机日历」",
