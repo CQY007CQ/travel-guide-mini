@@ -9,13 +9,17 @@ const A = require("../../utils/aicontent.js"); // 深度玩法 holder（内容�
 // v1.20.3：insights 仅 more 页用到，已从主包迁到分包 subpkg/utils，按需异步加载（主包瘦身绕开微信 1.5M 软线）。
 // 微信端静态字面量 require.async；Node（allcheck / 单测）无 require.async，回退同步 require。
 let INS = null, PZ = null;
-function _preloadMoreMods() {
+// 2026-11-09：加载完成后主动 refresh 一次 —— 否则异步模块到位了页面不重渲染，
+// 「本机数据洞察」会一直停在首次渲染时的空卡片（用户反馈"洞察怎么是空的"）。
+function _preloadMoreMods(page) {
+  const done = () => { try { page && page.refresh && page.refresh(); } catch (e) {} };
   if (typeof require.async === "function") {
-    require.async("../../subpkg/utils/insights.js").then((m) => { INS = m; }).catch(() => {});
-    require.async("../../subpkg/utils/personalize.js").then((m) => { PZ = m; }).catch(() => {});
+    require.async("../../subpkg/utils/insights.js").then((m) => { INS = m; done(); }).catch(() => {});
+    require.async("../../subpkg/utils/personalize.js").then((m) => { PZ = m; done(); }).catch(() => {});
   } else {
     try { INS = require("../../subpkg/utils/insights.js"); } catch (e) {}
     try { PZ = require("../../subpkg/utils/personalize.js"); } catch (e) {}
+    done();
   }
 }
 // v1.19.138：个性化目的地推荐（真实画像驱动）—— 已从主包迁到分包，随 _preloadMoreMods 异步加载
@@ -28,7 +32,7 @@ Page(SafePage({
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
-  onLoad() { this.__boot = T.ready().catch(() => null); _preloadMoreMods(); },
+  onLoad() { this.__boot = T.ready().catch(() => null); _preloadMoreMods(this); },
   onShow() { onShowRender(this, "more"); },
   _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
 
@@ -202,7 +206,8 @@ Page(SafePage({
         });
       })(),
       backupTip: bkTip,
-      insights: INS ? INS.insights() : [],   // v1.19.137：本机数据洞察（花费结构 / 月度趋势 / 出行节奏 / 省份分布）
+      // 2026-11-09：未加载完回退 null（不是 []）——[] 在 WXML 里为真，会渲染出一个空壳卡片
+      insights: INS ? INS.insights() : null,   // v1.19.137：本机数据洞察（花费结构 / 月度趋势 / 出行节奏 / 省份分布）
       personalized: PZ ? PZ.personalized(5) : {},   // v1.19.138：基于真实画像的个性化目的地推荐
       errN: EL.count(), // v1.19.106：错误日志条数，随页面刷新更新
       // 减法：无行程时只留「记账(可独立用) + 通用」，地图/美食/准备/速查待生成行程后再出现，减少空转入口

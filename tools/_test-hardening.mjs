@@ -132,6 +132,13 @@ await T.ready();
   ok("v1.20.6 景点详情不含「同城参考」", (T.baikeInfo("八达岭", "北京").text || "").indexOf("同城参考") < 0);
 }
 
+// ── v1.20.6 本机数据洞察：未加载不渲染空壳（回退 null）+ 分包模块到位后主动 refresh ──
+{
+  const _moreSrc = fs.readFileSync(path.join(ROOT, "pages/more/more.js"), "utf8");
+  ok("v1.20.6 洞察未加载回退 null（不渲染空卡）", /insights:\s*INS\s*\?\s*INS\.insights\(\)\s*:\s*null/.test(_moreSrc));
+  ok("v1.20.6 分包模块加载后主动 refresh", /_preloadMoreMods\(this\)/.test(_moreSrc) && /page\s*&&\s*page\.refresh/.test(_moreSrc));
+}
+
 console.log("");
 if (fail > 0) {
   console.log("审计加固运行时单测失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");
