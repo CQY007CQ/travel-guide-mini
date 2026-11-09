@@ -730,21 +730,9 @@ function hotelPortals(cityName, plan, areaName) {
 
 /* ---------- 预算（与网页版同语义） ---------- */
 // 自定义预算：按总金额 ÷ 天数 ÷ 人数 估算每人每天，住宿45%/餐饮22%/交通门票33%分摊
-function customBudgetObj(amt, days, peopleN) {
- if (!amt || amt <= 0) return null;
- const p = Math.max(1, peopleN || 1);
- const per = amt / Math.max(1, days || 1) / p;
- const hotel = Math.round(per * 0.45);
- const food = Math.round(per * 0.22);
- const lo = Math.max(50, Math.round(per * 0.7)), hi = Math.round(per * 1.3);
- return {
-  label: "自定义 ¥" + amt,
-  daily: lo + "-" + hi,
-  hotel: Math.max(60, Math.round(hotel * 0.8)) + "-" + Math.max(80, Math.round(hotel * 1.2)) + "元/晚",
-  food: Math.max(40, Math.round(food * 0.8)) + "-" + Math.max(60, Math.round(food * 1.2)) + "元/人/天",
-  note: "按自定义总预算 ¥" + amt + " 分摊：住宿约45%、餐饮约22%、交通门票约33%"
- };
-}
+// v1.20.7 去重：customBudgetObj 与 planner.js 实现完全一致，改惰性委托到 P（planner 单点真源），
+// 消除 travel.js 中 16 行重复定义；调用方 budgetTotalObj 仍在 plan 就绪后运行，P 已加载。
+function customBudgetObj(amt, days, peopleN) { return P.customBudgetObj(amt, days, peopleN); }
 // 预算档位的 daily 是范围字符串（如"300-600"），乘人数/天数需解析范围
 function scaleRange(s, m) {
  const parts = String(s).split("-").map(x => parseInt(x.trim(), 10));
@@ -6282,7 +6270,7 @@ module.exports = {
  provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
  spotTagOf, searchSpots,
- customBudgetObj, budgetTotalObj,
+ customBudgetObj: function (amt, days, peopleN) { return P.customBudgetObj(amt, days, peopleN); }, budgetTotalObj,
  isFrameName, isDetailable, stripHtml, spotDetailText, spotNoteDisp, spotInfo, spotInfoText,
  normalizeDayItems,
  cleanSpotName, navTarget, baikeKeyword, baikeInfo, baikeAliasKeys,

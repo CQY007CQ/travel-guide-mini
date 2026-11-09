@@ -107,6 +107,14 @@
     return false;
   }
 
+  /* ───────── 跳转动作构造（去重：原 8 处重复的 action 对象字面量） ───────── */
+  function actPlan(city, label) {
+    return { label: label || (city ? ("为" + city + "生成行程 →") : "去生成行程 →"), path: "pages/plan/plan" };
+  }
+  function actMore(label) {
+    return { label: label || "打开清单工具 →", path: "pages/more/more" };
+  }
+
   /* ───────── 回复生成（离线） ───────── */
   var lastCity = null;
   function escapeHtml(s) {
@@ -172,38 +180,40 @@
         var fh = foodHtml(city);
         if (fh) return { html: fh + "\n\n想吃得更细，可去 App「更多」里按城市翻美食清单～" };
         return { html: "<b>" + escapeHtml(city) + "</b> 暂时没有收录具体店铺，不过你可以去 App 生成行程，沿途会按城市给餐饮建议～",
-          actions: [{ label: "去生成行程 →", path: "pages/plan/plan" }] };
+          actions: [actPlan()] };
       }
       if (intent === "attraction") {
         var lh = landmarkHtml(city);
         if (lh) return { html: lh + "\n\n想排进行程、看顺路度和导航，点下面直接生成 👇",
-          actions: [{ label: "为" + city + "生成行程 →", path: "pages/plan/plan" }] };
+          actions: [actPlan(city)] };
         return { html: "<b>" + escapeHtml(city) + "</b> 的地标还在补全，先用 App 生成行程，会自动挑出当天顺路的景点～",
-          actions: [{ label: "去生成行程 →", path: "pages/plan/plan" }] };
+          actions: [actPlan()] };
       }
       if (intent === "itinerary") {
-        return { html: "为 <b>" + escapeHtml(city) + "</b> 规划行程，App 里最准——它会按你的天数、偏好、天气自动排景点+餐饮+顺路导航。\n我先把这座城市的亮点给你：\n" +
+        return { html: "为 <b>" + escapeHtml(city) + "</b> 规划行程，App 里最准——按你的天数、偏好、天气自动排景点+餐饮+顺路导航。\n我先把这座城市的亮点给你：\n" +
           (landmarkHtml(city) || "<span class='ai-muted'>地标数据收补中</span>") + "\n\n点下面直接进规划页 👇",
-          actions: [{ label: "为" + city + "生成行程 →", path: "pages/plan/plan" }] };
+          actions: [actPlan(city)] };
       }
       if (intent === "season") {
-        return { html: "<b>" + escapeHtml(city) + "</b> 出行季节建议：\n• 春秋（4–5 月 / 9–10 月）多数城市最舒服，少雨、温度宜人；\n• 夏季注意防暑防晒、南方多雨带伞；\n• 冬季北方干冷需保暖，南方湿冷备好薄羽绒。\n具体月份的穿衣与路况，去 App「行程」页会按你选的日期给当日天气提示～",
-          actions: [{ label: "去规划并看天气 →", path: "pages/plan/plan" }] };
+        return { html: "去 <b>" + escapeHtml(city) + "</b> 的最佳季节：\n• 春秋（4–5 / 9–10 月）最舒服，少雨温度宜人；\n• 夏季防暑防晒、南方多雨带伞；\n• 冬季北方保暖、南方防潮。\n具体月份穿衣与当日天气，App 行程页会按日期提示～",
+          actions: [actPlan(city, "去规划并看天气 →")] };
       }
       if (intent === "packing") {
         return { html: "去 <b>" + escapeHtml(city) + "</b> 的通用必备清单：\n<ul><li>身份证 / 学生证（门票常半价）</li><li>充电宝 + 数据线</li><li>舒适步行鞋</li><li>防晒霜 + 墨镜（户外多）</li><li>常用药 + 口罩</li><li>晴雨伞</li></ul>\n夏季加驱蚊、冬季加保暖层。App「更多」里也有按场景的清单可勾选～",
-          actions: [{ label: "打开清单工具 →", path: "pages/more/more" }] };
+          actions: [actMore()] };
       }
       if (intent === "transport") {
         return { html: "到 <b>" + escapeHtml(city) + "</b> 一般三种方式：\n• 飞机：查「" + escapeHtml(city) + "机场」到市区的大巴/地铁；\n• 高铁/火车：查「" + escapeHtml(city) + "站」，市内多通地铁；\n• 自驾：导航设目的地，留意限行与停车。\n落地后的具体点位导航，App 行程页点任意一行即可唤起地图～",
-          actions: [{ label: "去生成带导航的行程 →", path: "pages/plan/plan" }] };
+          actions: [actPlan(city, "去生成带导航的行程 →")] };
       }
       // 通用（提到了城市但意图不明）
-      var both = (foodHtml(city) || "") + (landmarkHtml(city) ? ("\n" + landmarkHtml(city)) : "");
+      var fhtml = foodHtml(city) || "";
+      var lhtml = landmarkHtml(city);
+      var both = fhtml + (lhtml ? ("\n" + lhtml) : "");
       if (both) return { html: both + "\n\n想把它排成几天行程？点下面直接生成 👇",
-        actions: [{ label: "为" + city + "生成行程 →", path: "pages/plan/plan" }] };
+        actions: [actPlan(city)] };
       return { html: "关于 <b>" + escapeHtml(city) + "</b>，我去 App 里能给你最完整的攻略。点下面直接生成行程～",
-        actions: [{ label: "去生成行程 →", path: "pages/plan/plan" }] };
+        actions: [actPlan()] };
     }
 
     // 没提到具体城市
