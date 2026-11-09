@@ -955,19 +955,11 @@ function baikeInfo(name, cityName) {
  // ↓ 地点级真实内容决定「是否收录」；以下城市级附加信息不参与 has 判定
  const has = !!(intro || note || facts.length);
  if (!has) return empty;
+ // 2026-11-09：按用户要求移除「同城参考」（同城应急 / 同城名店）——景点详情只保留本景点自身信息。
+ // extras 保留为空数组仅为兼容返回结构（页面/测试不读它）。
  const extras = [];
- try {
-  const E = require("./emergency-data.js");
-  const hs = cityName && E.HOSPITALS && E.HOSPITALS[cityName];
-  if (hs && hs.length) extras.push("同城应急 " + hs.slice(0, 2).map(h => h.n).filter(Boolean).join(" / "));
- } catch (e) {}
- try {
-  const fs = cityName && D.FOOD_SPOTS && D.FOOD_SPOTS[cityName];
-  if (fs && fs.length) extras.push("同城名店 " + fs.slice(0, 2).map(x => x.shop || x.name).filter(Boolean).join(" / "));
- } catch (e) {}
  const text = [intro || note,
-  facts.length ? "已收录信息：" + facts.join("；") : "",
-  extras.length ? "同城参考：" + extras.join("；") : ""]
+  facts.length ? "已收录信息：" + facts.join("；") : ""]
   .filter(Boolean).join("\n\n").slice(0, 380);
  return { has: true, title, intro: intro || note, extras, text, card: cardHit };
 }

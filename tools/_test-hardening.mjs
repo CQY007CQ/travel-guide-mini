@@ -129,6 +129,7 @@ await T.ready();
   const _per = [];
   for (let k = 0; k < 3; k++) { const c = T.dayAddCandidates(_pl, 2, ""); if (!c.length) break; const r = T.dayAddSpot(_pl, 2, c[0]); const it = _pl.days[2].items.find(x => x.name === r.name); _per.push(it && it.period); }
   ok("v1.20.6 删空后加景点按时段依次分配", _per[0] === "上午" && _per[1] === "下午" && _per[2] === "晚上", _per.join("/"));
+  ok("v1.20.6 景点详情不含「同城参考」", (T.baikeInfo("八达岭", "北京").text || "").indexOf("同城参考") < 0);
 }
 
 console.log("");
