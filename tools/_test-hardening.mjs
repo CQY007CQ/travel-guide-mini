@@ -147,6 +147,9 @@ await T.ready();
 {
   const _planSrc2 = fs.readFileSync(path.join(ROOT, "pages/plan/plan.js"), "utf8");
   ok("v1.20.6 日历写入失败时提供 .ics 文件", /_shareICS\(plan\)/.test(_planSrc2) && /shareFileMessage/.test(_planSrc2));
+  // 深度卡：切行程后必须清空/丢弃旧结果，否则会出现「井冈山行程显示太原深度玩法」
+  ok("v1.20.6 深度卡不残留旧城市",
+    /_planSig\(cur\)\s*!==\s*sig/.test(_planSrc2) && /if \(!hit\) \{ clear\(\); return; \}/.test(_planSrc2));
 }
 
 // ── v1.20.6 本机数据洞察：未加载不渲染空壳（回退 null）+ 分包模块到位后主动 refresh ──

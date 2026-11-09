@@ -331,18 +331,34 @@ Page(SafePage({
   } catch (e) {}
   return out;
  },
+ // 行程指纹：用于丢弃「已切走」的异步结果（城市/天数/首日/站点串）
+ _planSig(plan) {
+  try {
+   const days = (plan && plan.days) || [];
+   const d0 = (days[0] && days[0].date) || "";
+   return String((plan && plan.cityName) || "") + "|" + days.length + "|" + String(d0).slice(0, 10) + "|" + this._planCities(plan).join(",");
+  } catch (e) { return ""; }
+ },
  _loadDeep(plan) {
   const cands = this._planCities(plan);
-  if (!cands.length) return;
+  const clear = () => { try { this.setData({ deep: null }); } catch (e) {} };
+  if (!cands.length) { clear(); return; }
+  const sig = this._planSig(plan);
   try {
    A.initDeep().then(() => {
+    // 2026-11-09：异步落地前核对行程是否已切换 —— 否则旧城市的深度卡会贴到新行程上
+    //（用户反馈：井冈山行程里显示了「太原 · 深度玩法」）。
+    let cur = null;
+    try { cur = app.globalData && app.globalData.plan; } catch (e) {}
+    if (this._planSig(cur) !== sig) return;
     let hit = null;
     for (let i = 0; i < cands.length; i++) {
      if (A.hasDeep(cands[i])) { hit = cands[i]; break; }
     }
-    if (!hit) return;
+    // 新城市没有深度内容时必须清空，不能保留上一份行程的卡片
+    if (!hit) { clear(); return; }
     const raw = A.deepOf(hit);
-    if (!raw) return;
+    if (!raw) { clear(); return; }
     let total = 0;
     const bs = raw.blocks || [];
     for (let i = 0; i < bs.length; i++) total += ((bs[i].items || []).length + (bs[i].trips || []).length);
