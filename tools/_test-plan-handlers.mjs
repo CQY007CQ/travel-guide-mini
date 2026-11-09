@@ -46,6 +46,7 @@ function makeT(over = {}) {
     segCityOfDay: () => "西安",
     cleanSpotName: (n) => n,
     navTarget: (n) => ({ type: "coord", lat: 34, lon: 108, name: n }),
+    baikeKeyword: (n) => String(n || "").trim(),
     baikeUrl: (n) => "https://baike.example/" + encodeURIComponent(String(n || "")),
     spotDetailText: () => null,
     spotLookup: () => null,
@@ -155,24 +156,23 @@ const noThrow = (name, fn) => { try { fn(); ck(name, true); } catch (e) { ck(nam
   ck("onNav·有坐标则 openLocation", !!ctx.wxState.openLocation && ctx.wxState.openLocation.name === "兵马俑");
 }
 
-/* ============ 4. onBaike：v1.20.5 零外链纯离线 ============ */
-// ① 老桩（无 baikeInfo）② has:false → 只提示「该地点暂未收录百科」；③ 有收录 → 只弹窗展示。
-// 三种分支都必须零剪贴板：旧版无条件复制 403 / 验证码死链，是用户明确要求根除的问题。
+/* ============ 4. onBaike：弹窗展示 + 同时复制景点网址（2026-11-09 用户要求恢复复制） ============ */
+// ① 未收录 → 提示「该地点暂未收录百科」+ 仍复制网址；② 有收录 → 弹窗展示 + 复制网址。
 {
-  const a = makeFn("onBaike");
-  a.run(makePage(a.ctx, planOf()), ev(0, 0));
   const b = makeFn("onBaike", makeT({ baikeInfo: () => ({ has: false, title: "", text: "" }) }));
   b.run(makePage(b.ctx, planOf()), ev(0, 0));
   const c = makeFn("onBaike", makeT({ baikeInfo: () => ({ has: true, title: "兵马俑", text: "随包离线介绍" }) }));
   c.run(makePage(c.ctx, planOf()), ev(0, 0));
-  const diag = JSON.stringify([a.ctx.wxState, b.ctx.wxState, c.ctx.wxState]);
-  ck("onBaike·零外链：未收录只提示 / 有收录只弹窗，三分支均不复制",
-    [a, b, c].every(x => x.ctx.wxState.copy === 0 && x.ctx.wxState.clipboard === null)
-    && a.ctx.wxState.modals === 0 && b.ctx.wxState.modals === 0 && c.ctx.wxState.modals === 1
-    && [a, b].every(x => x.ctx.wxState.toasts.join("|").indexOf("该地点暂未收录百科") >= 0)
-    && c.ctx.wxState.toasts.length === 0
+  ck("onBaike·未收录：提示 + 仍复制网址",
+    b.ctx.wxState.modals === 0
+    && b.ctx.wxState.toasts.join("|").indexOf("该地点暂未收录百科") >= 0
+    && b.ctx.wxState.copy === 1 && /baike\.baidu\.com/.test(String(b.ctx.wxState.clipboard || "")));
+  ck("onBaike·有收录：弹窗 + 复制网址",
+    c.ctx.wxState.modals === 1
+    && c.ctx.wxState.copy === 1 && /baike\.baidu\.com/.test(String(c.ctx.wxState.clipboard || ""))
     && c.ctx.wxState.modalOpts && c.ctx.wxState.modalOpts.showCancel === false
-    && c.ctx.wxState.modalOpts.content === "随包离线介绍", diag);
+    && String(c.ctx.wxState.modalOpts.content || "").indexOf("随包离线介绍") === 0
+    && String(c.ctx.wxState.modalOpts.content || "").indexOf("已复制") >= 0);
 }
 
 /* ============ 5. onWish：未想玩 → 加入，触发 _render ============ */

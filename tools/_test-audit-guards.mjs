@@ -199,10 +199,16 @@ guard("加固运行时单测挂在已有门禁步（不新增 step）", () => {
 // 通用搜索页重复请求 302 到 wappass 图形验证码。任何外链都不可靠，改为纯离线 + 无收录提示。
 // 门禁断言查字面量会被本轮「历史说明注释」误伤 → 统一先滤注释行再匹配。
 const codeOnly = (s) => s.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
-guard("三处百科入口均零外链（403/验证码域名不得回潮）", () => {
-  const files = ["tools/_src-backup/travel.js", "tools/_src-backup/planner.js", "pages/plan/plan.js"];
-  const bad = files.filter((f) => /baike\.baidu\.com|www\.baidu\.com\/s/.test(codeOnly(readSrc(f))));
-  return [bad.length === 0, "回潮文件=" + (bad.join(",") || "无")];
+guard("百科外链仅限 onBaike 复制网址（其余位置零外链）", () => {
+  // 2026-11-09 用户要求：onBaike 弹窗时复制景点网址，故 plan.js 允许出现 1 次该域名；
+  // travel/planner 与 plan.js 其它位置仍必须零外链（不得回潮成 <a>/跳转）。
+  const hard = ["tools/_src-backup/travel.js", "tools/_src-backup/planner.js"];
+  const badHard = hard.filter((f) => /baike\.baidu\.com|www\.baidu\.com\/s/.test(codeOnly(readSrc(f))));
+  const s = codeOnly(readSrc("pages/plan/plan.js"));
+  const n1 = (s.match(/baike\.baidu\.com/g) || []).length;
+  const n2 = (s.match(/www\.baidu\.com\/s/g) || []).length;
+  return [badHard.length === 0 && n1 === 1 && n2 === 0,
+    "回潮文件=" + (badHard.join(",") || "无") + " / plan.js 外链出现 " + (n1 + n2) + " 次（应=1）"];
 });
 guard("travel.baikeUrl 已移除且不再导出", () => {
   const s = codeOnly(readSrc("tools/_src-backup/travel.js"));
@@ -215,12 +221,12 @@ guard("baikeInfo.has 只由地点级真实内容决定", () => {
   return [at >= 0 && cityAt > at && /if \(!has\) return empty;/.test(s.slice(at, cityAt)),
     "has 定义位置=" + at + " / 城市级 extras=" + cityAt];
 });
-guard("onBaike 零剪贴板 + 无收录明确提示", () => {
+guard("onBaike 弹窗 + 复制景点网址（2026-11-09 用户要求）", () => {
   const s = codeOnly(readSrc("pages/plan/plan.js"));
   const i = s.indexOf("onBaike(e)");
-  const body = s.slice(i, i + 1400);
+  const body = s.slice(i, i + 2200);
   return [i >= 0 && body.indexOf("该地点暂未收录百科") >= 0
-    && body.indexOf("setClipboardData") < 0 && body.indexOf("baikeUrl") < 0
+    && body.indexOf("setClipboardData") >= 0 && /baike\.baidu\.com/.test(body)
     && /showCancel:\s*false/.test(body), "onBaike body 检查失败"];
 });
 guard("planner.spotBaikeBar 无 <a href> 且保留 sd-ops 识别前缀", () => {

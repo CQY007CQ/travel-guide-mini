@@ -953,15 +953,22 @@ Page(SafePage({
   const it = plan.days[di].items[ix];
   const city = (T.segCityOfDay ? T.segCityOfDay(plan, di) : "") || plan.cityName || "";
   const info = T.baikeInfo ? T.baikeInfo(it.name, city) : null;
-  // v1.20.5：百科彻底离线化。百度百科 /item/ 与 /search/word 实测 403，通用搜索页
-  // 重复请求会跳 wappass 图形验证码 —— 「复制链接到浏览器」没有任何一种入口能保证可用。
-  // 故：随包有该地点真实收录就在小程序内弹窗展示；没有就明确提示。零剪贴板、零外链。
+  // 2026-11-09：按用户要求，弹窗展示的同时把「景点网址」也复制到剪贴板（恢复原有习惯）。
+  // 静默复制（不弹 toast，避免与弹窗抢层），改为在弹窗正文末尾提示"已复制网址"。
+  let copied = false;
+  try {
+   const kw = T.baikeKeyword ? T.baikeKeyword(it.name) : "";
+   // 注意：这里不用 /'/g 正则 —— check-handlers 的简易 tokenizer 会把单引号当字符串起点而吞掉后续代码。
+   const url = kw ? ("https://baike.baidu.com/search/word?word=" + encodeURIComponent(kw).split("'").join("%27")) : "";
+   if (url) { wx.setClipboardData({ data: url }); copied = true; }
+  } catch (err) {}
   if (!info || info.has === false || !info.text) {
-   wx.showToast({ title: "该地点暂未收录百科", icon: "none" });
+   wx.showToast({ title: "该地点暂未收录百科" + (copied ? "，网址已复制" : ""), icon: "none" });
    return;
   }
+  const content = info.text + (copied ? "\n\n（景点网址已复制，可粘贴到浏览器打开）" : "");
   wx.showModal({
-   title: info.title || it.name, content: info.text,
+   title: info.title || it.name, content: content,
    confirmText: "知道了", showCancel: false
   });
  },

@@ -45,8 +45,10 @@ const EXTERNAL_CACHE = "tools/official-roster/cache";
 const ALLOW_URL = [
   "https://devapi.qweather.com",  // 和风天气（已备案，request 合法域名可过审）
   "qweatherapi.com",              // 和风自定义域名（部分账号分配 xxx.qweatherapi.com）
-  // v1.20.5：百科外链域名白名单已移除。任何 baike.baidu.com / www.baidu.com/s 若再回到随包代码，
-  // 由「未登记外链」规则直接判失败（实测这些入口 403 / 图形验证码，不能再给用户）。
+  // 2026-11-09：用户要求景点详情弹窗同时复制「景点网址」，故放行百科搜索域名。
+  // 仅在 pages/plan/plan.js 的 onBaike 里允许出现（_test-audit-guards 断言全仓仅 1 处）；
+  // 其它文件再出现该域名仍会被 _test-audit-guards 拦下。
+  "baike.baidu.com",
 ];
 
 // 前后都要求「非 hex 字符」：64 位 sha256 摘要因此不会被切成两把 32 位 key

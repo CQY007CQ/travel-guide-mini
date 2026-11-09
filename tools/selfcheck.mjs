@@ -44,8 +44,10 @@ assert("baikeKeyword 组合名取主段", T.baikeKeyword("天安门广场 + 故�
 const _planSrc = req("fs").readFileSync("pages/plan/plan.js", "utf8");
 const _plannerSrc = req("fs").readFileSync("tools/_src-backup/planner.js", "utf8");
 assert("baikeUrl 已移除，不再生成任何百科外链", typeof T.baikeUrl === "undefined");
-assert("行程页 onBaike 零剪贴板且未收录明确提示",
-  _planSrc.indexOf("百科链接已复制") < 0 && !/onBaike\([\s\S]{0,900}?setClipboardData/.test(_planSrc)
+// 2026-11-09：用户明确要求「有弹窗的同时也把网址复制」→ 恢复复制（仍保留离线弹窗与未收录提示）。
+assert("行程页 onBaike 弹窗 + 复制景点网址（2026-11-09 用户要求）",
+  /onBaike\([\s\S]{0,1200}?setClipboardData/.test(_planSrc)
+  && _planSrc.indexOf("baike.baidu.com") >= 0
   && _planSrc.indexOf("该地点暂未收录百科") >= 0 && _planSrc.indexOf("showCancel: false") >= 0);
 assert("planner.spotBaikeBar 不再生成 <a href> 外链",
   _plannerSrc.indexOf("www.baidu.com/s") < 0 && _plannerSrc.indexOf("baike.baidu.com") < 0);
