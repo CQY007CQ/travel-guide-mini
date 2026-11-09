@@ -585,15 +585,16 @@ if (hotelNotes && Object.keys(hotelNotes).length) {
       const m = mapByCity[c.name];
       if (!m) continue;
       const exps = c.experiences || [];
-      const owners = new Set(exps.map(e => String((e && (e.name || e.t)) || "")));
       for (const e of exps) {
         if (!e || !e.name) continue;
         const to = m[e.name];
         if (!to) continue;
-        // 守卫：目标名已存在（且不是自己）→ 放弃，避免制造重复景点
+        // 守卫：目标名已被「其他条目」占用即放弃——含本轮改名刚产生的占用。
+        // （旧实现用改名前快照 owners.has(to) 联合判断，拦不住本轮改名自身造成的重名，
+        //   会让同城重复副本每轮 +11；改为只看实时占用 used 才能真正幂等。宁可不改也不错改。）
         let used = false;
         for (const x of exps) { if (x !== e && String((x && (x.name || x.t)) || "") === to) { used = true; break; } }
-        if (owners.has(to) && used) { guardSkip++; continue; }
+        if (used) { guardSkip++; continue; }
         e.name = to; if (e.t) e.t = to;
         renamed++;
       }

@@ -231,6 +231,17 @@ guard("planner.spotBaikeBar 无 <a href> 且保留 sd-ops 识别前缀", () => {
     && body.indexOf("本页不提供外链") >= 0, "spotBaikeBar body 检查失败"];
 });
 
+// ── 2026-11-09 §9.7 改名守卫幂等防回潮 ──────────────────────────────
+// 旧守卫依赖「改名前快照」owners.has(to)，拦不住本轮改名自身刚造成的重名，
+// 会让同城重复副本每轮 +11（合成用例 A→B、C→B 旧守卫产出 ["B","B"]）。
+// 现改为只看实时占用 used；此处守真实代码里不得再回退到 owners 快照判断（注释已由 codeOnly 滤除）。
+guard("§9.7 改名守卫只用实时占用 used（不得回退 owners 快照）", () => {
+  const s = codeOnly(readSrc("tools/_apply-safe.mjs"));
+  const hasFix = s.indexOf("if (used) { guardSkip++; continue; }") >= 0;
+  const noSnapshot = !/owners\.has\(to\)/.test(s) && s.indexOf("const owners = new Set(exps.map") < 0;
+  return [hasFix && noSnapshot, "§9.7 守卫回退：hasFix=" + hasFix + " noSnapshot=" + noSnapshot];
+});
+
 console.log("");
 if (fail > 0) {
   console.log("审计整改防回潮断言失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");

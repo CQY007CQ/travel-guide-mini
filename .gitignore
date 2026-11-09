@@ -30,14 +30,14 @@ tools/_bak*/
 tools/.tone-bak/
 tools/_dl/
 tools/_img-unused/
-tools/*.bak
-tools/*.bak.js
-tools/*.bak-*
+tools/**/*.bak
+tools/**/*.bak.js
+tools/**/*.bak-*
 tools/*.orig
 tools/*.pre-*
 
 # ---------- 4. 超大历史数据快照（>1MB，已合并进 utils/data.js） ----------
-tools/data-before-merge.bak.js
+tools/**/data-before-merge.bak.js
 tools/v199-amap-spots.js
 tools/v199-amap-spots.js.bak-before-scrape
 tools/v200-official-import.js

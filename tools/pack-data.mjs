@@ -289,7 +289,7 @@ if (b64.length <= CHUNK_B64_MAX) {
 } else {
   const parts = splitData(D, CHUNK_B64_MAX);
   // 键别名映射 __A 注入「每个」分块：每块加载时据此独立还原短键，多分包也安全
-  parts.forEach(p => { p.__A = _KEYMAP; });
+  parts.forEach(p => { p.__A = {}; });
   if (parts.length > CHUNK_SLOTS.length) {
     console.error("✗ 需要 " + parts.length + " 个数据分包，但 app.json 仅注册 " + CHUNK_SLOTS.length +
       " 个（subdata/subdata2/subdata3）。请在 app.json 增加 subdata4… 并重跑。");
