@@ -485,6 +485,8 @@
   font-size: calc(24rpx * var(--fs, 1)); font-weight: 700;
 }
 .draft-link .ic { width: 28rpx; height: 28rpx; opacity: .82; }
+/* 2026-11-09 #482：示例行程入口（比草稿箱更显眼一点，金色） */
+.sample-link { margin-top: 12rpx; color: var(--gold-tx, #d4a94e); }
 .draft-sheet { max-height: 76vh; display: flex; flex-direction: column; }
 .draft-empty { padding: 64rpx 40rpx; text-align: center; color: var(--t3, #64748b); font-size: calc(24rpx * var(--fs, 1)); line-height: 1.7; }
 .draft-list { max-height: 60vh; }

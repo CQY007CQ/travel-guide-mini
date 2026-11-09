@@ -1217,6 +1217,35 @@ Page(SafePage({
     }
   },
   goPlan() { wx.switchTab({ url: "/pages/plan/plan" }); },
+
+  // 2026-11-09（#482 示例行程）：一键载入「成都 5 天」精排示例，复用正常生成路径（离线可出）
+  onSample() {
+    try {
+      const c = T.findCity ? T.findCity("成都") : null;
+      if (!c) { wx.showToast({ title: "示例城市暂未收录", icon: "none" }); return; }
+      const d = new Date(); d.setDate(d.getDate() + 7);
+      const pad = n => (n < 10 ? "0" + n : "" + n);
+      const depart = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      const oldPlan = app.globalData && app.globalData.plan;
+      if (oldPlan && oldPlan.days && oldPlan.days.length) { try { T.savePlanSlot(oldPlan); } catch (e) {} }
+      const daysArr = T.buildPlan({
+        city: c, days: 5, depart: depart, budget: "mid", pace: "balance",
+        travelMode: "", people: 2, picks: [], pickOnly: false, bias: ""
+      });
+      const from = { province: c.province || "", city: c.name };
+      app.globalData.from = from;
+      app.setPlan({
+        cityName: c.name, province: c.province || "", totalDays: daysArr.length, depart: depart,
+        days: daysArr, budget: "mid", customAmt: 0, people: 2, pace: "balance", travelMode: "",
+        pickOnly: false, isMulti: false, from: from, savedAt: Date.now(), bias: "", isSample: true
+      });
+      try { T.resetTripPrep(); } catch (e) {}
+      wx.showToast({ title: "已载入示例：成都 · 5 天", icon: "none" });
+      wx.switchTab({ url: "/pages/plan/plan" });
+    } catch (err) {
+      try { wx.showToast({ title: "示例载入失败，请稍后重试", icon: "none" }); } catch (e) {}
+    }
+  },
   // v1.8.4 B18：预约提醒 → 出行准备页
   goPrep() { wx.navigateTo({ url: "/subpkg/prep/prep" }); },
   // 使用指南（独立页，随时可看）
