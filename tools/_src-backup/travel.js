@@ -2875,8 +2875,35 @@ function fxConvert(amt, from, to) {
 function footHeatmap() {
   const f = _footRaw();
   const cs = f.cities || {};
+  // 2026-11-09：足迹不只算打卡 —— 把「已结束的历史行程」城市也计入（用户要求，图才有内容）。
+  // 只统计结束日期 < 今天的行程；未来/在途行程不算（避免把计划当足迹）。
+  const citySet = {};
+  Object.keys(cs).forEach(name => { if (name) citySet[name] = 1; });
+  const todayYMD = store.fmtLocalDate(new Date());
+  const seenSig = {};
+  let trips = 0;
+  const addPlan = function (p) {
+    try {
+      if (!p || !p.days || !p.days.length) return;
+      const lastD = p.days[p.days.length - 1] && p.days[p.days.length - 1].date;
+      const end = String(lastD || "").slice(0, 10);
+      if (!end || end >= todayYMD) return; // 只计已结束的行程
+      const firstD = String((p.days[0] && p.days[0].date) || "").slice(0, 10);
+      const sig = String(p.cityName || "") + "|" + p.days.length + "|" + firstD;
+      if (seenSig[sig]) return; // 存档与当前行程可能是同一份，避免 trips 重复
+      seenSig[sig] = 1;
+      const add = function (c) { const s = String(c || "").trim(); if (s) citySet[s] = 1; };
+      if (Array.isArray(p.segments) && p.segments.length) p.segments.forEach(function (s) { add(s && s.cityName); });
+      add(p.cityName);
+      (p.days || []).forEach(function (d) { add(d && d.cityName); });
+      trips++;
+    } catch (e) {}
+  };
+  try { (listSavedPlans() || []).forEach(function (x) { addPlan(x && (x.plan || x)); }); } catch (e) {}
+  try { addPlan(store.get("planV1", null)); } catch (e) {}
+
   const agg = {};
-  Object.keys(cs).forEach(name => {
+  Object.keys(citySet).forEach(name => {
     const prov = (D.CITY2PROV && D.CITY2PROV[name]) || (cs[name] && cs[name].province) || "";
     if (!prov) return;
     agg[prov] = (agg[prov] || 0) + 1;
@@ -2888,7 +2915,7 @@ function footHeatmap() {
     return { name: p, n: n, level: n === 0 ? 0 : (n >= 4 ? 4 : (n === 3 ? 3 : (n === 2 ? 2 : 1))) };
   });
   const visited = list.filter(x => x.n > 0).length;
-  return { provs: list, visited: visited, cities: Object.keys(cs).length };
+  return { provs: list, visited: visited, cities: Object.keys(citySet).length, trips: trips };
 }
 
 /* ---------- 4. 账本月度汇总 ---------- */

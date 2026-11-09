@@ -253,6 +253,8 @@
     <view class="card group-card">
       <view class="foot-line">
         <text class="foot-big">{{heat.visited}}<text class="foot-lb">/34</text></text><text class="foot-lb"> 个省份已点亮 · {{heat.cities}} 座城市</text>
+        <!-- 2026-11-09：说明口径 —— 已结束的历史行程城市也计入（不只打卡） -->
+        <text class="foot-lb" wx:if="{{heat.trips}}"> · 含历史行程 {{heat.trips}} 趟</text>
       </view>
       <view class="heat-grid">
         <view class="heat-cell l{{item.level}}" wx:for="{{heat.provs}}" wx:key="name">
