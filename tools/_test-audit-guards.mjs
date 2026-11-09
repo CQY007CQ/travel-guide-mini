@@ -248,6 +248,22 @@ guard("§9.7 改名守卫只用实时占用 used（不得回退 owners 快照）
   return [hasFix && noSnapshot, "§9.7 守卫回退：hasFix=" + hasFix + " noSnapshot=" + noSnapshot];
 });
 
+// ── 2026-11-10 上传脚本「登录态前置检查」防回潮 ──────────────────────
+// 旧流程：先 pkill IDE → 等端口最多 180s → 最后一步才报 code 10「需要重新登录」。
+// 未登录时白等 3 分钟，还把用户正在使用的开发者工具关掉。修复后 0 秒返回并给指引。
+// 断言必须守：探测点在 pkill 之前、--parse 离线分支在探测之前（不受登录态影响）。
+guard("upload.sh 登录态前置检查早于 pkill 且 --parse 不受影响", () => {
+  const s = readSrc("tools/upload.sh");
+  const iParse = s.indexOf('= "--parse"');
+  const iLogin = s.indexOf("登录态前置检查");
+  const iIslogin = s.indexOf("islogin 2>/dev/null");
+  const iPkill = s.indexOf("pkill -9 -f wechatwebdevtools");
+  const hasExit = /\n\s*exit 1\b/.test(s.slice(iLogin, iPkill));
+  return [iParse >= 0 && iLogin > iParse && iIslogin > iLogin && iPkill > iIslogin && hasExit,
+    "iParse=" + iParse + " iLogin=" + iLogin + " iIslogin=" + iIslogin +
+    " iPkill=" + iPkill + " hasExit=" + hasExit];
+});
+
 console.log("");
 if (fail > 0) {
   console.log("审计整改防回潮断言失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");

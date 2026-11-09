@@ -75,6 +75,23 @@ DESC="${2:-手动上传}"
 PROJ="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="/tmp/upload-$(date +%H%M%S).log"
 
+echo "▶ 登录态前置检查"
+# 2026-11-10：未登录时 cli upload 必报 code 10「需要重新登录」。旧流程会先 pkill IDE、
+# 再等端口最多 180s，直到最后一步才失败 —— 白等且把用户正在用的工具关掉。
+# 这里提前探测，未登录立即返回并给出可照做的指引（--parse 离线模式不受影响）。
+if [ ! -x "$CLI" ]; then
+  red "✗ 找不到微信开发者工具 CLI：$CLI"
+  exit 1
+fi
+LOGIN_JSON="$("$CLI" islogin 2>/dev/null | grep -o '{\"login\":[a-z]*}' | head -1)"
+if [ "$LOGIN_JSON" != '{"login":true}' ]; then
+  red "✗ 微信开发者工具未登录（islogin 返回 ${LOGIN_JSON:-无输出}），上传必然失败 code 10"
+  echo  "   处理：打开微信开发者工具 → 用微信扫码登录 → 再重跑本脚本。"
+  echo  "   离线校验日志请用：./tools/upload.sh --parse /tmp/upload-*.log"
+  exit 1
+fi
+green "  已登录"
+
 echo "▶ 发布前门禁"
 node "$PROJ/tools/verify-release.mjs" || { red "✗ 发布门禁未通过，终止"; exit 1; }
 
