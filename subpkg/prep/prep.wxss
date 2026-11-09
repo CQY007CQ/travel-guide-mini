@@ -69,35 +69,6 @@
 .pk-box { width: 40rpx; color: var(--chip-tx, #d4a94e); font-size: calc(28rpx * var(--fs, 1)); }
 .pk-tx { font-size: calc(26rpx * var(--fs, 1)); line-height: 1.45; flex: 1; color: var(--t1, #eaeff7); }
 
-/* ===== v1.7 · 证件与出行必备 ===== */
-.doc-n { font-size: calc(21rpx * var(--fs, 1)); font-weight: 700; color: var(--gold-tx, #d4a94e); }
-.doc-item {
-  display: flex; align-items: flex-start; gap: 14rpx;
-  padding: 12rpx 0; border-bottom: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .08);
-}
-.doc-item:last-child { border-bottom: none; }
-.doc-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2rpx; }
-.doc-t { font-size: calc(25rpx * var(--fs, 1)); font-weight: 600; color: var(--t1, #eaeff7); }
-.doc-x { font-size: calc(20rpx * var(--fs, 1)); line-height: 1.5; }
-.doc-item.done .doc-t { color: var(--t3, #8fa3bc); text-decoration: line-through; }
-
-
-/* ===== v1.8.3 · 证件段进度条与勾选（此前缺定义，进度条不可见） ===== */
-.box {
-  width: 40rpx; height: 40rpx; flex-shrink: 0; margin-top: 2rpx;
-  border: 2rpx solid rgba(var(--ln-rgb, 148, 163, 184), .45);
-  border-radius: 10rpx; box-sizing: border-box;
-  display: flex; align-items: center; justify-content: center;
-  color: #14100a; font-size: calc(28rpx * var(--fs, 1)); font-weight: 800; line-height: 1;
-}
-.box.on {
-  background: linear-gradient(135deg, #e2b65c, #b8892f);
-  border-color: transparent;
-}
-.prog { display: flex; align-items: center; gap: 18rpx; margin-top: 16rpx; }
-.bar { flex: 1; height: 10rpx; border-radius: 10rpx; background: rgba(var(--ln-rgb, 148, 163, 184),.14); overflow: hidden; }
-.fill { height: 100%; border-radius: 10rpx;
-  background: linear-gradient(90deg, #e2b65c, #d4a94e);
-  box-shadow: 0 0 12rpx rgba(212,169,78,.4); }
+/* 2026-11-09：删除「证件与出行必备」手工清单（与下方自动行李清单重复），相关样式一并移除 */
 .sp-tip { font-size: calc(20rpx * var(--fs, 1)); margin: 12rpx 26rpx 0; line-height: 1.5; }
 .sos-card { border-color: rgba(229, 106, 106, .25); }

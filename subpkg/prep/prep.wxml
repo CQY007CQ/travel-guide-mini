@@ -50,25 +50,7 @@
     </view>
 
     <!-- 自动行李清单（按天数 / 出发季节 / 目的地气候 / 行程特色生成） -->
-    <!-- v1.7 · 证件与出行必备 -->
-    <view class="card">
-      <view class="h3 h3-row">
-        <view class="h3-l"><image class="ic" src="/images/icons/badge.png"/>证件与出行必备</view>
-        <text class="doc-n">{{docDone}}/{{docList.length}}</text>
-      </view>
-      <view class="prog">
-        <view class="bar"><view class="fill" style="width:{{docPct}}%"></view></view>
-      </view>
-      <view class="doc-item {{item.done ? 'done' : ''}}" wx:for="{{docList}}" wx:key="k"
-            data-k="{{item.k}}" bindtap="onDocTap">
-        <view class="box {{item.done ? 'on' : ''}}">{{item.done ? '✓' : ''}}</view>
-        <view class="doc-txt">
-          <text class="doc-t">{{item.t}}</text>
-          <text class="doc-x dim">{{item.x}}</text>
-        </view>
-      </view>
-    </view>
-
+    <!-- 2026-11-09：删除上方重复的「证件与出行必备」手工清单（与下方「证件与钱」分组重复，用户反馈"上下重复"） -->
     <view class="card" wx:if="{{pack}}">
       <view class="h3 h3-row"><image class="ic" src="/images/icons/backpack.png"/>自动行李清单</view>
       <view class="pk-sum">

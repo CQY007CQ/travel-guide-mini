@@ -26,7 +26,6 @@ Page(SafePage({
 
   data: {
     fz: 1,
-    docList: [], docDone: 0, docPct: 0,
     td: false,
     hasPlan: false, cityName: "", isMulti: false,
     tickets: [], tkDone: 0, bookN: 0,
@@ -117,7 +116,6 @@ Page(SafePage({
       duties.push({ who, list });
     }
 
-    const checks = T.getPrepChecks();
     this.setData({
       hasPlan: true, cityName: plan.cityName, isMulti,
       tickets, duties,
@@ -126,12 +124,8 @@ Page(SafePage({
       tkSum, peopleN: peopleN0,
       tkPct: tickets.length ? Math.round(tickets.filter(x => x.done).length / tickets.length * 100) : 0,
       // v1.5：智能行李清单
-      pack: T.packSmart(plan), planDays: plan.days.length,
-      // v1.7：证件与出行必备
-      docList: T.docItems().map(x => Object.assign({}, x, { done: !!checks[x.k] })),
-      docDone: T.docDone()
+      pack: T.packSmart(plan), planDays: plan.days.length
     });
-    this._syncDocPct();
   },
 
   /* ---- 行李清单勾选（与 today 页共用 miniPrepV1 的 pg_ 前缀，两处同步） ---- */
@@ -196,22 +190,6 @@ Page(SafePage({
   },
 
   goToday() { wx.switchTab({ url: "/pages/today/today" }); },
-
-  /* ---- v1.7：证件与出行必备清单 ---- */
-  // v1.12 UI 减法：文档进度条百分比预计算，避免 WXML 内除法表达式
-  _syncDocPct() {
-    const d = this.data;
-    this.setData({ docPct: d.docList.length ? Math.round(d.docDone / d.docList.length * 100) : 0 });
-  },
-  onDocTap(e) {
-    const k = e.currentTarget.dataset.k;
-    if (!k) return;
-    T.togglePrepCheck(k);
-    const checks = T.getPrepChecks();
-    const docList = (this.data.docList || []).map(x => Object.assign({}, x, { done: !!checks[x.k] }));
-    this.setData({ docList: docList, docDone: docList.filter(x => x.done).length });
-    this._syncDocPct();
-  },
 
   /* ---- 应急电话直拨 ---- */
   onCall(e) {
