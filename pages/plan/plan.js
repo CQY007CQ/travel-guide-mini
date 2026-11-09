@@ -1436,7 +1436,8 @@ Page(SafePage({
       });
     };
 
-    const draw = (canvas) => {
+    const draw = (canvas, attempt) => {
+      attempt = attempt || 0;
       try {
         // 高 dpr(3) 会让像素画布与输出图过大，钳到 2 兼顾清晰度与真机内存
         let dpr = 2;
@@ -1444,7 +1445,12 @@ Page(SafePage({
         const m = that._posterModel();
         canvas.width = m.W * dpr; canvas.height = m.H * dpr;
         const ctx = canvas.getContext("2d");
-        if (!ctx) return fail("draw", "getContext(2d) returned null", "绘图失败，请重试");
+        if (!ctx) {
+          // 2026-11-09 真机：canvas 刚挂载/尚未绘制时部分机型会返回 null。
+          // 已把 .share-canvas 从 z-index:-1 改到正层级，这里再给两次短重试兜底。
+          if (attempt < 2) { setTimeout(() => draw(canvas, attempt + 1), 120); return; }
+          return fail("draw", "getContext(2d) returned null after retries", "绘图失败，请重试");
+        }
         // setTransform 而非 scale：共用节点时避免残留变换叠加
         if (ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0); else ctx.scale(dpr, dpr);
         that._drawPoster(ctx, m.W, m);

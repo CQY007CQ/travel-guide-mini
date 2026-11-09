@@ -805,7 +805,10 @@
   height: 1px;
   opacity: 0.01;
   pointer-events: none;
-  z-index: -1;
+  /* 2026-11-09 真机修复：z-index:-1 会把 canvas 压到页面背景之后，部分机型对「完全被遮挡
+     的 canvas」不创建 2D 上下文（getContext('2d') 返回 null → 提示「绘图失败」）。
+     改到正层级：1px、opacity .01、pointer-events:none，视觉上不可见也不会拦点击。 */
+  z-index: 9999;
 }
 
 /* ── v1.19.78：城市深度玩法（内容随 subai 分包懒加载） ───────────────── */
