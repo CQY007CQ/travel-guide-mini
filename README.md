@@ -9,7 +9,7 @@
 交通动线与步行量、能直接导航的真实坐标、预算拆解、打包清单、逐日天气（联网时才有，
 断网自动降级）。城市数据与坐标随分包下发，**装机后完全不需要网络**。
 
-- 版本：`1.20.4`
+- 版本：`1.20.5`
 - AppID：`wxa365d49bc3366f95`（个人主体）
 - 基础库：`3.8.12`
 - 页面：主包 6 页（含 4 个 tabBar）+ 分包 12 页（功能 8 / 数据 3 / 内容 1）
@@ -145,7 +145,7 @@ node tools/_test-v11993-bootsmoke.mjs  # 17 页启动冒烟（抓分包 require 
 ## 六、发版
 
 ```bash
-cli upload --project "$(pwd)" --version 1.20.4 --desc "说明"
+cli upload --project "$(pwd)" --version 1.20.5 --desc "说明"
 ```
 
 - **不要传 `--info-output`**（本环境会触发 `二维码输出路径无效 code 17`）
@@ -185,3 +185,5 @@ cli upload --project "$(pwd)" --version 1.20.4 --desc "说明"
 | `docs/changelog/v1.19.107-变更清单.md` | 本次使用指南与可观测性更新记录 |
 | `docs/changelog/v1.19.77-审核描述.md` | 提审说明模板 |
 | `docs/changelog/v1.xx-变更清单.md` | 各版本变更记录 |
+| `docs/assessment/功能清单.md` | 功能字典（考核 / 评审附件，按模块梳理已实现功能 + 考后规划） |
+| `docs/assessment/演示讲稿.md` | 演示讲稿（疑问式开场 + 边看边讲 双版本合一，含演示点击顺序与未来规划） |

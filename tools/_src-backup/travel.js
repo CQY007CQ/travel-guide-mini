@@ -3,6 +3,8 @@ const D = require("./data.js");
 const store = require("./store.js");
 // v1.19.169 收敛地球距离计算：统一走 utils/geo.js（合并原 haversineKm/_havKm/_km2 与 planner.haversine）
 const { haversine, haversineKm } = require("./geo.js");
+// 跨模块纯函数单点真源（cleanSpotName / baikeKeyword），避免与 planner.js 各定义一份
+const { cleanSpotName, baikeKeyword } = require("./_shared.js");
 
 // v1.20 数据拆分包：data-packed.js 移入 subdata/data，主包异步加载。
 // planner.js 在模块顶层对 data.js 做了 36 个字段解构，必须在数据就绪后再 require，
@@ -36,7 +38,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.4";
+const APP_VER = "1.20.5";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -830,12 +832,7 @@ function spotDetailText(name, cityName) {
 }
 
 /* ---------- 导航 / 百科 ---------- */
-function cleanSpotName(name) {
- const raw = String(name || "").trim();
- let n = raw.replace(/^(?:继续深度游览|深度游览|出发前往|继续游览|凌晨出发，前往|抵达 \+ 直奔|抵达 \+ )\s*[「]?/, "").replace(/」$/, "");
- n = n.replace(/[（(【].*?[)）】]/g, "").trim();
- return n || raw;
-}
+// cleanSpotName 已收口到 _shared.js（与 planner.js 共用单点真源）
 // 导航目标判定（v1.14）：
 //   approx:false  → 景点精确坐标，直接 wx.openLocation 到点
 //   approx:"city" → 只定位到所在城市中心（真坐标，非景点位），仍可开地图，附提示让用户在地图内搜该点
@@ -974,14 +971,7 @@ function baikeInfo(name, cityName) {
   .filter(Boolean).join("\n\n").slice(0, 380);
  return { has: true, title, intro: intro || note, extras, text, card: cardHit };
 }
-function baikeKeyword(name) {
- let n = String(name || "").trim();
- if (!n) return "";
- n = n.replace(/^(?:继续深度游览|深度游览|出发前往|继续游览|凌晨出发，前往|抵达 \+ 直奔|抵达 \+ )\s*[「]?/, "").replace(/」$/, "");
- const parts = n.split(/\s*(?:\+|＋|、|\/)\s*/).map(s => s.trim()).filter(Boolean);
- if (parts.length) n = parts[0];
- return n.trim();
-}
+// baikeKeyword 已收口到 _shared.js（与 planner.js 共用单点真源）
 
 /* ---------- 今天卡片状态 ---------- */
 function todayState(plan) {

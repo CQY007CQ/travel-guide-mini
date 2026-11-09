@@ -84,7 +84,7 @@
   "preloadRule": {
     "pages/index/index": {
       "network": "all",
-      "packages": ["subpkg", "subdata2"]
+      "packages": ["subpkg"]
     },
     "pages/plan/plan": {
       "network": "wifi",

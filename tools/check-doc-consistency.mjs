@@ -85,9 +85,8 @@ const MATERIALS = [
   ["考核整改与答辩方案", path.join(OUT, "考核整改与答辩方案.md")],
   ["模拟考核评分报告", path.join(OUT, "模拟考核评分报告.md")],
   ["仓库 README", path.join(ROOT, "README.md")],
-  ["功能清单", path.join(ROOT, "功能清单.md")],
-  ["演示讲稿", path.join(ROOT, "演示讲稿.md")],
-  ["展示提词稿", path.join(ROOT, "展示提词稿.md")],
+  ["功能清单", path.join(ROOT, "docs/assessment/功能清单.md")],
+  ["演示讲稿", path.join(ROOT, "docs/assessment/演示讲稿.md")],
 ];
 const texts = {};
 console.log("【材料可读性】");
@@ -105,7 +104,7 @@ for (const [label] of MATERIALS) {
   const stale = STALE_VER.filter(v => t.indexOf(v) >= 0);
   ok(label + "：无过期「当前版本」数字", stale.length === 0, stale.join(","));
 }
-for (const label of ["考核计划书", "考核演示 PPT", "考核整改与答辩方案", "模拟考核评分报告", "仓库 README", "功能清单", "演示讲稿", "展示提词稿"]) {
+for (const label of ["考核计划书", "考核演示 PPT", "考核整改与答辩方案", "模拟考核评分报告", "仓库 README", "功能清单", "演示讲稿"]) {
   ok(label + "：含当前版本 " + VER, texts[label].indexOf(VER) >= 0);
 }
 
@@ -142,7 +141,7 @@ for (const [label] of MATERIALS) {
     const n = CN_NUM[m[1]];
     if (n === undefined || n !== ASSERT) numBad.push(label + "：" + m[0].trim() + "（真值 " + ASSERT + "）");
   }
-  const noAssertNeeded = ["功能清单", "演示讲稿", "展示提词稿"].indexOf(label) >= 0;
+  const noAssertNeeded = ["功能清单", "演示讲稿"].indexOf(label) >= 0;
   ok(label + "：推荐引擎单测断言数有被校验到", assertSents.length > 0 || noAssertNeeded, assertSents.length + " 句");
 }
 ok("材料中 " + numTotal + " 处回归/断言数字全部等于动态真值", numBad.length === 0, numBad.slice(0, 6).join(" ; "));
@@ -157,7 +156,7 @@ let staleHits = [];
 for (const [label] of MATERIALS) {
   for (const s of STALE_PHRASES) if (texts[label].indexOf(s) >= 0) staleHits.push(label + "：" + s);
 }
-ok("8 份材料无已知过期话术", staleHits.length === 0, staleHits.slice(0, 8).join(" ; "));
+ok("7 份材料无已知过期话术", staleHits.length === 0, staleHits.slice(0, 8).join(" ; "));
 
 /* ── ⑤ 榜单口径：必须标注月份 + 可复现命令，杜绝写死后再次漂移 ── */
 console.log("【榜单时令口径】");

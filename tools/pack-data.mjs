@@ -31,75 +31,9 @@ const D = req("./utils/data.js");
   console.log("✓ 打包期坐标完整性门禁通过");
 }
 
-// ── v1.19.55: JSON 键别名压缩（无损）────────────────────────────────
-// 仅别名高频 schema 键（出现次数>=MIN_ALIAS_FREQ 且长度>2），数据名键（公园/餐厅/城市名等）保持原样。
-// 每个分块 blob 内附带正向映射 __A；加载器(data.js) 据此还原，无需双文件同步。
-// 打包前做 round-trip 断言：别名化+还原后必须 === 原数据，否则中止（保证绝不损坏数据）。
-function _collectKeys(o, freq) {
-  if (Array.isArray(o)) { for (const x of o) _collectKeys(x, freq); return; }
-  if (o && typeof o === "object") { for (const k of Object.keys(o)) { freq[k] = (freq[k] || 0) + 1; _collectKeys(o[k], freq); } }
-}
-function _buildKeyMap(D) {
-  const freq = {}; _collectKeys(D, freq);
-  const MIN = 50;
-  const cand = Object.keys(freq).filter(k => freq[k] >= MIN && k.length > 2 && k !== "__A");
-  cand.sort((a, b) => freq[b] - freq[a]);
-  const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+=";
-  const existing = new Set(Object.keys(freq)); // 数据里已存在的全部键（含 v1.20 CITIES 压缩键 @A/@M/…），避免别名目标冲突
-  const map = {};
-  let ai = 0;
-  for (const k of cand) {
-    // 找到一个不与数据中已有键冲突的别名目标；若冲突会令 rename 覆盖真实键、导致 round-trip 失配、打包中止
-    while (ai < ALPHA.length) {
-      const alias = "@" + ALPHA[ai]; ai++;
-      if (!existing.has(alias)) { map[k] = alias; break; }
-    }
-    if (ai >= ALPHA.length) break; // 别名池用尽，剩余高频键保留原名（仅体积略增，绝不损坏数据）
-  }
-  return map; // long -> short
-}
-function _renameKeys(o, map) {
-  if (Array.isArray(o)) { for (let i = 0; i < o.length; i++) _renameKeys(o[i], map); return; }
-  if (o && typeof o === "object") {
-    for (const k of Object.keys(o)) {
-      const v = o[k];
-      if (k === "__A") continue;
-      if (Object.prototype.hasOwnProperty.call(map, k)) { const nk = map[k]; o[nk] = v; delete o[k]; _renameKeys(v, map); }
-      else _renameKeys(v, map);
-    }
-  }
-}
-function _invert(map) { const inv = {}; for (const k in map) inv[map[k]] = k; return inv; }
-function _expandKeys(o, inv) {
-  if (Array.isArray(o)) { for (let i = 0; i < o.length; i++) _expandKeys(o[i], inv); return; }
-  if (o && typeof o === "object") {
-    for (const k of Object.keys(o)) {
-      const v = o[k];
-      if (k === "__A") continue;
-      if (Object.prototype.hasOwnProperty.call(inv, k)) { const nk = inv[k]; o[nk] = v; delete o[k]; _expandKeys(v, inv); }
-      else _expandKeys(v, inv);
-    }
-  }
-}
-// 规范化为「键排序」的稳定形态：delete+add 会改变对象键顺序，JSON.stringify 因而失配；
-// 但运行时只按键名取值、不依赖顺序，故用排序后的深比较做 round-trip 断言（更严格、可捕获真实损坏）。
-function _canon(o) {
-  if (Array.isArray(o)) return o.map(_canon);
-  if (o && typeof o === "object") {
-    const r = {};
-    for (const k of Object.keys(o).sort()) r[k] = _canon(o[k]);
-    return r;
-  }
-  return o;
-}
-// ⚠️ 2026-10-02 起「键别名压缩」已停用（白屏事故根因）。
-//   原因：数据经 _apply-safe.mjs 反复增量 merge，同一字段被两套别名方案分别编码（如 name 既是 @A 又是 @k、
-//   limited 既是 @Z 又是 @u），而加载器只能从 __A 还原一套 → 另一套拷贝的 CITIES[i].name 永远 undefined →
-//   首页白屏 /「无法加载完整数据内容」。且 _apply-safe.mjs 直接读写原始 packed（不还原别名），
-//   只要别名存在就会持续污染。停用它即从根上消除该类损坏；_apply-safe 读写 long-key 数据也不再有害。
-//   代价：包体略增，若超过单块上限会自动拆成 2 个数据分包（app.json 已注册 subdata2/subdata3，加载器需补静态字面量）。
-const _KEYMAP = {};
-if (Object.keys(_KEYMAP).length) D.__A = _KEYMAP; // 附带正向映射，供加载器还原
+// v1.19.55 JSON 键别名压缩特性已于 2026-10-02 停用（白屏事故根因：_apply-safe 反复增量 merge 致别名方案冲突，
+// 加载器只能还原一套 → CITIES[i].name 永远 undefined → 首页白屏）。对应函数(_collectKeys/_buildKeyMap/_renameKeys/
+// _invert/_expandKeys/_canon)已删除；__A 仅保留空占位供加载器兼容解析，打包产物与停用前完全一致。
 
 // ── 主包瘦身（v1.19.9）─────────────────────────────────────────────
 // 微信主包上限 2048KB。数据扩到 2 万景点后再次逼近红线（实测 2126KB）。
@@ -214,6 +148,39 @@ try {
   }
 } catch (e) {
   console.log("瘦身跳过（数据异常，保持原样）:", e && e.message);
+}
+
+// ── v1.20.x 打包期精确去重（防回潮）────────────────────────────────
+// 与 data.js dedupeSpots() 同语义，在落库前移除同城「景点名+坐标」逐字节相同的副本，保证打包产物本身零冗余
+// （运行时去重退化为安全网）；同步去重 FOOD_SPOTS 同城同店同坐标副本。当前基数据已 0 重复，本段常态为 no-op，
+// 但若未来自动化采集/合并重新引入重复，会在打包期即清零，避免冗余随包发布。
+{
+  let _removed = 0;
+  for (const city in (D.SPOT_COORDS || {})) {
+    const list = D.SPOT_COORDS[city];
+    if (!Array.isArray(list)) continue;
+    const seen = Object.create(null); const out = [];
+    for (const row of list) {
+      if (!Array.isArray(row)) { out.push(row); continue; }
+      const key = JSON.stringify([row[0], row[1], row[2]]);
+      if (seen[key]) { _removed++; continue; }
+      seen[key] = 1; out.push(row);
+    }
+    D.SPOT_COORDS[city] = out;
+  }
+  for (const city in (D.FOOD_SPOTS || {})) {
+    const list = D.FOOD_SPOTS[city];
+    if (!Array.isArray(list)) continue;
+    const seen = Object.create(null); const out = [];
+    for (const s of list) {
+      if (!s || !s.shop) { out.push(s); continue; }
+      const key = JSON.stringify([s.shop, s.lat, s.lon]);
+      if (seen[key]) { _removed++; continue; }
+      seen[key] = 1; out.push(s);
+    }
+    D.FOOD_SPOTS[city] = out;
+  }
+  if (_removed) console.log("打包期精确去重:", _removed, "条副本（防回潮，落库前已清零）");
 }
 
 // ── 脏省名键清理（v1.19.62）：SPOT_COORDS / CITY2PROV / PROVINCE_CITIES 里「用省名当城市键」的项必须剔除。

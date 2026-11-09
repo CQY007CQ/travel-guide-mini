@@ -26,6 +26,8 @@ const { BIG_EXCLUDE, BIG_SPOT_DAYS, BUDGETS, BUDGET_STYLE, CAPITAL_COORDS, CITIE
 
 // v1.19.169 收敛地球距离计算：统一走 utils/geo.js（原 haversine 实现在此，已合并）
 const { haversine } = require("./geo.js");
+// 跨模块纯函数单点真源（cleanSpotName / baikeKeyword），避免与 travel.js 各定义一份
+const { cleanSpotName, baikeKeyword } = require("./_shared.js");
 
 // —— 晚间具名演出表：避免行程里出现「看一场本地演出」这类无场馆无剧目的泛安排 ——
 // 每个城市给「具体场馆 + 演出」，晚上空闲时段直接落到具名条目（在哪儿看什么）。
@@ -1553,12 +1555,7 @@ function spotEffort(name){
  return 1;
 }
 
-function cleanSpotName(name){
- const raw = String(name || "").trim();
- let n = raw.replace(/^(?:继续深度游览|深度游览|出发前往|继续游览|凌晨出发，前往|抵达 \+ 直奔|抵达 \+ )\s*[「]?/, "").replace(/」$/, "");
- n = n.replace(/[（(【].*?[)）】]/g, "").trim();
- return n || raw;
-}
+// cleanSpotName 已收口到 _shared.js（与 travel.js 共用单点真源）
 
 function uriEnc(s){ return encodeURIComponent(String(s == null ? "" : s)).replace(/'/g, "%27"); }
 
@@ -2174,14 +2171,5 @@ function spotKey(name){
  return String(name||"").split(SPOT_SEP).map(s=>s.trim()).filter(s=>s.length>=2);
 }
 
-function baikeKeyword(name){
- let n = String(name || "").trim();
- if(!n) return "";
- // 去掉行程动作前缀与书名号（深度游览「故宫」→ 故宫；继续游览 + 西湖 → 西湖）
- n = n.replace(/^(?:继续深度游览|深度游览|出发前往|继续游览|凌晨出发，前往|抵达 \+ 直奔|抵达 \+ )\s*[「]?/, "").replace(/」$/, "");
- // 组合名只取主段（天安门广场 + 故宫博物院 → 天安门广场），避免百科搜不到
- const parts = n.split(/\s*(?:\+|＋|、|\/)\s*/).map(s => s.trim()).filter(Boolean);
- if(parts.length) n = parts[0];
- return n.trim();
-}
+// baikeKeyword 已收口到 _shared.js（与 travel.js 共用单点真源）
 module.exports = { SHOW_TIPS, setStoreAdapter, showListOf, baikeKeyword, bestMatch, bigSpotInfo, budgetFoodDaily, budgetMealText, budgetStyleOf, budgetTierKey, buildPlanDays, buildProvinceCity, buildProvincePlanDays, cityLegTxt, cleanSpotName, countPlanStats, customBudgetObj, dedupSpots, findCity, getCoord, getProfile, getSpotCity, getSpotCoord, getWish, haversine, isWished, moneyStr, photoTip, profileAdjustedFoods, rangePair, relaxDetail, relaxIndex, resolveBudget, shopBand, spotBaikeBar, spotCharacter, spotDetailCore, spotDetailExtras, spotDetailFallback, spotDetailHtml, spotEffort, spotHidden, spotHours, spotHowTo, spotKey, spotOffpeak, spotOpenNote, spotOverlap, sunriseSpotInfo, tierOfPerDay, uriEnc };
