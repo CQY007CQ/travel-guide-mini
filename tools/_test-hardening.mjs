@@ -118,6 +118,8 @@ ok("v1.20.6 深度内容含大同/晋中", !!(DD.cities && DD.cities["大同"] &
 const _deepSrc = fs.readFileSync(path.join(ROOT, "subai/deep/deep.js"), "utf8");
 ok("v1.20.6 深度页未收录显式提示（无静默换城）",
   _deepSrc.includes("暂未收录深度玩法") && !/if \(!curName \|\| !A\.hasDeep\(curName\)\) curName = cities\[0\]/.test(_deepSrc));
+// 路由参数是 URL 编码过的（plan 页 encodeURIComponent），页面必须解码，否则会显示 %E5%8C%97%E4%BA%AC
+ok("v1.20.6 深度页解码 city 路由参数", /decodeURIComponent\(want\)/.test(_deepSrc));
 
 // ── v1.20.6 行程编辑：删空某天后加景点要按 上午/下午/晚上 依次分配（不再堆同一时段）──
 await T.ready();

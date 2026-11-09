@@ -62,7 +62,10 @@ Page({
   },
 
   onLoad(q) {
-    const want = (q && q.city) ? String(q.city) : "";
+    // 2026-11-09：路由参数可能是 URL 编码的（plan 页用 encodeURIComponent 传入，微信不会自动解码），
+    // 之前会把 %E5%8C%97%E4%BA%AC 当成城市名显示成「未收录」。这里统一解码（失败保留原值）。
+    let want = (q && q.city) ? String(q.city) : "";
+    try { want = decodeURIComponent(want); } catch (e) {}
     A.initDeep().then(() => {
       const cities = A.deepCities();
       if (!cities.length) { this.setData({ ready: true, cities: [], curName: "", msg: "内容暂未就绪" }); return; }
