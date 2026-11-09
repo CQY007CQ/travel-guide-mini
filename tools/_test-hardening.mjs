@@ -103,6 +103,13 @@ const _fp = { cityName: "太原", days: [{ items: [] }], depart: "2027-04-05", b
 ok("v1.20.6 问穿衣答复不含「适宜时节」", (T.askAssistant("太原穿衣穿什么", _fp).text || "").indexOf("适宜时节") < 0);
 ok("v1.20.6 问季节答复保留「适宜时节」", (T.askAssistant("太原什么季节去好", _fp).text || "").indexOf("适宜时节") >= 0);
 
+// ── v1.20.6 北方 11 月穿衣按冬季（不再给薄外套），南方不误伤 ──
+// 用指定日期的 dressForMonth 断言（不受运行当月影响）；覆盖华北/华东/高原三类。
+const _ty2 = T.findCity("太原"), _sh = T.findCity("上海"), _ls = T.findCity("拉萨");
+ok("v1.20.6 太原(华北)11月按冬季（羽绒服）", !!_ty2 && T.dressForMonth(_ty2, "2026-11-09").season === "冬季出行");
+ok("v1.20.6 上海(华东)11月仍按秋季（不误伤南方）", !!_sh && T.dressForMonth(_sh, "2026-11-09").season === "秋季出行");
+ok("v1.20.6 拉萨(高原)11月按冬季", !!_ls && T.dressForMonth(_ls, "2026-11-09").season === "冬季出行");
+
 console.log("");
 if (fail > 0) {
   console.log("审计加固运行时单测失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");

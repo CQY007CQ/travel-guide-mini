@@ -1234,7 +1234,7 @@ function clothAdvice(city) {
  try {
   const c = city || {};
   const climate = c.climate || "temperate";
-  const sk = SEASON_KEYS[new Date().getMonth() + 1] || "秋";
+  const sk = _clothSeason(new Date().getMonth() + 1, c);
   const wx = (D.SEASON_WX && D.SEASON_WX[climate] && D.SEASON_WX[climate][sk]) || "";
   const cl = (D.CLOTH && D.CLOTH[climate] && D.CLOTH[climate][sk]) || null;
   const lines = [];
@@ -2150,8 +2150,9 @@ function packSmart(plan) {
   const depStr = String((plan && plan.depart) || "").slice(0, 10);
   let month = new Date().getMonth() + 1;
   if (/^\d{4}-\d{2}-\d{2}$/.test(depStr)) month = parseInt(depStr.slice(5, 7), 10) || month;
-  const season = SEASON_KEYS[month] || "秋";
   const city = findCity(activeCityOf(plan) || (plan && plan.cityName) || "");
+  // v1.20.6：行李清单季节同样走区域/气候感知（北方 11/3 月按冬季备羽绒服等）
+  const season = _clothSeason(month, city);
   const climate = (city && city.climate) || "temperate";
   const isMulti = !!(plan && plan.segments && plan.segments.length > 1);
   // 行程特色：山 / 海 / 高原 / 古镇（决定特殊装备）
@@ -3229,6 +3230,18 @@ function dateHintsForPlan(plan) {
 
 /* ---------- A2 穿衣指数：按出行月份（dressForMonth）或当日实时温度（dressForTemp） ---------- */
 function _seasonKeyOf(month) { return ({ 12: "冬", 1: "冬", 2: "冬", 3: "春", 4: "春", 5: "春", 6: "夏", 7: "夏", 8: "夏", 9: "秋", 10: "秋", 11: "秋" })[month] || "秋"; }
+// v1.20.6：区域/气候感知的季节判定 —— 修「北方 11 月被当成秋季给薄外套」。
+// 11 月：东北/华北/西北 或 cold/plateau 气候，实际已入冬（0℃上下），按「冬」给羽绒服；
+//        华东/华中/华南/西南（温和）仍按「秋」。3 月同理（北方仍冷，按「冬」）。
+// 只用于穿衣/行李这类保暖相关判定，不改动 SEASON_KEYS 全表（其它功能口径不变）。
+function _clothSeason(month, city) {
+  const base = _seasonKeyOf(month);
+  const c = city || {};
+  const cold = c.climate === "cold" || c.climate === "plateau";
+  const north = c.region === "东北" || c.region === "华北" || c.region === "西北";
+  if ((month === 11 || month === 3) && (cold || north)) return "冬";
+  return base;
+}
 // v1.19.12：dressForMonth 纯函数（气候+月份→结果不变），今日页/行前多次调用 → memo
 const _dressMemo = new Map();
 function dressForMonth(city, dateStr) {
@@ -3240,7 +3253,7 @@ function dressForMonth(city, dateStr) {
   const c = city || {};
   const climate = c.climate || "temperate";
   const m = dateStr ? Number(String(dateStr).slice(5, 7)) : (new Date().getMonth() + 1);
-  const sk = _seasonKeyOf(m);
+  const sk = _clothSeason(m, c);
   const cl = (D.CLOTH && D.CLOTH[climate] && D.CLOTH[climate][sk]) || null;
   const wx = (D.SEASON_WX && D.SEASON_WX[climate] && D.SEASON_WX[climate][sk]) || "";
   if (cl) _res = { season: sk + "季出行", weather: wx, lines: [cl.tops, cl.bottoms, cl.shoes].filter(Boolean), acc: cl.accessories || "", tip: cl.tip || "" };
