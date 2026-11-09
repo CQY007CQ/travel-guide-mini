@@ -1239,7 +1239,8 @@ function clothAdvice(city) {
   const cl = (D.CLOTH && D.CLOTH[climate] && D.CLOTH[climate][sk]) || null;
   const lines = [];
   if (wx) lines.push(wx);
-  if (c.best) lines.push("适宜时节：" + c.best);
+  // v1.20.6：穿衣建议只讲「怎么穿」，「适宜时节」交给 askAssistant 在问季节时单独给
+  // （原先这里拼进来，导致「本地速查」问穿衣时混杂最佳季节，与穿衣无关）
   if (cl) {
    lines.push("上衣：" + cl.tops);
    lines.push("下装：" + cl.bottoms);
@@ -1466,6 +1467,10 @@ function askAssistant(rawQ, plan) {
   const adv = clothAdvice(cityObj);
   L(city + "穿衣建议：");
   L(adv || "数据暂缺，按目的地当月气候常识准备即可。");
+  // v1.20.6：只有问「季节/几月/什么时候去」才单独给「适宜时节」，单纯问穿衣不再混入最佳季节
+  if (/季节|几月|月份|什么时候|啥时候|最佳/.test(q) && cityObj && cityObj.best) {
+   L("\n适宜时节：" + cityObj.best);
+  }
   L("\n出发前再看一次预报，如逢雨天优先安排室内的展馆 / 商场路线，调整好衣物。");
   return { text: lines.join("\n"), tag: "ok" };
  }

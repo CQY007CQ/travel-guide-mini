@@ -93,6 +93,16 @@ ok("#15/#65 超长景点名截断到 200", !!(r && r.plan.days[0].items[1].name.
 ok("#15/#65 items 非数组被归一为 []", !!(r && Array.isArray(r.plan.days[1].items) && r.plan.days[1].items.length === 0));
 ok("#15/#65 合法备份照常返回 hasPlan", !!(r && r.hasPlan && r.count > 0), JSON.stringify(r && { c: r.count, p: r.hasPlan }));
 
+// ── v1.20.6 本地速查：穿衣建议不得混入「适宜时节」──
+// 症状：问「穿衣」时把城市「最佳时节」也拼进穿衣建议（太原 best=4-5月…即触发），
+//       行程页已过滤，但「本地速查」页没过滤 → 用户看到穿衣建议里冒出适宜时节。
+// 修法：clothAdvice 只讲「怎么穿」；askAssistant 仅在问「季节/几月/几时」时单独给适宜时节。
+const _ty = T.findCity("太原");
+ok("v1.20.6 穿衣建议不含「适宜时节」", !!_ty && (T.clothAdvice(_ty) || "").indexOf("适宜时节") < 0);
+const _fp = { cityName: "太原", days: [{ items: [] }], depart: "2027-04-05", budget: "mid", people: 2 };
+ok("v1.20.6 问穿衣答复不含「适宜时节」", (T.askAssistant("太原穿衣穿什么", _fp).text || "").indexOf("适宜时节") < 0);
+ok("v1.20.6 问季节答复保留「适宜时节」", (T.askAssistant("太原什么季节去好", _fp).text || "").indexOf("适宜时节") >= 0);
+
 console.log("");
 if (fail > 0) {
   console.log("审计加固运行时单测失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");
