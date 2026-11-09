@@ -348,6 +348,12 @@
               wx:for="{{day.items}}" wx:key="ix" wx:for-index="i" wx:for-item="it"
               style="{{dragOn && dragDi === di ? dragSh[i] : ''}}"
               data-di="{{di}}" data-ix="{{it.ix}}" bindtap="onToggle">
+          <view class="tl-thumb-wrap">
+            <image wx:if="{{it.img}}" class="tl-thumb" src="{{it.img}}" mode="aspectFill" lazy-load/>
+            <view wx:else class="tl-thumb gen" style="background:{{it.thumbBg}}">
+              <text class="tl-thumb-emoji">{{it.thumbEmoji}}</text>
+            </view>
+          </view>
           <view class="tl-main">
             <view class="tl-top">
               <text class="tl-period {{it.f ? 'p-f' : ''}}">{{it.period}}</text>
