@@ -8,8 +8,8 @@ const app = getAppSafe();
 // 工具分组抽到 utils/toolkit-groups.js，与指南页共用（避免页面模块互相 require）
 const ITEM_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 // 需要行程的工具（其输出是行程维度的，不能「加入想玩」）
-const PLAN_TOOLS = ["brief", "theme", "load", "rhythm", "tips", "book", "museum", "photo", "risk", "score", "draft", "line", "long", "moments", "daytext",
-  "countdown", "burn", "highlight", "rainy", "night", "crowd", "mistake", "density", "ticket2"];
+const PLAN_TOOLS = ["brief", "theme", "load", "rhythm", "tips", "book", "museum", "photo", "risk", "score", "draft", "moments", "daytext",
+  "burn", "highlight", "rainy", "night", "crowd", "mistake", "density", "ticket2"];
 
 // kind → 需要行程？(plan 组) 还是只要有城市即可
 Page(SafePage({
@@ -133,15 +133,12 @@ Page(SafePage({
    case "risk": txt = lines(T.riskCard(plan, city)); break;
    case "score": txt = T.tripScoreOf(plan).score + " 分：" + T.tripScoreOf(plan).comment; break;
    case "draft": txt = T.tripDraft(plan); break;
-   case "line": txt = T.shareOneLine(plan); break;
-   case "long": txt = T.shareLong(plan); break;
    case "moments": {
     const m = T.starMoments(plan);
     txt = m.length ? lines(m.map(x => "第" + x.di + "天 " + x.name + "：" + x.note)) : "没找到特别标注的高光，晒晒美食动线也出片";
     break;
    }
    case "daytext": txt = lines(arr.map((d, i) => "第" + (i + 1) + "天：" + T.dayPeek(d))); break;
-   case "why": txt = T.cityFirstLine(city); break;
    case "gem": txt = "彩蛋推荐：" + T.gemOfCity(city); break;
    case "food": txt = lines(T.foodRouteOf(city)); break;
    case "zone": txt = T.stayZoneOf(city); break;
@@ -157,11 +154,6 @@ Page(SafePage({
    case "fit": txt = T.whoFit(plan || (city ? { days: [] } : null)); break;
    case "end": txt = T.endNoteTxt(city); break;
    /* ---- v1.11 新工具 ---- */
-   case "countdown": {
-    const c = T.tripPhaseGuide(plan);
-    txt = c.txt + "\n行前准备：" + c.prepDone + "/" + c.prepTotal + "（" + c.prepPct + "%）";
-    break;
-   }
    case "burn": {
     const b = T.burnRate(plan);
     txt = "已花 ¥" + b.spent + "（记账 " + b.nBills + " 笔）\n日均 ¥" + b.rate + "\n" + b.verdict;
@@ -228,12 +220,6 @@ Page(SafePage({
    case "festival": txt = lines(T.festivalOf(city).map(x => "· " + x)); break;
    case "spicy": txt = T.spicyLevelOf(city).txt; break;
    case "foodbudget": txt = T.foodBudgetOf(city).txt; break;
-   case "musteat": txt = "必吃 TOP3：\n" + T.foodTop3(city).map((x, i) => (i + 1) + ". " + x).join("\n"); break;
-   case "foodstreet": {
-    const fs = T.foodStreetOf(city);
-    txt = fs.length ? fs.map(x => "· " + x.shop + "（" + x.food + "，人均 " + x.price + "）" + (x.addr ? " @" + x.addr : "")).join("\n") : "暂无美食街区数据，试试「必吃 TOP3」";
-    break;
-   }
    case "gift": txt = lines(T.giftIdea(city).map(x => "· " + x)); break;
    case "photospot": txt = lines(T.photoSpotOf(city).map(x => "· " + x)); break;
    case "nearby": {
