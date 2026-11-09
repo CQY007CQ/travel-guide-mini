@@ -3,9 +3,10 @@
  * 配色与小程序一致：中性黑 #0d0d0d + 金色 #d4a94e，不引入蓝黑。
  */
 :root {
-  /* rpx 基准必须跟画布宽度走：桌面端 #app 被限制在 520px，
-     若用 100vw（整窗宽）所有尺寸会被放大 1.5 倍以上，标题直接断行。 */
-  --rpx: calc(min(100vw, 520px) / 750);
+  /* rpx 基准跟画布宽度走：网页版铺满整窗（不再限制在 520px 手机画布）。
+     桌面宽屏把设计宽度上限收到 1024px，避免字号被放大到难以阅读；
+     1024px 及以下的屏幕（笔记本/平板/手机横屏）则 100% 填满整窗。 */
+  --rpx: calc(min(100vw, 1024px) / 750);
   --shell-bg: #f4f5f7;
   --shell-card: #ffffff;
   --shell-tx: #18233a;
@@ -38,21 +39,18 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 a { text-decoration: none; color: inherit; }
 button { font-family: inherit; }
 
-/* ── 桌面端居中成一个「手机画布」，避免宽屏下布局散架 ── */
+/* ── 网页版铺满整窗：不再居中成手机画布，宽屏下也占满宽度 ── */
 #app {
-  max-width: 520px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   min-height: 100vh;
   background: var(--shell-bg);
   position: relative;
   overflow-x: hidden;
 }
 @media (min-width: 700px) {
-  body { background: #0b0b0d; }
-  #app {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 30px 80px rgba(0, 0, 0, .55);
-    min-height: 100vh;
-  }
+  body { background: var(--shell-bg); }
 }
 
 /* ── 启动层 ── */
@@ -77,8 +75,8 @@ button { font-family: inherit; }
 
 /* ── tabBar ── */
 #tabbar {
-  position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: 0; width: 100%; max-width: 520px;
+  position: fixed; left: 0; transform: none;
+  bottom: 0; width: 100%; max-width: none;
   display: flex; z-index: 900;
   background: rgba(13, 13, 13, .94);
   border-top: 1px solid rgba(255, 255, 255, .08);
