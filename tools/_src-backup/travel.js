@@ -1761,6 +1761,22 @@ function footStats() {
  const cityList = Object.keys(f.cities || {});
  return { spots: Object.keys(f.spots || {}).length, cities: cityList.length, cityList };
 }
+// v1.20.8：本机数据洞察·兴趣标签偏好。遍历已打卡景点，按 SPOT_TAG_RULES 归类，
+// 聚合出「你更偏爱哪类景点」的真实画像（纯本地、零编造、零外链）。「其他」不计入（无偏好信号）。
+function footTagStats() {
+ const f = _footRaw();
+ const m = {};
+ let total = 0;
+ Object.keys(f.spots || {}).forEach(function (k) {
+  const s = f.spots[k];
+  const tags = spotTagOf(s && s.name ? s.name : k, s && s.city);
+  (tags || []).forEach(function (t) { if (t && t !== "其他") { m[t] = (m[t] || 0) + 1; total++; } });
+ });
+ const rows = Object.keys(m)
+  .map(function (t) { return { tag: t, n: m[t], pct: total ? Math.round(m[t] / total * 100) : 0 }; })
+  .sort(function (a, b) { return b.n - a.n; });
+ return { total: total, rows: rows };
+}
 // v1.19.135：已打卡景点的个人评价（方便下次选择时一眼看到）
 function getFootNote(name) {
  const k = cleanSpotName(name) || name;
@@ -2215,15 +2231,15 @@ const ACH_DEFS = (function () {
   const defs = [];
   const add = (o) => { defs.push(o); };
 
-  // —— 可见里程碑（沿用现有 8 个，始终展示进度）——
-  add({ id: "first",  t: "初出茅庐", d: "打卡第一个景点", cat: "足迹", hidden: false, test: c => c.spotsN >= 1 });
-  add({ id: "spot5",  t: "小有足迹", d: "累计打卡 5 个景点", cat: "足迹", hidden: false, test: c => c.spotsN >= 5 });
-  add({ id: "spot10", t: "打卡达人", d: "累计打卡 10 个景点", cat: "足迹", hidden: false, test: c => c.spotsN >= 10 });
-  add({ id: "city3",  t: "城市猎人", d: "点亮 3 座城市", cat: "城市", hidden: false, test: c => c.citiesN >= 3 });
-  add({ id: "city6",  t: "走遍四方", d: "点亮 6 座城市", cat: "城市", hidden: false, test: c => c.citiesN >= 6 });
-  add({ id: "note5",  t: "记录的人", d: "写下 5 篇旅行手记", cat: "手记", hidden: false, test: c => c.notes >= 5 });
-  add({ id: "bill20", t: "精打细算", d: "累计记 20 笔账", cat: "账本", hidden: false, test: c => c.bills >= 20 });
-  add({ id: "plan3",  t: "行程规划师", d: "保存 3 份行程", cat: "行程", hidden: false, test: c => c.planN >= 3 });
+  // —— 可见里程碑（沿用现有 8 个，始终展示进度 x/y）——
+  add({ id: "first",  t: "初出茅庐", d: "打卡第一个景点", cat: "足迹", hidden: false, target: 1,  cur: c => Math.min(c.spotsN, 1),  test: c => c.spotsN >= 1 });
+  add({ id: "spot5",  t: "小有足迹", d: "累计打卡 5 个景点", cat: "足迹", hidden: false, target: 5,  cur: c => Math.min(c.spotsN, 5),  test: c => c.spotsN >= 5 });
+  add({ id: "spot10", t: "打卡达人", d: "累计打卡 10 个景点", cat: "足迹", hidden: false, target: 10, cur: c => Math.min(c.spotsN, 10), test: c => c.spotsN >= 10 });
+  add({ id: "city3",  t: "城市猎人", d: "点亮 3 座城市", cat: "城市", hidden: false, target: 3,  cur: c => Math.min(c.citiesN, 3), test: c => c.citiesN >= 3 });
+  add({ id: "city6",  t: "走遍四方", d: "点亮 6 座城市", cat: "城市", hidden: false, target: 6,  cur: c => Math.min(c.citiesN, 6), test: c => c.citiesN >= 6 });
+  add({ id: "note5",  t: "记录的人", d: "写下 5 篇旅行手记", cat: "手记", hidden: false, target: 5,  cur: c => Math.min(c.notes, 5),   test: c => c.notes >= 5 });
+  add({ id: "bill20", t: "精打细算", d: "累计记 20 笔账", cat: "账本", hidden: false, target: 20, cur: c => Math.min(c.bills, 20),   test: c => c.bills >= 20 });
+  add({ id: "plan3",  t: "行程规划师", d: "保存 3 份行程", cat: "行程", hidden: false, target: 3,  cur: c => Math.min(c.planN, 3),   test: c => c.planN >= 3 });
 
   // —— 足迹隐藏阶梯 ——
   const SPOT_T = [20, 30, 50, 75, 100, 150, 200, 300, 500, 800, 1000, 1500, 2000];
@@ -2428,7 +2444,9 @@ function achievements() {
     if (def.hidden) {
       if (ok) hidList.push({ id: def.id, t: def.t, d: def.d, cat: def.cat, ok: true, pct: 100, ptxt: "已解锁" });
     } else {
-      visList.push({ id: def.id, t: def.t, d: def.d, cat: def.cat, ok: ok, pct: ok ? 100 : 0, ptxt: ok ? "已达成" : "未解锁" });
+      const tg = def.target || 1;
+      const cu = def.cur ? Math.min(def.cur(ctx), tg) : (ok ? tg : 0);
+      visList.push({ id: def.id, t: def.t, d: def.d, cat: def.cat, ok: ok, pct: Math.round(cu / tg * 100), ptxt: cu + "/" + tg });
     }
   });
   const total = ACH_DEFS.length;
@@ -6553,7 +6571,7 @@ module.exports = {
  RECENT_KEY, getRecent, pushRecent, delRecent,
  PLANS_KEY, listSavedPlans, savePlanSlot, restorePlanSlot, delPlanSlot,
  exportCollabPlan, mergeCollabPlan,
- FOOT_KEY, isVisited, markVisited, footStats, tripFoot, setFootNote, getFootNote,
+ FOOT_KEY, isVisited, markVisited, footStats, footTagStats, tripFoot, setFootNote, getFootNote,
   segCityOfDay, settleUp, swapCandidates, swapSpot, swapCandidatesByTag, swapSpotByTag,
   spendByDay, NOTES_KEY, getNotes, noteOf, addNote, delNote,
   budgetGauge,

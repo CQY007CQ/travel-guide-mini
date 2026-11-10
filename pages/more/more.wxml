@@ -165,12 +165,27 @@
             <text class="ins-city-n">{{item.n}} 次</text>
           </view>
         </view>
-        <view class="ins-sec" wx:if="{{insights.rhythm.tripN}}">
-          <view class="ins-h">出行节奏</view>
+        <view class="ins-sec" wx:if="{{insights.tags.rows.length}}">
+          <view class="ins-h">兴趣偏好（按打卡景点）</view>
+          <view class="ins-chips">
+            <text class="ins-chip" wx:for="{{insights.tags.rows}}" wx:key="tag">{{item.tag}} {{item.n}}</text>
+          </view>
+        </view>
+        <view class="ins-sec" wx:if="{{insights.span.km}}">
+          <view class="ins-h">足迹地理跨度</view>
+          <view class="ins-chips">
+            <text class="ins-chip">横跨约 {{insights.span.km}} km</text>
+            <text class="ins-chip" wx:if="{{insights.span.cities}}">{{insights.span.cities}} 座城市连线</text>
+          </view>
+        </view>
+        <view class="ins-sec" wx:if="{{insights.rhythm.tripN || insights.wf.wishN || insights.wf.favN}}">
+          <view class="ins-h">出行节奏 · 意愿</view>
           <view class="ins-chips">
             <text class="ins-chip" wx:if="{{insights.rhythm.avgDays}}">平均一趟 {{insights.rhythm.avgDays}} 天</text>
             <text class="ins-chip" wx:if="{{insights.rhythm.season}}">{{insights.rhythm.season}}季最多</text>
-            <text class="ins-chip" wx:if="{{insights.tendency.topCat}}">偏好 {{insights.tendency.topCat}}</text>
+            <text class="ins-chip" wx:if="{{insights.tendency.topCat}}">花费偏好 {{insights.tendency.topCat}}</text>
+            <text class="ins-chip" wx:if="{{insights.wf.wishCities}}">想玩 {{insights.wf.wishCities}} 城 · 去过 {{insights.wf.wishVisited}}</text>
+            <text class="ins-chip" wx:if="{{insights.wf.favN}}">收藏 {{insights.wf.favN}} 个 · 去过 {{insights.wf.favVisited}}</text>
           </view>
         </view>
       </block>

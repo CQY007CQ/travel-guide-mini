@@ -19,10 +19,15 @@ function _sig() {
   const L = (T.getLedger && T.getLedger()) || [];
   const P = (T.listSavedPlans && T.listSavedPlans()) || [];
   const f = (T.footHeatmap && T.footHeatmap()) || {};
+  const fs = (T.footStats && T.footStats()) || { spots: 0, cityList: [] };
+  const W = (T.getWish && T.getWish()) || [];
+  const F = (T.getFavs && T.getFavs()) || [];
   const lpart = L.map(e => ((e && e.cat) || "") + "|" + ((e && e.date) || "") + "|" + Math.round(_num(e && e.amt))).join(";");
   const ppart = P.map(p => (p && (p.depart || (p.days && p.days[0] && p.days[0].date))) || "").join(";");
+  // 省份聚合 + 每城计数（cityList）共同覆盖足迹细节：在已去省份内增删景点 / 改访问次数也会触发重算
   const fpart = (Array.isArray(f.provs) ? f.provs : []).map(p => p.name + "=" + (p.n || 0)).join(";");
-  return lpart + "##" + ppart + "##" + fpart;
+  const cityDetail = (Array.isArray(f.cityList) ? f.cityList : []).map(c => (c.name || "") + "=" + (c.n || 0)).join(";");
+  return lpart + "##" + ppart + "##" + fpart + "##" + cityDetail + "##spots=" + (fs.spots || 0) + "##wish=" + W.length + "##fav=" + F.length;
 }
 
 function _num(v) { const n = Number(v); return isFinite(n) ? n : 0; }
@@ -105,6 +110,36 @@ function footCities() {
   return { rows };
 }
 
+// 5b) 兴趣标签偏好（按打卡景点归类，来自 footTagStats）
+function interestTags() {
+  const r = (T.footTagStats && T.footTagStats()) || { rows: [] };
+  return { rows: r.rows || [] };
+}
+
+// 5c) 足迹地理跨度（去过的城市两两连线累计里程，来自 distanceStatOf）
+function geoSpan() {
+  const r = (T.distanceStatOf && T.distanceStatOf()) || { cities: 0, km: 0, txt: "" };
+  return { cities: r.cities || 0, km: r.km || 0, txt: r.txt || "" };
+}
+
+// 5d) 想玩 & 收藏转化（意愿维度：收藏/想玩了多少，其中已去过多少）
+function wishFav() {
+  const wish = (T.getWish && T.getWish()) || [];
+  const favs = (T.getFavs && T.getFavs()) || [];
+  const fs = (T.footStats && T.footStats()) || { cityList: [] };
+  const vis = new Set(fs.cityList || []);
+  const wCities = new Set(); let wVis = 0;
+  wish.forEach(x => { const c = (x && x.city) || ""; if (c) { wCities.add(c); if (vis.has(c)) wVis++; } });
+  const fCities = new Set(); let fVis = 0;
+  favs.forEach(x => { const c = (x && x.city) || ""; if (c) { fCities.add(c); if (vis.has(c)) fVis++; } });
+  return {
+    wishN: wish.length, wishCities: wCities.size, wishVisited: wVis,
+    wishPct: wCities.size ? Math.round(wVis / wCities.size * 100) : 0,
+    favN: favs.length, favCities: fCities.size, favVisited: fVis,
+    favPct: fCities.size ? Math.round(fVis / fCities.size * 100) : 0
+  };
+}
+
 // 6) 汇总：派生「个性化倾向」+ 一句话智能小结（纯数据驱动，无虚构）
 function insights() {
   const sig = _sig();
@@ -114,29 +149,36 @@ function insights() {
   const rhythm = travelRhythm();
   const fp = footProvinces();
   const fc = footCities();
+  const tags = interestTags();
+  const span = geoSpan();
+  const wf = wishFav();
   const noData = spend.total === 0 && rhythm.tripN === 0 && fp.cities === 0;
   const topCat = spend.rows[0] ? spend.rows[0].cat : "";
   const favProv = fp.rows[0] ? fp.rows[0].prov : "";
   const topCity = fc.rows[0] ? fc.rows[0].name : "";
+  const topTag = tags.rows[0] ? tags.rows[0].tag : "";
   const tendency = {
     topCat, topCatPct: spend.rows[0] ? spend.rows[0].pct : 0,
     avgDaily: (spend.total && rhythm.totalDays) ? Math.round(spend.total / rhythm.totalDays) : 0,
-    favProv, topCity, season: rhythm.season, litProvs: fp.visited
+    favProv, topCity, season: rhythm.season, litProvs: fp.visited,
+    topTag: topTag, spanKm: span.km
   };
   let summary = "还没有积累足够的本地数据，多用几次记账、打卡和存档，这里会给出你的旅行画像。";
   if (!noData) {
     const parts = [];
     if (topCity) parts.push("最常去" + topCity);
+    if (topTag) parts.push("爱逛" + topTag);
     if (favProv && favProv !== topCity) parts.push("偏爱" + favProv);
     if (fp.visited) parts.push("已点亮" + fp.visited + "个省份");
     if (rhythm.season) parts.push(rhythm.season + "季出行最多");
     if (topCat) parts.push("花费大头是" + topCat);
     if (rhythm.avgDays) parts.push("平均一趟" + rhythm.avgDays + "天");
+    if (span.km) parts.push("足迹横跨约" + span.km + "公里");
     summary = parts.length ? ("你" + parts.join("、") + "。") : "已积累一些本地记录，继续用会更准。";
   }
-  const val = { noData, spend, month, rhythm, fp, fc, tendency, summary };
+  const val = { noData, spend, month, rhythm, fp, fc, tags, span, wf, tendency, summary };
   _cache = { sig, val };
   return val;
 }
 
-module.exports = { spendByCategory, monthlySpend, travelRhythm, footProvinces, footCities, insights };
+module.exports = { spendByCategory, monthlySpend, travelRhythm, footProvinces, footCities, interestTags, geoSpan, wishFav, insights };
