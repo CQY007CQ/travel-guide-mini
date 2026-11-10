@@ -42,6 +42,14 @@ const LOCAL_POOLS = ["tools/geocode.keys", "tools/geocode.key"];
 // 故豁免同时强制「被 .gitignore 覆盖 + 未进入 git index」，且只豁免这一个目录。
 const EXTERNAL_CACHE = "tools/official-roster/cache";
 
+// 网页版构建产物（tools/web/build.mjs 由小程序同源源码打包生成，非手写源码、不进 git）：
+// 本地用真实 Key 构建时合法地含 Key，属构建产物而非仓库源码，跳过内容扫描避免误报。
+// 关键：web/lib/runtime.js 是「手写源码（已提交）」，不在豁免之列，仍会被扫描；
+// 真正的泄露面（utils/keys.js / docs/ 等源文件与文档）也照常扫描 —— 本豁免只去掉重复的构建产物噪声。
+const GENERATED = new Set([
+  "web/lib/modules.js", "web/lib/data.js", "web/lib/tpl.js", "web/lib/app.css", "web/lib/nav.js"
+]);
+
 const ALLOW_URL = [
   "https://devapi.qweather.com",  // 和风天气（已备案，request 合法域名可过审）
   "qweatherapi.com",              // 和风自定义域名（部分账号分配 xxx.qweatherapi.com）
@@ -115,6 +123,7 @@ const poolNotes = [];
 }
 
 for (const rel of all) {
+  if (GENERATED.has(rel)) continue;   // 跳过网页版构建产物（见上方说明）
   const abs = path.join(ROOT, rel);
   let src = "";
   try {

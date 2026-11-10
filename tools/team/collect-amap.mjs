@@ -1,15 +1,19 @@
 // 高德（AMap）合规批量采集 → 写入团队管线（tools/team/daily-region-amap.json）
 // 用法：
-//   node tools/team/collect-amap.mjs --key <你的AMAP_KEY> [--keys k1,k2] [--all] [--city 成都] [--limit 30]
-//   node tools/team/collect-amap.mjs --dry          # 离线校验输出 schema 是否能被 _merge-team-enrich.mjs 接纳
+//   node tools/team/collect-amap.mjs --key <KEY> [--keys k1,k2] [--all] [--city 成都] [--limit 30]
+//   node tools/team/collect-amap.mjs --dry            # 离线校验输出 schema
+//   node tools/team/collect-amap.mjs --all --fresh    # 清空已有 daily 从头采集（默认续传）
+//   node tools/team/collect-amap.mjs --all --food-cap 30 --hosp-cap 8   # 自定义每城上限
 //
-// 合规说明（零伪造）：本脚本只拉取高德返回的「真实」POI——真实名称、真实坐标、真实地址、
-//   真实医院等级。不编造任何字段；缺字段（菜单/价格/简介）一律留空，交给合并脚本按真实 rep 兜底。
-//   医院命中「城市名+人民医院/中医院/…」模板名红线的，默认跳过（与 _merge-team-enrich.mjs 的红线一致），
-//   避免把合规源里的真实名误伤——如确需收录，去掉 --skip-template 的默认行为自行调整。
+// 续传（resumable）：默认在已有 daily-region-amap.json 基础上增量补齐，跨日按 100/日配额
+//   分批跑不会丢数据；已达标（美食≥food-cap 且 医院≥hosp-cap）的城市自动跳过，把配额让给缺口城。
+//   同名（trim+小写）自动去重，重复跑不产生重复条目。--fresh 可清空重来。
 //
-// 配额：高德「搜索类」（text/around）个人认证仅 100 次/日/账号；多 key 共享同池，不扩容。
-//   本脚本按请求计数，超出即停并报告，绝不盲跑。
+// 合规说明（零伪造）：只拉高德返回的「真实」POI——真实名称/坐标/地址/医院等级，不编造任何字段。
+//   医院命中「城市名+人民医院/中医院/…」模板名红线默认跳过（与 _merge-team-enrich.mjs 一致）。
+//
+// 配额：高德「搜索类」（text/around）个人认证仅 100 次/日/账号；多 key 共享同池不扩容。按请求计数，
+//   超出即停并续写文件，绝不盲跑。（注：原「旅游景点」关键词仅消耗配额却不落盘，已移除。）
 import { createRequire } from "module";
 import { writeFileSync, readFileSync, existsSync } from "fs";
 const req = createRequire(process.cwd() + "/");
@@ -99,6 +103,9 @@ if (DRY) {
 }
 
 // ── 真实运行（需联网 + 高德 key）──
+const FRESH = args.includes("--fresh");
+const FOOD_CAP = Math.max(1, parseInt(get("--food-cap", String(LIMIT)), 10)); // 每城美食采集上限（对齐 GOAL_FOOD=30）
+const HOSP_CAP = Math.max(1, parseInt(get("--hosp-cap", "8"), 10));           // 每城真实医院采集上限（>GOAL_HOSP=5，留 kmc 过滤余量）
 const KEYS = (get("--keys") || get("--key") || process.env.AMAP_KEY || "").split(",").filter(Boolean);
 if (!KEYS.length) { console.error("✗ 缺少高德 key：--key <KEY> 或环境变量 AMAP_KEY"); process.exit(1); }
 const https = (() => { try { return req("https"); } catch (e) { return require("https"); } })();
@@ -110,48 +117,83 @@ function amapText(key, keyword, city, page) {
   });
 }
 
+// 续传：载入已有 daily 文件（保留 food/hospitals 及其它分区键），在其基础上增量补齐。
+const DAILY = "tools/team/daily-region-amap.json";
+const out = { region: "amap-auto", food: {}, hospitals: {} };
+if (!FRESH && existsSync(DAILY)) {
+  try {
+    const prev = JSON.parse(readFileSync(DAILY, "utf8"));
+    out.food = prev.food || {};
+    out.hospitals = prev.hospitals || {};
+    for (const k in prev) if (k !== "region" && k !== "food" && k !== "hospitals") out[k] = prev[k];
+    console.log(`== 续传：载入已有 ${DAILY}（美食 ${Object.keys(out.food).length} 城 / 医院 ${Object.keys(out.hospitals).length} 城），增量补齐 ==`);
+  } catch (e) { console.warn("  ⚠ 解析已有 daily 失败，改为从头采集：", e.message); }
+}
+// 同名（trim+小写）去重，避免重复跑产生重复条目
+const foodDup = (city, shop) => (out.food[city] || []).some(s => String(s.shop || "").trim().toLowerCase() === String(shop).trim().toLowerCase());
+const hospDup = (city, n) => (out.hospitals[city] || []).some(h => String(h.n || "").trim().toLowerCase() === String(n).trim().toLowerCase());
+
 (async () => {
   const targets = ALL ? (D.CITIES || []).filter(c => !c.limited).map(c => c.name)
     : CITY ? [CITY]
     : (existsSync("tools/team/gap-targets.json") ? JSON.parse(readFileSync("tools/team/gap-targets.json", "utf8")).cities.map(r => r.city) : []);
   if (!targets.length) { console.error("✗ 无目标城市：用 --all / --city / 先跑 gap-report.mjs"); process.exit(1); }
-  const out = { region: "amap-auto", food: {}, hospitals: {} };
-  let used = 0, dayCap = 100 * KEYS.length;  // 搜索类配额
+  let used = 0, dayCap = 100 * KEYS.length;  // 搜索类配额（text/around 共享，个人认证 100/日/账号）
   let ki = 0;
-  const nextKey = () => KEYS[ki = (ki + 1) % KEYS.length];
+  let skipped = 0, metFood = 0, metHosp = 0;
 
   for (const city of targets) {
-    if (used >= dayCap) { console.warn(`⚠ 已达日配额 ${dayCap}，停止。剩余 ${targets.length - targets.indexOf(city)} 城下次再跑。`); break; }
-    const ctr = cityCenter(city);
-    for (const kw of ["美食", "旅游景点", "医院"]) {
+    if (used >= dayCap) { console.warn(`⚠ 已达日配额 ${dayCap}，停止。剩余 ${targets.length - targets.indexOf(city)} 城下次再跑（数据已续写，不丢）。`); break; }
+    const haveFood = (out.food[city] || []).length;
+    const haveHosp = (out.hospitals[city] || []).length;
+    if (haveFood >= FOOD_CAP && haveHosp >= HOSP_CAP) { skipped++; continue; } // 已达标，跳过省配额
+
+    // 美食
+    if (haveFood < FOOD_CAP) {
+      if (!out.food[city]) out.food[city] = [];
       let page = 1, got = 0;
-      while (page <= 2 && got < LIMIT) {
+      while (page <= 2 && got < FOOD_CAP - haveFood && used < dayCap) {
         const key = KEYS[ki % KEYS.length]; ki++; used++;
         let json;
-        try { json = await amapText(key, kw, city, page); } catch (e) { console.warn("  ⚠", city, kw, "请求失败", e.message); break; }
+        try { json = await amapText(key, "美食", city, page); } catch (e) { console.warn("  ⚠", city, "美食请求失败", e.message); break; }
         const pois = parsePois(json);
         if (!pois.length) break;
         for (const p of pois) {
           if (p.lonlat.length !== 2 || !IN_CHINA(p.lonlat[1], p.lonlat[0])) continue;
           const lat = p.lonlat[1], lon = p.lonlat[0];
-          if (kw === "医院") {
-            if (SKIP_TPL && TPL.some(t => p.name === city + t)) { continue; } // 模板名红线，跳过
-            if (!out.hospitals[city]) out.hospitals[city] = [];
-            out.hospitals[city].push({ n: p.name, lat: +lat.toFixed(4), lon: +lon.toFixed(4), lv: mapLv(p.tag) });
-          } else if (kw === "美食") {
-            const shop = { shop: p.name, lat: +lat.toFixed(4), lon: +lon.toFixed(4) };
-            const rep = mapRep(p.tag); if (rep) shop.rep = rep;
-            if (p.cost) shop.price = "人均约¥" + p.cost;
-            if (!out.food[city]) out.food[city] = [];
-            out.food[city].push(shop);
-          }
-          got++;
+          if (foodDup(city, p.name)) continue;
+          const s = { shop: p.name, lat: +lat.toFixed(4), lon: +lon.toFixed(4) };
+          const rep = mapRep(p.tag); if (rep) s.rep = rep;
+          if (p.cost) s.price = "人均约¥" + p.cost;
+          out.food[city].push(s); got++; metFood++;
+        }
+        page++;
+      }
+    }
+
+    // 医院（模板名红线默认跳过；上限 HOSP_CAP）
+    if (haveHosp < HOSP_CAP) {
+      if (!out.hospitals[city]) out.hospitals[city] = [];
+      let page = 1, got = 0;
+      while (page <= 2 && got < HOSP_CAP - haveHosp && used < dayCap) {
+        const key = KEYS[ki % KEYS.length]; ki++; used++;
+        let json;
+        try { json = await amapText(key, "医院", city, page); } catch (e) { console.warn("  ⚠", city, "医院请求失败", e.message); break; }
+        const pois = parsePois(json);
+        if (!pois.length) break;
+        for (const p of pois) {
+          if (p.lonlat.length !== 2 || !IN_CHINA(p.lonlat[1], p.lonlat[0])) continue;
+          const lat = p.lonlat[1], lon = p.lonlat[0];
+          if (SKIP_TPL && TPL.some(t => p.name === city + t)) continue; // 模板名红线
+          if (hospDup(city, p.name)) continue;
+          out.hospitals[city].push({ n: p.name, lat: +lat.toFixed(4), lon: +lon.toFixed(4), lv: mapLv(p.tag) });
+          got++; metHosp++;
         }
         page++;
       }
     }
   }
-  writeFileSync("tools/team/daily-region-amap.json", JSON.stringify(out, null, 2));
-  console.log(`✅ 写出 tools/team/daily-region-amap.json：美食 ${Object.keys(out.food).length} 城 / 医院 ${Object.keys(out.hospitals).length} 城（共用 ${used} 次搜索配额）`);
+  writeFileSync(DAILY, JSON.stringify(out, null, 2));
+  console.log(`✅ 续写 ${DAILY}：美食 ${Object.keys(out.food).length} 城 / 医院 ${Object.keys(out.hospitals).length} 城（本次用 ${used} 次搜索配额，新增美食 ${metFood} / 医院 ${metHosp}${skipped ? `，跳过已达标 ${skipped} 城` : ""}）`);
   console.log("下一步：node tools/_merge-team-enrich.mjs --pack   # 合并入包并重打包");
 })();
