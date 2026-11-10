@@ -1,11 +1,15 @@
-/* web/app.js —— 网页版外壳：hash 路由 + tabBar + 启动流程
+/* web/app.js —— 网页版外壳：hash 路由 + tabBar + 全站页面导航 + 启动流程
  *
  * 刻意做得很薄：页面逻辑全在小程序源码里（由 modules.js 注册、runtime.js 驱动），
- * 这里只负责「换页」和「底部导航」两件外壳的事。
+ * 这里只负责「换页 / 底部导航 / 顶部返回 / 全站页面抽屉」这几件外壳的事。
+ *
+ * 2026-11-10：router 支持 ?query 透传与 replace/tab 语义；页面清单来自构建生成的
+ * lib/nav.js（与 app.json 同源），不再手抄 —— 小程序增删页面后重跑构建自动同步。
  */
 (function () {
   "use strict";
 
+  var HOME = "pages/index/index";
   var TABS = {
     "pages/index/index": "index",
     "pages/today/today": "today",
@@ -13,26 +17,69 @@
     "pages/more/more": "more",
   };
 
-  function currentPath() {
-    var h = String(location.hash || "").replace(/^#\/?/, "").split("?")[0];
-    return h || "pages/index/index";
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
-  /** 运行时调用的路由：统一落到 hash，由 hashchange 统一驱动渲染 */
-  function router(path, mode) {
-    var p = String(path || "").replace(/^\//, "").split("?")[0];
-    if (!p) return;
-    var target = "#/" + p;
+  function parseQuery(s) {
+    var q = {};
+    String(s || "").split("&").forEach(function (kv) {
+      if (!kv) return;
+      var i = kv.indexOf("=");
+      var k = i < 0 ? kv : kv.slice(0, i);
+      var v = i < 0 ? "" : kv.slice(i + 1);
+      try { q[decodeURIComponent(k)] = decodeURIComponent(v); } catch (e) {}
+    });
+    return q;
+  }
+
+  function splitHash() {
+    var raw = String(location.hash || "").replace(/^#\/?/, "");
+    var qi = raw.indexOf("?");
+    return {
+      path: (qi < 0 ? raw : raw.slice(0, qi)) || HOME,
+      query: qi < 0 ? {} : parseQuery(raw.slice(qi + 1)),
+    };
+  }
+
+  function pageTitle(p) {
+    var list = window.__WEB_NAV || [];
+    for (var i = 0; i < list.length; i++) if (list[i].p === p) return list[i].t;
+    return p.split("/").pop();
+  }
+
+  /** 运行时调用的路由：path 可带 ?query；mode = push / replace / tab */
+  function router(path, mode, query) {
+    var raw = String(path || "").replace(/^\//, "");
+    var qi = raw.indexOf("?");
+    var p = (qi < 0 ? raw : raw.slice(0, qi)) || HOME;
+    var q = qi < 0 ? {} : parseQuery(raw.slice(qi + 1));
+    if (query && typeof query === "object") {
+      for (var k in query) if (Object.prototype.hasOwnProperty.call(query, k)) q[k] = query[k];
+    }
+    var qs = Object.keys(q).map(function (k) {
+      return encodeURIComponent(k) + "=" + encodeURIComponent(q[k]);
+    }).join("&");
+    var target = "#/" + p + (qs ? "?" + qs : "");
+    mode = mode || "push";
     if (location.hash === target) {
-      // 同页重复跳转（例如已在该 tab 再点一次）：直接重挂，刷新数据
-      window.__mountPage(p);
+      // 同页重复跳转（例如已在该 tab 再点一次、或换了 query）：直接重挂刷新数据
+      window.__mountPage(p, q);
+      syncTab(p);
+      syncTopBar(p);
       return;
+    }
+    if (mode === "replace") {
+      // replaceState 不触发 hashchange，必须手动重挂；失败则退回普通 hash 赋值
+      try { history.replaceState(null, "", target); onHash(); return; } catch (e) {}
     }
     location.hash = target;
   }
 
   function syncTab(p) {
     var bar = document.getElementById("tabbar");
+    if (!bar) return;
     var key = TABS[p];
     if (key) {
       bar.classList.remove("hidden");
@@ -49,22 +96,100 @@
     });
   }
 
+  /* ── 顶部返回栏 + 全站页面抽屉 ── */
+  var topBar = null, navPanel = null;
+
+  function ensureChrome() {
+    if (topBar) return topBar;
+    topBar = document.createElement("div");
+    topBar.id = "webTopBar";
+    topBar.className = "hidden";
+    topBar.innerHTML =
+      '<button class="wt-back" id="webBack" type="button" aria-label="返回">‹ 返回</button>' +
+      '<span class="wt-title" id="webTopTitle"></span>' +
+      '<button class="wt-nav" id="webNavBtn" type="button" aria-label="全部页面">☰ 页面</button>';
+    document.body.appendChild(topBar);
+    document.getElementById("webBack").addEventListener("click", function () {
+      // 走 runtime 的 navigateBack：无历史时它会兜底回出发页，不会「点了没反应」
+      if (window.wx && typeof window.wx.navigateBack === "function") window.wx.navigateBack();
+      else router(HOME, "tab");
+    });
+    document.getElementById("webNavBtn").addEventListener("click", function () {
+      if (navPanel) navPanel.classList.toggle("hidden");
+    });
+    // tab 页不显示顶部栏，所以外壳左下角保留一个常驻的「全部页面」入口
+    var openBtn = document.getElementById("webNavOpen");
+    if (openBtn) openBtn.addEventListener("click", function () {
+      if (navPanel) navPanel.classList.toggle("hidden");
+    });
+    return topBar;
+  }
+
+  function buildNav() {
+    var p = document.createElement("div");
+    p.id = "webNavPanel";
+    p.className = "hidden";
+    var list = window.__WEB_NAV || [];
+    var groups = {}, order = [];
+    list.forEach(function (x) {
+      if (!groups[x.g]) { groups[x.g] = []; order.push(x.g); }
+      groups[x.g].push(x);
+    });
+    var html = '<div class="wn-head"><b>全部页面</b>' +
+      '<button id="webNavClose" type="button" aria-label="关闭">×</button></div>';
+    html += '<button class="wn-item wn-home" data-p="' + HOME + '" data-tab="1">回到出发页</button>';
+    order.forEach(function (g) {
+      html += '<div class="wn-g">' + esc(g) + "</div>";
+      groups[g].forEach(function (x) {
+        html += '<button class="wn-item" data-p="' + esc(x.p) + '" data-tab="' + (x.tab ? "1" : "0") + '">' +
+          esc(x.t) + (x.tab ? '<span class="wn-tab">tab</span>' : "") + "</button>";
+      });
+    });
+    html += '<div class="wn-foot">共 ' + list.length + " 页 · 清单由 app.json 自动生成，与小程序同源</div>";
+    p.innerHTML = html;
+    document.body.appendChild(p);
+    p.querySelector("#webNavClose").addEventListener("click", function () { p.classList.add("hidden"); });
+    p.addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest(".wn-item") : null;
+      if (!b) return;
+      router(b.getAttribute("data-p"), b.getAttribute("data-tab") === "1" ? "tab" : "push");
+      p.classList.add("hidden");
+    });
+    return p;
+  }
+
+  function syncTopBar(p) {
+    var bar = ensureChrome();
+    var isTab = Object.prototype.hasOwnProperty.call(TABS, p);
+    bar.classList.toggle("hidden", isTab);
+    document.body.classList.toggle("has-topbar", !isTab);
+    var t = document.getElementById("webTopTitle");
+    if (t) t.textContent = pageTitle(p);
+    document.title = pageTitle(p) + " · 旅行攻略生成器";
+    if (navPanel) Array.prototype.forEach.call(navPanel.querySelectorAll(".wn-item"), function (b) {
+      b.classList.toggle("on", b.getAttribute("data-p") === p);
+    });
+  }
+
   function onHash() {
-    var p = currentPath();
+    var r = splitHash();
     try {
-      window.__mountPage(p);
+      window.__mountPage(r.path, r.query);
     } catch (e) {
-      console.error("[web] 换页失败", p, e);
+      console.error("[web] 换页失败", r.path, e);
     }
-    syncTab(p);
+    syncTab(r.path);
+    syncTopBar(r.path);
     window.scrollTo(0, 0);
+    // 全站 AI 助手靠这个事件感知「用户现在在哪一页」，动态换快捷提问
+    try { document.dispatchEvent(new CustomEvent("web:pagechange", { detail: r })); } catch (e) {}
   }
 
   function bootFail(msg, err) {
     var b = document.getElementById("boot");
     document.getElementById("bootMsg").innerHTML =
-      '<span style="color:#e57373">' + msg + "</span>" +
-      (err ? '<br/><span style="font-size:11px;color:#7d8798">' + String(err.message || err) + "</span>" : "");
+      '<span style="color:#e57373">' + esc(msg) + "</span>" +
+      (err ? '<br/><span style="font-size:11px;color:#7d8798">' + esc(err.message || err) + "</span>" : "");
     console.error("[web] 启动失败", msg, err);
   }
 
@@ -82,18 +207,28 @@
 
       // 2) 启动运行时（提供 wx / Page / 渲染）
       window.__bootWeb(cfg, router);
+      ensureChrome();
+      navPanel = buildNav();
 
       // 3) tabBar 点击
       Array.prototype.forEach.call(document.querySelectorAll("#tabbar .tb"), function (el) {
         el.addEventListener("click", function () { router(el.dataset.p, "tab"); });
       });
 
-      // 4) 路由监听
+      // 4) 键盘快捷跳转：Alt+← 返回 / Alt+H 出发页 / Alt+N 页面抽屉
+      document.addEventListener("keydown", function (e) {
+        if (!e.altKey) return;
+        if (e.key === "ArrowLeft") { e.preventDefault(); window.__webBack(); }
+        else if (e.key === "h" || e.key === "H") { e.preventDefault(); router(HOME, "tab"); }
+        else if (e.key === "n" || e.key === "N") { e.preventDefault(); if (navPanel) navPanel.classList.toggle("hidden"); }
+      });
+
+      // 5) 路由监听
       window.addEventListener("hashchange", onHash);
-      if (!location.hash) location.hash = "#/pages/index/index";
+      if (!location.hash) location.hash = "#/" + HOME;
       else onHash();
 
-      // 5) 等数据就绪再收起启动层（解压 1.8MB 需要一点时间）
+      // 6) 等数据就绪再收起启动层（解压 2.3MB 需要一点时间）
       var T = window.__require("__entry__", "./utils/travel.js");
       var done = function () {
         setTimeout(function () {
@@ -114,6 +249,13 @@
     }
   });
 
-  /* 调试入口：控制台可直接切页 */
-  window.go = function (p) { router(p); };
+  /* 对外入口：控制台 / AI 助手 / 页面内都可用 */
+  window.go = function (p, mode) { router(p, mode || "push"); };
+  window.goQuery = function (p, q, mode) { router(p, mode || "push", q); };
+  window.__webRouter = router;
+  window.__webSplitHash = splitHash;
+  window.__webBack = function () {
+    if (window.wx && typeof window.wx.navigateBack === "function") window.wx.navigateBack();
+    else router(HOME, "tab");
+  };
 })();

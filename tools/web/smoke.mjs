@@ -41,8 +41,16 @@ function runFile(f) {
 console.log("== 1. 模块表加载 ==");
 runFile("modules.js");
 ok("modules.js 定义了 __require", typeof g.__require === "function");
+// 2026-11-10：浏览器没有 require.async，utils/data.js 会 require(_manifest.js)；
+// 清单若被 build.mjs 排除，resolveChunkPaths() 静默退回单块，chunk2 永远不加载。
+ok("数据分块清单 _manifest.js 已注册进模块表", !!g.__M["subdata/data/_manifest.js"]);
 runFile("data.js");
-ok("data.js 注册了数据分包", !!g.__M["subdata/data/data-packed.js"]);
+let manifest = [];
+try { manifest = g.__require("__entry__", "./subdata/data/_manifest.js") || []; } catch (e) {}
+const chunks = (Array.isArray(manifest) ? manifest : []).map((p) => String(p).replace(/^\.\.\//, ""));
+ok("清单列出数据块", chunks.length > 0, String(chunks.length));
+ok("清单里每一块都已在 data.js 注册", chunks.length > 0 && chunks.every((p) => !!g.__M[p]), chunks.join(","));
+ok("清单含第二块 data-packed2.js", chunks.some((p) => /data-packed2\.js$/.test(p)), chunks.join(","));
 
 console.log("== 2. 核心模块可解析 ==");
 let T = null, err = "";
@@ -59,6 +67,13 @@ if (T) {
   const D = T.D || {};
   ok("城市数 > 0", Array.isArray(D.CITIES) && D.CITIES.length > 0, String(D.CITIES && D.CITIES.length));
   ok("数据就绪标记", D.__dataReady === true);
+  // 只注册第 1 块时这两项为 0：它们是 chunk2 里的内容，能同时守住「注册」和「真被 applyPacked 加载」
+  ok("chunk2 资料卡真实进入运行时（SPOT_CARDS_BY_CITY）",
+    Object.keys(D.SPOT_CARDS_BY_CITY || {}).length > 0,
+    String(Object.keys(D.SPOT_CARDS_BY_CITY || {}).length));
+  ok("chunk2 城市详情真实进入运行时（SPOT_DETAILS_BY_CITY）",
+    Object.keys(D.SPOT_DETAILS_BY_CITY || {}).length > 0,
+    String(Object.keys(D.SPOT_DETAILS_BY_CITY || {}).length));
 
   console.log("== 4. 生成一份行程 ==");
   const bj = (D.CITIES || []).find((c) => c.name === "北京");
@@ -110,6 +125,15 @@ if (T) {
     }
   }
   ok(pages.length + " 个模板均可在空数据下渲染不抛错", rendered === pages.length, renderErrs.join(" ｜ "));
+
+  console.log("== 6b. 全站页面清单（网页导航 / AI 跳转同源） ==");
+  runFile("nav.js");
+  const nav = g.__WEB_NAV || [];
+  ok("nav.js 生成了页面清单", Array.isArray(nav) && nav.length >= 10, String(nav.length));
+  ok("清单每项含 path / title / group", nav.every((x) => x && x.p && x.t && x.g));
+  ok("清单里每个页面都有可渲染模板", nav.every((x) => !!g.__TPL[x.p]));
+  ok("清单不含分包 keep 占位页", !nav.some((x) => /\/keep\/keep$/.test(x.p)));
+  ok("4 个 tab 页被正确标记", nav.filter((x) => x.tab).length === 4, String(nav.filter((x) => x.tab).length));
 }
 
 /* ── 7. 浏览器降级能力 + 两端同源文案（静态护栏） ──
@@ -144,6 +168,89 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
   ok("首页磁贴含酒店住宿入口", /k:\s*"hotel"/.test(travel) && /"酒店住宿"/.test(travel) && /focus:\s*"hotel"/.test(travel));
   ok("首页磁贴含景点百科入口", /k:\s*"baike"/.test(travel) && /"景点百科"/.test(travel) && /focus:\s*"baike"/.test(travel));
   ok("首页磁贴含天气参考入口", /k:\s*"weather"/.test(travel) && /"天气参考"/.test(travel) && /focus:\s*"weather"/.test(travel));
+
+  // ── 2026-11-10 网页端「数据补齐 / 路由 / 降级 / 全站 AI」防回潮 ──
+  const appJs = fs.readFileSync(path.join(ROOT, "web/app.js"), "utf8");
+  const wxmlSrc = fs.readFileSync(path.join(ROOT, "tools/web/wxml.mjs"), "utf8");
+  const aiSrc = fs.readFileSync(path.join(ROOT, "web/ai-assistant.js"), "utf8");
+  ok("网页端 getApp() 具备 app.setPlan（首页生成 / AI 生成行程的前提）",
+    /APP\s*=\s*Object\.assign\(\{\},\s*appConfig/.test(rt));
+  ok("路由 query 透传到 onLoad",
+    rt.includes("__mountPage = function (pagePath, query)") && rt.includes("query: lastQuery"));
+  ok("wx.request GET 参数拼 URL",
+    rt.includes('url.indexOf("?") >= 0') && rt.includes("encodeURIComponent(k)"));
+  ok("fields({node:true}) 返回真实 DOM 节点", rt.includes("if (t.opts && t.opts.node) out.node = node"));
+  ok("selector picker 生成 option 并回填选中项",
+    rt.includes('document.createElement("option")') && rt.includes("el.selectedIndex"));
+  ok("date/time picker 事件转到真正可操作的 input", rt.includes("if (el.__ev) input.__ev = el.__ev"));
+  ok("地图标点点击委托还原 markerId",
+    rt.includes('closest(".map-mk[data-mid]")') && rt.includes("markerId: markerId"));
+  ok("WXML 编译器补 markertap / touchcancel 映射",
+    /markertap:\s*"markertap"/.test(wxmlSrc) && /touchcancel:\s*"touchcancel"/.test(wxmlSrc));
+  ok("app.js 全站导航 + 带参跳转 + 页面变化事件",
+    ["__WEB_NAV", "goQuery", "web:pagechange"].every((k) => appJs.includes(k)));
+  ok("AI 具备全站上下文 / 站点状态 / 行程生成 / 对外 API",
+    ["function context()", "function siteStatus(", "function generatePlan(", "APP.__webAI", "web:pagechange"]
+      .every((k) => aiSrc.includes(k)));
+}
+
+/* ── 8. 内置 AI 全站智能体：真的跑一遍（不是只看源码形状） ──
+   用最小 DOM stub 满足 ai-assistant.js 的 buildUI()，再直接调 __webAI.reply()，
+   验证它读的是同一份离线知识库、能写入真实 plan、能带 di 跳页、不编造数据。 */
+console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
+{
+  const fakeEl = () => ({
+    className: "", id: "", innerHTML: "", textContent: "", value: "", checked: false,
+    style: {}, dataset: {}, children: [],
+    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+    appendChild(c) { this.children.push(c); return c; },
+    setAttribute() {}, getAttribute() { return null; },
+    addEventListener() {}, removeEventListener() {}, focus() {}, remove() {},
+    querySelector() { return fakeEl(); },
+    querySelectorAll() { return []; },
+  });
+  const oldDoc = g.document;
+  g.document = {
+    readyState: "complete", body: fakeEl(), createElement: fakeEl,
+    getElementById: () => null, addEventListener() {},
+  };
+  const appStub = { globalData: {}, setPlan(p) { this.globalData.plan = p; } };
+  g.getApp = () => appStub;
+  g.__APP_CONFIG = appStub;
+  g.__webSplitHash = () => ({ path: "pages/index/index", query: {} });
+  g.__webCurrent = () => null;
+  g.goQuery = () => {};
+  g.go = () => {};
+  let loadErr = "";
+  try { (0, eval)(fs.readFileSync(path.join(ROOT, "web/ai-assistant.js"), "utf8")); }
+  catch (e) { loadErr = e.message; }
+  const AI = g.__webAI;
+  ok("AI 脚本可在浏览器形态下加载", !!AI, loadErr);
+  if (AI) {
+    const r1 = AI.reply("成都吃什么", AI.context());
+    ok("美食问答返回库内真实店铺", /ai-row/.test(r1.html) && r1.html.includes("成都"), r1.html.slice(0, 90));
+    ok("美食回答带「直达美食页」动作", (r1.actions || []).some((a) => a.path === "subpkg/food/food"));
+    const r2 = AI.reply("帮我生成成都3天行程", AI.context());
+    const madePlan = appStub.globalData.plan;
+    ok("一句话生成行程并写入 globalData",
+      r2.auto === "pages/plan/plan" && !!madePlan && madePlan.cityName === "成都" &&
+      madePlan.days && madePlan.days.length === 3,
+      JSON.stringify({ auto: r2.auto, city: madePlan && madePlan.cityName, days: madePlan && madePlan.days && madePlan.days.length }));
+    const r3 = AI.reply("打开美食页", AI.context());
+    ok("显式导航一步切到目标页", r3.auto === "subpkg/food/food", String(r3.auto));
+    const r4 = AI.reply("看第2天地图", AI.context());
+    ok("地图按天跳转带 di=1（0-based）",
+      r4.auto === "subpkg/map/map" && !!r4.query && r4.query.di === 1, JSON.stringify(r4.query || {}));
+    const r5 = AI.reply("行程体检", AI.context());
+    ok("站点状态问答读到真实行程", /行程体检/.test(r5.html) && /ai-row/.test(r5.html), r5.html.slice(0, 90));
+    const r6 = AI.reply("今天花了多少", AI.context());
+    ok("站点状态问答读到真实账本",
+      /¥/.test(r6.html) && (r6.actions || []).some((a) => a.path === "subpkg/ledger/ledger"));
+    const r7 = AI.reply("你好", AI.context());
+    ok("问候带当前页面上下文", /生成攻略/.test(r7.html));
+    ok("context() 反映当前页面", AI.context().title === "生成攻略", AI.context().title);
+  }
+  g.document = oldDoc;
 }
 
 console.log("\n结果：" + pass + " 通过 / " + fail + " 失败");

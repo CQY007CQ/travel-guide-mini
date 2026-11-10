@@ -33,7 +33,11 @@ const EVT_MAP = {
   tap: "click", input: "input", change: "change", confirm: "keydown",
   blur: "blur", focus: "focus", longpress: "contextmenu", longtap: "contextmenu",
   scroll: "scroll", scrolltolower: "scroll", touchstart: "touchstart",
-  touchmove: "touchmove", touchend: "touchend", submit: "submit", reset: "reset",
+  touchmove: "touchmove", touchend: "touchend", touchcancel: "touchcancel",
+  submit: "submit", reset: "reset",
+  // 原生 map 组件事件：网页端不是 addEventListener 派发，由 runtime 的 SVG 示意图
+  // 点击委托读 __ev["on:markertap"] 还原 markerId（见 runtime.js __h 的 the-map 分支）
+  markertap: "markertap", callouttap: "callouttap",
 };
 
 /* ────────────────────────────── 解析 ────────────────────────────── */
@@ -341,12 +345,22 @@ function compileNode(n) {
     propPairs.push('"__ev":{' + Object.entries(events).map(([k, v]) => JSON.stringify(k) + ":" + JSON.stringify(v)).join(",") + "}");
   }
 
+  // <navigator url="/xxx"> → <a href="#/xxx">：网页端不必依赖 JS 才能跳转，
+  // 且搜索引擎/新标签页打开都能落到正确的 hash 路由。
+  if (n.tag === "navigator" && attrs.url !== undefined) {
+    propPairs.push('"href":("#/"+String(' + compileMixed(String(attrs.url)) + ').replace(/^\\//,""))');
+  }
+
   const children = n.children.length ? compileChildren(n.children) : "null";
   let call = "__h(" + JSON.stringify(htmlTag === undefined ? "div" : htmlTag) + ",{" + propPairs.join(",") + "}," + children + ")";
-  // picker 特殊：mode=date 渲染成 date input
+  // picker 特殊：把 range / value / start / end 的真实表达式交给运行时的 __pick，
+  // 由它生成 option 或原生 date input（旧版传的是 "{{depart}}" 字面量 + 空 select）。
   if (n.tag === "picker") {
     const mode = attrs.mode || "selector";
-    call = "__pick(" + JSON.stringify(mode) + "," + JSON.stringify(attrs.value !== undefined ? attrs.value : "") + "," + call + ")";
+    const expr = (k, dflt) => (attrs[k] !== undefined ? compileMixed(String(attrs[k])) : dflt);
+    call = "__pick(" + JSON.stringify(mode) + "," + expr("value", '""') + "," + call + "," +
+      expr("range", "null") + "," + JSON.stringify(attrs["range-key"] || "") + "," +
+      expr("start", "null") + "," + expr("end", "null") + ")";
   }
   return call;
 }

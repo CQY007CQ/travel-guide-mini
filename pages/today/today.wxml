@@ -79,6 +79,10 @@
         <view wx:if="{{view.next}}" class="next-line">之后：{{view.next.clean}}</view>
         <view wx:else class="next-line dim"><image class="ic" src="/images/icons/moon.png"/>今天的安排已经走完了</view>
         <view wx:if="{{view.now}}" class="left-line">今天还剩 <text class="gold">{{view.left}}</text> 项安排</view>
+        <!-- v1.20.7：今日动线与步行量（与行程页同源的真实坐标估算，点击去行程看逐日动线） -->
+        <view wx:if="{{view.walk}}" class="walk-line" bindtap="goPlan">
+          <image class="ic ic-sm" src="/images/icons/route.png"/>{{view.walk.txt}}<text class="wl-go">看动线 ›</text>
+        </view>
         <!-- v1.9：超支轻提醒 + 今日装备 -->
         <view wx:if="{{view.overHint}}" class="over-line {{view.overHint.lv}}"><image class="ic ic-sm" src="/images/icons/wallet.png"/>{{view.overHint.txt}}</view>
         <view wx:if="{{view.gear.length}}" class="gear-row">

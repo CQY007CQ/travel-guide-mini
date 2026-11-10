@@ -98,6 +98,15 @@ Page(SafePage({
       out.now = now ? fmtIt(now) : null;
       out.next = nx ? fmtIt(nx) : null;
       out.left = act.left;
+      // v1.20.7：今天页补「动线 / 步行量」——与行程页共用 T.dayMove（真实坐标 + 强度估计），
+      // 不另造口径、不伪造坐标；无精确坐标时 legs=0，只给步行强度估计。
+      try {
+        const mv = T.dayMove(day, cityName);
+        if (mv) out.walk = {
+          km: mv.km, steps: mv.steps, legs: mv.legs,
+          txt: (mv.legs > 0 ? "动线约 " + mv.km + " km · " : "") + "预计步行 " + mv.steps + " 步"
+        };
+      } catch (e) { out.walk = null; }
       // 进行中 / 即将开始：now 的时段序等于当前时段 → 正在玩；大于当前时段 → 还没开始
       const cur = T.currentPeriodOrder();
       const ord = p => (T.D.PERIOD_ORDER && T.D.PERIOD_ORDER[p] != null ? T.D.PERIOD_ORDER[p] : 99);

@@ -166,6 +166,14 @@
 
 .aft-cta .wl-go { margin-left: auto; color: #d9a94e; font-weight: 700; flex-shrink: 0; }
 
+/* v1.20.7：今日动线 / 步行量（与 plan 页 .mv-line 同源数据，口径一致不另造） */
+.walk-line {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8rpx; margin-top: 14rpx;
+  font-size: calc(22rpx * var(--fs, 1)); color: var(--t4, #5b6b82);
+  background: rgba(var(--ln-rgb, 148,163,184), .09); border-radius: 12rpx; padding: 10rpx 14rpx;
+}
+.walk-line:active { opacity: .8; }
+
 /* v1.9.0：超支提醒 / 今日装备 / 明日预告 */
 .over-line { display: flex; align-items: center; gap: 8rpx; margin-top: 14rpx; font-size: calc(22rpx * var(--fs, 1)); padding: 10rpx 14rpx; border-radius: 12rpx; line-height: 1.45; }
 

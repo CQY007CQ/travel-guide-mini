@@ -7,10 +7,11 @@
 //   · 运行时（wx / Page / getApp）由 web/lib/runtime.js 提供，不参与构建。
 //
 // 产出（web/lib/）：
-//   data.js    —— subdata/data/data-packed.js（1.8MB base64，单独文件便于缓存）
-//   modules.js —— 全部 js 模块 + 迷你 CJS loader
-//   tpl.js     —— 17 个页面的渲染函数
+//   data.js    —— **全部** data-packed*.js（清单来自 _manifest.js，单独文件便于缓存）
+//   modules.js —— 其余全部 js 模块 + 迷你 CJS loader
+//   tpl.js     —— app.json 里所有页面的渲染函数
 //   app.css    —— app.wxss + 各页 wxss
+//   nav.js     —— 与 app.json 同源的全站页面清单（网页外壳导航用）
 //
 // 用法：node tools/web/build.mjs
 
@@ -29,7 +30,7 @@ const exists = (p) => fs.existsSync(path.join(ROOT, p));
 /* ───────────── 1. 收集模块 ───────────── */
 
 const EXCLUDE_DIRS = new Set(["tools", "node_modules", "web", "images", "docs", "shots", "outputs", ".git"]);
-const DATA_PACKED = "subdata/data/data-packed.js";
+const MANIFEST = "subdata/data/_manifest.js";
 
 function walkJs(dir, out = []) {
   for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
@@ -46,23 +47,55 @@ function walkJs(dir, out = []) {
   return out;
 }
 
+/**
+ * 从分包清单解析**所有**数据块路径。
+ * utils/data.js 在浏览器里没有 require.async，会走 resolveChunkPaths() 的
+ * require("../subdata/data/_manifest.js") 分支；清单里的路径相对 utils/ 带 "../"，
+ * 这里统一去掉还原成模块表 id（与 __resolve 的结果一致）。
+ *
+ * 2026-11-10 修复：旧版只注册 data-packed.js 一块，且把 _manifest.js 排除在
+ * modules.js 之外 —— resolveChunkPaths() 必然 fallback 到单块，chunk2 即便被
+ * 收录也从不被 applyPacked() 加载，网页端整块数据（如 SPOT_DETAILS_BY_CITY）静默缺失。
+ * 改为清单驱动后，pack-data 将来切第 3 块也自动跟上，不用再改网页构建。
+ */
+function chunkPaths() {
+  const src = read(MANIFEST);
+  const m = src.match(/module\.exports\s*=\s*(\[[\s\S]*?\])\s*;/);
+  if (!m) throw new Error("无法解析数据分块清单 " + MANIFEST);
+  const list = JSON.parse(m[1]);
+  if (!Array.isArray(list) || !list.length) throw new Error("数据分块清单为空: " + MANIFEST);
+  return list.map((p) => String(p).replace(/^\.\.\//, ""));
+}
+
+const CHUNKS = chunkPaths();
+for (const p of CHUNKS) {
+  if (!exists(p)) throw new Error("数据分块缺失（清单与产物不一致）: " + p);
+}
+
 const allJs = walkJs("");
-const modules = allJs.filter((p) => p !== DATA_PACKED && !p.endsWith("_manifest.js"));
+// 数据块只在 data.js 里注册一次，避免 modules.js 再重复塞 2MB+ base64；
+// _manifest.js 必须留在 modules.js，否则浏览器端 resolveChunkPaths() 会退回单块。
+const chunkSet = new Set(CHUNKS);
+const modules = allJs.filter((p) => !chunkSet.has(p));
 const pageJs = modules.filter((p) => /^(pages|subpkg|subai|subdata)\//.test(p) && !/\/utils\//.test(p) && /\/[^/]+\.js$/.test(p) && /^(pages|subpkg|subai|subdata)\/[^/]+\/[^/]+\.js$/.test(p));
 
-console.log("模块总数:", modules.length, "｜页面 JS:", pageJs.length, "｜数据包:", exists(DATA_PACKED) ? "有" : "缺失");
+console.log("模块总数:", modules.length, "｜页面 JS:", pageJs.length, "｜数据块:", CHUNKS.length);
 
-/* ───────────── 2. 数据包 ───────────── */
+/* ───────────── 2. 数据包（清单驱动的全部数据块） ───────────── */
 
-const dataSrc = read(DATA_PACKED);
 fs.mkdirSync(OUT, { recursive: true });
-fs.writeFileSync(
-  path.join(OUT, "data.js"),
-  "/* 由 tools/web/build.mjs 生成，勿手改 —— 来自 " + DATA_PACKED + " */\n" +
-  "(function(g){ g.__M = g.__M || {}; g.__M[" + JSON.stringify(DATA_PACKED) + "] = function(module, exports, require){\n" +
-  dataSrc + "\n}; })(typeof window!=='undefined'?window:globalThis);\n",
-  "utf8"
-);
+const dataParts = [
+  "/* 由 tools/web/build.mjs 生成，勿手改 —— 数据分块清单 " + MANIFEST + " */",
+  "(function(g){ g.__M = g.__M || {};",
+];
+for (const p of CHUNKS) {
+  dataParts.push("g.__M[" + JSON.stringify(p) + "] = function(module, exports, require){");
+  dataParts.push(read(p));
+  dataParts.push("};");
+}
+dataParts.push("})(typeof window!=='undefined'?window:globalThis);");
+fs.writeFileSync(path.join(OUT, "data.js"), dataParts.join("\n"), "utf8");
+console.log("数据块已注册:", CHUNKS.join(" , "));
 
 /* ───────────── 3. 模块表 ───────────── */
 
@@ -135,6 +168,28 @@ for (const p of pages) {
 tpl.push("})(typeof window!=='undefined'?window:globalThis);");
 fs.writeFileSync(path.join(OUT, "tpl.js"), tpl.join("\n"), "utf8");
 console.log("页面模板编译:", compiled + "/" + pages.length);
+
+/* ───────── 4.5 全站页面清单（网页外壳导航 / AI 全站跳转同源） ─────────
+ * 网页版要提供「跳到任意页」的导航抽屉和 AI 站点导航，页面清单不能手抄：
+ * 手抄必然随 app.json 漂移。这里由 app.json + 各页 .json 的标题直接生成，
+ * 增删页面后重跑构建自动同步；数据分包的 keep 占位空页不进导航。 */
+{
+  const tabSet = new Set(((appJson.tabBar && appJson.tabBar.list) || []).map((x) => x.pagePath));
+  const GROUP = { pages: "主导航", subpkg: "旅行工具", subai: "深度内容", subdata: "数据与增强", subdata2: "数据与增强", subdata3: "数据与增强" };
+  const nav = [];
+  for (const p of pages) {
+    if (/\/keep\/keep$/.test(p)) continue;          // 分包占位空页，不是给用户用的界面
+    if (!exists(p + ".wxml")) continue;             // 没有界面的页不进导航
+    let title = "";
+    try { title = JSON.parse(read(p + ".json")).navigationBarTitleText || ""; } catch (e) {}
+    const root = p.split("/")[0];
+    nav.push({ p: p, t: title || p.split("/").pop(), g: GROUP[root] || "其他", tab: tabSet.has(p) });
+  }
+  fs.writeFileSync(path.join(OUT, "nav.js"),
+    "/* 由 tools/web/build.mjs 生成，勿手改 —— 来自 app.json */\n" +
+    "window.__WEB_NAV = " + JSON.stringify(nav) + ";\n", "utf8");
+  console.log("全站页面清单:", nav.length, "页（tab", nav.filter((x) => x.tab).length, "）");
+}
 
 /* ───────────── 5. 样式 ───────────── */
 
@@ -252,7 +307,10 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
   let html = fs.readFileSync(idxPath, "utf8");
   const deps = [
     "web/lib/modules.js", "web/lib/data.js", "web/lib/tpl.js", "web/lib/app.css",
-    "web/lib/runtime.js", "web/app.js", "web/shell.css",
+    "web/lib/nav.js", "web/lib/runtime.js", "web/app.js", "web/shell.css",
+    // 2026-11-10：AI 助手原本用固定戳 v=ai20261109，改了脚本浏览器仍吃旧缓存。
+    // 纳入统一内容 hash 后，任何资源改动都会自动破缓存，且构建依旧幂等。
+    "web/ai-assistant.js", "web/ai-assistant.css",
   ];
   const h = crypto.createHash("sha1");
   for (const rel of deps) {
@@ -260,7 +318,8 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
     if (fs.existsSync(p)) h.update(fs.readFileSync(p));
   }
   const v = h.digest("hex").slice(0, 8);
-  html = html.replace(/(src|href)="((?:lib\/[^"?]+|shell\.css|app\.js))(?:\?v=[^"]*)?"/g, (m, a, f) => a + '="' + f + "?v=" + v + '"');
+  html = html.replace(/(src|href)="((?:lib\/[^"?]+|shell\.css|app\.js|ai-assistant\.(?:css|js)))(?:\?v=[^"]*)?"/g,
+    (m, a, f) => a + '="' + f + "?v=" + v + '"');
   fs.writeFileSync(idxPath, html, "utf8");
   console.log("资源引用已打版本号 v=" + v + "（内容 hash，构建幂等）");
 }
