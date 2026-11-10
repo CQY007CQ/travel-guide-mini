@@ -1022,6 +1022,9 @@ Page(SafePage({
       try { AN.track("plan_generate", { ok: 1, mode: this.data.multiMode ? "multi" : (this.data.isGuide ? "prov" : "city"), days: this.data.days }); } catch (e) {}
       wx.switchTab({ url: "/pages/plan/plan" });
     } catch (err) {
+      // v1.20.6：把被吞的真实异常透出来，否则「生成失败」永远是无头案。
+      // 与 web/lib/runtime.js 的 handler 错误日志保持一致（属错误上报，非调试噪音）。
+      try { console.error("[generate] 生成攻略真实异常：", err); } catch (e) {}
       // 埋点：生成失败（这是最该盯的指标——主路径走不通，其他优化都是白费）
       try { AN.track("plan_generate", { ok: 0 }); } catch (e) {}
        // v1.11：生产包不留 console.log（错误已通过 toast 告知用户）
