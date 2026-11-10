@@ -19,7 +19,11 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
+import { createRequire } from "module";
 import { compilePage } from "./wxml.mjs";
+
+// build.mjs 本身是 ESM（.mjs），但 esbuild 以 CommonJS 发布，需用 createRequire 才能 require。
+const require = createRequire(import.meta.url);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const OUT = path.join(ROOT, "web/lib");
@@ -296,6 +300,39 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
   console.log("静态资源：images/ → web/images/（" + n + " 个文件，" + (bytes / 1024).toFixed(0) + "KB）");
 }
 
+/* ───────────── 7.5 云互通 SDK（可选） ───────────── */
+// @cloudbase/js-sdk 经 esbuild 打成 IIFE（全局 tcb），产物 web/lib/cloudbase-sdk.js。
+// 仅在开发者本地装了该依赖时才拷贝；未装则告警并跳过 —— 网页版云能力 fail-closed，不影响构建与本地功能。
+{
+  const sdkSrc = path.join(ROOT, "node_modules/@cloudbase/js-sdk/dist/index.esm.js");
+  const sdkOut = path.join(OUT, "cloudbase-sdk.js");
+  if (fs.existsSync(sdkSrc)) {
+    try {
+      const esbuildPkg = path.join(ROOT, "node_modules/esbuild");
+      if (fs.existsSync(esbuildPkg)) {
+        const esbuild = require(esbuildPkg);
+        esbuild.buildSync({
+          entryPoints: [sdkSrc],
+          bundle: true,
+          format: "iife",
+          globalName: "tcb",
+          outfile: sdkOut,
+          platform: "browser",
+          define: { process: JSON.stringify({ env: { NODE_ENV: "production" } }) },
+          legalComments: "none"
+        });
+        console.log("云互通：已用 esbuild 打包 CloudBase SDK → web/lib/cloudbase-sdk.js");
+      } else {
+        console.warn("⚠️ 未找到 esbuild，跳过 cloudbase-sdk.js 打包（网页版云能力将关闭；运行 npm i esbuild @cloudbase/js-sdk 后重跑构建即可启用）");
+      }
+    } catch (e) {
+      console.warn("⚠️ 打包 CloudBase SDK 失败，网页版云能力将关闭：" + (e && e.message));
+    }
+  } else {
+    console.log("云互通：未安装 @cloudbase/js-sdk（npm i @cloudbase/js-sdk），网页版云能力保持关闭（本地功能不受影响）");
+  }
+}
+
 /* ───────────── 8. 缓存破除 ───────────── */
 // 静态站点最常见的坑：改了 css/js 但浏览器还在用旧缓存，排查时极度误导
 // （本次就出现「rpx 基准已修，页面尺寸没变」）。这里给 index.html 的资源引用统一打版本号。
@@ -311,6 +348,9 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
     // 2026-11-10：AI 助手原本用固定戳 v=ai20261109，改了脚本浏览器仍吃旧缓存。
     // 纳入统一内容 hash 后，任何资源改动都会自动破缓存，且构建依旧幂等。
     "web/ai-assistant.js", "web/ai-assistant.css",
+    // 云互通：cloud-web.js 是手写适配器（必随包）；cloudbase-sdk.js 由下方从 node_modules 拷贝（缺失仅告警）。
+    // 两者都纳入内容 hash，SDK 升级时懒加载 URL 也会自动破缓存。
+    "web/lib/cloud-web.js", "web/lib/cloudbase-sdk.js",
   ];
   const h = crypto.createHash("sha1");
   for (const rel of deps) {

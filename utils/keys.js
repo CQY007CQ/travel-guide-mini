@@ -19,7 +19,12 @@
 const DEFAULT = {
   qweatherKey: "", // v1.20.4 #1/#19：明文移出仓库，改运行时注入（setKeys）
   qweatherHost: "", // 同上，须与 qweatherKey 配对注入
-  amapKey: "" // 高德 Key：当前未使用；未来若用高德须填本人账号申请的 Key
+  amapKey: "", // 高德 Key：当前未使用；未来若用高德须填本人账号申请的 Key
+  // 云环境 ID（CloudBase）：个人主体也能开云开发（约 ¥19.9/月）。
+  // 未填 → 云能力整体 fail-closed 降级（本地优先，绝不抛错，见 utils/cloud.js）。
+  // 接入：运行时 wx.setStorageSync("__app_keys__", { cloudEnv: "你的环境ID" })，
+  //   或直接在此填入（环境 ID 是标识符非密钥，风险低；但公开仓库仍建议用运行时注入避免泄露）。
+  cloudEnv: ""
 };
 
 // 占位符特征：未真正配置的 Key
@@ -51,6 +56,9 @@ function amapKey() { return _resolve("amapKey"); }
 // 是否已有可用的和风 Key（fail-closed 判据，供 weather 跳过 / 降级）
 function qweatherConfigured() { return !!qweatherKey(); }
 
+// 云环境 ID（fail-closed：空白 / 占位符 → null → 云能力整体关闭，绝不抛错）
+function cloudEnv() { return _resolve("cloudEnv"); }
+
 // 运行时注入（见上方②）。仅落内存 + storage，不写文件、不回传任何服务器。
 function setKeys(patch) {
   try {
@@ -64,4 +72,4 @@ function setKeys(patch) {
   return false;
 }
 
-module.exports = { qweatherKey, qweatherHost, amapKey, qweatherConfigured, setKeys, DEFAULT };
+module.exports = { qweatherKey, qweatherHost, amapKey, qweatherConfigured, cloudEnv, setKeys, DEFAULT };

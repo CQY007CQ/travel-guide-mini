@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#0d0d0d"/>
 <!-- #114 安全门禁：限定资源与出站连接仅来自同源 + 已知天气/地理 API，抑制 XSS 影响面与任意出站。
      内联 script/style 暂放行（'unsafe-inline'）；可选大模型(api.openai.com)被拦后会优雅回退离线助手。 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.qweatherapi.com https://*.amap.com"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.qweatherapi.com https://*.amap.com *.tcloudbaseg.com"/>
 <title>旅行攻略生成器 · 网页版</title>
-<link rel="stylesheet" href="lib/app.css?v=9605b20a"/>
-<link rel="stylesheet" href="shell.css?v=9605b20a"/>
-<link rel="stylesheet" href="ai-assistant.css?v=9605b20a"/>
+<link rel="stylesheet" href="lib/app.css?v=10faf45d"/>
+<link rel="stylesheet" href="shell.css?v=10faf45d"/>
+<link rel="stylesheet" href="ai-assistant.css?v=10faf45d"/>
 </head>
 <body>
   <!-- 启动遮罩：数据包解压需要一点时间，避免白屏 -->
@@ -32,13 +32,14 @@
     <a class="tb" data-p="pages/more/more"><img alt="更多"/><span>更多</span></a>
   </nav>
 
-  <script src="lib/modules.js?v=9605b20a"></script>
-  <script src="lib/data.js?v=9605b20a"></script>
-  <script src="lib/tpl.js?v=9605b20a"></script>
-  <script src="lib/nav.js?v=9605b20a"></script>
-  <script src="lib/runtime.js?v=9605b20a"></script>
-  <script src="app.js?v=9605b20a"></script>
-  <script src="ai-assistant.js?v=9605b20a"></script>
+  <script src="lib/modules.js?v=10faf45d"></script>
+  <script src="lib/data.js?v=10faf45d"></script>
+  <script src="lib/tpl.js?v=10faf45d"></script>
+  <script src="lib/nav.js?v=10faf45d"></script>
+  <script src="lib/runtime.js?v=10faf45d"></script>
+  <script src="lib/cloud-web.js?v=10faf45d"></script>
+  <script src="app.js?v=10faf45d"></script>
+  <script src="ai-assistant.js?v=10faf45d"></script>
 
   <!-- 网页版数据互通：导出 / 导入备份文件（与小程序同 schema，可跨端迁移数据） -->
   <div id="webDataBar">
@@ -48,6 +49,10 @@
       <button id="webNavOpen" type="button">全部页面</button>
       <button id="webExport" type="button">导出数据</button>
       <button id="webImport" type="button">导入数据</button>
+      <button id="webCopySync" type="button">复制同步码</button>
+      <button id="webInputSync" type="button">输入同步码</button>
+      <button id="webPush" type="button">上传云端</button>
+      <button id="webPull" type="button">云端恢复</button>
     </div>
     <input id="webImpFile" type="file" accept="application/json,.json" hidden/>
   </div>
@@ -107,6 +112,57 @@
         } catch (e) { toast("导入失败：" + (e && e.message ? String(e.message).slice(0, 40) : "文件不是有效备份")); }
       };
       rd.readAsText(f);
+    };
+  })();
+  /* ── 网页版云互通：复制/输入同步码 + 上传/恢复行程（本地优先，未配云环境则提示） ── */
+  (function () {
+    function C() { try { return window.__require("__entry__", "./utils/cloud.js"); } catch (e) { return null; } }
+    function CS() { try { return window.__require("__entry__", "./utils/cloud-sync.js"); } catch (e) { return null; } }
+    function currentPlan() { try { return (window.__APP_CONFIG && window.__APP_CONFIG.globalData && window.__APP_CONFIG.globalData.plan) || null; } catch (e) { return null; } }
+    function fallbackCopy(t) {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        document.execCommand("copy"); ta.remove(); toast("同步码已复制：" + t);
+      } catch (e) { toast("复制失败，请手动记录：" + t); }
+    }
+    var copyBtn = document.getElementById("webCopySync");
+    if (copyBtn) copyBtn.onclick = function () {
+      var c = C(); if (!c) { toast("同步模块未就绪，请稍候"); return; }
+      var code = c.getPairedUid() || c.localUid();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function () { toast("同步码已复制：" + code); }, function () { fallbackCopy(code); });
+      } else fallbackCopy(code);
+    };
+    var inBtn = document.getElementById("webInputSync");
+    if (inBtn) inBtn.onclick = function () {
+      var c = C(); if (!c) { toast("同步模块未就绪，请稍候"); return; }
+      var v = window.prompt("粘贴另一端复制的同步码（u_ 开头）：", "");
+      if (v == null) return;
+      if (c.setPairedUid(v)) toast("已关联，可跨端同步"); else toast("同步码无效");
+    };
+    var pushBtn = document.getElementById("webPush");
+    if (pushBtn) pushBtn.onclick = function () {
+      var c = C(); if (!c) { toast("同步模块未就绪，请稍候"); return; }
+      if (!c.cloudEnabled()) { toast("未配置云环境（cloudEnv 为空）"); return; }
+      var cs = CS(); if (!cs) { toast("同步模块未就绪，请稍候"); return; }
+      cs.pushPlan(currentPlan()).then(function (r) {
+        toast(r && r.ok ? "已上传到云端" : "上传失败：" + ((r && r.reason) || ""));
+      }).catch(function () { toast("上传异常"); });
+    };
+    var pullBtn = document.getElementById("webPull");
+    if (pullBtn) pullBtn.onclick = function () {
+      var c = C(); if (!c) { toast("同步模块未就绪，请稍候"); return; }
+      if (!c.cloudEnabled()) { toast("未配置云环境（cloudEnv 为空）"); return; }
+      var cs = CS(); if (!cs) { toast("同步模块未就绪，请稍候"); return; }
+      cs.pullLatest().then(function (r) {
+        if (r && r.ok && r.plan) {
+          if (window.__APP_CONFIG) window.__APP_CONFIG.globalData.plan = r.plan;
+          if (window.__webRefresh) window.__webRefresh();
+          toast("已从云端恢复");
+        } else toast("恢复失败：" + ((r && r.reason) || ""));
+      }).catch(function () { toast("恢复异常"); });
     };
   })();
   </script>

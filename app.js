@@ -54,6 +54,8 @@ App({
     pendingAch: []     // v1.20.6：app.onShow 结算出的「新解锁成就」，待 more 页弹窗授予
   },
   onLaunch() {
+    // 云开发接入（失败静默降级，绝不阻塞启动；未配置云环境 ID 时整体关闭，本地优先）
+    try { require("./utils/cloud.js").init(); } catch (e) {}
     // v1.19.65：**启动阶段不再预加载分包数据**。数据包近 2.5MB，若在 appLaunch 期间就触发
     // 分包下载/解析，会拖垮启动（真机/审核环境实测 `routeTo appLaunch timeout` → 黑屏/白屏）。
     // 改为由首页 onLoad 触发（那时启动已完成），启动本身保持轻量。

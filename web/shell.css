@@ -123,6 +123,35 @@ button { font-family: inherit; }
   }
 }
 
+/* ── 首页（pages/index）专属桌面布局：消掉「主卡高、副卡矮」造成的错位空格 ──
+   思路：主配置卡（.hero 行程配置）整行铺满；其余小卡（快捷入口 / 智能推荐 / 想玩 / 快捷回填）
+   用 auto-fit 网格两两成对，单卡自动撑满整行 —— 不出现「右栏大片留白 / 底截一刀」。
+   仅 ≥820px 接管；<820px 回落手机单列（.home-aux 用 auto-fit 自然塌成单列）。 */
+@media (min-width: 820px) {
+  #app > .page[data-page="pages/index/index"] {
+    display: block;
+    max-width: 1560px;
+    margin: 0 auto;
+    padding: 0 12px;
+  }
+  #app > .page[data-page="pages/index/index"] .home-aux {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 18px;
+    margin: 0 14px;
+  }
+  #app > .page[data-page="pages/index/index"] .home-aux > .card {
+    margin: 0;
+    border-radius: 18px;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, .06), 0 6px 18px rgba(16, 24, 40, .05);
+    transition: transform .22s ease, box-shadow .22s ease;
+  }
+  #app > .page[data-page="pages/index/index"] .home-aux > .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(16, 24, 40, .10), 0 16px 40px rgba(16, 24, 40, .12);
+  }
+}
+
 /* 手动「单列」覆盖自动分栏（用户偏好优先） */
 body.single-col #app > .page { display: block; max-width: 980px; margin: 0 auto; }
 body.single-col #app > .page > .card { margin: 20rpx 24rpx; }

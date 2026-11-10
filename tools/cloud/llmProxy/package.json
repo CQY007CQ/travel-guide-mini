@@ -1,0 +1,9 @@
+{
+  "name": "llmProxy",
+  "version": "1.0.0",
+  "description": "旅行攻略生成器：LLM 代理（Key 仅存云函数环境变量，不下发前端）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

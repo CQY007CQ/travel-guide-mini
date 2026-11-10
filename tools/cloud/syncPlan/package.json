@@ -1,0 +1,9 @@
+{
+  "name": "syncPlan",
+  "version": "1.0.0",
+  "description": "旅行攻略生成器：小程序↔网页版行程互通（主行程上云/拉回）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

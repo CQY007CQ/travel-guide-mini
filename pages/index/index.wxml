@@ -18,6 +18,8 @@
     <view class="df-btn {{loadingData ? 'df-loading' : ''}}" bindtap="retryData">{{loadingData ? '重试中…' : '重试加载'}}</view>
   </view>
 
+  <!-- 首页桌面布局：以下小卡成对排布（见 web/shell.css 的 .home-aux） -->
+  <view class="home-aux">
   <!-- v1.7 · 快捷入口（更多页可自定义显示哪些；老用户默认折叠，减负首屏） -->
   <view class="quick-bar card" wx:if="{{tiles.length}}">
     <view class="qb-head" bindtap="toggleQuick">
@@ -65,6 +67,7 @@
       <view class="rb-foot">点城市名填入表单</view>
     </view>
     <view class="rb-empty" wx:if="{{recTried && !recList.length}}">没找到合适的，换个说法试试</view>
+  </view>
   </view>
   <!-- 行程状态：出发倒计时 + 预约提醒 合并为一卡（v1.19.59 减法） -->
   <view class="card plan-status" wx:if="{{countdown || remind}}">
@@ -278,6 +281,7 @@
   </view>
 
   <!-- 想玩景点池（折叠卡片） -->
+  <view class="home-aux" wx:if="{{(cityName && poolCount && !multiMode && !provMode) || favs.length || recents.length}}">
   <view wx:if="{{cityName && poolCount && !multiMode && !provMode}}" class="card pool fb-fade-d2">
     <view class="pool-bar" bindtap="onPoolTap">
       <view class="pool-l">
@@ -346,6 +350,8 @@
         </view>
       </view>
     </view>
+  </view>
+
   </view>
 
   <view wx:if="{{hasOld}}" class="tip" bindtap="resumeOld">继续上次行程</view>

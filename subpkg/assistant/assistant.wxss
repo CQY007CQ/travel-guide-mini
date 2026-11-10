@@ -35,6 +35,13 @@
 .keep-btn:active { color: var(--chip-tx, #d4a94e); }
 .keep-btn-2 { border-style: solid; }
 
+/* 增强意图的「直达对应页」按钮（对齐网页版 AI 全站导航） */
+.actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 16rpx; }
+.act-btn { font-size: calc(22rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e);
+  background: rgba(var(--ln-rgb, 148, 163, 184), .08);
+  border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .22); border-radius: 999rpx; padding: 8rpx 22rpx; }
+.act-btn:active { background: rgba(var(--chip-rgb, 212, 169, 78), .18); }
+
 /* 收藏列表 */
 .keeps .keep-it { font-size: calc(24rpx * var(--fs, 1)); color: var(--t2, #c9d4e4); line-height: 1.6; padding: 12rpx 0;
   border-bottom: 1rpx solid rgba(var(--ln-rgb,148,163,184),.06); white-space: pre-wrap; word-break: break-word; }

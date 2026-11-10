@@ -46,8 +46,13 @@ const EXTERNAL_CACHE = "tools/official-roster/cache";
 // 本地用真实 Key 构建时合法地含 Key，属构建产物而非仓库源码，跳过内容扫描避免误报。
 // 关键：web/lib/runtime.js 是「手写源码（已提交）」，不在豁免之列，仍会被扫描；
 // 真正的泄露面（utils/keys.js / docs/ 等源文件与文档）也照常扫描 —— 本豁免只去掉重复的构建产物噪声。
+// 2026-11-11 补充 web/lib/cloudbase-sdk.js：该文件是 esbuild 把第三方 @cloudbase/js-sdk（ESM）打成
+// 的 IIFE 全局包（见 tools/web/build.mjs 7.5 节），含 SDK 内部 secret/token 标识符与协议常量，
+// 非本仓凭据；且 web/.gitignore 已忽略、不进 git index（下方 GENERATED 豁免仅跳过内容噪声，
+// 不削弱对 utils/keys.js 等真源的扫描）。同属「生成的第三方打包产物」，与上方 modules/data 同类。
 const GENERATED = new Set([
-  "web/lib/modules.js", "web/lib/data.js", "web/lib/tpl.js", "web/lib/app.css", "web/lib/nav.js"
+  "web/lib/modules.js", "web/lib/data.js", "web/lib/tpl.js", "web/lib/app.css", "web/lib/nav.js",
+  "web/lib/cloudbase-sdk.js"
 ]);
 
 const ALLOW_URL = [

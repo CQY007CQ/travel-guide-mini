@@ -60,6 +60,10 @@
     <view class="h3">最近一次查询</view>
     <view class="r-q">问：{{lastQuery}}</view>
     <view class="r-a">{{lastResult}}</view>
+    <!-- 增强意图附带的「直达对应页」按钮（对齐网页版 AI 全站导航） -->
+    <view class="actions" wx:if="{{actions.length}}">
+      <view class="act-btn" wx:for="{{actions}}" wx:key="label" data-path="{{item.path}}" data-query="{{item.query}}" data-mode="{{item.mode}}" bindtap="onAction">{{item.label}}</view>
+    </view>
     <view class="keep-line">
       <view class="keep-btn" bindtap="keepLast"><image class="ic ic-sm" src="/images/icons/star.png"/>收藏（已收藏 {{keepN}}）</view>
       <view class="keep-btn keep-btn-2" bindtap="toggleKeeps" wx:if="{{keeps.length}}">查看收藏（{{keeps.length}}）</view>

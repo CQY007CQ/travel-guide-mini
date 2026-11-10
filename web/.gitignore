@@ -4,3 +4,4 @@ lib/data.js
 lib/modules.js
 lib/tpl.js
 lib/nav.js
+lib/cloudbase-sdk.js

@@ -1,0 +1,9 @@
+{
+  "name": "recommend",
+  "version": "1.0.0",
+  "description": "旅行攻略生成器：每用户偏好档案（跨端个性化底座）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
