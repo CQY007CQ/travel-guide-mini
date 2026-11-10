@@ -44,8 +44,15 @@ function _realCities() {
 }
 
 function corpusStats() {
+  const all = Array.isArray(D.CITIES) ? D.CITIES : [];
   const real = _realCities();
   const cities = real.length;
+  // 2026-11-10：把「城市池条目数」与「去重后真实城市数」分开报。
+  // 用户看到帮助页的「415 城」以为全应用只有 415 座城，其实那是有真实美食店的城数；
+  // CITIES 751 条里含 327 条全称别名（阿坝 / 阿坝藏族羌族自治州指向同一地），
+  // 直接拿 751 当城市数会夸大，直接拿 415 当城市数又会低估 —— 两个口径必须并列。
+  const cityEntries = all.length;
+  const aliasEntries = cityEntries - cities;
   const spotCities = _countKeys(D.SPOT_COORDS);
   let spots = 0;
   for (const k in D.SPOT_COORDS) if (Array.isArray(D.SPOT_COORDS[k])) spots += D.SPOT_COORDS[k].length;
@@ -73,11 +80,13 @@ function corpusStats() {
 
   return {
     ready: !!(D.__dataReady),
-    cities, spotCities, spots, spotInfo, foods,
+    cities, cityEntries, aliasEntries, spotCities, spots, spotInfo, foods,
     hospitalCities, hospitals, approxCities, provinces,
     climate, region,
-    // 一句话总览（用于卡片头）—— 全部为真实打包数据，不夸大覆盖
-    headline: cities + " 座城市 · " + spots + " 个景点 · " + hospitals + " 家具名医院覆盖 " +
+    // 一句话总览（用于卡片头）—— 全部为真实打包数据，不夸大覆盖；
+    // 显式带出「城市池 751 条 / 含 327 条别名」，回应「不是查到 700 多城吗」的疑问
+    headline: cities + " 座真实城市（城市池 " + cityEntries + " 条，含 " + aliasEntries +
+      " 条全称别名）· " + spots + " 个景点 · " + hospitals + " 家具名医院覆盖 " +
       hospitalCities + " 城（另 " + approxCities + " 城走地图搜索）"
   };
 }

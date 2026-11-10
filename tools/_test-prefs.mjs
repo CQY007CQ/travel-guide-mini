@@ -41,12 +41,16 @@ const ok = (c, m) => { if (!c) { console.error("  ✗ " + m); fails++; } else co
   const p2 = T.getPrefs();
   ok(p2 && p2.pace === "relax" && p2.budget === "high", "多站: route 路径也能学 pace/budget");
 
-  // 5) 确定性：同入参两次结果一致
+  // 5) 确定性：同入参两次结果一致。
+  //    _pickPref 会写入 at: Date.now()，旧版把整个对象 JSON.stringify 比较，
+  //    两次调用只要跨毫秒就偶发红（allcheck 实测偶发）。时间戳本就该变，
+  //    这里只比较偏好字段本身，断言条数与文案保持不变。
   T.learnPrefs({ city: "北京", days: 3, pace: "fast", budget: "low", travelMode: "family" });
   const a = T.getPrefs();
   T.learnPrefs({ city: "北京", days: 3, pace: "fast", budget: "low", travelMode: "family" });
   const b = T.getPrefs();
-  ok(JSON.stringify(a) === JSON.stringify(b), "确定性: 同入参两次学习结果稳定");
+  const stripAt = (p) => { const o = Object.assign({}, p || {}); delete o.at; return JSON.stringify(o); };
+  ok(stripAt(a) === stripAt(b), "确定性: 同入参两次学习结果稳定");
 
   // 6) 空/异常入参不崩
   let threw = false;

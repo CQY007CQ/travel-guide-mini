@@ -94,6 +94,17 @@ if (s) {
     s.region.reduce((a, b) => a + b.n, 0) === s.cities,
     s.region.reduce((a, b) => a + b.n, 0) + " vs " + s.cities);
   ok("ready 标记为 true", s.ready === true);
+
+  /* ---------- 5b. 城市口径双轨（2026-11-10） ----------
+     防回潮：曾经把「有真实美食店的城数」误当成城市总数，也没说清 751 条里含别名。 */
+  ok("城市池条目数 > 去重后真实城市数", s.cityEntries > s.cities,
+    "cityEntries=" + s.cityEntries + " cities=" + s.cities);
+  ok("别名条目数 = 城市池条目 - 真实城市",
+    s.aliasEntries === s.cityEntries - s.cities, "alias=" + s.aliasEntries);
+  ok("headline 并列标出城市池条目数与真实城市数",
+    s.headline.includes(String(s.cityEntries)) && s.headline.includes("真实城市") && s.headline.includes("别名"),
+    s.headline);
+  ok("有景点坐标城数 > 0", s.spotCities > 0, "spotCities=" + s.spotCities);
 }
 
 /* ---------- 6. 真源与产物都指向 emergency-data（防回潮） ---------- */
@@ -117,6 +128,9 @@ ok("help.wxml 渲染 approxCities（降级城单独展示）",
 ok("help.js 通过 corpusStats() 取数", /corpusStats\s*\(/.test(helpJs));
 ok("help.js 取数失败不拖垮页面（try/catch）",
   /try\s*\{[^}]*corpusStats|corpusStats[^;]*\}\s*catch/.test(helpJs));
+ok("help.wxml 展示城市池条目数", /\{\{\s*corpus\.cityEntries\s*\}\}/.test(helpWxml));
+ok("help.wxml 解释全称别名口径", /全称别名/.test(helpWxml));
+ok("help.wxml 说明未收录城市走降级、不编造", /不编造店名与坐标/.test(helpWxml));
 
 /* ---------- 8. 使用指南不再写静态医院数字 ---------- */
 const guideJs = read("subpkg/guide/guide.js");
