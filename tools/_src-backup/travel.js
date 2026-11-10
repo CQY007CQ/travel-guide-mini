@@ -48,6 +48,7 @@ function bootData() {
   if (_booted && Array.isArray(D.CITIES) && D.CITIES.length) return;
   if (!Array.isArray(D.CITIES) || !D.CITIES.length) { _booted = false; return; } // 数据尚未就绪，留待重试后再跑
   _booted = true;
+  _citiesOfCache = null; // v1.20.6：bootData 改写 c.province，清空 citiesOf 缓存保证一致性
   (Array.isArray(D.CITIES) ? D.CITIES : []).forEach(c => { if (!c.province && D.CITY2PROV && D.CITY2PROV[c.name]) c.province = D.CITY2PROV[c.name]; });
   const real = Array.isArray(D.PREP_CHECKLIST) ? D.PREP_CHECKLIST : null;
   if (real && real.length && Array.isArray(PACK_LIST)) {
@@ -74,6 +75,7 @@ function namedCities() {
 // 46 座精编城走专属攻略数据，其余城市由 planner 用本市景点库/省地标兜底生成）
 // guide=true 的精编城市排前面，方便优先选择
 function citiesOf(prov) {
+ if (_citiesOfCache && _citiesOfCache.has(prov)) return _citiesOfCache.get(prov);
  const names = (D.PROVINCE_CITIES && D.PROVINCE_CITIES[prov]) || [];
  const guide = new Set((Array.isArray(D.CITIES) ? D.CITIES : []).map(c => c.name));
  // v1.19.79：同名「X市」归并 —— 选择列表只展示带数据的 canonical 名，避免用户选到零景点「X市」
@@ -93,9 +95,16 @@ function citiesOf(prov) {
    if (!_seen.has(cn)) { _seen.add(cn); out.push({ name: cn, province: prov, guide: true, limited: true }); }
   }
  });
- return out.sort((a, b) => (b.guide - a.guide) || a.name.localeCompare(b.name, "zh"));
+ const res = out.sort((a, b) => (b.guide - a.guide) || a.name.localeCompare(b.name, "zh"));
+ if (!_citiesOfCache) _citiesOfCache = new Map();
+ _citiesOfCache.set(prov, res);
+ return res;
 }
 
+// v1.20.6：citiesOf 是纯函数、首页会对每个省反复调用（省→城市列表，一次渲染即触发 30+ 次 citiesOf）。
+// 同省结果缓存，避免每次都重建 751 城 Set + 排序。数据启动后不变；bootData 会改写 c.province，
+// 故在其开头清空本缓存，保证「启动前（若有）调用」与「启动后调用」取到一致结果。
+let _citiesOfCache = null;
 // 任意城市解析：46 精编城 → 专属攻略；其它城市 → 本市景点库，本市未收录再回退省级地标
 // （planner.findCity 已实现完整兜底，这里补上 province 推断）
 // v1.11：城市名 → 城市对象索引（原本每次 findCity 都要线性扫 132 城）
@@ -569,23 +578,33 @@ function wishPicksFor(cityName) {
 
 // v1.17.10：就近城市（≤200km 的最近一座）—— 给新城（平遥/婺源等）在缺少独立数据时
 // 回退到所属地级市用（如平遥→晋中、阳朔→桂林）。超出 200km 视为无可回退，返回空串。
- function nearbyCityOf(cityName) {
+// v1.20.6：美食页等场景按「缺数据新城」回退时调用，内部线性扫描全部 751 城算球面距离。
+// 城市名→结果缓存，避免每次打开美食页都对全量城市做一遍 haversine（纯函数、数据启动后不变）。
+const _nearbyCache = new Map();
+function nearbyCityOf(cityName) {
+ const nm = canonCityName(String(cityName || ""));
+ if (_nearbyCache.has(nm)) return _nearbyCache.get(nm);
+ let res = "";
  try {
-  const nm = canonCityName(String(cityName || ""));
-  if (!nm || !findCity(nm)) return "";
-  const g = P.getCoord(nm);
-  if (!g) return "";
-  let best = "", bd = Infinity;
-  for (let i = 0; i < D.CITIES.length; i++) {
-   const x = D.CITIES[i];
-   if (!x || x.name === nm) continue;
-   const gx = P.getCoord(x.name);
-   if (!gx) continue;
-   const d = haversineKm(g, gx);
-   if (d < bd) { bd = d; best = x.name; }
+  if (nm && findCity(nm)) {
+   const g = P.getCoord(nm);
+   if (g) {
+    let best = "", bd = Infinity;
+    for (let i = 0; i < D.CITIES.length; i++) {
+     const x = D.CITIES[i];
+     if (!x || x.name === nm) continue;
+     const gx = P.getCoord(x.name);
+     if (!gx) continue;
+     const d = haversineKm(g, gx);
+     if (d < bd) { bd = d; best = x.name; }
+    }
+    res = bd <= 200 ? best : "";
+   }
   }
-  return bd <= 200 ? best : "";
- } catch (e) { return ""; }
+ } catch (e) { res = ""; }
+ if (_nearbyCache.size > 400) _nearbyCache.clear();
+ _nearbyCache.set(nm, res);
+ return res;
 }
 // 美食店铺（用于地图"美食"图层）
 function foodSpotsFor(cityName) {
