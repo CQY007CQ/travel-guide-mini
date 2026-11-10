@@ -294,10 +294,20 @@ function compileNode(n) {
   const events = {};
   const dataset = {};
   const extra = [];
+  let scrollCls = "";
 
   for (const a of n.attrs) {
     const name = a.name;
     if (ATTR_SKIP.has(name)) continue;
+
+    // scroll-view 的 scroll-x/y 在小程序里由原生组件提供横向/纵向滚动；
+    // 网页端编译成普通 div 后若不补 overflow，横向列表会直接溢出到相邻列
+    // （两列布局下尤其明显：热门路线会压到右边卡片上）。这里转成 class，
+    // 由 shell.css 的 #app .w-sx / .w-sy 补上等价的浏览器滚动。
+    if (name === "scroll-x" || name === "scroll-y") {
+      if (a.value !== "false") scrollCls += (scrollCls ? " " : "") + (name === "scroll-x" ? "w-sx" : "w-sy");
+      continue;
+    }
 
     // 事件绑定
     const evm = name.match(/^(bind|catch|capture-bind|capture-catch|mut-bind):?(.+)$/);
@@ -334,6 +344,11 @@ function compileNode(n) {
     } else {
       props[key] = JSON.stringify(a.value);
     }
+  }
+
+  if (scrollCls) {
+    const base = props.class ? "(" + props.class + ")" : '""';
+    props.class = "(" + base + " + " + JSON.stringify(" " + scrollCls) + ").trim()";
   }
 
   const propPairs = Object.entries(props).map(([k, v]) => JSON.stringify(k) + ":" + v);

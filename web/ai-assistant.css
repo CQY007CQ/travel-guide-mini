@@ -196,3 +196,14 @@
 @media (min-width: 700px) {
   .ai-toast { bottom: calc(36px + env(safe-area-inset-bottom)); }
 }
+
+/* 桌面宽屏：AI 助手靠右加宽，不占内容中心；侧栏出现后可用宽度自动扣减 */
+@media (min-width: 1100px) {
+  .ai-panel {
+    left: auto; right: 24px;
+    transform: translateY(24px);
+    width: min(560px, calc(100vw - var(--sidebar-w, 224px) - 48px));
+  }
+  .ai-panel.open { transform: translateY(0); }
+  .ai-fab { right: 24px; }
+}

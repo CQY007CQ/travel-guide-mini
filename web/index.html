@@ -8,9 +8,9 @@
      内联 script/style 暂放行（'unsafe-inline'）；可选大模型(api.openai.com)被拦后会优雅回退离线助手。 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.qweatherapi.com https://*.amap.com"/>
 <title>旅行攻略生成器 · 网页版</title>
-<link rel="stylesheet" href="lib/app.css?v=5d239dfd"/>
-<link rel="stylesheet" href="shell.css?v=5d239dfd"/>
-<link rel="stylesheet" href="ai-assistant.css?v=5d239dfd"/>
+<link rel="stylesheet" href="lib/app.css?v=c95783dd"/>
+<link rel="stylesheet" href="shell.css?v=c95783dd"/>
+<link rel="stylesheet" href="ai-assistant.css?v=c95783dd"/>
 </head>
 <body>
   <!-- 启动遮罩：数据包解压需要一点时间，避免白屏 -->
@@ -32,28 +32,36 @@
     <a class="tb" data-p="pages/more/more"><img alt="更多"/><span>更多</span></a>
   </nav>
 
-  <script src="lib/modules.js?v=5d239dfd"></script>
-  <script src="lib/data.js?v=5d239dfd"></script>
-  <script src="lib/tpl.js?v=5d239dfd"></script>
-  <script src="lib/nav.js?v=5d239dfd"></script>
-  <script src="lib/runtime.js?v=5d239dfd"></script>
-  <script src="app.js?v=5d239dfd"></script>
-  <script src="ai-assistant.js?v=5d239dfd"></script>
+  <script src="lib/modules.js?v=c95783dd"></script>
+  <script src="lib/data.js?v=c95783dd"></script>
+  <script src="lib/tpl.js?v=c95783dd"></script>
+  <script src="lib/nav.js?v=c95783dd"></script>
+  <script src="lib/runtime.js?v=c95783dd"></script>
+  <script src="app.js?v=c95783dd"></script>
+  <script src="ai-assistant.js?v=c95783dd"></script>
 
   <!-- 网页版数据互通：导出 / 导入备份文件（与小程序同 schema，可跨端迁移数据） -->
   <div id="webDataBar">
-    <button id="webNavOpen" type="button">全部页面</button>
-    <button id="webExport" type="button">导出数据</button>
-    <button id="webImport" type="button">导入数据</button>
+    <button id="webToolsToggle" type="button">工具 / 布局</button>
+    <div id="webTools" class="hidden">
+      <button id="webLayoutBtn" type="button">宽屏 / 单列</button>
+      <button id="webNavOpen" type="button">全部页面</button>
+      <button id="webExport" type="button">导出数据</button>
+      <button id="webImport" type="button">导入数据</button>
+    </div>
     <input id="webImpFile" type="file" accept="application/json,.json" hidden/>
   </div>
   <style>
-    #webDataBar{position:fixed;left:10px;bottom:64px;z-index:9998;display:flex;flex-direction:column;gap:8px}
+    #webDataBar{position:fixed;left:10px;bottom:64px;z-index:9998;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
     #webDataBar button{font:13px/1 -apple-system,system-ui,sans-serif;color:#e8eef7;background:rgba(28,32,40,.92);
       border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:9px 12px;cursor:pointer;backdrop-filter:blur(6px);
       box-shadow:0 4px 14px rgba(0,0,0,.35)}
     #webDataBar button:active{transform:scale(.96)}
+    #webTools{display:flex;flex-direction:column;gap:6px}
+    #webTools.hidden{display:none}
     @media(min-width:720px){#webDataBar{bottom:18px}}
+    @media(min-width:1100px){#webDataBar{left:calc(var(--sidebar-w, 224px) + 12px);bottom:12px}
+      #webTools{flex-direction:row;flex-wrap:wrap;max-width:calc(100vw - var(--sidebar-w, 224px) - 24px)}}
   </style>
   <script>
   (function () {

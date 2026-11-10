@@ -192,6 +192,25 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
   ok("AI 具备全站上下文 / 站点状态 / 行程生成 / 对外 API",
     ["function context()", "function siteStatus(", "function generatePlan(", "APP.__webAI", "web:pagechange"]
       .every((k) => aiSrc.includes(k)));
+
+  // ── 2026-11-10 桌面自适应（横屏）防回潮 ──
+  const shell = fs.readFileSync(path.join(ROOT, "web/shell.css"), "utf8");
+  const htmlSrc = fs.readFileSync(path.join(ROOT, "web/index.html"), "utf8");
+  // 只取真正的 --rpx 声明：注释里解释「旧版是 min(100vw,1024px)/750」会被字面量误伤
+  const rpxDecl = (shell.match(/--rpx:\s*([^;]+);/g) || []).join(" ");
+  ok("rpx 刻度与容器宽度解耦（不再随屏宽把正文放大到 38px）",
+    /clamp\(/.test(rpxDecl) && !/min\(100vw/.test(rpxDecl));
+  ok("宽屏两列 / 超大屏三列 + 手动强制多列与单列",
+    /repeat\(2,\s*minmax\(0,\s*1fr\)\)/.test(shell) && /repeat\(3,\s*minmax\(0,\s*1fr\)\)/.test(shell) &&
+    /body\.force-wide/.test(shell) && /body\.single-col/.test(shell));
+  ok(">=1100px 左侧常驻侧栏并隐藏底部 tabBar",
+    /#webSidebar\s*\{/.test(shell) && /#tabbar\s*\{\s*display:\s*none\s*!important/.test(shell));
+  ok("scroll-view 横向滚动降级（防多列下内容溢出到相邻列）",
+    /w-sx/.test(wxmlSrc) && /#app \.w-sx/.test(shell) && /overflow-x:\s*auto/.test(shell));
+  ok("工具条默认折叠，不再压住内容",
+    htmlSrc.includes("webToolsToggle") && /#webTools\.hidden/.test(htmlSrc));
+  ok("桌面侧栏与布局切换由 app.js 驱动",
+    ["buildSidebar", "toggleLayout", "force-wide", "webToolsToggle"].every((k) => appJs.includes(k)));
 }
 
 /* ── 8. 内置 AI 全站智能体：真的跑一遍（不是只看源码形状） ──

@@ -16,6 +16,12 @@
     "pages/plan/plan": "plan",
     "pages/more/more": "more",
   };
+  var TAB_LABEL = {
+    "pages/index/index": "出发",
+    "pages/today/today": "今天",
+    "pages/plan/plan": "行程",
+    "pages/more/more": "更多",
+  };
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -78,6 +84,10 @@
   }
 
   function syncTab(p) {
+    // 桌面侧栏高亮必须放在 tabbar 的早退判断之前
+    if (sidebar) Array.prototype.forEach.call(sidebar.querySelectorAll(".ws-item"), function (b) {
+      b.classList.toggle("on", b.getAttribute("data-p") === p);
+    });
     var bar = document.getElementById("tabbar");
     if (!bar) return;
     var key = TABS[p];
@@ -96,8 +106,8 @@
     });
   }
 
-  /* ── 顶部返回栏 + 全站页面抽屉 ── */
-  var topBar = null, navPanel = null;
+  /* ── 顶部返回栏 + 全站页面抽屉 + 桌面侧栏 ── */
+  var topBar = null, navPanel = null, sidebar = null;
 
   function ensureChrome() {
     if (topBar) return topBar;
@@ -158,6 +168,76 @@
     return p;
   }
 
+  /* ── 桌面常驻侧栏（≥1100px 显示）：替代底部 tabBar，形成横屏应用结构 ── */
+  function buildSidebar() {
+    var p = document.createElement("aside");
+    p.id = "webSidebar";
+    var list = window.__WEB_NAV || [];
+    var groups = {}, order = [];
+    list.forEach(function (x) {
+      if (!groups[x.g]) { groups[x.g] = []; order.push(x.g); }
+      groups[x.g].push(x);
+    });
+    var html = '<div class="ws-brand"><b>旅行攻略生成器</b><span>网页版 · 桌面布局</span></div>';
+    html += '<div class="ws-scroll"><div class="ws-group">主导航</div>';
+    Object.keys(TABS).forEach(function (path) {
+      html += '<button class="ws-item" data-p="' + esc(path) + '" data-tab="1">' + esc(TAB_LABEL[path] || path) + "</button>";
+    });
+    order.forEach(function (g) {
+      var rest = groups[g].filter(function (x) { return !x.tab; });
+      if (!rest.length) return;
+      html += '<div class="ws-group">' + esc(g) + "</div>";
+      rest.forEach(function (x) {
+        html += '<button class="ws-item" data-p="' + esc(x.p) + '" data-tab="0">' + esc(x.t) + "</button>";
+      });
+    });
+    html += "</div>";
+    html += '<div class="ws-foot">' +
+      '<button class="ws-btn" id="wsAI">打开 AI 助手</button>' +
+      '<button class="ws-btn" id="wsLayout">切换宽屏 / 单列</button>' +
+      "</div>";
+    p.innerHTML = html;
+    document.body.appendChild(p);
+    p.addEventListener("click", function (e) {
+      var t = e.target;
+      var item = t.closest ? t.closest(".ws-item") : null;
+      if (item) {
+        router(item.getAttribute("data-p"), item.getAttribute("data-tab") === "1" ? "tab" : "push");
+        return;
+      }
+      if (t.closest && t.closest("#wsAI")) { if (window.__webAI) window.__webAI.open(); return; }
+      if (t.closest && t.closest("#wsLayout")) toggleLayout();
+    });
+    return p;
+  }
+
+  /* ── 布局偏好：默认按视口自动分栏，用户可在任意宽度手动强制「宽屏多列 / 单列」 ── */
+  var LAYOUT_KEY = "web_layout_v1";
+  var WIDE_BP = 820;   // 与 shell.css 的自动两列断点一致
+  function applyLayoutPref() {
+    try {
+      var v = localStorage.getItem(LAYOUT_KEY);
+      document.body.classList.toggle("force-wide", v === "wide");
+      document.body.classList.toggle("single-col", v === "single");
+    } catch (e) {}
+  }
+  function currentlyWide() {
+    if (document.body.classList.contains("single-col")) return false;
+    if (document.body.classList.contains("force-wide")) return true;
+    return window.innerWidth >= WIDE_BP;   // 自动模式
+  }
+  function toggleLayout() {
+    var next = !currentlyWide();           // 点一下切到相反状态
+    document.body.classList.toggle("force-wide", next);
+    document.body.classList.toggle("single-col", !next);
+    try { localStorage.setItem(LAYOUT_KEY, next ? "wide" : "single"); } catch (e) {}
+    try {
+      if (window.wx && window.wx.showToast) {
+        window.wx.showToast({ title: next ? "已切换为宽屏多列" : "已切换为单列阅读", icon: "none" });
+      }
+    } catch (e) {}
+  }
+
   function syncTopBar(p) {
     var bar = ensureChrome();
     var isTab = Object.prototype.hasOwnProperty.call(TABS, p);
@@ -209,6 +289,17 @@
       window.__bootWeb(cfg, router);
       ensureChrome();
       navPanel = buildNav();
+      sidebar = buildSidebar();
+      applyLayoutPref();
+      var layoutBtn = document.getElementById("webLayoutBtn");
+      if (layoutBtn) layoutBtn.addEventListener("click", toggleLayout);
+      // 工具条默认收起，避免浮动按钮压住内容；桌面侧栏里另有「切换宽屏 / 单列」入口
+      var toolsToggle = document.getElementById("webToolsToggle");
+      var toolsBox = document.getElementById("webTools");
+      if (toolsToggle && toolsBox) toolsToggle.addEventListener("click", function () {
+        var hidden = toolsBox.classList.toggle("hidden");
+        toolsToggle.textContent = hidden ? "工具 / 布局" : "收起工具";
+      });
 
       // 3) tabBar 点击
       Array.prototype.forEach.call(document.querySelectorAll("#tabbar .tb"), function (el) {

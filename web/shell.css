@@ -3,10 +3,12 @@
  * 配色与小程序一致：中性黑 #0d0d0d + 金色 #d4a94e，不引入蓝黑。
  */
 :root {
-  /* rpx 基准跟画布宽度走：网页版铺满整窗（不再限制在 520px 手机画布）。
-     桌面宽屏把设计宽度上限收到 1024px，避免字号被放大到难以阅读；
-     1024px 及以下的屏幕（笔记本/平板/手机横屏）则 100% 填满整窗。 */
-  --rpx: calc(min(100vw, 1024px) / 750);
+  /* 2026-11-10 桌面自适应：旧版 --rpx = min(100vw,1024px)/750，宽屏时 1rpx≈1.365px，
+     28rpx 的正文被放大到 38px，整屏只放得下两三大张卡 —— 这正是「竖屏难受」的根因。
+     改为以可读字号为锚的刻度（28rpx 在手机约 14px、在桌面约 18px），把「尺寸刻度」
+     与「容器宽度」解耦：宽屏靠多列布局填满屏幕，而不是靠放大字号。 */
+  --rpx: clamp(0.5px, calc(100vw / 1100), 0.64px);
+  --sidebar-w: 224px;
   --shell-bg: #f4f5f7;
   --shell-card: #ffffff;
   --shell-tx: #18233a;
@@ -39,15 +41,17 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 a { text-decoration: none; color: inherit; }
 button { font-family: inherit; }
 
-/* ── 网页版铺满整窗 + 自适应 ──
-   移动端/平板（<1024px）：100% 满宽铺满整窗，rpx 随视口缩放。
-   桌面端（≥1024px）：内容列收束到 1024px 居中 —— 与 --rpx 基准
-   (min(100vw,1024px)/750) 严格一致，消除「750rpx 元素左对齐、右侧大片空白」的错位；
-   两侧用氛围渐变托底，看起来是刻意的满屏沉浸式而非破版。 */
+/* ── 桌面自适应布局（2026-11-10） ──
+   旧版是「一台被放大的手机竖屏」：内容列固定在 1024px 居中、字号随屏宽线性放大，
+   电脑上两侧大片留白、一屏只放得下两张卡。现在改为：
+     · #app 始终铺满可用宽度，去掉 1024px 手机画布；
+     · 顶层 .card 在 ≥820px 自动两列、≥1700px 三列，横向空间真正被利用；
+     · ≥1100px 用左侧常驻侧栏替代底部 tabBar，形成桌面应用的横屏结构；
+     · <820px 保持单列手机布局；用户可用「宽屏 / 单列」按钮随时覆盖，偏好本地记住。 */
 #app {
   width: 100%;
-  max-width: 1024px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--shell-bg);
@@ -61,7 +65,95 @@ button { font-family: inherit; }
       radial-gradient(900px 500px at 110% 110%, rgba(125, 211, 252, .06), transparent 55%),
       var(--shell-bg);
   }
-  #app { box-shadow: 0 0 60px rgba(0, 0, 0, .10); }
+}
+
+/* 多列内容网格：只重排页面顶层的 .card；头部 / 空态 / 工具条等仍占整行。
+   用 #app 前缀提高特异性，压过页面级 wxss 的 [data-page] .card 规则。 */
+@media (min-width: 820px) {
+  #app > .page {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    column-gap: 6px;
+  }
+  #app > .page > * { grid-column: 1 / -1; }
+  #app > .page > .card {
+    grid-column: auto;
+    align-self: start;
+    margin: 12px;   /* 统一覆盖 .card 的 20rpx 24rpx 与 .card + .card 的叠加 */
+  }
+}
+@media (min-width: 1700px) {
+  #app > .page { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1500px) {
+  #app > .page { max-width: 1800px; margin: 0 auto; }
+}
+
+/* 手动「单列」覆盖自动分栏（用户偏好优先） */
+body.single-col #app > .page { display: block; max-width: 980px; margin: 0 auto; }
+body.single-col #app > .page > .card { margin: 20rpx 24rpx; }
+
+/* 手动「强制宽屏多列」：预览面板 / 竖条窗口等窄视口也能主动切成横屏布局。
+   与 body.single-col 互斥（由 app.js 保证），二者特异性相同，靠 JS 不并存。 */
+body.force-wide #app > .page {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  column-gap: 6px;
+}
+body.force-wide #app > .page > * { grid-column: 1 / -1; }
+body.force-wide #app > .page > .card {
+  grid-column: auto; align-self: start; margin: 10px;
+}
+/* 极窄视口（<700px）即使手动选了宽屏也回退单列：两列时每列不足 350px 会挤成一团 */
+@media (max-width: 699px) {
+  body.force-wide #app > .page { display: block; }
+  body.force-wide #app > .page > .card { margin: 20rpx 24rpx; }
+}
+
+/* ── 左侧常驻侧栏：桌面横屏结构 ── */
+#webSidebar {
+  display: none;
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w);
+  z-index: 9402; flex-direction: column;
+  background: var(--shell-card); border-right: 1px solid var(--shell-line);
+  font: 13px/1.4 -apple-system, system-ui, "PingFang SC", sans-serif;
+  box-shadow: 2px 0 18px rgba(0, 0, 0, .06);
+}
+#webSidebar .ws-brand {
+  padding: 18px 16px 14px; border-bottom: 1px solid var(--shell-line);
+}
+#webSidebar .ws-brand b { display: block; color: var(--shell-tx); font-size: 15px; letter-spacing: .5px; }
+#webSidebar .ws-brand span { display: block; color: var(--shell-tx3); font-size: 11px; margin-top: 4px; }
+#webSidebar .ws-scroll { flex: 1; overflow-y: auto; padding: 6px 8px 12px; }
+#webSidebar .ws-group {
+  color: var(--shell-tx3); font-size: 11px; letter-spacing: 1px;
+  margin: 12px 8px 5px; padding-bottom: 4px; border-bottom: 1px solid var(--shell-line);
+}
+#webSidebar .ws-item {
+  display: flex; align-items: center; width: 100%; text-align: left;
+  border: 0; border-radius: 8px; padding: 8px 10px; margin: 1px 0;
+  background: transparent; color: var(--shell-tx); cursor: pointer; font-size: 13px;
+}
+#webSidebar .ws-item:hover { background: rgba(212, 169, 78, .12); }
+#webSidebar .ws-item.on { color: var(--gold); font-weight: 700; background: rgba(212, 169, 78, .14); }
+#webSidebar .ws-item .ws-dot { margin-left: auto; color: var(--shell-tx3); font-size: 10px; font-weight: 400; }
+#webSidebar .ws-foot { border-top: 1px solid var(--shell-line); padding: 10px 12px; display: grid; gap: 6px; }
+#webSidebar .ws-btn {
+  border: 1px solid var(--shell-line); background: transparent; color: var(--shell-tx);
+  border-radius: 8px; padding: 8px 10px; cursor: pointer; font-size: 12px; text-align: left;
+}
+#webSidebar .ws-btn:hover { border-color: rgba(212, 169, 78, .5); color: var(--gold); }
+@media (min-width: 1100px) {
+  #app { margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); }
+  body.has-tabbar #app { padding-bottom: 0; }
+  #tabbar { display: none !important; }
+  #webSidebar { display: flex; }
+  #webTopBar { left: var(--sidebar-w); }
+  #webNavPanel { left: calc(var(--sidebar-w) + 12px); right: auto; }
+  /* 侧栏已常驻全部页面清单，左下角重复入口收起 */
+  #webNavOpen { display: none; }
 }
 
 /* ── 启动层 ── */
@@ -182,6 +274,17 @@ input::placeholder, textarea::placeholder { color: var(--shell-tx3); }
 .w-picker-select { display: block; -webkit-appearance: none; appearance: none; padding-right: 24px; }
 /* date/time 模式：原 select 退化为占位，真正可操作的是原生 input */
 .w-picker-native { display: none !important; }
+
+/* scroll-view 横向/纵向滚动降级：wxml.mjs 把 scroll-x/y 转成 class。
+   小程序由原生组件提供滚动，网页端只是普通 div；缺 overflow 时横向列表
+   会溢出容器，在多列布局下直接压到相邻列的卡片上。 */
+#app .w-sx {
+  overflow-x: auto; overflow-y: hidden; max-width: 100%;
+  white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+#app .w-sy { overflow-y: auto; max-height: 100%; -webkit-overflow-scrolling: touch; }
+#app .w-sx::-webkit-scrollbar { height: 5px; }
+#app .w-sx::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .45); border-radius: 4px; }
 
 /* ── 网页版地图占位 ──
    合规红线：离线零 key，不内嵌任何在线地图 SDK / 底图。
