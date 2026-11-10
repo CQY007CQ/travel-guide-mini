@@ -50,7 +50,8 @@ const EL = require("./utils/errlog.js");
 App({
   globalData: {
     plan: null,        // { days, cityName, totalDays, ... }
-    from: null         // { province, city }
+    from: null,        // { province, city }
+    pendingAch: []     // v1.20.6：app.onShow 结算出的「新解锁成就」，待 more 页弹窗授予
   },
   onLaunch() {
     // v1.19.65：**启动阶段不再预加载分包数据**。数据包近 2.5MB，若在 appLaunch 期间就触发
@@ -70,6 +71,24 @@ App({
     } catch (e) {
       try { if (typeof console !== "undefined" && console.warn) console.warn("[app] onLaunch storage 恢复失败（已跳过）:", e && e.message); } catch (_) {}
     }
+  },
+  // v1.20.6：每次进入前台都结算一次成就解锁，把「新解锁」暂存到 globalData.pendingAch 待 more 页弹窗授予；
+  // 同时给一个轻量 toast 即时提示，避免只在成就页才感知到（隐藏成就「达成即授予」的核心体验）。
+  onShow() {
+    try {
+      const T = require("./utils/travel.js");
+      if (T && typeof T.syncAchievements === "function") {
+        const r = T.syncAchievements();
+        if (r && r.newly && r.newly.length) {
+          if (!this.globalData.pendingAch) this.globalData.pendingAch = [];
+          this.globalData.pendingAch = this.globalData.pendingAch.concat(r.newly);
+          try {
+            const msg = (r.newly.length > 1 ? ("解锁 " + r.newly.length + " 枚新成就") : ("解锁成就 · " + r.newly[0].t));
+            if (typeof wx !== "undefined" && wx.showToast) wx.showToast({ title: msg, icon: "none" });
+          } catch (e2) {}
+        }
+      }
+    } catch (e) {}
   },
   // C3（v1.9.1）：行程结束后首次冷启动 → 归档并清当前档；more「我的行程」可恢复回顾
   _archiveOld(p) {

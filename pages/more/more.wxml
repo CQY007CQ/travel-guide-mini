@@ -327,6 +327,36 @@
           <text class="ach-p">{{item.ptxt}}</text>
         </view>
       </view>
+      <view class="ach-hd" wx:if="{{ach.hiddenGot}}">
+        <text class="ach-hd-t">🔒 隐藏成就（已解锁 {{ach.hiddenGot}} / {{ach.hiddenTotal}}）</text>
+        <text class="ach-hd-sub">达成即自动授予，未达成前不公开</text>
+      </view>
+      <view class="ach-grid ach-grid-hide" wx:if="{{ach.hiddenGot}}">
+        <view class="ach-it on ach-hide" wx:for="{{ach.hiddenList}}" wx:key="id">
+          <image class="ach-ic" src="/images/icons/medal.png"/>
+          <text class="ach-t">{{item.t}}</text>
+          <text class="ach-d dim">{{item.d}}</text>
+          <text class="ach-p ach-hide-tag">已解锁</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- v1.20.6：隐藏成就解锁弹窗（自动授予） -->
+  <view class="ach-mask" wx:if="{{achModal.show}}" bindtap="closeAchModal">
+    <view class="ach-pop" catchtap="noop">
+      <view class="ach-pop-h">🎉 解锁新成就</view>
+      <view class="ach-pop-sub" wx:if="{{achModal.more > 0}}">本次共解锁 {{achModal.list.length}} 枚，另有 {{achModal.more}} 枚已记入隐藏成就</view>
+      <view class="ach-pop-list">
+        <view class="ach-pop-it" wx:for="{{achModal.list}}" wx:key="id">
+          <image class="ach-ic" src="/images/icons/medal.png"/>
+          <view class="ach-pop-tx">
+            <text class="ach-pop-t">{{item.t}}</text>
+            <text class="ach-pop-d dim">{{item.d}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="ach-pop-btn" bindtap="closeAchModal">收下</view>
     </view>
   </view>
 

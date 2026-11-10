@@ -2201,28 +2201,272 @@ function packSmart(plan) {
 }
 
 /* ---------- 旅行成就徽章（基于足迹 / 手记 / 账本 / 行程存档） ---------- */
+/* ================= 旅行成就引擎（v1.20.6：200+ 含隐藏成就） =================
+ * 设计：ACH_DEFS 是主清单（数据驱动生成，>=200 条）。
+ *  - hidden:false 为「可见里程碑」：始终在成就页展示进度（沿用旧 8 个）。
+ *  - hidden:true 为「隐藏成就」：达成前不陈列，达成时自动弹出授予，之后在「已解锁隐藏成就」区展示。
+ *  achContext() 从本地数据一次性汇总判定所需上下文（全程保护，缺字段不崩）。
+ *  syncAchievements() 持久化已解锁集合并返回「本次新解锁」（供弹窗）；peekNewAchievements() 仅计算不落盘。
+ */
+const ACH_REGIONS = ["华北", "华东", "华南", "华中", "西南", "西北", "东北"];
+const ACH_TAGS = ["历史古迹", "博物馆", "宗教", "古镇", "自然风光", "亲子", "乐园", "美食", "海滨", "徒步"];
+
+const ACH_DEFS = (function () {
+  const defs = [];
+  const add = (o) => { defs.push(o); };
+
+  // —— 可见里程碑（沿用现有 8 个，始终展示进度）——
+  add({ id: "first",  t: "初出茅庐", d: "打卡第一个景点", cat: "足迹", hidden: false, test: c => c.spotsN >= 1 });
+  add({ id: "spot5",  t: "小有足迹", d: "累计打卡 5 个景点", cat: "足迹", hidden: false, test: c => c.spotsN >= 5 });
+  add({ id: "spot10", t: "打卡达人", d: "累计打卡 10 个景点", cat: "足迹", hidden: false, test: c => c.spotsN >= 10 });
+  add({ id: "city3",  t: "城市猎人", d: "点亮 3 座城市", cat: "城市", hidden: false, test: c => c.citiesN >= 3 });
+  add({ id: "city6",  t: "走遍四方", d: "点亮 6 座城市", cat: "城市", hidden: false, test: c => c.citiesN >= 6 });
+  add({ id: "note5",  t: "记录的人", d: "写下 5 篇旅行手记", cat: "手记", hidden: false, test: c => c.notes >= 5 });
+  add({ id: "bill20", t: "精打细算", d: "累计记 20 笔账", cat: "账本", hidden: false, test: c => c.bills >= 20 });
+  add({ id: "plan3",  t: "行程规划师", d: "保存 3 份行程", cat: "行程", hidden: false, test: c => c.planN >= 3 });
+
+  // —— 足迹隐藏阶梯 ——
+  const SPOT_T = [20, 30, 50, 75, 100, 150, 200, 300, 500, 800, 1000, 1500, 2000];
+  const SPOT_N = { 20: "足迹成册", 30: "步履不停", 50: "走南闯北", 75: "山河过客", 100: "百景行者", 150: "阅景无数", 200: "千里走单骑", 300: "踏遍千景", 500: "丈量神州", 800: "山河故人", 1000: "万里同风", 1500: "行走的地图", 2000: "足迹封神" };
+  SPOT_T.forEach(n => add({ id: "spot" + n, t: SPOT_N[n], d: "累计打卡 " + n + " 个景点", cat: "足迹", hidden: true, test: c => c.spotsN >= n }));
+
+  // —— 城市隐藏阶梯 ——
+  const CITY_T = [10, 15, 20, 25, 34, 50, 75, 100, 150, 200, 300];
+  const CITY_N = { 10: "十城记", 15: "十五明月", 20: "纵横四海", 25: "廿五城录", 34: "遍历九州", 50: "半壁江山", 75: "三分天下", 100: "全域游侠", 150: "百城之约", 200: "城城相依", 300: "行走中国" };
+  CITY_T.forEach(n => add({ id: "city" + n, t: CITY_N[n], d: "点亮 " + n + " 座城市", cat: "城市", hidden: true, test: c => c.citiesN >= n }));
+
+  // —— 手记隐藏阶梯 ——
+  const NOTE_T = [10, 15, 20, 30, 50, 80, 100, 150, 200];
+  const NOTE_N = { 10: "笔耕不辍", 15: "游记新秀", 20: "游记作家", 30: "行吟诗人", 50: "字里行间", 80: "万卷书外", 100: "百篇行者", 150: "行走的笔", 200: "游记大宗" };
+  NOTE_T.forEach(n => add({ id: "note" + n, t: NOTE_N[n], d: "写下 " + n + " 篇旅行手记", cat: "手记", hidden: true, test: c => c.notes >= n }));
+
+  // —— 账本隐藏阶梯 ——
+  const BILL_T = [30, 50, 80, 100, 150, 200, 300, 500, 800, 1000];
+  const BILL_N = { 30: "账本初成", 50: "账房先生", 80: "精算学徒", 100: "精算师", 150: "账目了然", 200: "理财达人", 300: "钱程似锦", 500: "千金薄记", 800: "账海舵手", 1000: "财务自由" };
+  BILL_T.forEach(n => add({ id: "bill" + n, t: BILL_N[n], d: "累计记 " + n + " 笔账", cat: "账本", hidden: true, test: c => c.bills >= n }));
+
+  // —— 行程隐藏阶梯 ——
+  const PLAN_T = [5, 6, 8, 10];
+  const PLAN_N = { 5: "行程收藏家", 6: "六六大顺", 8: "八方能旅", 10: "十全行程" };
+  PLAN_T.forEach(n => add({ id: "plan" + n, t: PLAN_N[n], d: "保存 " + n + " 份行程", cat: "行程", hidden: true, test: c => c.planN >= n }));
+
+  // —— 区域覆盖（7 大区，到访即解锁）——
+  const REG_M = { 华北: "北国风光", 华东: "江南拾光", 华南: "南风扑面", 华中: "楚天寥廓", 西南: "西南秘境", 西北: "大漠长歌", 东北: "雪国邮戳" };
+  ACH_REGIONS.forEach(r => add({ id: "reg_" + r, t: REG_M[r], d: "到访「" + r + "」地区", cat: "区域", hidden: true, test: c => c.regions.has(r) }));
+  const REGN_N = { 2: "双区穿越", 3: "三区游历", 4: "四方来客", 5: "五湖四海", 6: "六合行者", 7: "七大区通关" };
+  [2, 3,4, 5, 6, 7].forEach(n => add({ id: "regn" + n, t: REGN_N[n], d: "足迹覆盖 " + n + " 个大区", cat: "区域", hidden: true, test: c => c.regionN >= n }));
+  add({ id: "reg_north", t: "北国巡礼", d: "集齐华北 / 东北 / 西北", cat: "区域", hidden: true, test: c => ["华北", "东北", "西北"].every(r => c.regions.has(r)) });
+  add({ id: "reg_south", t: "南方全勤", d: "集齐华东 / 华南 / 华中 / 西南", cat: "区域", hidden: true, test: c => ["华东", "华南", "华中", "西南"].every(r => c.regions.has(r)) });
+
+  // —— 省份覆盖阶梯 ——
+  const PROV_T = [1, 2, 3, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, 30, 32, 34];
+  const PROV_N = { 1: "初入一省", 2: "两省风情", 3: "三省通衢", 5: "五省打卡", 8: "八方来客", 10: "十省鸿图", 12: "十二锦绣", 15: "十五州记", 18: "十八行省", 20: "廿省游历", 22: "廿二山河", 25: "廿五城录", 28: "廿八省志", 30: "三十行省", 32: "卅二风物", 34: "版图收藏家" };
+  PROV_T.forEach(n => add({ id: "prov" + n, t: PROV_N[n], d: "足迹覆盖 " + n + " 个省份", cat: "省份", hidden: true, test: c => c.provN >= n }));
+
+  // —— 标签（景观 / 体验类型）覆盖 ——
+  const TAG_M = { 历史古迹: "时空旅人", 博物馆: "博古通今", 宗教: "寻踪问道", 古镇: "古镇慢摇", 自然风光: "山水知音", 亲子: "亲子时光", 乐园: "童心未泯", 美食: "寻味之旅", 海滨: "向海而居", 徒步: "徒步上瘾" };
+  ACH_TAGS.forEach(tg => add({ id: "tag_" + tg, t: TAG_M[tg], d: "体验「" + tg + "」类景点", cat: "体验", hidden: true, test: c => c.tags.has(tg) }));
+  const TAGN_N = { 2: "双修玩家", 3: "三味行者", 4: "四艺俱全", 5: "五感旅行", 6: "六艺傍身", 7: "七巧旅人", 8: "八面玲珑", 9: "九流宾客", 10: "十全体验" };
+  [2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(n => add({ id: "tagn" + n, t: TAGN_N[n], d: "足迹覆盖 " + n + " 类体验", cat: "体验", hidden: true, test: c => c.tagN >= n }));
+
+  // —— 单类深度（某类景点数量）——
+  const deepTag = (tag, n, id, t, d) => add({ id, t, d, cat: "深度", hidden: true, test: c => (c.tagCounts[tag] || 0) >= n });
+  deepTag("自然风光", 5, "deep_nat5", "山系青年", "自然风光类打卡 5 处");
+  deepTag("自然风光", 10, "deep_nat10", "山野老饕", "自然风光类打卡 10 处");
+  deepTag("历史古迹", 5, "deep_his5", "读城人", "历史古迹类打卡 5 处");
+  deepTag("历史古迹", 10, "deep_his10", "古迹猎人", "历史古迹类打卡 10 处");
+  deepTag("博物馆", 3, "deep_mus3", "博物馆日", "博物馆类打卡 3 处");
+  deepTag("博物馆", 6, "deep_mus6", "馆藏控", "博物馆类打卡 6 处");
+  deepTag("美食", 5, "deep_food5", "美食猎人", "美食类打卡 5 处");
+  deepTag("海滨", 3, "deep_sea3", "海岛迷情", "海滨类打卡 3 处");
+  deepTag("宗教", 3, "deep_rel3", "信仰之旅", "宗教类打卡 3 处");
+  deepTag("古镇", 3, "deep_town3", "烟雨江南", "古镇类打卡 3 处");
+  deepTag("乐园", 2, "deep_fun2", "乐园童心", "乐园类打卡 2 处");
+  deepTag("徒步", 3, "deep_hike3", "栈道行者", "徒步类打卡 3 处");
+
+  // —— 单城深度（同城打卡数）——
+  const DC_N = { 5: "一城千面", 8: "深耕一城", 10: "城熟于心", 12: "同城百事", 15: "一城之主", 20: "故地重游", 25: "城事悠悠", 30: "城之眷恋" };
+  [5, 8, 10, 12, 15, 20, 25, 30].forEach(n => add({ id: "depth" + n, t: DC_N[n], d: "同一城市打卡 " + n + " 个景点", cat: "深度", hidden: true, test: c => c.maxCitySpots >= n }));
+
+  // —— 同省多城 ——
+  [3, 5, 8, 10].forEach(n => add({ id: "provcity" + n, t: (n === 3 ? "一省三城" : n === 5 ? "一省五城" : n === 8 ? "一省八城" : "一省十城"), d: "同一省份点亮 " + n + " 座城市", cat: "省份", hidden: true, test: c => c.maxProvCities >= n }));
+
+  // —— 季节 ——
+  const SEA = { 春: "春之旅", 夏: "夏之旅", 秋: "秋之旅", 冬: "冬之旅" };
+  Object.keys(SEA).forEach(s => add({ id: "sea_" + s, t: SEA[s], d: "在「" + s + "」季出行", cat: "时节", hidden: true, test: c => c.seasons.has(s) }));
+  add({ id: "sea_2", t: "两季过客", d: "足迹跨 2 个季节", cat: "时节", hidden: true, test: c => c.seasonN >= 2 });
+  add({ id: "sea_3", t: "三季行者", d: "足迹跨 3 个季节", cat: "时节", hidden: true, test: c => c.seasonN >= 3 });
+  add({ id: "sea_4", t: "四季轮回", d: "足迹踏遍春夏秋冬", cat: "时节", hidden: true, test: c => c.seasonN >= 4 });
+
+  // —— 跨年 ——
+  const YR_N = { 2: "跨年旅人", 3: "三载游历", 4: "四年之约", 5: "五载同行", 6: "六度春秋", 8: "八载流年", 10: "十年行者" };
+  [2, 3, 4, 5, 6, 8, 10].forEach(n => add({ id: "yr" + n, t: YR_N[n], d: "足迹跨 " + n + " 个年份", cat: "时节", hidden: true, test: c => c.yearN >= n }));
+
+  // —— 想玩 / 收藏 / 队友 ——
+  const W_N = { 1: "种草第一步", 3: "心愿萌芽", 5: "想玩清单", 8: "向往之地", 10: "清单渐丰", 15: "环游心愿", 20: "种草达人", 30: "心愿收集家", 40: "百愿成行", 50: "清单狂魔" };
+  [1, 3, 5, 8, 10, 15, 20, 30, 40, 50].forEach(n => add({ id: "wish" + n, t: W_N[n], d: "想玩清单添加 " + n + " 个", cat: "心愿", hidden: true, test: c => c.wish >= n }));
+  const F_N = { 1: "初见收藏", 3: "收藏夹初成", 5: "心水清单", 8: "珍藏旅程", 10: "收藏家", 15: "甄选之旅", 20: "百里挑一", 30: "藏宝阁", 40: "万中选一", 50: "臻藏旅人", 60: "收藏满仓" };
+  [1, 3, 5, 8, 10, 15, 20, 30, 40, 50, 60].forEach(n => add({ id: "fav" + n, t: F_N[n], d: "收藏 " + n + " 个目的地", cat: "心愿", hidden: true, test: c => c.favs >= n }));
+  const M_N = { 1: "结伴而行", 2: "呼朋唤友", 3: "三人成行", 4: "四人行", 5: "团队作战", 6: "小队远征", 8: "八方来客", 10: "旅团团长" };
+  [1, 2, 3, 4, 5, 6, 8, 10].forEach(n => add({ id: "mate" + n, t: M_N[n], d: "同行伙伴 " + n + " 人", cat: "社交", hidden: true, test: c => c.mates >= n }));
+
+  // —— 消费金额 ——
+  const AMT_N = { 100: "初尝花费", 300: "小试开销", 500: "破费一笔", 1000: "千金一掷", 2000: "潇洒出行", 5000: "阔绰旅程", 10000: "万元户", 20000: "两万足迹", 50000: "五万行者", 100000: "十万之旅", 200000: "廿万豪旅", 500000: "五十万里程", 1000000: "百万人生" };
+  [100, 300, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000].forEach(n => add({ id: "amt" + n, t: AMT_N[n], d: "累计花费 ¥" + n, cat: "账本", hidden: true, test: c => c.billAmt >= n }));
+  add({ id: "bigbill", t: "一掷千金", d: "单笔消费 ≥ ¥1000", cat: "账本", hidden: true, test: c => c.maxBill >= 1000 });
+  add({ id: "cat2", t: "开销入门", d: "涉及 2 类消费", cat: "账本", hidden: true, test: c => c.billCatN >= 2 });
+  add({ id: "cat4", t: "精明消费者", d: "涉及 4 类消费", cat: "账本", hidden: true, test: c => c.billCatN >= 4 });
+  add({ id: "cat6", t: "全维开支", d: "涉及 6 类消费", cat: "账本", hidden: true, test: c => c.billCatN >= 6 });
+  add({ id: "aa2", t: "AA 达人", d: "与 2 人及以上 AA 结算", cat: "账本", hidden: true, test: c => c.billPayerN >= 2 });
+  add({ id: "aa4", t: "分账高手", d: "与 4 人及以上 AA 结算", cat: "账本", hidden: true, test: c => c.billPayerN >= 4 });
+  add({ id: "food500", t: "美食家", d: "美食类累计 ≥ ¥500", cat: "账本", hidden: true, test: c => (c.catAmt["美食"] || 0) >= 500 });
+  add({ id: "stay500", t: "住宿控", d: "住宿类累计 ≥ ¥500", cat: "账本", hidden: true, test: c => (c.catAmt["住宿"] || 0) >= 500 });
+  add({ id: "trans500", t: "交通控", d: "交通类累计 ≥ ¥500", cat: "账本", hidden: true, test: c => (c.catAmt["交通"] || 0) >= 500 });
+
+  // —— 行程属性（基于已存档行程）——
+  add({ id: "budget_low", t: "穷游党", d: "规划过「经济」行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.budget) === "low") });
+  add({ id: "budget_high", t: "轻奢游", d: "规划过「舒适 / 豪华」行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.budget) === "high" || (p && p.budget) === "custom") });
+  add({ id: "pace_leisure", t: "慢旅行", d: "规划过「悠闲」节奏", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.pace) === "leisure") });
+  add({ id: "pace_speed", t: "暴走族", d: "规划过「紧凑」节奏", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.pace) === "speed") });
+  add({ id: "mode_family", t: "亲子时光", d: "规划过亲子行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.travelMode) === "family") });
+  add({ id: "mode_couple", t: "二人世界", d: "规划过情侣行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.travelMode) === "couple") });
+  add({ id: "mode_solo", t: "独行侠", d: "规划过 solo 行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.travelMode) === "solo") });
+  add({ id: "mode_elder", t: "银发同游", d: "规划过长辈同行", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.travelMode) === "elder") });
+  add({ id: "multi_seg", t: "跨省串联", d: "规划过多城多段行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.segments) && p.segments.length >= 2) });
+  add({ id: "multi_seg3", t: "三城记", d: "规划过 3 城及以上行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.segments) && p.segments.length >= 3) });
+  add({ id: "short3", t: "周末快闪", d: "规划过 ≤3 天行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.days) && p.days.length <= 3) });
+  add({ id: "long10", t: "深度长居", d: "规划过 ≥10 天行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.days) && p.days.length >= 10) });
+  add({ id: "long14", t: "半月悠游", d: "规划过 ≥14 天行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.days) && p.days.length >= 14) });
+  add({ id: "longroute", t: "长途跋涉", d: "单行程串联 ≥1000km", cat: "行程", hidden: true, test: c => c.plans.some(p => { try { return routeKmOf(p) >= 1000; } catch (e) { return false; } }) });
+  add({ id: "collab", t: "协作达人", d: "导入过同行人行程", cat: "社交", hidden: true, test: c => c.hasCollab });
+
+  // —— 人格 / 综合 ——
+  add({ id: "persona", t: "找到自己", d: "生成专属旅行人格", cat: "综合", hidden: true, test: c => !!c.persona });
+  add({ id: "combo_ancient", t: "古今同游", d: "同涉历史古迹与博物馆", cat: "体验", hidden: true, test: c => c.tags.has("历史古迹") && c.tags.has("博物馆") });
+  add({ id: "combo_nature", t: "山水之间", d: "同涉自然风光与历史古迹", cat: "体验", hidden: true, test: c => c.tags.has("自然风光") && c.tags.has("历史古迹") });
+  add({ id: "combo_sea", t: "海与古", d: "同涉海滨与古镇", cat: "体验", hidden: true, test: c => c.tags.has("海滨") && c.tags.has("古镇") });
+  add({ id: "combo_mountain_sea", t: "山海相连", d: "同涉自然风光与海滨", cat: "体验", hidden: true, test: c => c.tags.has("自然风光") && c.tags.has("海滨") });
+  add({ id: "combo_full", t: "十项全能", d: "十类体验 + 50 足迹", cat: "体验", hidden: true, test: c => c.tagN >= 10 && c.spotsN >= 50 });
+
+  return defs;
+})();
+
+// 成就上下文：从本地数据一次性汇总（全部带保护，缺字段不崩）
+function achContext() {
+  const ctx = {
+    spotsN: 0, citiesN: 0, regions: new Set(), provinces: new Set(), tags: new Set(),
+    tagCounts: {}, seasons: new Set(), years: new Set(), notes: 0, bills: 0, billAmt: 0,
+    billCats: new Set(), billPayers: new Set(), catAmt: {}, maxBill: 0, planN: 0, plans: [],
+    wish: 0, favs: 0, mates: 0, persona: null, maxCitySpots: 0, maxProvCities: 0, hasCollab: false,
+    regionN: 0, provN: 0, tagN: 0, seasonN: 0, yearN: 0, billCatN: 0, billPayerN: 0
+  };
+  try {
+    const f = _footRaw();
+    const spots = f.spots || {}; const cities = f.cities || {};
+    const cityList = Object.keys(cities);
+    ctx.spotsN = Object.keys(spots).length;
+    ctx.citiesN = cityList.length;
+    const citySpots = {}; const provCities = {};
+    cityList.forEach(c => {
+      const ci = _cityIndex().get(c) || null;
+      let region = "", prov = "";
+      if (ci) { region = ci.region || ""; prov = ci.province || (D.CITY2PROV && D.CITY2PROV[c]) || ""; }
+      if (region && region !== "远方") ctx.regions.add(region);
+      if (prov) { ctx.provinces.add(prov); provCities[prov] = (provCities[prov] || 0) + 1; }
+    });
+    ctx.maxProvCities = Object.keys(provCities).length ? Math.max.apply(null, Object.values(provCities)) : 0;
+    Object.keys(spots).forEach(k => {
+      const s = spots[k];
+      const city = s.city || "";
+      if (city) citySpots[city] = (citySpots[city] || 0) + 1;
+      try { (spotTagOf(s.name || k, city) || []).forEach(t => { if (t && t !== "其他") { ctx.tags.add(t); ctx.tagCounts[t] = (ctx.tagCounts[t] || 0) + 1; } }); } catch (e) {}
+      const ts = s.ts;
+      if (ts) {
+        const d = new Date(ts); const m = d.getMonth() + 1;
+        const ssn = (m >= 3 && m <= 5) ? "春" : (m >= 6 && m <= 8) ? "夏" : (m >= 9 && m <= 11) ? "秋" : "冬";
+        ctx.seasons.add(ssn); ctx.years.add(d.getFullYear());
+      }
+    });
+    ctx.maxCitySpots = Object.keys(citySpots).length ? Math.max.apply(null, Object.values(citySpots)) : 0;
+    ctx.notes = (getNotes() || []).length;
+    const ledger = getLedger() || [];
+    ctx.bills = ledger.length;
+    ledger.forEach(b => {
+      const amt = Number(b.amt) || 0;
+      ctx.billAmt += amt;
+      if (amt > ctx.maxBill) ctx.maxBill = amt;
+      if (b.cat) { ctx.billCats.add(b.cat); ctx.catAmt[b.cat] = (ctx.catAmt[b.cat] || 0) + amt; }
+      if (b.payer) ctx.billPayers.add(String(b.payer));
+    });
+    const plans = listSavedPlans() || [];
+    ctx.planN = plans.length; ctx.plans = plans;
+    ctx.hasCollab = plans.some(p => p && typeof p.name === "string" && p.name.indexOf("同行人") >= 0);
+    ctx.wish = (getWish() || []).length;
+    ctx.favs = (getFavs() || []).length;
+    ctx.mates = (getMates() || []).length;
+    ctx.persona = travelPersona();
+  } catch (e) {}
+  ctx.regionN = ctx.regions.size; ctx.provN = ctx.provinces.size;
+  ctx.tagN = ctx.tags.size; ctx.seasonN = ctx.seasons.size; ctx.yearN = ctx.years.size;
+  ctx.billCatN = ctx.billCats.size; ctx.billPayerN = ctx.billPayers.size;
+  return ctx;
+}
+
+const ACH_UNLOCKED_KEY = "miniAchGotV1";
+function _achStored() { try { return new Set(store.get(ACH_UNLOCKED_KEY, []) || []); } catch (e) { return new Set(); } }
+function _achPersist(set) { try { store.set(ACH_UNLOCKED_KEY, Array.from(set)); } catch (e) {} }
+
 function achievements() {
-  const f = footStats();
-  const notes = getNotes().length;
-  const bills = getLedger().length;
-  const plans = listSavedPlans().length;
-  const DEF = [
-    { id: "first", t: "初出茅庐", d: "打卡第一个景点", cur: f.spots, need: 1 },
-    { id: "spot5", t: "小有足迹", d: "累计打卡 5 个景点", cur: f.spots, need: 5 },
-    { id: "spot10", t: "打卡达人", d: "累计打卡 10 个景点", cur: f.spots, need: 10 },
-    { id: "city3", t: "城市猎人", d: "点亮 3 座城市", cur: f.cities, need: 3 },
-    { id: "city6", t: "走遍四方", d: "点亮 6 座城市", cur: f.cities, need: 6 },
-    { id: "note5", t: "记录的人", d: "写下 5 篇旅行手记", cur: notes, need: 5 },
-    { id: "bill20", t: "精打细算", d: "累计记 20 笔账", cur: bills, need: 20 },
-    { id: "plan3", t: "行程规划师", d: "保存 3 份行程", cur: plans, need: 3 }
-  ];
-  const list = DEF.map(x => Object.assign({}, x, {
-    ok: x.cur >= x.need,
-    pct: Math.min(100, Math.round(x.cur / x.need * 100)),
-    ptxt: Math.min(x.cur, x.need) + "/" + x.need
-  }));
-  const got = list.filter(x => x.ok).length;
-  return { list: list, got: got, total: list.length, pct: Math.round(got / list.length * 100) };
+  const ctx = achContext();
+  const got = [];
+  const visList = [];
+  const hidList = [];
+  ACH_DEFS.forEach(def => {
+    let ok = false;
+    try { ok = !!def.test(ctx); } catch (e) { ok = false; }
+    if (ok) got.push(def.id);
+    if (def.hidden) {
+      if (ok) hidList.push({ id: def.id, t: def.t, d: def.d, cat: def.cat, ok: true, pct: 100, ptxt: "已解锁" });
+    } else {
+      visList.push({ id: def.id, t: def.t, d: def.d, cat: def.cat, ok: ok, pct: ok ? 100 : 0, ptxt: ok ? "已达成" : "未解锁" });
+    }
+  });
+  const total = ACH_DEFS.length;
+  const gotN = got.length;
+  return {
+    list: visList,
+    hiddenList: hidList,
+    hiddenGot: hidList.length,
+    hiddenTotal: ACH_DEFS.filter(d => d.hidden).length,
+    got: gotN, total: total, pct: total ? Math.round(gotN / total * 100) : 0
+  };
+}
+
+// 持久化已解锁集合，返回「本次新解锁」（用于自动授予弹窗）
+function syncAchievements() {
+  const ctx = achContext();
+  const stored = _achStored();
+  const now = new Set();
+  const newly = [];
+  ACH_DEFS.forEach(def => {
+    let ok = false;
+    try { ok = !!def.test(ctx); } catch (e) {}
+    if (ok) { now.add(def.id); if (!stored.has(def.id)) newly.push(def); }
+  });
+  _achPersist(now);
+  return { newly: newly.map(d => ({ id: d.id, t: d.t, d: d.d, cat: d.cat })) };
+}
+
+// 仅计算「新解锁」不落盘（供 app.onShow 即时提示，避免重复持久化与重复弹窗）
+function peekNewAchievements() {
+  const ctx = achContext();
+  const stored = _achStored();
+  const newly = [];
+  ACH_DEFS.forEach(def => {
+    let ok = false; try { ok = !!def.test(ctx); } catch (e) {}
+    if (ok && !stored.has(def.id)) newly.push(def);
+  });
+  return newly.map(d => ({ id: d.id, t: d.t, d: d.d, cat: d.cat }));
 }
 
 /* ---------- 行程强度总览（plan 页头部：景点数 / 城市数 / 天数 / 强度标签） ---------- */
@@ -6313,7 +6557,7 @@ module.exports = {
   segCityOfDay, settleUp, swapCandidates, swapSpot, swapCandidatesByTag, swapSpotByTag,
   spendByDay, NOTES_KEY, getNotes, noteOf, addNote, delNote,
   budgetGauge,
-  parseQuickBill, guessCat, budgetSplit, SPLIT_BASE, tripCheck, tripHealth, packSmart, achievements, tripOverview, tripStatsText,
+  parseQuickBill, guessCat, budgetSplit, SPLIT_BASE, tripCheck, tripHealth, packSmart, achievements, syncAchievements, peekNewAchievements, tripOverview, tripStatsText,
   // v1.6.0
   dayAddCandidates, dayAddSpot, dayRemoveSpot,
   dailyBudget, spendForecast, tripReview,

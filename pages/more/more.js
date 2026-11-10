@@ -28,7 +28,8 @@ const app = getAppSafe();
 
 Page(SafePage({
   data: {
-    fz: 1, td: false, hasPlan: false, deepOn: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0 },
+    fz: 1, td: false, hasPlan: false, deepOn: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0,
+    achModal: { show: false, list: [], more: 0 } },
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
@@ -174,6 +175,7 @@ Page(SafePage({
     // v1.8.5 C14：本地数据积累提示（备份入口文案随数据量变化）
     const bkTip = (savedPlans.length || (foot && (foot.spots || foot.cities)) || T.getNotes().length || wish.length || ledgerLen)
       ? "已积累本地数据，换机 / 卸载前导出一份更安心" : "行程/账本/想玩/待办 全量导出";
+    const ach = T.achievements();
     this.setData({
       dark: T.themeMode() === "dark",
       themePref: T.themePref(),
@@ -185,7 +187,7 @@ Page(SafePage({
       planLibN: savedPlans.length,
       foot,
       notes: T.getNotes().slice(-8).reverse(),
-      ach: T.achievements(),
+      ach: ach,
       // v1.9：省章进度 / 旅行人格 / 想玩骰子
       stamp: T.provStamp(),
       persona: T.travelPersona(),
@@ -255,7 +257,26 @@ Page(SafePage({
         }
       ]
     });
+    // v1.20.6：成就解锁持久化 + 自动授予弹窗（app.onShow 已把跨页新解锁暂存到 globalData.pendingAch）
+    try {
+      const r = T.syncAchievements();
+      let pending = [];
+      try { const app = (typeof getApp === "function") ? getApp() : null; if (app && app.globalData && Array.isArray(app.globalData.pendingAch)) pending = app.globalData.pendingAch; } catch (e) {}
+      const all = (r.newly || []).concat(pending);
+      try { const app = (typeof getApp === "function") ? getApp() : null; if (app && app.globalData) app.globalData.pendingAch = []; } catch (e) {}
+      if (all && all.length) this._showAchPopup(all);
+    } catch (e) {}
   },
+
+  /* v1.20.6：隐藏成就解锁 —— 弹窗自动授予（批量，至多展示 5 枚，其余以「+N」提示） */
+  _showAchPopup(arr) {
+    if (!arr || !arr.length) return;
+    const list = arr.slice(0, 5);
+    const more = arr.length - list.length;
+    this.setData({ achModal: { show: true, list: list, more: more } });
+  },
+  closeAchModal() { try { this.setData({ "achModal.show": false }); } catch (e) {} },
+  noop() {},
 
   /* ---- v1.9：想玩骰子（随机抽一条想玩） ---- */
   onWishDice() {
