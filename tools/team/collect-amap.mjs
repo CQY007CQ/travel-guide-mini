@@ -4,6 +4,7 @@
 //   node tools/team/collect-amap.mjs --dry            # 离线校验输出 schema
 //   node tools/team/collect-amap.mjs --all --fresh    # 清空已有 daily 从头采集（默认续传）
 //   node tools/team/collect-amap.mjs --all --food-cap 30 --hosp-cap 8   # 自定义每城上限
+//   node tools/team/collect-amap.mjs --stats          # 离线统计已采集覆盖（美食/医院 城数·条数 + 对比 gap-targets 达标率，无需 key）
 //
 // 续传（resumable）：默认在已有 daily-region-amap.json 基础上增量补齐，跨日按 100/日配额
 //   分批跑不会丢数据；已达标（美食≥food-cap 且 医院≥hosp-cap）的城市自动跳过，把配额让给缺口城。
@@ -21,6 +22,7 @@ const req = createRequire(process.cwd() + "/");
 const args = process.argv.slice(2);
 const get = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const DRY = args.includes("--dry");
+const STATS = args.includes("--stats");
 const ALL = args.includes("--all");
 const CITY = get("--city");
 const LIMIT = parseInt(get("--limit", "30"), 10);
@@ -107,7 +109,7 @@ const FRESH = args.includes("--fresh");
 const FOOD_CAP = Math.max(1, parseInt(get("--food-cap", String(LIMIT)), 10)); // 每城美食采集上限（对齐 GOAL_FOOD=30）
 const HOSP_CAP = Math.max(1, parseInt(get("--hosp-cap", "8"), 10));           // 每城真实医院采集上限（>GOAL_HOSP=5，留 kmc 过滤余量）
 const KEYS = (get("--keys") || get("--key") || process.env.AMAP_KEY || "").split(",").filter(Boolean);
-if (!KEYS.length) { console.error("✗ 缺少高德 key：--key <KEY> 或环境变量 AMAP_KEY"); process.exit(1); }
+if (!KEYS.length && !STATS) { console.error("✗ 缺少高德 key：--key <KEY> 或环境变量 AMAP_KEY"); process.exit(1); }
 const https = (() => { try { return req("https"); } catch (e) { return require("https"); } })();
 function amapText(key, keyword, city, page) {
   const params = `key=${encodeURIComponent(key)}&keywords=${encodeURIComponent(keyword)}&city=${encodeURIComponent(city)}&citylimit=true&offset=25&page=${page}&extensions=all`;
@@ -126,9 +128,36 @@ if (!FRESH && existsSync(DAILY)) {
     out.food = prev.food || {};
     out.hospitals = prev.hospitals || {};
     for (const k in prev) if (k !== "region" && k !== "food" && k !== "hospitals") out[k] = prev[k];
-    console.log(`== 续传：载入已有 ${DAILY}（美食 ${Object.keys(out.food).length} 城 / 医院 ${Object.keys(out.hospitals).length} 城），增量补齐 ==`);
+    if (!STATS) console.log(`== 续传：载入已有 ${DAILY}（美食 ${Object.keys(out.food).length} 城 / 医院 ${Object.keys(out.hospitals).length} 城），增量补齐 ==`);
   } catch (e) { console.warn("  ⚠ 解析已有 daily 失败，改为从头采集：", e.message); }
 }
+
+// ── 离线覆盖统计（--stats，无需 key / 不触网）──
+if (STATS) {
+  console.log("== --stats：采集覆盖统计 ==");
+  const foodCities = Object.keys(out.food || {}).length;
+  const hospCities = Object.keys(out.hospitals || {}).length;
+  let foodItems = 0, hospItems = 0;
+  for (const c in out.food) foodItems += (out.food[c] || []).length;
+  for (const c in out.hospitals) hospItems += (out.hospitals[c] || []).length;
+  console.log(`已采集：美食 ${foodCities} 城 / ${foodItems} 条；医院 ${hospCities} 城 / ${hospItems} 条`);
+  let targets = [];
+  if (existsSync("tools/team/gap-targets.json")) {
+    try { targets = JSON.parse(readFileSync("tools/team/gap-targets.json", "utf8")).cities || []; } catch (e) { /* ignore */ }
+  }
+  if (targets.length) {
+    let met = 0;
+    for (const r of targets) {
+      const f = (out.food[r.city] || []).length, h = (out.hospitals[r.city] || []).length;
+      if (f >= FOOD_CAP && h >= HOSP_CAP) met++;
+    }
+    console.log(`目标城市 ${targets.length} 城：已达标（美食≥${FOOD_CAP} 且 医院≥${HOSP_CAP}）${met} 城，待补 ${targets.length - met} 城`);
+  } else {
+    console.log("（未找到 gap-targets.json，先跑 node tools/team/gap-report.mjs 生成待采集清单）");
+  }
+  process.exit(0);
+}
+
 // 同名（trim+小写）去重，避免重复跑产生重复条目
 const foodDup = (city, shop) => (out.food[city] || []).some(s => String(s.shop || "").trim().toLowerCase() === String(shop).trim().toLowerCase());
 const hospDup = (city, n) => (out.hospitals[city] || []).some(h => String(h.n || "").trim().toLowerCase() === String(n).trim().toLowerCase());
