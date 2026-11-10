@@ -22,27 +22,19 @@ const EL = require("../../utils/errlog.js");        // v1.19.199：分享图失�
 const app = getAppSafe();
 
 function isFrame(n) { return T.isFrameName(n); }
-// v1.20.8：路线缩略图（零网络 / 零域名白名单 / 全量覆盖）
-// 每个景点一张「可视化配图」：按名称哈希得到稳定色相的渐变 + 分类 emoji；
-// 若将来某景点有了真实照片（走白名单 CDN / 云存储的 it.img），则优先显示真图。
-function hueHex(h, s, l) {
-  s /= 100; l /= 100;
-  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
-  let r = 0, g = 0, b = 0;
-  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
-  const to = function (v) { return ('0' + Math.round((v + m) * 255).toString(16)).slice(-2); };
-  return '#' + to(r) + to(g) + to(b);
-}
-function thumbFor(name, isF, img) {
-  const nm = name || '';
-  let h = 0; for (let i = 0; i < nm.length; i++) h = (h * 31 + nm.charCodeAt(i)) >>> 0;
-  h = h % 360;
-  let emoji = '🏞️';
-  if (isF) emoji = '🍜';
-  else if (/酒店|民宿|客栈|住宿|青旅|宾馆|旅舍|度假村/.test(nm)) emoji = '🏨';
-  else if (/站|机场|码头|汽车|高铁|港口|枢纽|地铁|轻轨/.test(nm)) emoji = '🚌';
-  const bg = 'linear-gradient(135deg,' + hueHex(h, 58, 64) + ',' + hueHex((h + 38) % 360, 62, 46) + ')';
-  return { thumbBg: bg, thumbEmoji: emoji, img: img || '' };
+// v1.20.8→v1.20.9：路线缩略图（零网络 / 零域名白名单 / 全量覆盖）
+// 收口到 utils/travel.js 的 spotCover()：稳定渐变 + 分类图标 + 名称，真图 it.img 优先。
+// 无真图时由渲染层标注「示意图」，杜绝伪装成实拍。
+function thumbFor(name, img, city) {
+  const cv = T.spotCover(city || "", name, img);
+  return {
+    thumbBg: cv.bg,
+    thumbEmoji: cv.glyph,
+    img: cv.isReal ? (img || "") : "",
+    coverLabel: cv.label,
+    coverBadge: cv.badge,
+    coverCat: cv.cat
+  };
 }
 const MODE_LABEL = { family: "亲子游", couple: "情侣游", solo: "独行", elder: "带老人" };
 function getSeason(month) {
@@ -182,7 +174,7 @@ Page(SafePage({
    load: T.dayLoad(plan, di),   // v1.8.4 B12：单日参考时长 / 超时预警
    mv: (!plan.isProv) ? T.dayMove(d, segs ? segs[segByDay[di]].cityName : (plan.cityName || "")) : null,
    items: (d.items || []).map((it, ix) => {
-    const _th = thumbFor(it.name, isFrame(it.name), it.img);
+    const _th = thumbFor(it.name, it.img, plan.cityName);
     return {
     ix,
     period: it.period || "",
@@ -199,7 +191,7 @@ Page(SafePage({
     effortTx: ["轻走", "徒步", "费腿"][T.P.spotEffort ? T.P.spotEffort(it.name) : 0] || "轻走",
     hour: T.P.spotHours ? T.P.spotHours(it.name) || "" : "",
     // v1.20.8：缩略图（生成配图 / 真实照片字段透传）
-    thumbBg: _th.thumbBg, thumbEmoji: _th.thumbEmoji, img: _th.img
+    thumbBg: _th.thumbBg, thumbEmoji: _th.thumbEmoji, img: _th.img, coverLabel: _th.coverLabel, coverBadge: _th.coverBadge, coverCat: _th.coverCat
    };
   })
   }));

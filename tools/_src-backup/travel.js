@@ -646,6 +646,48 @@ function spotTagOf(name, cityName) {
  _tagMemo.set(mk, res);
  return res;
 }
+
+// v1.20.9：生成式封面（零网络 / 零外链 / 零伪造 / 全量覆盖）
+// 给「没有真实照片」的景点一张确定性封面：按 城市|名称 哈希得到稳定渐变 + 类别图标 + 景点名；
+// 用户真实照（it.img，本地相册）优先级最高。这是诚实的「示意图」占位，不是假照片 ——
+// 渲染层必须标注「示意图」，不得伪装成实拍。
+const COVER_GLYPH = {
+  "历史古迹": "🏯", "博物馆": "🏛️", "宗教": "⛩️", "古镇": "🏘️",
+  "自然风光": "🏞️", "亲子": "🧸", "乐园": "🎡", "美食": "🍜",
+  "海滨": "🏖️", "徒步": "🥾", "其他": "📍"
+};
+function hslHex(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  const to = function (v) { return ('0' + Math.round((v + m) * 255).toString(16)).slice(-2); };
+  return '#' + to(r) + to(g) + to(b);
+}
+function spotCover(city, name, img) {
+  const nm = String(name || '').trim();
+  let h = 0; const key = (city || '') + '|' + nm;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  const hue = h % 360, hue2 = (hue + 34) % 360;
+  const bg = 'linear-gradient(135deg,' + hslHex(hue, 56, 62) + ',' + hslHex(hue2, 64, 44) + ')';
+  let glyph = '🏞️';
+  if (typeof isFrameName === 'function' && isFrameName(nm)) glyph = '🍜';
+  else if (/酒店|民宿|客栈|住宿|青旅|宾馆|旅舍|度假村/.test(nm)) glyph = '🏨';
+  else if (/站|机场|码头|汽车|高铁|港口|枢纽|地铁|轻轨/.test(nm)) glyph = '🚌';
+  else { const tg = spotTagOf(nm, city); const cat = (tg && tg[0]) ? tg[0] : '其他'; glyph = COVER_GLYPH[cat] || '🏞️'; }
+  const isReal = !!img;
+  let cat = '其他';
+  try { const tg = spotTagOf(nm, city); cat = (tg && tg[0]) ? tg[0] : '其他'; } catch (e) {}
+  return {
+    bg: bg,
+    glyph: glyph,
+    cat: cat,
+    label: (typeof cleanSpotName === 'function') ? (cleanSpotName(nm) || nm) : nm,
+    isReal: isReal,
+    placeholder: !isReal,
+    badge: isReal ? '' : '示意图'
+  };
+}
 // 多维检索：按城市 + 标签 + 关键词过滤景点，返回 [{name, city, tags, period, note}]
 function searchSpots(opts) {
  const o = opts || {};
@@ -6554,7 +6596,7 @@ module.exports = {
  badgesOf, yearReportNew, chinaLite, transportEstimate,
  provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
- spotTagOf, searchSpots,
+ spotTagOf, searchSpots, spotCover,
  customBudgetObj: function (amt, days, peopleN) { return P.customBudgetObj(amt, days, peopleN); }, budgetTotalObj,
  isFrameName, isDetailable, stripHtml, spotDetailText, spotNoteDisp, spotInfo, spotInfoText,
  normalizeDayItems,

@@ -352,6 +352,8 @@
             <image wx:if="{{it.img}}" class="tl-thumb" src="{{it.img}}" mode="aspectFill" lazy-load/>
             <view wx:else class="tl-thumb gen" style="background:{{it.thumbBg}}">
               <text class="tl-thumb-emoji">{{it.thumbEmoji}}</text>
+              <view class="tl-thumb-name">{{it.coverLabel}}</view>
+              <view class="tl-thumb-badge" wx:if="{{it.coverBadge}}">{{it.coverBadge}}</view>
             </view>
           </view>
           <view class="tl-main">

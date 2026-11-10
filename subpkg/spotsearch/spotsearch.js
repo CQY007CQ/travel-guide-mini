@@ -144,7 +144,13 @@ Page(SafePage({
       limit: 80
     });
     // 结果行带上「是否已在想玩」状态，供按钮显示 加入想玩 / 已想玩
-    const results = (r.results || []).map(x => Object.assign({}, x, { wished: T.isWished(x.name) }));
+    const results = (r.results || []).map(x => {
+      const cv = T.spotCover(x.city || "", x.name, "");
+      return Object.assign({}, x, {
+        wished: T.isWished(x.name),
+        coverBg: cv.bg, coverGlyph: cv.glyph, coverLabel: cv.label, coverBadge: cv.badge, coverCat: cv.cat
+      });
+    });
     this.setData({
       results: results,
       stat: r.mode === "empty" ? "" : (r.total ? ("为你锁定 " + r.total + " 个最贴合的景点") : ""),
