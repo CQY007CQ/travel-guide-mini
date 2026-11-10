@@ -1,0 +1,63 @@
+{
+  "_note": "官方公开名录源注册表（美食店 / 医院批量采集）。采集器 tools/data/_collect-official-roster.mjs，校验门禁 tools/audit/_test-roster-integrity.mjs。",
+  "_policy": "候选池只收「有官方公开来源、逐条可追溯」的具名条目；严禁模板名/残缺名/无来源条目。未做地址核验与坐标定位的条目一律 verified:false，不得直接并入 HOSPITALS / FOOD_SPOTS（应急场景给错位置比暂无收录更危险）。",
+  "_blocked": "本轮实测受限的外部批量源：国家卫健委医疗机构查询 zgcx.nhc.gov.cn:9090 → 403；商务部开放数据 PDF 下载 /front/data/download → HTTP 500；Overpass 开放地图 POI → 406/超时；百度百科/搜索 → 403 或图形验证码。这些源不得写入可靠数据源，也不要用模板名回填凑数。",
+  "sources": [
+    {
+      "id": "sh-2019",
+      "kind": "hospital",
+      "authority": "上海市卫生健康委员会",
+      "title": "关于转发国家卫生健康委办公厅关于采集二级和三级公立医院2019年度绩效考核数据有关工作的通知（附件2/附件3 医院名单）",
+      "url": "https://wsjkw.sh.gov.cn/yljg4/20200615/519b1d02e9de4b5d9eb477fe6ffe77e6.html",
+      "city": "上海",
+      "prov": "上海",
+      "collected": "2026-11-09",
+      "enabled": true
+    },
+    {
+      "id": "js-2025",
+      "kind": "hospital",
+      "authority": "江苏省卫生健康委员会",
+      "title": "关于公布2025年三级医院评审结果的通知（苏卫医政〔2026〕6号）",
+      "url": "https://wjw.jiangsu.gov.cn/art/2026/3/3/art_49511_11734657.html",
+      "city": "",
+      "prov": "江苏",
+      "collected": "2026-11-09",
+      "enabled": true
+    },
+    {
+      "id": "fj-2025b",
+      "kind": "hospital",
+      "authority": "福建省卫生健康委员会",
+      "title": "福建省2025年度第二批次三级医院评审结果公示",
+      "url": "https://wjw.fujian.gov.cn/jggk/csxx/yzc/gzdt/202510/t20251014_7021302.htm",
+      "city": "",
+      "prov": "福建",
+      "collected": "2026-11-09",
+      "enabled": true
+    },
+    {
+      "id": "fj-2025a",
+      "kind": "hospital",
+      "authority": "福建省卫生健康委员会",
+      "title": "福建省2025年度第一批次三级医院评审结果通知",
+      "url": "https://wjw.fj.gov.cn/xxgk/zfxxgkzl/zfxxgkml/wszh/yzgl/202507/t20250703_6961415.htm",
+      "city": "",
+      "prov": "福建",
+      "collected": "2026-11-09",
+      "enabled": true
+    },
+    {
+      "id": "mofcom-laozihao",
+      "kind": "food",
+      "authority": "商务部流通发展司",
+      "title": "中华老字号企业名录（开放数据，完全开放）",
+      "url": "https://opendata.mofcom.gov.cn/front/data/detail?id=NM012",
+      "city": "",
+      "prov": "",
+      "collected": "2026-11-09",
+      "enabled": false,
+      "blocked": "PDF 下载接口 /front/data/download?id=... 实测 HTTP 500；名录查询页需交互，无法批量取回。待接口恢复或取得合规导出文件后启用。"
+    }
+  ]
+}

@@ -44,7 +44,7 @@
 
 **第 4 条**
 - 类型：数据
-- 位置：`tools/pack-data.mjs` L141–143（备注上限 26 字）
+- 位置：`tools/build/pack-data.mjs` L141–143（备注上限 26 字）
 - 问题描述：景点备注超 26 字被截断，采集截断类长文案被一刀切，真实短介绍也可能被切掉尾句。
 - 严重程度：中
 - 优化建议：截断前先按句末标点（`。！？`）就近截断，优先保留完整句子而非硬切 26 字。
@@ -52,7 +52,7 @@
 
 **第 5 条**
 - 类型：数据
-- 位置：`tools/pack-data.mjs` L76（`if (v.rating && Number(v.rating) >= 4.0)`）
+- 位置：`tools/build/pack-data.mjs` L76（`if (v.rating && Number(v.rating) >= 4.0)`）
 - 问题描述：瘦身期只保留评分 ≥4.0 的 `SPOT_INFO`，把真实存在的 3.x 分景点从结构化信息里删除（属**数据丢失**，不止体积优化）。
 - 严重程度：中
 - 优化建议：把「评分过滤」与「体积瘦身」解耦：低分景点的 `rating` 仍保留（≤1 字节/条），仅砍掉非刚需的开放时间/人均/地址大字段。
@@ -60,7 +60,7 @@
 
 **第 6 条**
 - 类型：数据
-- 位置：`tools/_apply-safe.mjs` §9.10（6000 条 `SPOT_CARDS_BY_CITY`）
+- 位置：`tools/build/_apply-safe.mjs` §9.10（6000 条 `SPOT_CARDS_BY_CITY`）
 - 问题描述：6000 条资料卡是「把散在 6 张表的真实字段聚合」，**并非新增 6000 条百科/美食/医院**；用户诉求「百科+5000 / 美食+1000 / 医院+1000」实际未达标。
 - 严重程度：中
 - 优化建议：如要继续补足计数，必须走合规外源（高德搜索配额 key 或官方名录导出），逐条地址核验后入包；禁止模板拼接凑数。
@@ -91,7 +91,7 @@
 
 **第 10 条**
 - 类型：数据
-- 位置：`tools/pack-data.mjs` L117–136（`CITY_LANDMARKS_EXTRA` 去重）
+- 位置：`tools/build/pack-data.mjs` L117–136（`CITY_LANDMARKS_EXTRA` 去重）
 - 问题描述：当城市地标名恰好等于某 `SPOT_COORDS` 已解析名时整条删除，可能把「同名但不同实体」的地标误删。
 - 严重程度：低
 - 优化建议：去重时比对的不只是名字，还比对坐标是否一致；坐标不一致则保留地标条目。
@@ -99,7 +99,7 @@
 
 **第 11 条**
 - 类型：数据
-- 位置：`tools/pack-data.mjs` L186–199（脏省名键清理）
+- 位置：`tools/build/pack-data.mjs` L186–199（脏省名键清理）
 - 问题描述：以省名当城市键的项被整条剔除；若某城市恰与省同名（如「北京」在 `CITY2PROV` 被当键），存在误删风险。
 - 严重程度：低
 - 优化建议：清理前先排除「直辖市/特别行政区」白名单，仅清理真正非城市的省名键。
@@ -107,7 +107,7 @@
 
 **第 12 条**
 - 类型：数据（合规红线）
-- 位置：`tools/_hospital-batch4/5/6.json`（1572 行模板拼接）/ `tools/_test-roster-integrity.mjs`（指纹锁）
+- 位置：`tools/_hospital-batch4/5/6.json`（1572 行模板拼接）/ `tools/audit/_test-roster-integrity.mjs`（指纹锁）
 - 问题描述：1572 行「城名+人民医院/中医院」模板拼接且坐标为城心固定网格，属**禁止入包**负样本，靠指纹集合门禁锁死。
 - 严重程度：高
 - 优化建议：维持指纹门禁；并在 `pack-data` 打包期再次扫描 `HOSPITALS` 是否命中任一指纹，双保险。
@@ -123,7 +123,7 @@
 
 **第 14 条**
 - 类型：数据
-- 位置：`tools/pack-data.mjs` L90/L98/L110（`toFixed(3)` 坐标截断）
+- 位置：`tools/build/pack-data.mjs` L90/L98/L110（`toFixed(3)` 坐标截断）
 - 问题描述：坐标从 6 位小数降到 3 位，精度约 100m；城市级 POI 可接受，但精确到门牌的景点被统一降精度。
 - 严重程度：低
 - 优化建议：按数据类型分精度：景点/美食保留 4–5 位（~10m），城市级行政点可用 3 位。
@@ -168,7 +168,7 @@
 
 **第 20 条**
 - 类型：数据
-- 位置：`tools/_apply-safe.mjs` §9.10（每轮重建 `SPOT_CARDS_BY_CITY`）
+- 位置：`tools/build/_apply-safe.mjs` §9.10（每轮重建 `SPOT_CARDS_BY_CITY`）
 - 问题描述：`apply` 每轮从零重建 6000 条，依赖「聚合」而非增量，apply→pack 重跑成本高、且可重复。
 - 严重程度：低
 - 优化建议：加内容哈希缓存，仅当源表变更才重建，否则复用上次产物。
@@ -182,7 +182,7 @@
 
 **第 22 条**
 - 类型：数据
-- 位置：`tools/pack-data.mjs` L110（`price: x.price || ""`）
+- 位置：`tools/build/pack-data.mjs` L110（`price: x.price || ""`）
 - 问题描述：美食价格以字符串存储（含「¥」「元」等混杂），类型不一致，排序/区间筛选困难。
 - 严重程度：低
 - 优化建议：价格存数值 `priceNum` + 单位分离，渲染端再格式化。
@@ -198,7 +198,7 @@
 
 **第 24 条**
 - 类型：数据
-- 位置：`utils/data.js` `__A` 空占位(L23 注释) / `tools/pack-data.mjs` L34 停用说明
+- 位置：`utils/data.js` `__A` 空占位(L23 注释) / `tools/build/pack-data.mjs` L34 停用说明
 - 问题描述：`__A` 仅留空占位供「兼容解析」，但别名压缩已于 2026-10-02 停用，加载器已不消费——属死契约。
 - 严重程度：低
 - 优化建议：在下个大版本清理 `__A` 字段及对应读取分支，减少误导。
@@ -212,7 +212,7 @@
 - 优化建议：优先补齐旅游热门偏远目的地（西藏/青海/新疆景点周边）的具名医院，而非均摊。
 
 **第 26 条**
-- 位置：`tools/pack-data.mjs` L252–266（分块上限 2 块）
+- 位置：`tools/build/pack-data.mjs` L252–266（分块上限 2 块）
 - 问题描述：分块逻辑只支持 2 块（`subdata`/`subdata2`）；若数据继续增长突破 2×~2MB，会溢出未处理。
 - 严重程度：中
 - 优化建议：分块改为通用 N 块 + `app.json` 动态注册占位，避免硬编码 2 块上限。
@@ -227,7 +227,7 @@
 
 **第 28 条**
 - 类型：数据
-- 位置：`tools/_apply-safe.mjs` §9.9（模板套话剔除）/ `experiences.note`
+- 位置：`tools/build/_apply-safe.mjs` §9.9（模板套话剔除）/ `experiences.note`
 - 问题描述：「已收录」「可一键导航」等功能性占位文案在部分路径未被统一剥离，可能进入展示。
 - 严重程度：低
 - 优化建议：集中 `stripPlaceholder(note)` 工具，在 `applySpotEnrich`/`applyFoodEnrich` 统一调用，单测覆盖。
@@ -307,7 +307,7 @@
 
 **第 38 条**
 - 类型：安全
-- 位置：`tools/check-secrets.mjs`（全仓扫描）
+- 位置：`tools/check/check-secrets.mjs`（全仓扫描）
 - 问题描述：本地 `geocode.keys` 不进 git 是正确做法，但 9 个读 key 池脚本若某处误把 key 当说明文字发出，仍会泄露。
 - 严重程度：中
 - 优化建议：维持 `check-secrets` L1 全仓扫描 + 32hex 前后边界，并把「说明文字误当 key 发出」的失败模式加入回归用例（已部分覆盖）。
@@ -353,7 +353,7 @@
 
 **第 44 条**
 - 类型：安全
-- 位置：`tools/_amap-compliance.mjs`（`REVOKED_KEYS` 摘要）
+- 位置：`tools/data/_amap-compliance.mjs`（`REVOKED_KEYS` 摘要）
 - 问题描述：审计报告曾误判该文件含明文 key；实际为 64 位 sha256 摘要（边界复核命中 0），但扫描脚本正则需带边界避免误报。
 - 严重程度：低
 - 优化建议：维持带前后 hex 边界的 32hex 匹配；`check-secrets` 输出不打印疑似值。
@@ -381,7 +381,7 @@
 
 **第 48 条**
 - 类型：安全
-- 位置：`tools/build-min.mjs` / `tools/pack-data.mjs`（构建期 `console.log`）
+- 位置：`tools/build/build-min.mjs` / `tools/build/pack-data.mjs`（构建期 `console.log`）
 - 问题描述：构建脚本 `console.log` 打印的是计数/路径，**不含 key**；但需保证未来不误加 `console.log(key)`。
 - 严重程度：低
 - 优化建议：`check-secrets` 增加「构建脚本 `console.log` 含 key 变量名」扫描（如 `log(.*key)`）。
@@ -444,7 +444,7 @@
 
 **第 56 条**
 - 类型：性能
-- 位置：`tools/pack-data.mjs` L204/L219/L301（`zlib.deflateSync` 同步，level:9）
+- 位置：`tools/build/pack-data.mjs` L204/L219/L301（`zlib.deflateSync` 同步，level:9）
 - 问题描述：构建期同步最高压缩，单次阻塞数秒（可接受于构建，但大文件易 OOM）。
 - 严重程度：低
 - 优化建议：构建脚本改用流式 `zlib.createDeflate` 或 level:6 折中，避免大 JSON 一次性入内存。
@@ -509,7 +509,7 @@
 
 **第 65 条**
 - 类型：性能
-- 位置：`tools/_apply-safe.mjs` §9.10 每轮重建 6000 卡（见数据维度 #20）
+- 位置：`tools/build/_apply-safe.mjs` §9.10 每轮重建 6000 卡（见数据维度 #20）
 - 问题描述：重复计算，apply→pack 重跑成本高。
 - 严重程度：低
 - 优化建议：内容哈希缓存。
@@ -577,7 +577,7 @@
 
 **第 74 条**
 - 类型：代码
-- 位置：`tools/pack-data.mjs` 魔法数字 L76(4.0)/L141(26)/L90(3 位)
+- 位置：`tools/build/pack-data.mjs` 魔法数字 L76(4.0)/L141(26)/L90(3 位)
 - 问题描述：评分阈值、截断长度、坐标精度均为散落字面量，无常量名，易误改且易触发门禁自伤（历史教训）。
 - 严重程度：中
 - 优化建议：提取 `const RATING_MIN=4.0, NOTE_MAX=26, COORD_DP=3` 置文件头，门禁断言引用常量而非字面量。
@@ -599,10 +599,10 @@
 
 **第 77 条**
 - 类型：代码
-- 位置：`tools/_apply-safe.mjs` §9.7 改名守卫（已修复，见 L~588）
+- 位置：`tools/build/_apply-safe.mjs` §9.7 改名守卫（已修复，见 L~588）
 - 问题描述：历史 bug——`owners` 用改名前快照导致同城重复副本每轮 +11；已改为实时 `used` 判定并加回归断言。
 - 严重程度：高（已修复）
-- 优化建议：维持 `tools/_test-audit-guards.mjs` 第 36 条断言，禁止回退到 `owners.has(to)`。
+- 优化建议：维持 `tools/audit/_test-audit-guards.mjs` 第 36 条断言，禁止回退到 `owners.has(to)`。
 
 **第 78 条**
 - 类型：代码
@@ -621,7 +621,7 @@
 
 **第 80 条**
 - 类型：代码
-- 位置：`tools/_test-audit-guards.mjs` `codeOnly()`(L201)
+- 位置：`tools/audit/_test-audit-guards.mjs` `codeOnly()`(L201)
 - 问题描述：门禁靠「先滤注释行再匹配字面量」避免被自身注释误伤，设计脆弱——注释改措辞可能漏判。
 - 严重程度：低
 - 优化建议：改用 AST/正则定位函数体，而非整文件字符串匹配；降低自伤概率。
@@ -685,14 +685,14 @@
 
 **第 89 条**
 - 类型：代码
-- 位置：`tools/build-min.mjs`（terser 8 文件）
+- 位置：`tools/build/build-min.mjs`（terser 8 文件）
 - 问题描述：压缩产物与 `_src-backup` 真源分离，维护者易改错文件（改 `utils/` 被下次构建覆盖）。
 - 严重程度：中
 - 优化建议：在 `utils/` 顶部注释 + `allcheck` 断言「`utils/*.js` 与 `_src-backup` 构建一致」，改错即红。
 
 **第 90 条**
 - 类型：代码
-- 位置：`tools/_apply-safe.mjs`（1000+ 行合并+补丁混合）
+- 位置：`tools/build/_apply-safe.mjs`（1000+ 行合并+补丁混合）
 - 问题描述：数据修正脚本同时承担「合并团队数据 + 应用补丁 + 生成资料卡」，单一巨函数难测。
 - 严重程度：中
 - 优化建议：拆为 `mergeTeam()`/`applyPatches()`/`buildCards()` 三函数，各自单测。
@@ -812,7 +812,7 @@
 
 **第 106 条**
 - 类型：架构
-- 位置：`tools/lib-near-dup.mjs`（被 `_apply-safe`/`geocode-runner` 依赖）
+- 位置：`tools/data/lib-near-dup.mjs`（被 `_apply-safe`/`geocode-runner` 依赖）
 - 问题描述：近重工具是活依赖，若被误归档会断构建。
 - 严重程度：低
 - 优化建议：`check-deps.mjs` 已将其纳入依赖扫描（`SKIP_PATH` 含 `_archive`），维持。
@@ -991,7 +991,7 @@
 
 ## 附：已收口/已修复项（审计追溯，非新缺陷）
 
-- 死代码清理：`tools/pack-data.mjs` 删除 69 行停用别名压缩函数（sha1 字节级等价，零体积变化）—— 见压缩程序收口。
+- 死代码清理：`tools/build/pack-data.mjs` 删除 69 行停用别名压缩函数（sha1 字节级等价，零体积变化）—— 见压缩程序收口。
 - §9.7 改名守卫幂等修复（`_apply-safe.mjs` + 第 36 条回归断言）—— 见本轮整改。
 - 密钥明文出仓（`keys.js` DEFAULT 清空 + `setKeys` 运行时注入）—— 审计 #1/#19。
 - 网页版 XSS：`escHtml` 全量覆盖 innerHTML 动态文本 —— 审计 #44/#46。

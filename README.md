@@ -58,7 +58,7 @@ cd miniprogram-travel
 **首次修改代码前，请先看这两件事**（都是踩过线上事故的坑，见 `docs/design/ARCHITECTURE.md` 第七节）：
 
 - 改 `utils/data.js` 无效 —— 它是生成产物，真源在 `tools/_src-backup/data.js`
-- 增量改数据只能走 `tools/_apply-safe.mjs`，**禁用 `merge-data-patch.mjs`**
+- 增量改数据只能走 `tools/build/_apply-safe.mjs`，**禁用 `merge-data-patch.mjs`**
 
 ---
 
@@ -101,8 +101,8 @@ miniprogram-travel/
 数据改动**只能**走这条链，顺序不能颠倒：
 
 ```bash
-node tools/_apply-safe.mjs        # 1. 以当前 packed 为底，叠加 tools/v19N-*.js 增量补丁
-node tools/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data/data-packed*.js
+node tools/build/_apply-safe.mjs        # 1. 以当前 packed 为底，叠加 tools/v19N-*.js 增量补丁
+node tools/build/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data/data-packed*.js
 ./allcheck.sh                     # 3. 全量回归
 ```
 
@@ -113,7 +113,7 @@ node tools/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data
 | 打包器内置"脏键清理" | 自动剔除 `SPOT_COORDS` / `CITY2PROV` 里的非直辖市省名键，否则跨省解析会串城 |
 | `require.async()` 实参必须是静态字符串字面量 | 传变量会导致微信解析不到分包 → 数据永不加载 → **首页白屏**（线上事故根因） |
 | 键别名压缩已停用 | 与 `_apply-safe` 的读写不同源，会互相污染导致键损坏 |
-| 坐标与美食去重走 `tools/lib-near-dup.mjs` | 「同一景点」的判定只有一处真源，避免扫描器与写入端规则漂移（曾导致每日任务连续多天空转） |
+| 坐标与美食去重走 `tools/data/lib-near-dup.mjs` | 「同一景点」的判定只有一处真源，避免扫描器与写入端规则漂移（曾导致每日任务连续多天空转） |
 | 美食增量批次 `v202-food-shops2.js` | 店名来自公开资料、坐标由 `geocode/geo` 取得并经质量闸门（地址含预期街道 / 非公交站 / 距城中心 ≤25km） |
 
 ---
@@ -127,15 +127,15 @@ node tools/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data
 专项回归（新增，`v1.19.78` 起常态化，已覆盖 deep / ad / remind / 今日正当时 / 转发卡 / 分享种草 等）：
 
 ```bash
-node tools/_test-recommend.mjs         # 推荐引擎（61 项断言）
-node tools/_fuzz-recommend.mjs         # 推荐引擎模糊测试（171 组标签组合 + 极端输入）
-node tools/_test-emergency.mjs         # 旅途应急（288 条断言：分诊正确性 / 数据完整性 / 禁词红线）
-node tools/_test-foodmap.mjs           # 菜名→店铺匹配（16 条断言）
+node tools/test/_test-recommend.mjs         # 推荐引擎（61 项断言）
+node tools/test/_fuzz-recommend.mjs         # 推荐引擎模糊测试（171 组标签组合 + 极端输入）
+node tools/test/_test-emergency.mjs         # 旅途应急（288 条断言：分诊正确性 / 数据完整性 / 禁词红线）
+node tools/test/_test-foodmap.mjs           # 菜名→店铺匹配（16 条断言）
 node tools/_test-v11987-insp-ui.mjs    # 今日正当时 灵感卡接线
-node tools/_test-v11988-sharecard.mjs  # 转发黑金卡生成
+node tools/test/_test-v11988-sharecard.mjs  # 转发黑金卡生成
 node tools/_test-v11989-sharetitle.mjs # 分享即种草
-node tools/_test-plan-handlers.mjs     # 行程页 14 个交互 handler
-node tools/_test-v11993-bootsmoke.mjs  # 17 页启动冒烟（抓分包 require 层级错误）
+node tools/test/_test-plan-handlers.mjs     # 行程页 14 个交互 handler
+node tools/test/_test-v11993-bootsmoke.mjs  # 17 页启动冒烟（抓分包 require 层级错误）
 ```
 
 写回归脚本的约定：**从源码里 `indexOf` 抽出真实 handler 文本，塞进 vm 沙盒跑**，而不是照着逻辑另抄一份 —— 否则源码改了测试照样是绿的，等于没测。

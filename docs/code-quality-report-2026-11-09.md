@@ -71,7 +71,7 @@
 
 ## 5. 新增永久门禁：发布代码洁净度
 
-已在 `tools/check-demo-quality.mjs` 增加第 13 项「发布代码洁净度」：
+已在 `tools/check/check-demo-quality.mjs` 增加第 13 项「发布代码洁净度」：
 - 扫描全部 44 个发布 JS，禁止 `console.log/debug/info`、`debugger`、`eval(`、`new Function(`；
 - 跳过纯注释行（避免历史注释误伤）、放行 `console.error/warn`；
 - 当前：**44 个发布 JS 洁净**。

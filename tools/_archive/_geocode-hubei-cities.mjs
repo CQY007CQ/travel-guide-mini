@@ -1,5 +1,5 @@
 // 一次性：湖北三直管市（仙桃/天门/潜江）城市坐标 + 19 个官方景点坐标
-// 只用高德 geocode/geo（独立配额，合规）；输出 tools/v202-hubei-cities.js 补丁
+// 只用高德 geocode/geo（独立配额，合规）；输出 tools/data/v202-hubei-cities.js 补丁
 import fs from "fs";
 
 const KEYS = (() => { try { return fs.readFileSync("tools/geocode.keys", "utf8"); } catch (e) { return ""; } })()
@@ -68,8 +68,8 @@ for (const c of CITIES) {
     experiences: spots.map(n => ({ name: n, period: "全天", note: "官方 A 级景区，建议预留 2-4 小时" }))
   });
 }
-fs.writeFileSync("tools/v202-hubei-cities.js",
+fs.writeFileSync("tools/data/v202-hubei-cities.js",
   "// 自动生成（geocode/geo 合规）：湖北三直管市补丁\nmodule.exports = " + JSON.stringify(out, null, 1) + ";\n", "utf8");
 console.log("城市坐标:", JSON.stringify(cityCoords));
 console.log("景点坐标命中:", Object.keys(spotCoords).map(k => k + ":" + spotCoords[k].length).join(" "));
-console.log("已写 tools/v202-hubei-cities.js");
+console.log("已写 tools/data/v202-hubei-cities.js");

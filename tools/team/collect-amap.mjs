@@ -224,5 +224,5 @@ const hospDup = (city, n) => (out.hospitals[city] || []).some(h => String(h.n ||
   }
   writeFileSync(DAILY, JSON.stringify(out, null, 2));
   console.log(`✅ 续写 ${DAILY}：美食 ${Object.keys(out.food).length} 城 / 医院 ${Object.keys(out.hospitals).length} 城（本次用 ${used} 次搜索配额，新增美食 ${metFood} / 医院 ${metHosp}${skipped ? `，跳过已达标 ${skipped} 城` : ""}）`);
-  console.log("下一步：node tools/_merge-team-enrich.mjs --pack   # 合并入包并重打包");
+  console.log("下一步：node tools/data/_merge-team-enrich.mjs --pack   # 合并入包并重打包");
 })();

@@ -44,7 +44,7 @@
 ### 📌 仍待处理（架构评估项，非代码自动可解部分）
 
 - **#58·#77 双源合并**：手写双源（keys.js / data.js 经 `cp` 同步）与压缩产物双源（utils 8 文件经 build-min 同步）的**漂移风险已由「合并门禁」门禁化**（allcheck 构建前后 cmp + 手写文件 cmp，不一致即失败，v1.20.4）。彻底消除双源（合并数据源）仍待架构评估。
-- **#82 CI 断言**：已落地首版「审计整改防回潮断言」（`tools/_test-audit-guards.mjs` + allcheck 步骤，v1.20.4），守护 #1/#19/#56/#81 不回潮；后续可按需继续补充核心逻辑断言。
+- **#82 CI 断言**：已落地首版「审计整改防回潮断言」（`tools/audit/_test-audit-guards.mjs` + allcheck 步骤，v1.20.4），守护 #1/#19/#56/#81 不回潮；后续可按需继续补充核心逻辑断言。
 
 > 说明：本审计"已具备的强项"第 4 条已记录凭证照片修复；上表 #12 / #61 / #71 为其代码级落地，二者一致。
 
@@ -201,7 +201,7 @@
 
 **第 21 条**
 - 类型：安全
-- 位置：`tools/_food-geocode.mjs:54`、`tools/_emergency-verify.mjs:41`、`tools/_emergency-geocode2.mjs:77`、`tools/add-key.mjs:43`
+- 位置：`tools/_food-geocode.mjs:54`、`tools/_emergency-verify.mjs:41`、`tools/_emergency-geocode2.mjs:77`、`tools/build/add-key.mjs:43`
 - 问题描述：这些脚本用 `execSync('curl -s --max-time 12 "' + url + '"')`，URL 含拼接变量（城市名/坐标），若变量含 shell 元字符会命令注入；属本地工具但应避免。
 - 严重程度：中
 - 优化建议：改用 Node 原生 `https`/`fetch` + `URL` 构造，禁用 shell 拼接；或 `execFile` 传参数组。

@@ -32,7 +32,7 @@
 ### 方案 B（备用）：网页版（快速预览 / 无缝兜底）
 ```bash
 cd outputs/miniprogram-travel
-bash tools/demo-serve.sh          # 默认 8899 端口
+bash tools/dev/demo-serve.sh          # 默认 8899 端口
 # 浏览器打开： http://127.0.0.1:8899/index.html
 ```
 - 完全离线（本地 python 服务 + 随包数据），不依赖外网与账号。
@@ -77,7 +77,7 @@ bash tools/demo-serve.sh          # 默认 8899 端口
 
 | 风险 | 应对 |
 |---|---|
-| 网页版页面空白 | `Cmd+Shift+R` 强刷（PWA 缓存）；重跑 `bash tools/demo-serve.sh` |
+| 网页版页面空白 | `Cmd+Shift+R` 强刷（PWA 缓存）；重跑 `bash tools/dev/demo-serve.sh` |
 | 地图要真实底图 | 用方案 A 微信开发者工具（主）；网页版有「真实坐标示意图」（散点+连线），如实说明不加载在线底图 |
 | 天气/联网功能失败 | 已做降级，不阻塞主流程；如实说明「需联网，失败不阻断」 |
 | 数据加载慢 | 启动层遮罩 + 失败重试按钮；等待即可 |
@@ -88,7 +88,7 @@ bash tools/demo-serve.sh          # 默认 8899 端口
 
 ## 六、演示前 5 分钟自检清单
 
-- [ ] `bash tools/demo-serve.sh` 起服务，浏览器能打开首页（非空白）
+- [ ] `bash tools/dev/demo-serve.sh` 起服务，浏览器能打开首页（非空白）
 - [ ] 首页能选城并生成 5 天行程
 - [ ] 行程/美食/记账/准备/更多 逐页点开不白屏
 - [ ] 长图/分享图能导出

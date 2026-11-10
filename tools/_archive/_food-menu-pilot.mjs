@@ -1,5 +1,5 @@
 // 美食菜单 / 口碑 试点生成器（10 个热门城市）
-// 输出 tools/v205-food-menu.js 的 FOOD_SPOTS_ADD（仅 {shop,menu,rep,note}，无坐标 → 命中已有店回写扩展字段）。
+// 输出 tools/data/v205-food-menu.js 的 FOOD_SPOTS_ADD（仅 {shop,menu,rep,note}，无坐标 → 命中已有店回写扩展字段）。
 //
 // 合规与诚实原则（与项目红线一致）：
 //  - 不伪造星级、不编造"大众点评/美团"式假评论、不违规抓取。
@@ -322,7 +322,7 @@ const header = "// 美食菜单 / 口碑 试点补丁（10 热门城市）——
   "// menu[n]=菜名, menu[p]=参考价(¥xx, 常识级整理, 到店以实价为准)\n" +
   "// rep=口碑标签(老字号/本地人常去/游客打卡/市井烟火/宴请名店), note=编辑点评(编辑整理)\n";
 const body = "module.exports = { FOOD_SPOTS_ADD: " + JSON.stringify(ADD, null, 1) + " };\n";
-fs.writeFileSync("tools/v205-food-menu.js", header + body);
+fs.writeFileSync("tools/data/v205-food-menu.js", header + body);
 
 console.log("✅ 生成 v205-food-menu.js");
 console.log("覆盖店铺:", total, "| 知名定制:", fanCnt, "| 品类派生:", catCnt, "| 城市兜底:", cityCnt, "| 空菜单:", noMenu);
