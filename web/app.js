@@ -178,7 +178,8 @@
       if (!groups[x.g]) { groups[x.g] = []; order.push(x.g); }
       groups[x.g].push(x);
     });
-    var html = '<div class="ws-brand"><b>旅行攻略生成器</b><span>网页版 · 桌面布局</span></div>';
+    var html = '<div class="ws-brand"><b>旅行攻略生成器</b><span>网页版 · 桌面布局</span>' +
+      '<button class="ws-collapse" id="wsCollapse" type="button" aria-label="收起侧栏" title="收起侧栏">‹</button></div>';
     html += '<div class="ws-scroll"><div class="ws-group">主导航</div>';
     Object.keys(TABS).forEach(function (path) {
       html += '<button class="ws-item" data-p="' + esc(path) + '" data-tab="1">' + esc(TAB_LABEL[path] || path) + "</button>";
@@ -205,9 +206,17 @@
         router(item.getAttribute("data-p"), item.getAttribute("data-tab") === "1" ? "tab" : "push");
         return;
       }
+      if (t.closest && t.closest("#wsCollapse")) { toggleSidebar(); return; }
       if (t.closest && t.closest("#wsAI")) { if (window.__webAI) window.__webAI.open(); return; }
       if (t.closest && t.closest("#wsLayout")) toggleLayout();
     });
+    // 折叠态的「展开菜单」浮钮（仅折叠时通过 CSS 显示）
+    var expand = document.createElement("button");
+    expand.id = "wsExpand";
+    expand.type = "button";
+    expand.textContent = "☰ 展开菜单";
+    expand.addEventListener("click", toggleSidebar);
+    document.body.appendChild(expand);
     return p;
   }
 
@@ -236,6 +245,20 @@
         window.wx.showToast({ title: next ? "已切换为宽屏多列" : "已切换为单列阅读", icon: "none" });
       }
     } catch (e) {}
+  }
+
+  /* ── 侧栏折叠偏好：默认展开，用户可收起让出全宽（桌面横屏时更有用） ── */
+  var SIDEBAR_KEY = "web_sidebar_v1";
+  function applySidebarPref() {
+    try {
+      var v = localStorage.getItem(SIDEBAR_KEY);
+      document.body.classList.toggle("sidebar-collapsed", v === "collapsed");
+    } catch (e) {}
+  }
+  function toggleSidebar() {
+    var collapsed = !document.body.classList.contains("sidebar-collapsed");
+    document.body.classList.toggle("sidebar-collapsed", collapsed);
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? "collapsed" : "expanded"); } catch (e) {}
   }
 
   function syncTopBar(p) {
@@ -291,6 +314,7 @@
       navPanel = buildNav();
       sidebar = buildSidebar();
       applyLayoutPref();
+      applySidebarPref();
       var layoutBtn = document.getElementById("webLayoutBtn");
       if (layoutBtn) layoutBtn.addEventListener("click", toggleLayout);
       // 工具条默认收起，避免浮动按钮压住内容；桌面侧栏里另有「切换宽屏 / 单列」入口

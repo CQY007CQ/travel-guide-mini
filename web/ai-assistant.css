@@ -213,6 +213,21 @@ body.has-tabbar .ai-panel { bottom: calc(64px + env(safe-area-inset-bottom)); }
   .ai-fab { right: 24px; }
 }
 
+/* 超宽屏（≥1700px）：AI 助手吸右为常驻栏，不再浮层遮挡，内容自动左移让位 */
+@media (min-width: 1700px) {
+  body.ai-docked .ai-panel {
+    left: auto; right: 0; top: 0; bottom: 0; transform: none; opacity: 1; pointer-events: auto;
+    width: min(420px, 36vw); height: 100vh; height: 100dvh; border-radius: 0;
+    box-shadow: -10px 0 40px rgba(0, 0, 0, .16);
+  }
+  body.ai-docked .ai-backdrop { display: none; }
+  body.ai-docked .ai-fab { display: none; }
+  /* 内容区左移，给常驻栏让出宽度（左侧已是侧栏，形成「中内容 + 右助手」三栏） */
+  body.ai-docked #app { margin-right: min(420px, 36vw); }
+  body.ai-docked #webTopBar { right: min(420px, 36vw); }
+  body.ai-docked #webNavPanel { right: calc(min(420px, 36vw) + 10px); }
+}
+
 /* 清空对话按钮（与设置齿轮同排，清掉多轮上下文避免串城） */
 .ai-head .ai-clear {
   flex-shrink: 0; border: 1px solid var(--shell-line, rgba(19, 29, 49, .1));

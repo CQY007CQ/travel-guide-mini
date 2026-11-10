@@ -1023,7 +1023,13 @@
 
   function openPanel() {
     dom.panel.classList.add("open");
-    dom.backdrop.classList.add("show");
+    // 超宽屏（≥1700px）：吸右为常驻栏，不弹遮罩、不挡内容；窄屏仍是居中浮层 + 遮罩
+    if (window.innerWidth >= 1700) {
+      document.body.classList.add("ai-docked");
+      dom.backdrop.classList.remove("show");
+    } else {
+      dom.backdrop.classList.add("show");
+    }
     dom.fab.style.display = "none";
     refreshChips();
     setTimeout(function () { dom.input.focus(); }, 220);
@@ -1039,6 +1045,7 @@
   }
   function closePanel() {
     dom.panel.classList.remove("open");
+    document.body.classList.remove("ai-docked");
     dom.backdrop.classList.remove("show");
     dom.fab.style.display = "";
   }

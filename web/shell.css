@@ -41,6 +41,16 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 a { text-decoration: none; color: inherit; }
 button { font-family: inherit; }
 
+/* 自定义滚动条：降低视觉重量，贴合中性黑 + 金的设计语言（Firefox 用 scrollbar-*，WebKit 用伪元素） */
+* { scrollbar-width: thin; scrollbar-color: rgba(148, 163, 184, .42) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, .40); border-radius: 8px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, .62); }
+
 /* ── 桌面自适应布局（2026-11-10） ──
    旧版是「一台被放大的手机竖屏」：内容列固定在 1024px 居中、字号随屏宽线性放大，
    电脑上两侧大片留白、一屏只放得下两张卡。现在改为：
@@ -57,6 +67,7 @@ button { font-family: inherit; }
   background: var(--shell-bg);
   position: relative;
   overflow-x: hidden;
+  transition: margin .26s ease, width .26s ease;
 }
 @media (min-width: 1024px) {
   body {
@@ -68,26 +79,48 @@ button { font-family: inherit; }
 }
 
 /* 多列内容网格：只重排页面顶层的 .card；头部 / 空态 / 工具条等仍占整行。
-   用 #app 前缀提高特异性，压过页面级 wxss 的 [data-page] .card 规则。 */
+   用 #app 前缀提高特异性，压过页面级 wxss 的 [data-page] .card 规则。
+   横屏自由铺展：列数随视口宽度自动增加，卡片宽度恒定适中，屏越宽铺得越多、
+   单张却不会拉得过长 —— 这是「自由铺展」与「可读性」的平衡点。 */
 @media (min-width: 820px) {
   #app > .page {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-content: start;
-    column-gap: 6px;
+    column-gap: 18px;
+    row-gap: 0;
   }
   #app > .page > * { grid-column: 1 / -1; }
   #app > .page > .card {
     grid-column: auto;
     align-self: start;
-    margin: 12px;   /* 统一覆盖 .card 的 20rpx 24rpx 与 .card + .card 的叠加 */
+    margin: 14px;   /* 统一覆盖 .card 的 20rpx 24rpx 与 .card + .card 的叠加 */
+    border-radius: 18px;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, .06), 0 6px 18px rgba(16, 24, 40, .05);
+    transition: transform .22s ease, box-shadow .22s ease;
+  }
+  #app > .page > .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(16, 24, 40, .10), 0 16px 40px rgba(16, 24, 40, .12);
   }
 }
 @media (min-width: 1700px) {
   #app > .page { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* 超宽屏：四列，把横向空间进一步铺满、单卡宽度仍守在舒适区间 */
+@media (min-width: 2400px) {
+  #app > .page { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* 极致宽屏：自适应列数，每增加约 440px 宽就多铺一列，永不把单卡拉得过宽 */
+@media (min-width: 3200px) {
+  #app > .page { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); align-content: start; }
+}
+/* 文字型页面（设置 / 使用指南等）：超宽屏收成舒适阅读栏，避免一行拉太长 */
 @media (min-width: 1500px) {
-  #app > .page { max-width: 1800px; margin: 0 auto; }
+  #app > .page[data-page="pages/more/more"],
+  #app > .page[data-page="subpkg/guide/guide"] {
+    display: block; max-width: 960px; margin: 0 auto;
+  }
 }
 
 /* 手动「单列」覆盖自动分栏（用户偏好优先） */
@@ -120,9 +153,31 @@ body.force-wide #app > .page > .card {
   background: var(--shell-card); border-right: 1px solid var(--shell-line);
   font: 13px/1.4 -apple-system, system-ui, "PingFang SC", sans-serif;
   box-shadow: 2px 0 18px rgba(0, 0, 0, .06);
+  transition: transform .26s ease, box-shadow .26s ease;
 }
+/* 侧栏收起按钮（在品牌区右上角，让出全宽用） */
+#webSidebar .ws-collapse {
+  position: absolute; top: 14px; right: 12px;
+  width: 30px; height: 30px; border: 1px solid var(--shell-line); background: transparent;
+  color: var(--shell-tx2); border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1;
+}
+#webSidebar .ws-collapse:hover { color: var(--gold); border-color: rgba(212, 169, 78, .5); }
+#webSidebar .ws-collapse:active { transform: scale(.94); }
+/* 侧栏收起后的「展开菜单」浮钮：平时隐藏，折叠态才出现 */
+#wsExpand {
+  display: none;
+  position: fixed; top: 10px; left: 10px; z-index: 9403;
+  align-items: center; gap: 6px;
+  border: 1px solid var(--shell-line); background: var(--shell-card); color: var(--shell-tx);
+  border-radius: 10px; padding: 8px 12px; cursor: pointer;
+  font: 13px/1 -apple-system, system-ui, "PingFang SC", sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .16);
+}
+#wsExpand:hover { color: var(--gold); border-color: rgba(212, 169, 78, .5); }
+#wsExpand:active { transform: scale(.97); }
 #webSidebar .ws-brand {
   padding: 18px 16px 14px; border-bottom: 1px solid var(--shell-line);
+  position: relative;
 }
 #webSidebar .ws-brand b { display: block; color: var(--shell-tx); font-size: 15px; letter-spacing: .5px; }
 #webSidebar .ws-brand span { display: block; color: var(--shell-tx3); font-size: 11px; margin-top: 4px; }
@@ -154,6 +209,11 @@ body.force-wide #app > .page > .card {
   #webNavPanel { left: calc(var(--sidebar-w) + 12px); right: auto; }
   /* 侧栏已常驻全部页面清单，左下角重复入口收起 */
   #webNavOpen { display: none; }
+  /* 侧栏收起：让出全宽，内容铺满屏幕；侧栏滑出视口外，仅留左上「展开菜单」浮钮 */
+  body.sidebar-collapsed #app { margin-left: 0; width: 100%; }
+  body.sidebar-collapsed #webSidebar { transform: translateX(-100%); box-shadow: none; }
+  body.sidebar-collapsed #webTopBar { left: 0; }
+  body.sidebar-collapsed #wsExpand { display: flex; }
 }
 
 /* ── 启动层 ── */
