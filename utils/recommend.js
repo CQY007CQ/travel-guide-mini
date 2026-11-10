@@ -157,12 +157,13 @@ const NEG_PREFIX = ["不", "别", "勿", "莫", "不想", "不愿", "不要", "�
 function hasIntentWord(s, w) {
   let i = s.indexOf(w);
   while (i >= 0) {
-    const prev1 = i >= 1 ? s.charAt(i - 1) : "";
-    const prev2 = i >= 2 ? s.slice(i - 2, i) : "";
+    // 长度无关的否定前缀判定：取紧邻词首的前 n.length 个字逐字比对。
+    // 此前仅特判 1/2 字前缀（prev1/prev2），导致 3 字前缀「千万别」永远无法命中（死条目）；
+    // 现对任意长度统一处理，新增多字否定词无需改这里。
     let neg = false;
     for (let k = 0; k < NEG_PREFIX.length; k++) {
       const n = NEG_PREFIX[k];
-      if (n.length === 1 ? prev1 === n : prev2 === n) { neg = true; break; }
+      if (i >= n.length && s.slice(i - n.length, i) === n) { neg = true; break; }
     }
     if (!neg) return true; // 首个非否定命中即视作有效意图
     i = s.indexOf(w, i + w.length); // 否则跳到下一处（处理"不要便宜但省钱"之类的极端输入）

@@ -1029,5 +1029,23 @@ assert("未打卡城市→无『可二刷』理由", boNo38.why.join("").indexOf
 assert("已打卡『可二刷』贡献正权重(差值≈1.0)", Math.abs((boYes38.b - boNo38.b) - 1.0) < 1e-9, "Δ=" + (boYes38.b - boNo38.b));
 assert("已打卡城市总权重高于未打卡", boYes38.b > boNo38.b, boYes38.b + " vs " + boNo38.b);
 
+console.log("== 40. v1.20.6 · 否定前缀长度无关化（修『千万别』死条目）==");
+// 旧 hasIntentWord 仅特判 1/2 字前缀（prev1/prev2），导致 NEG_PREFIX 里的 3 字项「千万别」
+// 永远无法命中 → 形如「千万别便宜」仍会被解析成预算 low（否定失效）。现改为长度无关的前缀比对。
+const ep40a = R.extractPrefs("千万别便宜", {});
+assert("3 字否定『千万别便宜』不误判为 low", ep40a.budget !== "low", ep40a.budget);
+const ep40b = R.extractPrefs("千万别奢华", {});
+assert("3 字否定『千万别奢华』不误判为 high", ep40b.budget !== "high", ep40b.budget);
+// 回归：正向词本身仍生效
+const ep40c = R.extractPrefs("便宜点，穷游", {});
+assert("正向『便宜』仍解析为 low", ep40c.budget === "low", ep40c.budget);
+// 回归：既有 1/2 字否定不受重构影响
+const ep40d = R.extractPrefs("不想便宜", {});
+assert("2 字否定『不想便宜』不误判为 low", ep40d.budget !== "low", ep40d.budget);
+const ep40e = R.extractPrefs("别豪华", {});
+assert("1 字否定『别豪华』不误判为 high", ep40e.budget !== "high", ep40e.budget);
+const ep40f = R.extractPrefs("别特种兵，轻松点", {});
+assert("1 字否定+正向→leisure（既有用例不变）", ep40f.pace === "leisure", ep40f.pace);
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
