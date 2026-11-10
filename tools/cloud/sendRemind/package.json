@@ -1,9 +1,0 @@
-{
-  "name": "sendRemind",
-  "version": "1.0.0",
-  "description": "旅行攻略生成器：出发提醒订阅消息（入库 + 定时发送）",
-  "main": "index.js",
-  "dependencies": {
-    "wx-server-sdk": "~2.6.3"
-  }
-}
