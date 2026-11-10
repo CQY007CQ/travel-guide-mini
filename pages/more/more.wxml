@@ -156,6 +156,15 @@
             <text class="ins-chip" wx:for="{{insights.fp.rows}}" wx:key="prov">{{item.prov}} {{item.n}}</text>
           </view>
         </view>
+        <view class="ins-sec" wx:if="{{insights.fc.rows.length}}">
+          <view class="ins-h">足迹城市榜（Top）</view>
+          <view class="ins-city" wx:for="{{insights.fc.rows}}" wx:key="name">
+            <text class="ins-rank">{{index + 1}}</text>
+            <text class="ins-city-name">{{item.name}}</text>
+            <text class="ins-city-prov">{{item.prov}}</text>
+            <text class="ins-city-n">{{item.n}} 次</text>
+          </view>
+        </view>
         <view class="ins-sec" wx:if="{{insights.rhythm.tripN}}">
           <view class="ins-h">出行节奏</view>
           <view class="ins-chips">

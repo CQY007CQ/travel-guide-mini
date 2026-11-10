@@ -192,6 +192,9 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
   ok("AI 具备全站上下文 / 站点状态 / 行程生成 / 对外 API",
     ["function context()", "function siteStatus(", "function generatePlan(", "APP.__webAI", "web:pagechange"]
       .every((k) => aiSrc.includes(k)));
+  ok("AI 多轮上下文 / 写操作 / 零伪造校验 / 动态提问 / 清空对话",
+    ["tryRegenerate", "tryAction", "findRealSpot", "dynamicChips", "clearConversation",
+      "aiClear", "state: function", "lastSpots"].every((k) => aiSrc.includes(k)));
 
   // ── 2026-11-10 桌面自适应（横屏）防回潮 ──
   const shell = fs.readFileSync(path.join(ROOT, "web/shell.css"), "utf8");
@@ -233,6 +236,19 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
     readyState: "complete", body: fakeEl(), createElement: fakeEl,
     getElementById: () => null, addEventListener() {},
   };
+  // 与 web/lib/runtime.js 一致的存储 shim：AI 的写操作要经 wx.* 落到 localStorage，
+  // 裸 Node 下没有 wx，store.set 会静默失败，验证就成了空跑。
+  const oldWx = g.wx;
+  g.wx = {
+    getStorageSync(k) {
+      const r = g.localStorage.getItem("wx:" + k);
+      if (r === null) return "";
+      try { return JSON.parse(r); } catch (e) { return r; }
+    },
+    setStorageSync(k, v) { g.localStorage.setItem("wx:" + k, JSON.stringify(v)); },
+    removeStorageSync(k) { g.localStorage.removeItem("wx:" + k); },
+    showToast() {},
+  };
   const appStub = { globalData: {}, setPlan(p) { this.globalData.plan = p; } };
   g.getApp = () => appStub;
   g.__APP_CONFIG = appStub;
@@ -268,8 +284,84 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
     const r7 = AI.reply("你好", AI.context());
     ok("问候带当前页面上下文", /生成攻略/.test(r7.html));
     ok("context() 反映当前页面", AI.context().title === "生成攻略", AI.context().title);
+
+    // ── 多轮上下文 / 写操作 / 零伪造（2026-11-10 续） ──
+    const TR = g.__require("__entry__", "./utils/travel.js");
+    AI.reply("成都吃什么", AI.context());
+    const r8 = AI.reply("那有什么好玩的", AI.context());
+    ok("追问沿用上一轮城市并直接给出景点（不再甩泛话）",
+      /成都/.test(r8.html) && /<li>|ai-row/.test(r8.html), r8.html.slice(0, 100));
+    ok("state() 记住上一轮城市与意图",
+      AI.state().city === "成都" && AI.state().intent === "attraction", JSON.stringify(AI.state()));
+
+    AI.reply("帮我生成成都3天行程", AI.context());
+    const r9 = AI.reply("改成5天", AI.context());
+    ok("在上一份行程上改天数（多轮重排真的写回 globalData）",
+      r9.auto === "pages/plan/plan" && !!appStub.globalData.plan &&
+      appStub.globalData.plan.days.length === 5,
+      JSON.stringify({ auto: r9.auto, days: appStub.globalData.plan && appStub.globalData.plan.days.length }));
+    ok("state() 记住最近生成的行程", !!AI.state().plan && AI.state().plan.days === 5,
+      JSON.stringify(AI.state().plan));
+
+    const before = (TR.getLedger() || []).length;
+    const r10 = AI.reply("记一笔 打车 32", AI.context());
+    const after = (TR.getLedger() || []).length;
+    ok("写操作：一句话记账真的写入本机账本",
+      /已记下/.test(r10.html) && after === before + 1, "before=" + before + " after=" + after);
+
+    const r11 = AI.reply("把西湖加入想玩", AI.context());
+    const wish = TR.getWish();
+    ok("写操作：真实景点加入想玩且城市归属正确",
+      /已加入想玩清单/.test(r11.html) && wish.some((x) => x.name === "西湖" && x.city === "杭州"),
+      JSON.stringify(wish.slice(0, 3)));
+    const r12 = AI.reply("把不存在的景点XYZ加入想玩", AI.context());
+    ok("零伪造：未收录的景点名拒绝写入",
+      /没找到/.test(r12.html) && !/已加入/.test(r12.html), r12.html.slice(0, 110));
+
+    AI.reply("杭州有哪些必去", AI.context());
+    const firstSpot = AI.state().spots[0];
+    const r13 = AI.reply("把第一个加入想玩", AI.context());
+    ok("指代解析：把「第一个」还原成刚列出的真实景点",
+      !!firstSpot && r13.html.indexOf(firstSpot) >= 0, "first=" + firstSpot);
+
+    AI.reset();
+    ok("清空对话同时清掉多轮上下文",
+      AI.state().city === null && AI.state().plan === null && AI.state().spots.length === 0,
+      JSON.stringify(AI.state()));
+
+    // ── 2026-11-10 续②：单景点详情 / 出片点 / 周边城市 / 城市名片 / 精准最佳月份 ──
+    const rSpot = AI.reply("介绍一下西湖", AI.context());
+    ok("单景点详情问答读到真实资料（不编造）",
+      /西湖/.test(rSpot.html) && !/没找到/.test(rSpot.html) &&
+      rSpot.html.replace(/<[^>]+>/g, "").replace(/\s+/g, "").length > 20,
+      rSpot.html.slice(0, 130));
+    ok("单景点详情回答带查找/深度玩法动作",
+      (rSpot.actions || []).some((a) => a.path === "subpkg/spotsearch/spotsearch"));
+
+    const rPhoto = AI.reply("成都哪里出片", AI.context());
+    ok("出片点推荐返回真实机位列表",
+      /成都/.test(rPhoto.html) && /出片|拍照|机位|适合/.test(rPhoto.html), rPhoto.html.slice(0, 110));
+
+    const rNear = AI.reply("成都附近还有哪好玩", AI.context());
+    ok("周边城市按距离推荐",
+      /成都/.test(rNear.html) && /km|附近|顺路|眉山|都江堰/.test(rNear.html), rNear.html.slice(0, 120));
+
+    const rCity = AI.reply("介绍一下成都", AI.context());
+    ok("城市名片返回建议天数/最佳月份/气候",
+      /成都/.test(rCity.html) && /建议玩|最佳出行|气候|消费/.test(rCity.html), rCity.html.slice(0, 120));
+
+    const rMonth = AI.reply("几月去成都最好", AI.context());
+    ok("最佳月份精准到城市（非通用套话）",
+      /成都/.test(rMonth.html) && /最佳出行月份/.test(rMonth.html) && !/通用口径/.test(rMonth.html),
+      rMonth.html.slice(0, 120));
+
+    // 回归：景点列表类问法仍走 attraction，不被 cityinfo 抢走
+    const rMust = AI.reply("杭州有哪些必去", AI.context());
+    ok("「必去」类问法仍返回景点列表（未被城市名片抢走）",
+      /杭州/.test(rMust.html) && /<li>|ai-row|代表性/.test(rMust.html), rMust.html.slice(0, 100));
   }
   g.document = oldDoc;
+  g.wx = oldWx;
 }
 
 console.log("\n结果：" + pass + " 通过 / " + fail + " 失败");

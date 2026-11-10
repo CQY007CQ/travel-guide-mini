@@ -38,12 +38,14 @@ function initDeep() {
     if (typeof require.async === "function") {
       try {
         // 静态字面量（微信编译期必须静态，否则分包内容加载不到 → 白屏）
-        const [m1, m2] = await Promise.all([
+        const [m1, m2, m3] = await Promise.all([
           require.async("../subai/data/ai-deep.js"),
-          require.async("../subai/data/ai-deep-extra.js")
+          require.async("../subai/data/ai-deep-extra.js"),
+          require.async("../subai/data/ai-deep-auto.js")
         ]);
         applyMod(m1);
         applyMod(m2);
+        applyMod(m3);
       } catch (e) {
         S.err = true;
         if (typeof console !== "undefined" && console.warn) console.warn("[aicontent] 深度内容加载失败:", e && e.message);
@@ -53,6 +55,7 @@ function initDeep() {
       try {
         applyMod(require("../subai/data/ai-deep.js"));
         applyMod(require("../subai/data/ai-deep-extra.js"));
+        applyMod(require("../subai/data/ai-deep-auto.js"));
       } catch (e) {
         S.err = true;
       }

@@ -25,8 +25,10 @@
   position: fixed; inset: 0; z-index: 9989;
   background: rgba(8, 10, 14, .5); backdrop-filter: blur(2px);
   opacity: 0; transition: opacity .2s ease;
+  /* 收起时不能吃掉页面点击：只靠 opacity:0 仍会接收事件 */
+  pointer-events: none;
 }
-.ai-backdrop.show { opacity: 1; }
+.ai-backdrop.show { opacity: 1; pointer-events: auto; }
 
 .ai-panel {
   position: fixed; z-index: 9990;
@@ -50,6 +52,8 @@
     height: min(76vh, 700px);
   }
 }
+/* tab 页底部有约 50px 的原生 tabBar，面板要抬高，否则输入框下沿被压住 */
+body.has-tabbar .ai-panel { bottom: calc(64px + env(safe-area-inset-bottom)); }
 
 /* 头部 */
 .ai-head {
@@ -205,5 +209,14 @@
     width: min(560px, calc(100vw - var(--sidebar-w, 224px) - 48px));
   }
   .ai-panel.open { transform: translateY(0); }
+  body.has-tabbar .ai-panel { bottom: calc(24px + env(safe-area-inset-bottom)); }
   .ai-fab { right: 24px; }
 }
+
+/* 清空对话按钮（与设置齿轮同排，清掉多轮上下文避免串城） */
+.ai-head .ai-clear {
+  flex-shrink: 0; border: 1px solid var(--shell-line, rgba(19, 29, 49, .1));
+  background: transparent; cursor: pointer; color: var(--shell-tx2, #5b6b82);
+  font-size: 11px; line-height: 1; padding: 7px 9px; border-radius: 8px;
+}
+.ai-head .ai-clear:hover { color: var(--gold, #d4a94e); border-color: rgba(212, 169, 78, .5); }

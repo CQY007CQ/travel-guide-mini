@@ -38,14 +38,42 @@ function ok(name, cond, extra) {
   else { fail++; console.log("  ✗ FAIL: " + name + (extra ? "  → " + extra : "")); }
 }
 
-// ── #1/#19 密钥无明文 ──
+// ── #1/#19 密钥无明文（已提交/公开仓库口径） ──
+// 2026-11-09 业主决策：本人和风 Key 内置进源码、仅朋友间使用，但「绝不提交到公开仓库」。
+// 因此守卫的语义必须是「已提交版本（HEAD）无明文」，而非工作区——工作区允许存在
+// 未提交的本地内置覆盖（保住朋友间便利）。一旦有人 git commit 把 Key 提交进仓库，
+// 下次本守卫立即变红拦截，把「不要提交公开仓库」变成自动护栏。
+// 注：check-secrets.mjs 仍扫描工作区并据实标红（提醒「本地有明文、勿提交」），属预期内红。
+function committedContent(rel) {
+  try {
+    const { execSync } = require("child_process");
+    return execSync(`git show HEAD:${rel}`, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  } catch (e) { return null; } // 非 git 仓库 / 文件未跟踪 → 回退到严格读工作区
+}
 try {
   const keys = require(path.join(ROOT, "utils/keys.js"));
   const D = keys.DEFAULT || {};
-  ok("#1/#19 DEFAULT.qweatherKey 为空串（无明文回潮）", D.qweatherKey === "", JSON.stringify(D.qweatherKey));
-  ok("#1/#19 DEFAULT.qweatherHost 为空串", D.qweatherHost === "", JSON.stringify(D.qweatherHost));
-  ok("#1/#19 DEFAULT.amapKey 为空串", D.amapKey === "", JSON.stringify(D.amapKey));
   ok("#1/#19 setKeys 运行时注入仍可用", typeof keys.setKeys === "function");
+  // 已提交版本必须干净（HEAD 口径）
+  const headSrc = committedContent("utils/keys.js");
+  if (headSrc === null) {
+    // 无 git / 未跟踪：退化为严格检查工作区，避免本地无 git 时漏检
+    ok("#1/#19 DEFAULT.qweatherKey 为空串（无明文回潮）", D.qweatherKey === "", JSON.stringify(D.qweatherKey));
+    ok("#1/#19 DEFAULT.qweatherHost 为空串", D.qweatherHost === "", JSON.stringify(D.qweatherHost));
+    ok("#1/#19 DEFAULT.amapKey 为空串", D.amapKey === "", JSON.stringify(D.amapKey));
+  } else {
+    // 先滤掉注释行（含示例占位符 `qweatherKey:"..."` 的说明文字），只比对真实赋值
+    const code = headSrc.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+    const m = /qweatherKey:\s*"([^"]*)"|qweatherKey:\s*'([^']*)'/.exec(code);
+    const h = /qweatherHost:\s*"([^"]*)"|qweatherHost:\s*'([^']*)'/.exec(code);
+    // 注意：捕获到空串 "" 是合法值（HEAD 应为空），不能用 `||` 短路（空串会被当成 falsy 跳到 undefined 组）
+    const kVal = m ? (m[1] !== undefined ? m[1] : m[2]) : "";
+    const hVal = h ? (h[1] !== undefined ? h[1] : h[2]) : "";
+    ok("#1/#19 已提交 HEAD:utils/keys.js 无明文 qweatherKey", kVal === "", JSON.stringify(kVal));
+    ok("#1/#19 已提交 HEAD:utils/keys.js 无明文 qweatherHost", hVal === "", JSON.stringify(hVal));
+    // 工作区允许本地未提交的内置覆盖（朋友间使用），仅作信息提示不判失败
+    if (D.qweatherKey) console.log("  ℹ 工作区含未提交的内置和风 Key（本地/朋友间使用，按业主决策允许；勿 git commit）");
+  }
 } catch (e) {
   fail++; console.log("  ✗ FAIL: 加载 utils/keys.js 抛错  → " + e.message);
 }

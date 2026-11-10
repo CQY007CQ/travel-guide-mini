@@ -8,6 +8,7 @@ const AD = require("../utils/ad.js");
 // 确保 ignoreUploadUnusedFiles 开启时也不会被当成未使用文件剔除。
 require("../data/ai-deep.js");
 require("../data/ai-deep-extra.js");
+require("../data/ai-deep-auto.js");
 
 const BLOCK_ICON = {
   "本地人的节奏": "bulb",

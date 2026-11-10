@@ -83,6 +83,9 @@
     { key: "season",     kw: /天气|季节|几月|最佳时间|什么时候|穿|温度|冷|热|雨季|避开|气候|舒服|适宜/ },
     { key: "packing",    kw: /带|必备|准备|行李|物品|装备|清单|收拾|要带|装/ },
     { key: "transport",  kw: /怎么去|交通|高铁|飞机|机场|车站|到达|自驾|火车|怎么到|怎么走/ },
+    { key: "photo",      kw: /出片|拍照|摄影|机位|美照|取景|怎么拍|拍什么|拍照点|出片点|拍照片/ },
+    { key: "near",       kw: /附近|周边|顺路|邻近|周边城市|附近城市|同省|还有哪.*(玩|去|逛)/ },
+    { key: "cityinfo",   kw: /介绍|概况|名片|怎么样|咋样|适合玩几天|城市简介|城市概况/ },
     { key: "greeting",   kw: /你好|您好|hi|hello|在吗|助手|你是|嗨|在么|你是谁/ },
     { key: "help",       kw: /能做什么|怎么用|功能|帮助|会什么|能帮|干什么|怎么操作/ },
   ];
@@ -138,6 +141,24 @@
     if (D.FOOD_SPOTS && D.FOOD_SPOTS[city] && D.FOOD_SPOTS[city].length) return true;
     if (D.SPOT_COORDS && D.SPOT_COORDS[city] && D.SPOT_COORDS[city].length) return true;
     return false;
+  }
+
+  /* 单景点名识别：复用 SPOT_DETAILS 的策展键（930 个具名真实景点）拼成最长优先正则，
+     只做「文本里是否提到了某个已知景点」，配合 findRealSpot 取回真实城市归属 —— 绝不编造。 */
+  var _spotReg = null;
+  function spotRegex() {
+    if (_spotReg) return _spotReg;
+    var D = getD(), keys = Object.keys(D.SPOT_DETAILS || {}).filter(function (k) { return k && k.length >= 2; });
+    keys.sort(function (a, b) { return b.length - a.length; });
+    var esc = keys.map(function (k) { return k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); });
+    _spotReg = new RegExp(esc.join("|"), "g");
+    return _spotReg;
+  }
+  function findSpotInText(text) {
+    var reg = spotRegex(), m, found = null, fl = 0;
+    reg.lastIndex = 0;
+    while ((m = reg.exec(text)) !== null) { if (m[0].length > fl) { fl = m[0].length; found = m[0]; } }
+    return found;
   }
 
   /* ───────── 4. 全站动作 ───────── */
@@ -234,6 +255,7 @@
     } catch (e) {
       return { ok: false, msg: "行程已算出但保存失败：" + escapeHtml(e && e.message ? e.message : String(e)) };
     }
+    lastPlan = { city: city.name, days: plan.totalDays };
     return { ok: true, plan: plan };
   }
 
@@ -347,13 +369,19 @@
   }
 
   /* ───────── 7. 回复生成（离线） ───────── */
+  /* ── 多轮会话状态：接着上一轮聊、并在上一份行程上继续改 ── */
   var lastCity = null;
+  var lastIntent = null;      // 上一轮实际处理的意图
+  var lastPlan = null;        // { city, days } 最近一次由 AI 生成的行程
+  var lastSpots = [];         // 最近列出的真实景点名（供「把第一个加入想玩」）
+  var lastShops = [];         // 最近列出的真实店铺名
   function escapeHtml(s) {
     return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
   function foodHtml(city) {
     var foods = getFoods(city, 6);
     if (!foods.length) return null;
+    lastShops = foods.map(function (f) { return f.shop; }).filter(Boolean);
     var lines = foods.map(function (f) {
       var dishes = (f.menu || []).slice(0, 3).map(function (m) { return m.n; }).filter(Boolean).join("、");
       var price = f.price;
@@ -369,6 +397,7 @@
   function landmarkHtml(city) {
     var names = getLandmarks(city, 8);
     if (!names.length) return null;
+    lastSpots = names.filter(function (x) { return typeof x === "string"; });
     var D = getD();
     var lis = names.map(function (nm) {
       var d = D.SPOT_DETAILS && D.SPOT_DETAILS[nm];
@@ -377,6 +406,149 @@
       return "<li>" + escapeHtml(nm) + "</li>";
     }).join("");
     return "<div class='ai-muted'>" + escapeHtml(city) + " · 代表性去处（" + names.length + "+）</div><ul>" + lis + "</ul>";
+  }
+
+  /** 在离线库里找真实存在的景点名；找不到返回 null —— 绝不把用户随口说的名字写进想玩 */
+  function findRealSpot(name) {
+    var nm = String(name || "").trim();
+    if (nm.length < 2) return null;
+    var D = getD(), coords = D.SPOT_COORDS || {}, cities = Object.keys(coords), i, j, arr, s;
+    // 精确优先，并带上景点真实所属城市（否则「西湖」会被记到上一轮聊的成都名下）
+    for (i = 0; i < cities.length; i++) {
+      arr = coords[cities[i]] || [];
+      for (j = 0; j < arr.length; j++) {
+        s = Array.isArray(arr[j]) ? arr[j][0] : (arr[j] && arr[j].name ? arr[j].name : arr[j]);
+        if (typeof s === "string" && s === nm) return { name: s, city: cities[i] };
+      }
+    }
+    // 详情库里收录但暂无坐标的景点也算真实
+    if (D.SPOT_DETAILS && D.SPOT_DETAILS[nm]) return { name: nm, city: "" };
+    // 最后才做包含匹配，避免「西湖」被「西湖天地」抢走
+    for (i = 0; i < cities.length; i++) {
+      arr = coords[cities[i]] || [];
+      for (j = 0; j < arr.length; j++) {
+        s = Array.isArray(arr[j]) ? arr[j][0] : (arr[j] && arr[j].name ? arr[j].name : arr[j]);
+        if (typeof s === "string" && s.indexOf(nm) >= 0) return { name: s, city: cities[i] };
+      }
+    }
+    return null;
+  }
+
+  /** 写操作：只做「用户明确指令 + 本地可逆」的两件事，全部走项目真实 API，零伪造 */
+  function tryAction(text, ctx, place) {
+    var T = getT();
+
+    // ① 记一笔账。只认「记一笔 / 记一下 / 记账」开头的明确指令，
+    //    避免与「今天花了多少」这类查询混淆（查询由 siteStatus 先处理）。
+    var mBill = text.match(/^(?:帮我|请|给我)?\s*(?:记一笔|记一下|记个账|记下|加一笔|记账)\s*(.+)$/);
+    if (mBill) {
+      var b = T.parseQuickBill ? T.parseQuickBill(mBill[1]) : null;
+      if (!b) return {
+        html: "没从「" + escapeHtml(mBill[1]) + "」里识别出金额。写成「记一笔 打车 32」这种带数字的说法就行～",
+        actions: [act("subpkg/ledger/ledger", "打开账本 →")],
+      };
+      try {
+        T.addLedger(b.amt, b.cat, b.name);
+        if (APP.__webRefresh) APP.__webRefresh();
+        return {
+          html: "已记下 <b>¥" + b.amt + "</b> · " + escapeHtml(b.cat) + " · " + escapeHtml(b.name) +
+            "（写入本机账本；说「今天花了多少」可查，去账本页可删）。",
+          actions: [act("subpkg/ledger/ledger", "打开账本核对 →"),
+            act("pages/today/today", "打开今天 →", {}, "tab")],
+        };
+      } catch (e) {
+        return {
+          html: "写入账本失败：" + escapeHtml(e && e.message ? e.message : String(e)),
+          actions: [act("subpkg/ledger/ledger", "打开账本 →")],
+        };
+      }
+    }
+
+    // ② 加入想玩：名字必须能在离线景点库里查到，否则明确拒绝，不编造、不写脏数据
+    var mWish = text.match(/(?:把|将)?\s*(.{2,24}?)\s*(?:加入|加到|放进|加进|添加进|添加到)\s*想玩/) ||
+      text.match(/想玩(?:清单|列表|池)?\s*(?:里)?\s*(?:加|添加|加入)\s*(.{2,24})/);
+    if (mWish) {
+      var raw = String(mWish[1] || "").trim();
+      if (/第一个|刚才|上面|它|这个|那个/.test(raw) && lastSpots.length) raw = lastSpots[0];
+      raw = raw.replace(/^(?:把|将|这个|那个)\s*/, "").replace(/[，。！？!?,.]$/, "").trim();
+      var real = findRealSpot(raw);
+      if (!real) return {
+        html: "离线景点库里没找到「" + escapeHtml(raw) + "」，我不把没收录的名字写进想玩清单。可以说得更准确些，或先问「成都有哪些必去」再挑一个。",
+        actions: [act("subpkg/spotsearch/spotsearch", "按标签找景点 →")],
+      };
+      var city = real.city || ((place && place.type === "city") ? place.name :
+        (lastCity || (ctx.plan && ctx.plan.cityName) || ""));
+      var was = T.isWished ? T.isWished(real.name) : false;
+      try {
+        T.toggleWish(real.name, city);
+      } catch (e) {
+        return { html: "写入想玩清单失败：" + escapeHtml(e && e.message ? e.message : String(e)) };
+      }
+      return {
+        html: (was ? "已从想玩清单移除" : "已加入想玩清单") + "：<b>" + escapeHtml(real.name) + "</b>" +
+          (city ? "（" + escapeHtml(city) + "）" : "") + "。再说一次可" + (was ? "重新加入" : "取消") +
+          "；生成行程时会优先排进去。",
+        actions: [act("pages/index/index", "去生成攻略 →", {}, "tab"),
+          act("subpkg/spotsearch/spotsearch", "按标签找景点 →")],
+      };
+    }
+    return null;
+  }
+
+  /** 在上一份行程基础上改天数 / 重新生成（多轮） */
+  function tryRegenerate(text, place) {
+    var hasDays = /(\d+|[一二三四五六七八九十两])\s*(?:天|日)/.test(text);
+    var tweak = /改成|换成|改为|调成/.test(text);
+    var explicit = /重新生成|再生成|重排|换一份/.test(text);
+    if (!((hasDays && tweak) || explicit)) return null;
+    var city = (place && place.type === "city") ? place.name : (lastPlan && lastPlan.city);
+    if (!city) return null;    // 没有上一份行程可改，交回普通流程
+    var days = hasDays ? parseDays(text) : (lastPlan ? lastPlan.days : 3);
+    var res = generatePlan(city, days);
+    if (!res.ok) return {
+      html: res.msg, actions: [act("pages/index/index", "打开生成攻略 →", {}, "tab")],
+    };
+    return {
+      html: "已把 <b>" + escapeHtml(city) + "</b> 的行程重排为 <b>" + res.plan.totalDays +
+        " 天</b>（出发日 " + escapeHtml(res.plan.depart) + "），并写入当前行程。\n" + siteSummary(context()),
+      actions: [act("pages/plan/plan", "打开每日行程 →", {}, "tab"),
+        act("subpkg/map/map", "看地图导引 →")],
+      auto: "pages/plan/plan", mode: "tab",
+    };
+  }
+
+  /** 单景点详情问答（离线真实资料，零伪造）：「介绍一下西湖」「西湖门票多少」「外滩值得去吗」 */
+  function trySpotDetail(text, ctx, place) {
+    // 仅在用户明显在问「某个具体景点」时介入，且不抢「生成行程」类指令
+    if (/生成|做一份|排一份|规划|路线|几天|日游|安排一下|行程|把我/.test(text)) return null;
+    if (!/介绍|简介|怎么样|咋样|门票|开放时间|几点开|几点开放|游玩|值得去|百科|科普|攻略|是什么|讲讲|说说|详情/.test(text)) return null;
+    var name = findSpotInText(text);
+    if (!name) return null;                       // 文本里没提到任何已知景点 → 交回通用流程
+    var T = getT();
+    // 城市提示优先级：景点真实归属城市 > 文本里识别到的城市 > 上一轮城市 > 当前行程城市
+    var real = findRealSpot(name);                 // 全库扫描，取回真实城市归属（不跨城误配）
+    var cityHint = (real && real.city) ? real.city
+      : (place && place.type === "city") ? place.name
+      : (lastCity || (ctx.plan && ctx.plan.cityName) || "");
+    var lk = T.spotLookup ? T.spotLookup(name, cityHint) : null;
+    var bk = T.baikeInfo ? T.baikeInfo(name, cityHint) : { has: false };
+    var intro = (lk && lk.intro) || (bk && bk.intro) || "";
+    var facts = [];
+    if (T.spotInfoText) { var si = T.spotInfoText(name); if (si) facts.push(si); }
+    if (bk && bk.text && bk.text !== intro) facts.push(bk.text);
+    if (lk && lk.how) facts.push("怎么去：" + lk.how);
+    lastSpots = [name];                            // 让「把第一个/它加入想玩」可接着用
+    var lines = [];
+    lines.push("<b>" + escapeHtml(name) + "</b>" + (cityHint ? "（" + escapeHtml(cityHint) + "）" : ""));
+    if (intro) lines.push(escapeHtml(intro.length > 120 ? intro.slice(0, 120) + "…" : intro));
+    if (facts.length) lines.push(facts.map(function (f) { return "<div class='ai-row'>· " + escapeHtml(f) + "</div>"; }).join(""));
+    if (!intro && !facts.length)
+      lines.push("离线库已收录该景点的坐标/交通信息，但暂未整理深度百科。可以生成行程把它排进去，或问「成都吃什么」这类周边信息。");
+    return {
+      html: lines.join("\n"),
+      actions: [act("subpkg/spotsearch/spotsearch", "按标签找更多景点 →"),
+        act("subai/deep/deep", "城市深度玩法 →", cityHint ? { city: cityHint } : {})],
+    };
   }
 
   function buildReply(text, ctx) {
@@ -389,7 +561,21 @@
 
     // ① 站点状态：读真实账本/行程/清单/足迹，优先于泛化问答
     var site = siteStatus(text, ctx);
-    if (site) return site;
+    if (site) { lastIntent = "status"; return site; }
+
+    // ①b 明确指令的写操作（记账 / 加入想玩），全部走真实 API 并校验名字
+    var action = tryAction(text, ctx, place);
+    if (action) { lastIntent = "action"; return action; }
+
+    // ①c 在上一份行程上继续改：改成 N 天 / 重新生成
+    var regen = tryRegenerate(text, place);
+    if (regen) { lastIntent = "itinerary"; return regen; }
+
+    // 追问：没提城市但有明确意图时，沿用上一轮城市，直接给答案而不是甩一句泛话
+    var isFollowup = !place && lastCity && intent !== "general" &&
+      (/那|这|它|呢|再|还|又|刚才|上面|同一/.test(text) ||
+        /^(?:有什么|有哪些|吃什么|玩什么|怎么玩|几月|什么时候|带什么|好吃|必去)/.test(text));
+    if (isFollowup) place = { type: "city", name: lastCity };
 
     // ② 直接把行程排出来（不是回一句「去规划页」）
     if (detectGenerate(text)) {
@@ -403,6 +589,7 @@
       var n = parseDays(text);
       var res = generatePlan(target, n);
       if (!res.ok) return { html: res.msg, actions: [act("pages/index/index", "打开生成攻略 →", {}, "tab")] };
+      lastIntent = "itinerary";
       var d0 = res.plan.days[0] || {};
       return {
         html: "已为 <b>" + escapeHtml(target) + "</b> 生成 <b>" + res.plan.totalDays + " 天</b>行程（出发日 " +
@@ -451,13 +638,19 @@
       };
     if (intent === "help")
       return {
-        html: "我能帮你：\n• <b>查数据</b>：城市美食 / 景点地标 / 最佳季节 / 必备清单\n" +
+        html: "我能帮你：\n• <b>查数据</b>：城市美食 / 景点地标 / 单景点详情（「介绍一下西湖」）/ 最佳月份 / 出片点（「成都哪里出片」）/ 周边城市（「成都附近还有哪好玩」）/ 城市名片（「介绍一下成都」）/ 必备清单\n" +
           "• <b>读当前状态</b>：行程体检、倒计时、今天花费、行李进度、足迹、动线步行量\n" +
           "• <b>真干活</b>：直接生成并写入行程、带参数跳到任意一页（含地图指定某一天）\n" +
+          "• <b>接着聊</b>：问完「成都吃什么」，直接说「那有什么好玩的」「改成 5 天」\n" +
+          "• <b>写本机数据</b>：「记一笔 打车 32」「把西湖加入想玩」（只写离线库里真实存在的景点）\n" +
           "• <b>全站导航</b>：说「打开美食页」「看第 2 天地图」即可\n\n" +
           (llmEnabled() ? "已接入大模型，可自由对话。" : "默认纯离线，无需联网、无需 Key。") + "\n" + siteSummary(ctx),
         actions: pageActions(ctx, "general"),
       };
+
+    // ④b 单景点详情问答（离线真实资料，零伪造）：先于此处理，让「西湖怎么样」即使没提城市也能答
+    var spot = trySpotDetail(text, ctx, place);
+    if (spot) { lastIntent = "spot"; return spot; }
 
     // ⑤ 省份
     if (place && place.type === "province") {
@@ -476,6 +669,8 @@
 
     // ⑥ 城市类
     if (place && place.type === "city") {
+      lastIntent = intent;
+      var T = getT();
       var city = place.name;
       if (intent === "food") {
         var fh = foodHtml(city);
@@ -494,8 +689,13 @@
         };
       }
       if (intent === "season") {
+        var T = getT();
+        var bm = T.bestTravelMonth ? T.bestTravelMonth(city) : "";
         return {
-          html: "去 <b>" + escapeHtml(city) + "</b> 的最佳季节（通用口径）：\n• 春秋（4–5 / 9–10 月）最舒服，少雨温度宜人；\n• 夏季防暑防晒、南方多雨带伞；\n• 冬季北方保暖、南方防潮。\n具体月份穿衣与当日天气，行程页会按出发日期提示～",
+          html: "去 <b>" + escapeHtml(city) + "</b> 的最佳出行月份：<b>" + escapeHtml(bm || "春秋最宜（4–5 / 9–10 月）") + "</b>。\n" +
+            "• 春秋（4–5 / 9–10 月）最舒服，少雨温度宜人；\n" +
+            "• 夏季防暑防晒、南方多雨带伞；\n• 冬季北方保暖、南方防潮。\n" +
+            "具体月份穿衣与当日天气，行程页会按出发日期提示～",
           actions: pageActions(ctx, "season"),
         };
       }
@@ -515,6 +715,46 @@
           actions: pageActions(ctx, "transport"),
         };
       }
+      if (intent === "photo") {
+        var ps = T.photoSpotOf ? T.photoSpotOf(city) : [];
+        if (ps.length) {
+          return {
+            html: "<b>" + escapeHtml(city) + "</b> 适合出片 / 拍照的地方（离线库整理）：\n<ul>" +
+              ps.map(function (n) { return "<li>" + escapeHtml(n) + "</li>"; }).join("") + "</ul>" +
+              "清晨和黄昏光线最出片，带上相机或手机就出发～",
+            actions: pageActions(ctx, "attraction"),
+          };
+        }
+        return {
+          html: "<b>" + escapeHtml(city) + "</b> 暂时没有整理专门出片点，可以先生成行程沿途找机位，或看城市深度玩法。",
+          actions: [actPlan(city), act("subai/deep/deep", "城市深度玩法 →", { city: city })],
+        };
+      }
+      if (intent === "near") {
+        var nb = T.nearbyCities ? T.nearbyCities(city, 6) : [];
+        if (nb.length) {
+          return {
+            html: "<b>" + escapeHtml(city) + "</b> 附近值得顺路逛的城市（按直线距离）：\n" +
+              nb.map(function (x) {
+                return "<div class='ai-row'>· " + escapeHtml(x.name) + "（" + escapeHtml(x.province || "") + "）约 " + x.km + " km</div>";
+              }).join("") + "\n想看哪座？直接说城市名，我给你美食、景点和最佳月份～",
+            actions: [act("pages/index/index", "去生成攻略 →", {}, "tab")],
+          };
+        }
+        return { html: "<b>" + escapeHtml(city) + "</b> 附近暂无可推荐城市。", actions: [actPlan(city)] };
+      }
+      if (intent === "cityinfo") {
+        var cb = T.cityBrief ? T.cityBrief(city) : null;
+        if (cb) {
+          var ci = ["<b>" + escapeHtml(cb.name) + "</b> · 建议玩 <b>" + cb.days + " 天</b> · " + escapeHtml(cb.climateTxt || "") +
+            " · " + escapeHtml(cb.costTxt || "")];
+          ci.push("最佳出行：<b>" + escapeHtml(cb.best || "四季皆宜") + "</b>");
+          if (cb.foods && cb.foods.length) ci.push("招牌：" + cb.foods.map(escapeHtml).join("、"));
+          if (cb.areas && cb.areas.length) ci.push("热门住宿区：" + cb.areas.map(escapeHtml).join("、"));
+          return { html: ci.join("\n"), actions: pageActions(ctx, "general") };
+        }
+        return { html: "关于 <b>" + escapeHtml(city) + "</b>，离线库里没有更详细的城市名片；我可以先生成一份行程。", actions: [actPlan(city)] };
+      }
       var fhtml = foodHtml(city) || "";
       var lhtml = landmarkHtml(city);
       var both = fhtml + (lhtml ? ("\n" + lhtml) : "");
@@ -533,6 +773,9 @@
         season: "问我「几月去 XX 最好」，把 XX 换成城市名就行～",
         packing: "去哪类目的地？告诉我城市，我给精准清单与进度。",
         transport: "说个城市，我告诉你怎么到、落地怎么走。",
+        photo: "想拍美照？说「XX 哪里出片」，我列出适合拍照的地方（如「成都哪里出片」）。",
+        near: "说「XX 附近还有哪好玩」，我按距离推荐顺路城市。",
+        cityinfo: "说「介绍一下 XX」或「XX 适合玩几天」，我给你城市名片。",
       };
       return {
         html: (tips[intent] || "") + "\n\n也可以先看看这些已收录城市：\n" +
@@ -542,11 +785,15 @@
       };
     }
 
-    if (lastCity)
+    if (lastCity) {
+      var hint = lastIntent === "food" ? "要我换成景点、最佳季节，还是直接排成行程？" :
+        lastIntent === "attraction" ? "想看美食、最佳季节，还是把它排进行程？" :
+        "可以问美食、景点、最佳季节，或者说「改成 5 天」重排上一份行程。";
       return {
-        html: "我可以帮你查 <b>" + escapeHtml(lastCity) + "</b> 的美食、景点、季节或清单，也可以直接生成行程。\n" + siteSummary(ctx),
+        html: "接着聊 <b>" + escapeHtml(lastCity) + "</b>：" + hint + "\n" + siteSummary(ctx),
         actions: pageActions(ctx, "general"),
       };
+    }
     return {
       html: "我是旅行攻略生成器的内置助手 🧭 当前在 <b>" + escapeHtml(ctx.title) + "</b> 页。\n" +
         "试试「成都吃什么」「帮我生成杭州 3 天行程」「行程体检」，或点下面的快捷提问～",
@@ -639,6 +886,7 @@
         "<div class='ai-avatar'>🧭</div>" +
         "<div style='flex:1'><div class='ai-title'>旅行 AI 助手</div>" +
         "<div class='ai-sub' id='aiCtx'>离线知识库 · 内置</div></div>" +
+        "<button class='ai-clear' id='aiClear' title='清空对话与上下文'>清空</button>" +
         "<button class='ai-gear' id='aiGear' title='设置'>⚙</button>" +
         "<button class='ai-x' id='aiClose' title='关闭'>×</button>" +
       "</div>" +
@@ -675,6 +923,7 @@
     panel.querySelector("#aiClose").addEventListener("click", closePanel);
     panel.querySelector("#aiSend").addEventListener("click", send);
     panel.querySelector("#aiGear").addEventListener("click", function () { dom.settings.classList.toggle("show"); });
+    panel.querySelector("#aiClear").addEventListener("click", clearConversation);
     dom.input.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
     });
@@ -712,7 +961,7 @@
   /** 快捷提问随当前页面变化 —— AI 跟着用户所在页面走，不是固定的一组问题 */
   var CHIPS = {
     "*": ["成都吃什么", "杭州最佳季节", "帮我生成成都3天行程", "我今天花了多少", "行程体检"],
-    "pages/index/index": ["帮我生成成都3天行程", "杭州5日游怎么安排", "西安有哪些必去", "去海边要带什么"],
+    "pages/index/index": ["帮我生成成都3天行程", "杭州5日游怎么安排", "西安有哪些必去", "成都附近还有哪好玩"],
     "pages/today/today": ["今天还剩几项安排", "我今天花了多少", "还差几天出发", "打包清单进度"],
     "pages/plan/plan": ["行程体检", "哪天最累", "看第2天地图", "总花费和预算对比"],
     "pages/more/more": ["足迹点亮几座城", "帮我生成西安4天行程", "打开使用指南", "数据怎么备份"],
@@ -722,23 +971,54 @@
     "subpkg/map/map": ["看第2天地图", "哪天最累", "今天还剩几项安排", "打开美食页"],
     "subpkg/ledger/ledger": ["我今天花了多少", "总花费和预算对比", "怎么 AA 分账", "行程体检"],
     "subpkg/prep/prep": ["还差几项没准备", "打包清单进度", "打开出行准备", "还差几天出发"],
-    "subpkg/spotsearch/spotsearch": ["重庆有哪些必去", "按标签找景点", "生成重庆3天行程"],
+    "subpkg/spotsearch/spotsearch": ["重庆有哪些必去", "成都哪里出片", "按标签找景点", "生成重庆3天行程"],
     "subpkg/toolkit/toolkit": ["打开旅行百宝箱", "行程体检", "生成一份行程"],
-    "subpkg/assistant/assistant": ["成都吃什么", "杭州最佳季节", "打开本地速查"],
+    "subpkg/assistant/assistant": ["成都吃什么", "介绍一下西湖", "杭州最佳季节", "打开本地速查"],
     "subai/deep/deep": ["这个城市怎么避坑", "生成一份行程", "看第2天地图"],
     "subpkg/guide/guide": ["怎么用这个应用", "打开使用指南", "帮我生成成都3天行程"],
   };
+  /** 动态快捷提问：跟着当前行程、当前所在天、上一份行程和刚列出的景点走 */
+  function dynamicChips(ctx) {
+    var out = [], p = ctx.plan;
+    if (p && p.cityName && p.days && p.days.length) {
+      var shortCity = String(p.cityName).split(" → ")[0];
+      out.push(shortCity + "吃什么");
+      var st = null;
+      try { var T0 = getT(); st = T0.todayState ? T0.todayState(p) : null; } catch (e) {}
+      var dayNo = st && st.phase === "during" ? st.dayNo : 1;
+      out.push("看第" + dayNo + "天地图");
+      out.push("改成" + Math.min(14, p.days.length + 1) + "天");
+    }
+    if (lastPlan && lastPlan.city) out.push("重新生成" + lastPlan.city + "行程");
+    if (lastSpots.length && lastSpots[0].length <= 8) out.push("把" + lastSpots[0] + "加入想玩");
+    return out;
+  }
   function refreshChips() {
     if (!dom.chips) return;
     var ctx = context();
-    var list = CHIPS[ctx.path] || CHIPS["*"];
+    var list = (CHIPS[ctx.path] || CHIPS["*"]).slice();
+    dynamicChips(ctx).forEach(function (t) { if (list.indexOf(t) < 0) list.unshift(t); });
+    list = list.filter(function (t, i, a) { return a.indexOf(t) === i; }).slice(0, 6);
     dom.chips.innerHTML = "";
     list.forEach(function (t) {
       var b = el("button", "ai-chip", escapeHtml(t));
       b.addEventListener("click", function () { dom.input.value = t; send(); });
       dom.chips.appendChild(b);
     });
-    if (dom.ctxLine) dom.ctxLine.textContent = "当前：" + ctx.title + " · 离线内置";
+    if (dom.ctxLine) {
+      dom.ctxLine.textContent = "当前：" + ctx.title +
+        (lastPlan ? " · 已记住 " + lastPlan.city + " " + lastPlan.days + " 天" : "") + " · 离线内置";
+    }
+  }
+
+  /** 清空对话同时清掉多轮上下文，避免上一座城市串到下一轮 */
+  function clearConversation() {
+    history = [];
+    lastCity = null; lastIntent = null; lastPlan = null; lastSpots = []; lastShops = [];
+    dom.msgs.innerHTML = "";
+    dom._welcomed = true;
+    pushBot("已清空对话与上下文。可以重新问「成都吃什么」，或让我生成一份新行程。");
+    refreshChips();
   }
 
   function openPanel() {
@@ -856,6 +1136,15 @@
     generatePlan: generatePlan,
     open: openPanel,
     close: closePanel,
+    reset: clearConversation,
+    // 只读的多轮上下文快照，便于外壳/测试确认 AI 记住了什么
+    state: function () {
+      return {
+        city: lastCity, intent: lastIntent,
+        plan: lastPlan ? { city: lastPlan.city, days: lastPlan.days } : null,
+        spots: lastSpots.slice(), shops: lastShops.slice(),
+      };
+    },
   };
 
   function init() {

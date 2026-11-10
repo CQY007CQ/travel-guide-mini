@@ -2866,7 +2866,7 @@ function footHeatmap() {
   // 2026-11-09：足迹不只算打卡 —— 把「已结束的历史行程」城市也计入（用户要求，图才有内容）。
   // 只统计结束日期 < 今天的行程；未来/在途行程不算（避免把计划当足迹）。
   const citySet = {};
-  Object.keys(cs).forEach(name => { if (name) citySet[name] = 1; });
+  Object.keys(cs).forEach(name => { if (name) citySet[name] = (citySet[name] || 0) + 1; });
   const todayYMD = store.fmtLocalDate(new Date());
   const seenSig = {};
   let trips = 0;
@@ -2880,7 +2880,7 @@ function footHeatmap() {
       const sig = String(p.cityName || "") + "|" + p.days.length + "|" + firstD;
       if (seenSig[sig]) return; // 存档与当前行程可能是同一份，避免 trips 重复
       seenSig[sig] = 1;
-      const add = function (c) { const s = String(c || "").trim(); if (s) citySet[s] = 1; };
+      const add = function (c) { const s = String(c || "").trim(); if (s) citySet[s] = (citySet[s] || 0) + 1; };
       if (Array.isArray(p.segments) && p.segments.length) p.segments.forEach(function (s) { add(s && s.cityName); });
       add(p.cityName);
       (p.days || []).forEach(function (d) { add(d && d.cityName); });
@@ -2891,10 +2891,12 @@ function footHeatmap() {
   try { addPlan(store.get("planV1", null)); } catch (e) {}
 
   const agg = {};
+  const cityRows = [];
   Object.keys(citySet).forEach(name => {
     const prov = (D.CITY2PROV && D.CITY2PROV[name]) || (cs[name] && cs[name].province) || "";
     if (!prov) return;
     agg[prov] = (agg[prov] || 0) + 1;
+    cityRows.push({ name: name, prov: prov, n: citySet[name] });
   });
   // v1.8.4 B14：全量 34 省级宫格（没去过的置灰 level0），一眼看清「点亮全国」的进度
   const PROVS = D.PROVINCES || [];
@@ -2903,7 +2905,9 @@ function footHeatmap() {
     return { name: p, n: n, level: n === 0 ? 0 : (n >= 4 ? 4 : (n === 3 ? 3 : (n === 2 ? 2 : 1))) };
   });
   const visited = list.filter(x => x.n > 0).length;
-  return { provs: list, visited: visited, cities: Object.keys(citySet).length, trips: trips };
+  // v1.20.7：足迹城市榜（按访问次数排序 top10）—— 比省级更细的个人画像维度，供「本机数据洞察」消费
+  const cityList = cityRows.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, "zh")).slice(0, 10);
+  return { provs: list, visited: visited, cities: Object.keys(citySet).length, trips: trips, cityList: cityList };
 }
 
 /* ---------- 4. 账本月度汇总 ---------- */

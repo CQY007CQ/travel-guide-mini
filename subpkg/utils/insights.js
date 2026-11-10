@@ -97,7 +97,15 @@ function footProvinces() {
   return { cities: h.cities || 0, visited: h.visited || 0, rows };
 }
 
-// 5) 汇总：派生「个性化倾向」+ 一句话智能小结（纯数据驱动，无虚构）
+// 5) 足迹城市榜（复用 footHeatmap 的城市级计数，按访问次数排序 top10）
+// v1.20.7：此前洞察只到省级，城市维度能给出更细的个人画像（"最常去的城市"比"最常去的省"更有记忆点）。
+function footCities() {
+  const h = (T.footHeatmap && T.footHeatmap()) || {};
+  const rows = Array.isArray(h.cityList) ? h.cityList : [];
+  return { rows };
+}
+
+// 6) 汇总：派生「个性化倾向」+ 一句话智能小结（纯数据驱动，无虚构）
 function insights() {
   const sig = _sig();
   if (_cache.sig === sig && _cache.val) return _cache.val;
@@ -105,27 +113,30 @@ function insights() {
   const month = monthlySpend();
   const rhythm = travelRhythm();
   const fp = footProvinces();
+  const fc = footCities();
   const noData = spend.total === 0 && rhythm.tripN === 0 && fp.cities === 0;
   const topCat = spend.rows[0] ? spend.rows[0].cat : "";
   const favProv = fp.rows[0] ? fp.rows[0].prov : "";
+  const topCity = fc.rows[0] ? fc.rows[0].name : "";
   const tendency = {
     topCat, topCatPct: spend.rows[0] ? spend.rows[0].pct : 0,
     avgDaily: (spend.total && rhythm.totalDays) ? Math.round(spend.total / rhythm.totalDays) : 0,
-    favProv, season: rhythm.season, litProvs: fp.visited
+    favProv, topCity, season: rhythm.season, litProvs: fp.visited
   };
   let summary = "还没有积累足够的本地数据，多用几次记账、打卡和存档，这里会给出你的旅行画像。";
   if (!noData) {
     const parts = [];
-    if (favProv) parts.push("最常去" + favProv);
+    if (topCity) parts.push("最常去" + topCity);
+    if (favProv && favProv !== topCity) parts.push("偏爱" + favProv);
     if (fp.visited) parts.push("已点亮" + fp.visited + "个省份");
     if (rhythm.season) parts.push(rhythm.season + "季出行最多");
     if (topCat) parts.push("花费大头是" + topCat);
     if (rhythm.avgDays) parts.push("平均一趟" + rhythm.avgDays + "天");
     summary = parts.length ? ("你" + parts.join("、") + "。") : "已积累一些本地记录，继续用会更准。";
   }
-  const val = { noData, spend, month, rhythm, fp, tendency, summary };
+  const val = { noData, spend, month, rhythm, fp, fc, tendency, summary };
   _cache = { sig, val };
   return val;
 }
 
-module.exports = { spendByCategory, monthlySpend, travelRhythm, footProvinces, insights };
+module.exports = { spendByCategory, monthlySpend, travelRhythm, footProvinces, footCities, insights };
