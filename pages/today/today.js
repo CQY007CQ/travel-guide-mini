@@ -4,6 +4,9 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const Cloud = require("../../utils/cloud.js");   // 云端 AI（llmProxy 强模型网关，fail-closed）
 const AIAgent = require("../../utils/ai-agent.js");
+
+// 主动建议缓存：15 分钟内同行程不重复打云端（避免 onShow 频繁触发）
+let _proactiveCache = { key: "", ts: 0, tip: "" };
 const app = getAppSafe();
 
 Page(SafePage({
@@ -26,13 +29,14 @@ Page(SafePage({
     // v1.8.5 C9：每日一句（无行程时陪伴文案）
     quote: null,
     // AI 今日建议（云端强模型优先 · 离线规则库兜底）
-    aiText: "", aiSource: "", aiLoading: false, aiErr: ""
+    aiText: "", aiSource: "", aiLoading: false, aiErr: "",
+    proactiveTip: "", proactiveLoading: false, proactiveOffline: false
   },
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：主题或刷新任一环节抛错都不该白屏
   onLoad() { this.__boot = T.ready().catch(() => null); },
-  onShow() { onShowRender(this, "today"); },
+  onShow() { onShowRender(this, "today"); this._loadProactive(); },
   _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
 
   refresh() {
@@ -213,6 +217,55 @@ Page(SafePage({
     try { r = T.askAssistant("今天安排", plan); } catch (e) { r = { text: "" }; }
     const txt = (r && r.text) || "离线模式：按行程顺序走，留意体力与预算节奏；详情看「行程」页。";
     this.setData({ aiText: txt, aiSource: "", aiLoading: false, aiErr: "" });
+  },
+
+  // ── 主动 AI 建议：打开「今天」页即基于真实行程状态推 1 条（强模型优先 · 离线回落规则提示）──
+  _loadProactive() {
+    const self = this;
+    const plan = app.globalData && app.globalData.plan;
+    if (!plan || !plan.days || !plan.days.length) return;
+    const key = (plan.cityName || "") + "|" + (plan.depart || "");
+    const now = Date.now();
+    // 15 分钟内同行程直接复用缓存，避免 onShow 频繁打云端
+    if (_proactiveCache.key === key && now - _proactiveCache.ts < 15 * 60 * 1000 && _proactiveCache.tip) {
+      self.setData({ proactiveTip: _proactiveCache.tip, proactiveOffline: _proactiveCache.offline || false, proactiveLoading: false });
+      return;
+    }
+    if (self.data.proactiveLoading) return;
+    const v = this.data.view || {};
+    const detail = [];
+    if (this.data.state === "before") { if (v.daysLeft != null) detail.push("阶段：行前，距出发 " + v.daysLeft + " 天。"); }
+    else if (this.data.state === "during") {
+      if (v.dayNo != null) detail.push("阶段：行程中，第 " + v.dayNo + "/" + (v.total || "?") + " 天。");
+      if (v.budgetTxt) detail.push(v.budgetTxt + "。");
+      if (v.walk && v.walk.txt) detail.push(v.walk.txt + "。");
+    } else detail.push("阶段：行程已结束。");
+    const offlineTip = function () {
+      let t = "";
+      try { const ck = T.planCheckup(plan); if (ck && ck.tips && ck.tips.length) t = ck.tips[0]; } catch (e) {}
+      return t || "离线模式：按行程顺序走，留意体力与预算节奏。";
+    };
+    const q = "结合上面真实的本机行程信息，给我今天最值得注意的 1 条建议（一句话，具体到这座城 / 这天 / 这个节奏），不要套话。";
+    let ctx = "";
+    try { ctx = Cloud.aiContextOf(plan, "今天页·主动建议") + "\n" + detail.join("\n"); } catch (e) { ctx = detail.join("\n"); }
+    if (!Cloud.cloudEnabled()) {
+      const t = offlineTip();
+      _proactiveCache = { key: key, ts: now, tip: t, offline: true };
+      self.setData({ proactiveTip: t, proactiveOffline: true, proactiveLoading: false });
+      return;
+    }
+    self.setData({ proactiveLoading: true });
+    AIAgent.ask("today-proactive", q, ctx)
+      .then((r) => {
+        const tip = (r && r.ok && r.text) ? r.text : offlineTip();
+        _proactiveCache = { key: key, ts: now, tip: tip, offline: !(r && r.ok) };
+        self.setData({ proactiveTip: tip, proactiveOffline: !(r && r.ok), proactiveLoading: false });
+      })
+      .catch(() => {
+        const t = offlineTip();
+        _proactiveCache = { key: key, ts: now, tip: t, offline: true };
+        self.setData({ proactiveTip: t, proactiveOffline: true, proactiveLoading: false });
+      });
   },
 
   // v1.8.5 C10：行程结束后的回顾入口

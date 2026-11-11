@@ -148,6 +148,17 @@
 
 </block>
 
+    <!-- AI 主动建议：打开即基于真实行程状态推一条（强模型优先 · 离线回落规则提示） -->
+    <view class="card ai-today" wx:if="{{proactiveTip}}">
+      <view class="ai-h">
+        <image class="ic" src="/images/icons/sparkle.png"/>
+        <text class="ai-t">AI 主动建议</text>
+        <text class="ai-badge" wx:if="{{proactiveOffline}}">离线</text>
+        <text class="ai-badge" wx:else>智能</text>
+      </view>
+      <view class="ai-body">{{proactiveTip}}</view>
+    </view>
+
     <!-- AI 今日建议（云端强模型优先 · 离线兜底） -->
     <view class="card ai-today">
       <view class="ai-h">
