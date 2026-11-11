@@ -1,4 +1,5 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <ai-entry topic="ledger" />
 
   <!-- ① 一眼看清：总计 / 今日 / 本周 -->
   <view class="card stat-card">
@@ -35,7 +36,7 @@
   <!-- ④ 主操作：一句话记账 -->
   <view class="card quick-card">
     <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/bill.png"/>一句话记账</view>
+      <view class="h3-l"><image lazy-load class="ic" src="/images/icons/bill.png"/>一句话记账</view>
       <text class="dim u-fs20">例：打车 32 · 门票 80</text>
     </view>
     <view class="qk-row">
@@ -70,7 +71,7 @@
     <view class="h3 row-between">
       <text>账单明细 <text class="dim u-fs20">（点 ✕ 删除，可撤销）</text></text>
       <view class="row">
-        <view class="btn-export vexp" wx:if="{{vouchN}}" bindtap="onVouchShow"><image class="ic ic-sm" src="/images/icons/camera.png"/>凭证 {{vouchN}}</view>
+        <view class="btn-export vexp" wx:if="{{vouchN}}" bindtap="onVouchShow"><image lazy-load class="ic ic-sm" src="/images/icons/camera.png"/>凭证 {{vouchN}}</view>
         <view class="btn-export" bindtap="onExportMenu">导出 ▾</view>
       </view>
     </view>
@@ -81,8 +82,8 @@
     <view class="kw-n" wx:if="{{kw || catFilter}}">筛出 {{filteredN}} / {{allN}} 笔</view>
     <view wx:if="{{!items.length}}" class="dim u-padc">还没有账单，记下第一笔吧</view>
     <view class="lg-row" wx:for="{{items}}" wx:key="_id">
-      <image wx:if="{{item.img}}" class="lg-thumb" src="{{item.img}}" mode="aspectFill" data-i="{{index}}" catchtap="pickBillImg"/>
-      <view wx:else class="lg-cam" data-i="{{index}}" catchtap="pickBillImg"><image class="ic ic-sm" src="/images/icons/camera.png"/></view>
+      <image lazy-load wx:if="{{item.img}}" class="lg-thumb" src="{{item.img}}" mode="aspectFill" data-i="{{index}}" catchtap="pickBillImg"/>
+      <view wx:else class="lg-cam" data-i="{{index}}" catchtap="pickBillImg"><image lazy-load class="ic ic-sm" src="/images/icons/camera.png"/></view>
       <view class="lg-main">
         <view class="lg-txt">{{item.name}} <text class="lg-cat">{{item.cat}}</text>
           <text wx:if="{{item.share>1}}" class="lg-aa">AA · {{item.share}}人 · 人均 ¥{{item.per}}</text>
@@ -97,7 +98,7 @@
   <!-- ⑦ 折叠：详细记账（需指定日期 / 付款人 / AA 人数时才用） -->
   <view class="card fold-hd" bindtap="toggleSec" data-s="detail">
     <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>详细记账</view>
+      <view class="h3-l"><image lazy-load class="ic" src="/images/icons/calc.png"/>详细记账</view>
       <text class="dim u-fs20">{{secDetail ? '收起 ▴' : '指定日期 / 付款人 / AA ▾'}}</text>
     </view>
   </view>
@@ -112,7 +113,7 @@
       <input class="inp-name" placeholder="项目（如 高铁票 / 打车 / 门票）" value="{{name}}" bindinput="onName"/>
       <view class="row mt">
         <picker mode="date" value="{{date}}" bindchange="onDatePick">
-          <view class="date-pick"><image class="ic ic-sm" src="/images/icons/calendar.png"/>{{date}} ›</view>
+          <view class="date-pick"><image lazy-load class="ic ic-sm" src="/images/icons/calendar.png"/>{{date}} ›</view>
         </picker>
         <input class="inp-payer" placeholder="付款人" value="{{payer}}" bindinput="onPayerChange"/>
       </view>
@@ -132,14 +133,14 @@
   <!-- ⑧ 折叠：看数据（7 块分析，默认收起） -->
   <view class="card fold-hd" bindtap="toggleSec" data-s="stats">
     <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/trend.png"/>看数据</view>
+      <view class="h3-l"><image lazy-load class="ic" src="/images/icons/trend.png"/>看数据</view>
       <text class="dim u-fs20">{{secStats ? '收起 ▴' : '趋势 / 预测 / 分类 ▾'}}</text>
     </view>
   </view>
   <block wx:if="{{secStats}}">
     <!-- 近 7 日花销柱 + 本月一句话复盘 -->
     <view class="card w7-card" wx:if="{{week7 && week7.sum > 0}}">
-      <view class="w7-head"><image class="ic ic-sm" src="/images/icons/trend.png"/>近 7 日 · ¥{{week7.sum}}</view>
+      <view class="w7-head"><image lazy-load class="ic ic-sm" src="/images/icons/trend.png"/>近 7 日 · ¥{{week7.sum}}</view>
       <view class="w7-row">
         <view class="w7-col" wx:for="{{week7.days}}" wx:key="key">
           <view class="w7-bar"><view class="w7-fill {{item.amt === week7.max && item.amt > 0 ? 'w7-max' : ''}}" style="height:{{item.amt > 0 ? (item.amt / week7.max * 88) : 4}}%"></view></view>
@@ -152,7 +153,7 @@
     <!-- 花费预测 -->
     <view class="card fc-card" wx:if="{{forecast && forecast.budget > 0}}">
       <view class="h3 row-between">
-        <view class="h3-l"><image class="ic" src="/images/icons/trend.png"/>花费预测</view>
+        <view class="h3-l"><image lazy-load class="ic" src="/images/icons/trend.png"/>花费预测</view>
         <text class="fc-lv {{forecast.over ? 'over' : 'ok'}}">{{forecast.over ? '可能超支' : '花费可控'}}</text>
       </view>
       <view class="fc-nums">
@@ -169,7 +170,7 @@
     <!-- 每日预算额度 -->
     <view class="card db-card" wx:if="{{dbud && dbud.perDay > 0}}">
       <view class="h3 row-between">
-        <view class="h3-l"><image class="ic" src="/images/icons/coin.png"/>每日额度</view>
+        <view class="h3-l"><image lazy-load class="ic" src="/images/icons/coin.png"/>每日额度</view>
         <text class="dim u-fs20">¥{{dbud.perDay}} / 天</text>
       </view>
       <view class="db-row {{item.over ? 'db-over' : ''}} {{item.isToday ? 'db-today' : ''}}" wx:for="{{dbud.rows}}" wx:key="date">
@@ -184,7 +185,7 @@
     <!-- 每日花费柱 -->
     <view class="card" wx:if="{{dayBars.length > 1}}">
       <view class="h3 row-between">
-        <view class="h3-l"><image class="ic" src="/images/icons/clock.png"/>每日花费</view>
+        <view class="h3-l"><image lazy-load class="ic" src="/images/icons/clock.png"/>每日花费</view>
         <text class="dim u-fs20">最近 {{dayBars.length}} 个记账日</text>
       </view>
       <view class="day-bars">
@@ -199,7 +200,7 @@
     <!-- 分类占比 -->
     <view class="card cat-card" wx:if="{{catSums.length}}">
       <view class="h3 row-between">
-        <view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>花费分类占比</view>
+        <view class="h3-l"><image lazy-load class="ic" src="/images/icons/calc.png"/>花费分类占比</view>
         <text class="dim u-fs20">按全部账目 · 点标签分类记账</text>
       </view>
       <view class="stack">
@@ -217,7 +218,7 @@
     <!-- 预算分配对照 -->
     <view class="card split-card" wx:if="{{split}}">
       <view class="h3 row-between">
-        <view class="h3-l"><image class="ic" src="/images/icons/pie.png"/>预算分配对照</view>
+        <view class="h3-l"><image lazy-load class="ic" src="/images/icons/pie.png"/>预算分配对照</view>
         <text class="dim u-fs20">建议 vs 实际</text>
       </view>
       <view class="sp-row" wx:for="{{split.rows}}" wx:key="cat">
@@ -233,7 +234,7 @@
 
     <!-- 月度汇总 -->
     <view class="card mon-card" wx:if="{{monthly}}">
-      <view class="h3 h3-row"><image class="ic" src="/images/icons/calendar2.png"/>月度汇总</view>
+      <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/calendar2.png"/>月度汇总</view>
       <view class="mon-row" wx:for="{{monthly.months}}" wx:key="ym">
         <text class="mon-lb">{{item.label}}</text>
         <view class="mon-track"><view class="mon-fill" style="width:{{item.pct}}%"></view></view>
@@ -249,7 +250,7 @@
   <!-- ⑨ 折叠：同行分账（AA / 人情 / 同行人） -->
   <view class="card fold-hd" bindtap="toggleSec" data-s="social">
     <view class="h3 row-between">
-      <view class="h3-l"><image class="ic" src="/images/icons/people.png"/>同行分账</view>
+      <view class="h3-l"><image lazy-load class="ic" src="/images/icons/people.png"/>同行分账</view>
       <text class="dim u-fs20">{{secSocial ? '收起 ▴' : 'AA / 垫付 / 同行人 ▾'}}</text>
     </view>
   </view>
@@ -257,7 +258,7 @@
     <!-- AA 结算 -->
     <view class="card settle-card" wx:if="{{settle && settle.people > 1}}">
       <view class="h3 row-between">
-        <view class="h3-l"><image class="ic" src="/images/icons/calc.png"/>AA 结算</view>
+        <view class="h3-l"><image lazy-load class="ic" src="/images/icons/calc.png"/>AA 结算</view>
         <text class="btn-export" bindtap="copySettle">复制方案</text>
       </view>
       <view class="st-sum">共 ¥{{settle.total}} · {{settle.people}} 人 · 人均 ¥{{settle.per}}</view>
@@ -276,7 +277,7 @@
     <!-- 人情往来 -->
     <view class="card iou-card">
       <view class="h3 row-between">
-        <view class="h3-l"><image class="ic" src="/images/icons/people.png"/>人情往来</view>
+        <view class="h3-l"><image lazy-load class="ic" src="/images/icons/people.png"/>人情往来</view>
         <text class="dim u-fs20" wx:if="{{iouSt}}">净应收 ¥{{iouSt.pending}}</text>
       </view>
       <view class="iou-add">
@@ -308,7 +309,7 @@
     <!-- 同行人 -->
     <view class="card mate-card">
       <view class="h3 row-between">
-        <view class="h3-l"><image class="ic" src="/images/icons/people.png"/>同行人</view>
+        <view class="h3-l"><image lazy-load class="ic" src="/images/icons/people.png"/>同行人</view>
         <text class="dim u-fs20">点一下设为当前付款人</text>
       </view>
       <view class="mate-chips">

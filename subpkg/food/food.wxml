@@ -1,6 +1,6 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
   <view wx:if="{{!hasPlan}}" class="empty">
-    <view class="em-ic"><image class="em-img" src="/images/icons/food.png"/></view>
+    <view class="em-ic"><image lazy-load class="em-img" src="/images/icons/food.png"/></view>
     <view class="em-t">先去生成攻略</view>
     <view class="em-s">这里会显示目的地的必吃清单与地道名店</view>
   </view>
@@ -35,10 +35,10 @@
     </view>
 
     <view class="card">
-      <view class="h3 h3-row"><image class="ic" src="/images/icons/trophy.png"/>地道名店推荐 <text class="dim u-fs20">（{{shopHead}}）</text></view>
-      <view wx:if="{{budgetTxt}}" class="budget-tip"><image class="ic ic-sm" src="/images/icons/wallet.png"/>{{budgetTxt}}</view>
-      <view wx:if="{{shopSrc}}" class="budget-tip"><image class="ic ic-sm" src="/images/icons/target.png"/>{{shopSrc}}</view>
-      <view wx:if="{{dishNote}}" class="budget-tip"><image class="ic ic-sm" src="/images/icons/search.png"/>{{dishNote}}</view>
+      <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/trophy.png"/>地道名店推荐 <text class="dim u-fs20">（{{shopHead}}）</text></view>
+      <view wx:if="{{budgetTxt}}" class="budget-tip"><image lazy-load class="ic ic-sm" src="/images/icons/wallet.png"/>{{budgetTxt}}</view>
+      <view wx:if="{{shopSrc}}" class="budget-tip"><image lazy-load class="ic ic-sm" src="/images/icons/target.png"/>{{shopSrc}}</view>
+      <view wx:if="{{dishNote}}" class="budget-tip"><image lazy-load class="ic ic-sm" src="/images/icons/search.png"/>{{dishNote}}</view>
       <view wx:if="{{!shops.length}}" class="dim note">{{emptyShopTx}}</view>
       <view class="shop {{item.hit ? 'hit' : ''}}" wx:for="{{shops}}" wx:key="id"
             data-lat="{{item.lat}}" data-lon="{{item.lon}}" data-shop="{{item.shop}}" data-addr="{{item.addr}}"
@@ -65,7 +65,7 @@
     <!-- AI 吃什么（云端强模型优先 · 离线兜底） -->
     <view class="card ai-food">
       <view class="ai-h">
-        <image class="ic" src="/images/icons/sparkle.png"/>
+        <image lazy-load class="ic" src="/images/icons/sparkle.png"/>
         <text class="ai-t">AI 吃什么</text>
         <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
         <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askFoodAI">{{aiLoading ? '思考中…' : (aiText ? '再问一次' : '生成')}}</view>

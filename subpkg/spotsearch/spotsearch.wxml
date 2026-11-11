@@ -1,4 +1,5 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <ai-entry topic="spotsearch" />
 
   <view class="head">
     <view class="h-title">按标签找景点</view>
@@ -7,7 +8,7 @@
 
   <!-- 搜索框 -->
   <view class="card search-bar">
-    <image class="s-ic" src="/images/icons/search.png"/>
+    <image lazy-load class="s-ic" src="/images/icons/search.png"/>
     <input class="s-inp" value="{{qText}}" placeholder="输入关键词，如：雪山 / 古镇 / 免费 / 带娃" confirm-type="search" bindinput="onInput" bindconfirm="onSearch"/>
     <view class="s-go" bindtap="onSearch">搜索</view>
   </view>

@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "使用指南",
   "navigationBarBackgroundColor": "#eaeff7",
-  "navigationBarTextStyle": "black"
+  "navigationBarTextStyle": "black",
+  "usingComponents": { "ai-entry": "../ai-entry/ai-entry" }
 }

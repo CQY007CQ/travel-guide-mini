@@ -1,11 +1,11 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
   <!-- 全场景 AI 速达：把小程序全部能力以 AI 语境一站式带到眼前（空态/有行程都展示） -->
   <view class="card scenes" wx:if="{{scenarios.length}}">
-    <view class="h3"><image class="ic" src="/images/icons/search.png"/>全场景 AI 速达</view>
+    <view class="h3"><image lazy-load class="ic" src="/images/icons/search.png"/>全场景 AI 速达</view>
     <view class="scene-sub dim">点一下，立刻获得该场景的 AI 建议与直达入口</view>
     <view class="scene-grid">
       <view class="scene" wx:for="{{scenarios}}" wx:key="key" data-key="{{item.key}}" bindtap="onScenario">
-        <image class="scene-ic" src="/images/icons/{{item.icon}}"/>
+        <image lazy-load class="scene-ic" src="/images/icons/{{item.icon}}"/>
         <text class="scene-t">{{item.label}}</text>
       </view>
     </view>
@@ -18,7 +18,7 @@
 
   <!-- 空态 -->
   <view class="empty" wx:if="{{!hasPlan}}">
-    <view class="em-ic"><image class="em-img" src="/images/icons/search.png"/></view>
+    <view class="em-ic"><image lazy-load class="em-img" src="/images/icons/search.png"/></view>
     <view class="em-t">先生成一份行程</view>
     <view class="em-s">下面所有速查卡片都需要先生成攻略，才能给出贴合「这座城 · 这几天 · 这种节奏」的答案。</view>
     <view class="em-cta" bindtap="goIndex">去生成攻略</view>
@@ -26,12 +26,12 @@
 
   <!-- 头部：上下文 + 一键查 + 自由查 -->
   <view class="card head" wx:if="{{hasPlan}}">
-    <view class="h2"><image class="ic" src="/images/icons/search.png"/>本地速查</view>
+    <view class="h2"><image lazy-load class="ic" src="/images/icons/search.png"/>本地速查</view>
     <view class="ctx dim">{{ctx}}</view>
 
     <!-- AI 识物入口：拍照认植物 / 地标，旅途科普 -->
     <view class="lens-entry" bindtap="goLens">
-      <image class="le-ic" src="/images/icons/camera.png"/>
+      <image lazy-load class="le-ic" src="/images/icons/camera.png"/>
       <text class="le-t">AI 识物：拍一张认植物 / 地标</text>
       <text class="le-a">→</text>
     </view>
@@ -39,7 +39,7 @@
     <view class="h3">一键查</view>
     <view class="tiles">
       <view class="tile" wx:for="{{tiles}}" wx:key="k" data-k="{{item.k}}" bindtap="onTile">
-        <image class="tile-ic" src="/images/icons/{{item.ic}}"/>
+        <image lazy-load class="tile-ic" src="/images/icons/{{item.ic}}"/>
         <text class="tile-t">{{item.t}}</text>
       </view>
     </view>
@@ -64,7 +64,7 @@
 
   <!-- 查景点结果 -->
   <view class="card spot" wx:if="{{spotResult}}">
-    <view class="h3"><image class="ic" src="/images/icons/search.png"/>{{spotResult.name}}<text class="spot-city" wx:if="{{spotResult.city}}"> · {{spotResult.city}}</text></view>
+    <view class="h3"><image lazy-load class="ic" src="/images/icons/search.png"/>{{spotResult.name}}<text class="spot-city" wx:if="{{spotResult.city}}"> · {{spotResult.city}}</text></view>
     <view class="spot-sec" wx:if="{{spotResult.intro}}"><view class="spot-lab">介绍</view><view class="spot-txt">{{spotResult.intro}}</view></view>
     <view class="spot-sec" wx:if="{{spotResult.how}}"><view class="spot-lab">怎么玩</view><view class="spot-txt">{{spotResult.how}}</view></view>
     <view class="spot-sec" wx:if="{{spotResult.route}}"><view class="spot-lab">怎么去</view><view class="spot-txt">{{spotResult.route}}</view></view>
@@ -91,14 +91,14 @@
       <view class="act-btn" wx:for="{{actions}}" wx:key="label" data-path="{{item.path}}" data-query="{{item.query}}" data-mode="{{item.mode}}" bindtap="onAction">{{item.label}}</view>
     </view>
     <view class="keep-line">
-      <view class="keep-btn" bindtap="keepLast"><image class="ic ic-sm" src="/images/icons/star.png"/>收藏（已收藏 {{keepN}}）</view>
+      <view class="keep-btn" bindtap="keepLast"><image lazy-load class="ic ic-sm" src="/images/icons/star.png"/>收藏（已收藏 {{keepN}}）</view>
       <view class="keep-btn keep-btn-2" bindtap="toggleKeeps" wx:if="{{keeps.length}}">查看收藏（{{keeps.length}}）</view>
     </view>
   </view>
 
   <!-- 收藏展开 -->
   <view class="card keeps" wx:if="{{keepsOpen && keeps.length}}">
-    <view class="h3"><image class="ic" src="/images/icons/star.png"/>我的收藏（本地保存）</view>
+    <view class="h3"><image lazy-load class="ic" src="/images/icons/star.png"/>我的收藏（本地保存）</view>
     <view class="keep-it" wx:for="{{keeps}}" wx:key="*this">· {{item}}</view>
     <view class="keep-clear" bindtap="clearKeeps">清空收藏</view>
   </view>

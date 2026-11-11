@@ -1,20 +1,20 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
   <view wx:if="{{!hasPlan}}" class="empty">
-    <view class="em-ic"><image class="em-img" src="/images/icons/luggage.png"/></view>
+    <view class="em-ic"><image lazy-load class="em-img" src="/images/icons/luggage.png"/></view>
     <view class="em-t">先去生成攻略</view>
     <view class="em-s">这里会整理票价预约、酒店比价与团队分工</view>
   </view>
 
   <block wx:if="{{hasPlan}}">
     <view class="card">
-      <view class="h3 h3-row"><image class="ic" src="/images/icons/ticket.png"/>行程景点 · 票价与预约</view>
+      <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/ticket.png"/>行程景点 · 票价与预约</view>
       <view class="tk-head" wx:if="{{tickets.length}}">
         <view class="tk-sum">
           <text>已订 {{tkDone}}/{{tickets.length}}</text>
           <text wx:if="{{bookN}}" class="dim"> · 其中 {{bookN}} 项需提前预约</text>
           <text wx:else class="dim"> · 均无需强制预约</text>
         </view>
-        <view class="tk-est" wx:if="{{tkSum > 0}}"><image class="ic ic-sm" src="/images/icons/wallet.png"/>门票 <text class="gold">¥{{tkSum}}</text><text class="dim">（{{peopleN}} 人合计）</text></view>
+        <view class="tk-est" wx:if="{{tkSum > 0}}"><image lazy-load class="ic ic-sm" src="/images/icons/wallet.png"/>门票 <text class="gold">¥{{tkSum}}</text><text class="dim">（{{peopleN}} 人合计）</text></view>
         <view class="tk-bar"><view class="tk-fill" style="width:{{tkPct}}%"></view></view>
       </view>
       <view wx:if="{{!tickets.length}}" class="dim note">行程中的景点暂无强制预约要求，出发前到官方渠道确认开放情况即可</view>
@@ -37,7 +37,7 @@
         </view>
         <view class="tk-ops" wx:if="{{item.book || item.note || item.date || item.url}}">
           <picker wx:if="{{item.book}}" mode="date" value="{{item.date || ''}}" data-i="{{index}}" bindchange="onTkDate">
-            <view class="tk-op tk-op-row {{item.date ? 'set' : ''}}"><image class="ic ic-sm" src="/images/icons/calendar.png"/>{{item.date ? item.dateTx : '定预约日'}}</view>
+            <view class="tk-op tk-op-row {{item.date ? 'set' : ''}}"><image lazy-load class="ic ic-sm" src="/images/icons/calendar.png"/>{{item.date ? item.dateTx : '定预约日'}}</view>
           </picker>
           <view class="tk-op tk-op-row" wx:if="{{item.url}}" data-i="{{index}}" bindtap="onTkUrl">复制预约链接</view>
           <view class="tk-op-note" wx:if="{{item.note}}">{{item.note}}</view>
@@ -52,7 +52,7 @@
     <!-- 自动行李清单（按天数 / 出发季节 / 目的地气候 / 行程特色生成） -->
     <!-- 2026-11-09：删除上方重复的「证件与出行必备」手工清单（与下方「证件与钱」分组重复，用户反馈"上下重复"） -->
     <view class="card" wx:if="{{pack}}">
-      <view class="h3 h3-row"><image class="ic" src="/images/icons/backpack.png"/>自动行李清单</view>
+      <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/backpack.png"/>自动行李清单</view>
       <view class="pk-sum">
         <text>已装 {{pack.done}}/{{pack.total}}</text>
         <text class="dim"> · 按 {{pack.season}}季 · {{planDays}} 天行程生成</text>
@@ -69,12 +69,12 @@
     </view>
 
     <view class="card">
-      <view class="h3 h3-row"><image class="ic" src="/images/icons/home.png"/>酒店预订比价建议</view>
+      <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/home.png"/>酒店预订比价建议</view>
       <view class="tip-line" wx:for="{{hotelTips}}" wx:key="*this">{{item}}</view>
     </view>
 
     <view class="card">
-      <view class="h3 h3-row"><image class="ic" src="/images/icons/people.png"/>团队分工</view>
+      <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/people.png"/>团队分工</view>
       <view class="duty" wx:for="{{duties}}" wx:key="who">
         <text class="duty-who">{{item.who}}</text>
         <view class="duty-list">
@@ -86,7 +86,7 @@
 
   <!-- 应急电话（点击直接拨号） -->
   <view class="card sos-card">
-    <view class="h3 h3-row"><image class="ic" src="/images/icons/info.png"/>应急电话 · 点按直拨</view>
+    <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/info.png"/>应急电话 · 点按直拨</view>
     <view class="sos-grid">
       <view class="sos-it" wx:for="{{sosList}}" wx:key="tel" data-tel="{{item.tel}}" bindtap="onCall">
         <text class="sos-n">{{item.tel}}</text>
@@ -98,7 +98,7 @@
   <!-- AI 多轮问答 -->
   <view class="card ai-card">
     <view class="ai-h">
-      <image class="ic" src="/images/icons/sparkle.png"/>
+      <image lazy-load class="ic" src="/images/icons/sparkle.png"/>
       <text class="ai-t">AI 行前顾问</text>
       <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
       <view class="ai-clear" bindtap="aiClear">清空</view>

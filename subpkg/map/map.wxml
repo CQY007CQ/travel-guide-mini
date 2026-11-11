@@ -1,6 +1,7 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <ai-entry topic="help-emergency" />
   <view wx:if="{{!hasPlan}}" class="empty">
-    <view class="em-ic"><image class="em-img" src="/images/icons/map.png"/></view>
+    <view class="em-ic"><image lazy-load class="em-img" src="/images/icons/map.png"/></view>
     <view class="em-t">先去生成攻略</view>
     <view class="em-s">这里会按天显示真实坐标标点与当天行进连线</view>
   </view>
@@ -14,9 +15,9 @@
 
     <!-- 图层切换 -->
     <view class="layer-bar">
-      <view class="layer-chip {{layer==='spots'?'on':''}}" data-layer="spots" bindtap="onLayer"><image class="ic ic-sm" src="/images/icons/pin.png"/> 景点</view>
-      <view class="layer-chip {{layer==='food'?'on':''}}" data-layer="food" bindtap="onLayer"><image class="ic ic-sm" src="/images/icons/food.png"/> 美食</view>
-      <view class="layer-chip {{layer==='stay'?'on':''}}" data-layer="stay" bindtap="onLayer"><image class="ic ic-sm" src="/images/icons/home.png"/> 住宿</view>
+      <view class="layer-chip {{layer==='spots'?'on':''}}" data-layer="spots" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/pin.png"/> 景点</view>
+      <view class="layer-chip {{layer==='food'?'on':''}}" data-layer="food" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/food.png"/> 美食</view>
+      <view class="layer-chip {{layer==='stay'?'on':''}}" data-layer="stay" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/home.png"/> 住宿</view>
     </view>
 
     <!-- v1.8.4 B11：动线顺路度评分 -->

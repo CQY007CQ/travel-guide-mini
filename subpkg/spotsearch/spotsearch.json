@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "按标签找景点"
+  "navigationBarTitleText": "按标签找景点",
+  "usingComponents": { "ai-entry": "../ai-entry/ai-entry" }
 }

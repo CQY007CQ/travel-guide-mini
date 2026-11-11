@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "地图导引" }
+{ "navigationBarTitleText": "地图导引", "usingComponents": { "ai-entry": "../ai-entry/ai-entry" } }

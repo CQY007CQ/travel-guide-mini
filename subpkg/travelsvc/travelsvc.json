@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "旅客服务" }
+{ "navigationBarTitleText": "旅客服务", "usingComponents": { "ai-entry": "../ai-entry/ai-entry" } }

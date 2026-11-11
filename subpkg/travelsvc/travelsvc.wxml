@@ -1,4 +1,5 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <ai-entry topic="travelsvc" />
   <!-- 头部 -->
   <view class="svc-head">
     <view class="sh-row">

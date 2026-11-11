@@ -1,0 +1,3 @@
+<view class="ai-fab" bindtap="onTap">
+  <text class="ai-fab-t">🤖 {{label}}</text>
+</view>

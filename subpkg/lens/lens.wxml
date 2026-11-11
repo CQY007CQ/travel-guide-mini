@@ -1,7 +1,7 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
   <!-- 头部说明 -->
   <view class="card head">
-    <view class="h2"><image class="ic" src="/images/icons/camera.png"/>AI 识物 · 旅途科普</view>
+    <view class="h2"><image lazy-load class="ic" src="/images/icons/camera.png"/>AI 识物 · 旅途科普</view>
     <view class="sub">拍一张旅途中的花草、地标或美食，AI 帮你认一认，并讲讲能碰不能碰、值不值得看的小知识。</view>
     <view class="cloud-tag {{cloudOn ? 'on' : 'off'}}">{{cloudOn ? '云端 AI 已就绪' : '云端未开启 · 可先「文字问」'}}</view>
   </view>
@@ -9,16 +9,16 @@
   <!-- 拍照 / 相册 -->
   <view class="card pick">
     <view class="preview" wx:if="{{img}}">
-      <image class="pv-img" src="{{img}}" mode="aspectFill"/>
+      <image lazy-load class="pv-img" src="{{img}}" mode="aspectFill"/>
       <view class="pv-clear" catchtap="clearImg">✕ 重选</view>
     </view>
     <view class="placeholder" wx:else>
-      <image class="ph-ic" src="/images/icons/camera.png"/>
+      <image lazy-load class="ph-ic" src="/images/icons/camera.png"/>
       <text class="ph-t">还没有照片</text>
     </view>
     <view class="pick-ops">
-      <view class="op op-main" bindtap="takePhoto"><image class="op-ic" src="/images/icons/camera.png"/>拍照</view>
-      <view class="op" bindtap="pickAlbum"><image class="op-ic" src="/images/icons/search.png"/>相册</view>
+      <view class="op op-main" bindtap="takePhoto"><image lazy-load class="op-ic" src="/images/icons/camera.png"/>拍照</view>
+      <view class="op" bindtap="pickAlbum"><image lazy-load class="op-ic" src="/images/icons/search.png"/>相册</view>
       <view class="op op-go {{img ? '' : 'op-dis'}}" bindtap="identify">识别</view>
     </view>
   </view>

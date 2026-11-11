@@ -71,9 +71,11 @@ function skipRegex(src, i) {
   return src.length - 1;
 }
 
-// 提取 Page({...}) 顶层 key（支持 key:value 与 key(){} 简写，忽略嵌套层级）
+// 提取 Page({...}) / Component({...}) 顶层与 methods 内 key（支持 key:value 与 key(){} 简写）
+// 兼容自定义组件：组件用 Component({...}) 且处理器写在 methods 内（深度 2）。
 function pageTopKeys(src) {
-  const pi = src.indexOf("Page(");
+  let pi = src.indexOf("Page(");
+  if (pi < 0) pi = src.indexOf("Component(");
   if (pi < 0) return null;
   const oi = src.indexOf("{", pi);
   if (oi < 0) return null;
@@ -90,7 +92,7 @@ function pageTopKeys(src) {
       if (depth === 0) break;
       continue;
     }
-    if (depth !== 1) continue;
+    if (depth !== 1 && depth !== 2) continue;
     if (/[A-Za-z_$]/.test(c)) {
       let j = i;
       while (j < src.length && /[A-Za-z0-9_$]/.test(src[j])) j++;
