@@ -19,6 +19,7 @@ function _preloadSubMods() {
   }
 }
 const EL = require("../../utils/errlog.js");        // v1.19.199：分享图失败分阶段留痕（真机可回溯）
+const Cloud = require("../../utils/cloud.js");      // 云端 AI（llmProxy 强模型网关，fail-closed）
 const app = getAppSafe();
 
 function isFrame(n) { return T.isFrameName(n); }
@@ -89,7 +90,9 @@ Page(SafePage({
   // v1.19.78：城市深度玩法（随 subai 分包懒加载；未收录城市保持 null → UI 自动不显示）
   deep: null,
   // v1.19.179：「我的攻略」本地库——当前行程是否已保存到库（命中签名则回显「已保存」）
-  savedId: "", savedAt: 0
+  savedId: "", savedAt: 0,
+  // 行程页 AI 答疑（云端强模型优先，离线规则引擎兜底）
+  aiOpen: false, aiInput: "", aiAnswer: "", aiLoading: false, aiSource: "", aiErr: ""
  },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
@@ -1209,6 +1212,43 @@ Page(SafePage({
   this.setData({ moveOpen: true, moveDi: di, moveIx: ix, moveDays: moveDays });
  },
  closeMove() { this.setData({ moveOpen: false, moveDi: -1, moveIx: -1, moveDays: [] }); },
+
+ // ── 行程页 AI 答疑（云端强模型优先 · 离线规则引擎兜底 · 零白屏） ──
+ openAI() {
+  const plan = app.globalData && app.globalData.plan;
+  if (!plan || !plan.days || !plan.days.length) { wx.showToast({ title: "先生成行程再问 AI", icon: "none" }); return; }
+  this.setData({ aiOpen: true, aiErr: "" });
+ },
+ closeAI() { this.setData({ aiOpen: false }); },
+ onAIInput(e) { this.setData({ aiInput: e.detail.value }); },
+ _aiCtx() {
+  try { return Cloud.aiContextOf(app.globalData && app.globalData.plan, "每日行程页"); }
+  catch (e) { return ""; }
+ },
+ _aiOffline(q) {
+  const plan = app.globalData && app.globalData.plan;
+  let r;
+  try { r = T.askAssistant(q, plan); } catch (e) { r = { text: "暂时答不上来，换个问法试试" }; }
+  this.setData({ aiAnswer: (r && r.text) || "", aiLoading: false, aiSource: "", aiErr: "" });
+ },
+ sendAI() {
+  const q = (this.data.aiInput || "").trim();
+  if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
+  const self = this;
+  // 云未开启 → 直接离线，不做无谓等待
+  if (typeof Cloud.cloudEnabled === "function" && !Cloud.cloudEnabled()) {
+   self.setData({ aiLoading: true });
+   setTimeout(() => { self._aiOffline(q); }, 0);
+   return;
+  }
+  self.setData({ aiLoading: true, aiErr: "" });
+  Cloud.aiChat({ prompt: q, context: self._aiCtx() })
+   .then((r) => {
+    if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiLoading: false, aiSource: r.source || "ai", aiErr: "" });
+    else self._aiOffline(q);
+   })
+   .catch(() => { self._aiOffline(q); });
+ },
  onMovePick(e) {
   const to = Number(e.currentTarget.dataset.i);
   const plan = app.globalData.plan;

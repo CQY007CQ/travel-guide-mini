@@ -23,6 +23,9 @@
 .btn:active { opacity: .85; }
 
 /* 结果区 */
+.result .h3 { display: flex; align-items: center; gap: 14rpx; }
+.result .ai-badge { font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 16rpx; }
 .result .r-q { font-size: calc(23rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-bottom: 12rpx; }
 .result .r-a { font-size: calc(27rpx * var(--fs, 1)); color: var(--t1, #dce5f0); line-height: 1.7; white-space: pre-wrap;
   word-break: break-word; padding: 18rpx 22rpx; background: var(--panel, #18233a);

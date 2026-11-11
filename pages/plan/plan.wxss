@@ -897,3 +897,15 @@
 .ps-li:active { background: rgba(var(--ln-rgb, 148, 163, 184), .10); }
 .ps-li-wish { color: var(--gold-tx, #d4a94e); }
 .ps-empty { padding: 24rpx 8rpx; text-align: center; color: var(--t3, #b9c6da); font-size: calc(24rpx * var(--fs, 1)); line-height: 1.7; }
+
+/* ══ 行程页 AI 答疑（强模型优先 · 离线兜底） ══ */
+.aischeet .ai-tip { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #b9c6da); line-height: 1.6; padding: 4rpx 2rpx 14rpx; }
+.ai-inp-row { display: flex; align-items: center; gap: 12rpx; }
+.ai-inp { flex: 1; background: var(--panel, #1c1c1c); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .18); border-radius: 999rpx; padding: 16rpx 26rpx; font-size: calc(26rpx * var(--fs, 1)); color: var(--t1, #eaeff7); }
+.ai-send { flex: none; background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f); color: #14100a; font-weight: 800; border-radius: 999rpx; padding: 16rpx 30rpx; font-size: calc(26rpx * var(--fs, 1)); }
+.ai-send:active { opacity: .85; }
+.ai-loading { padding: 22rpx 4rpx; color: var(--t3, #b9c6da); font-size: calc(25rpx * var(--fs, 1)); }
+.ai-ans { margin-top: 16rpx; background: var(--panel, #1c1c1c); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .12); border-radius: 18rpx; padding: 18rpx 22rpx; max-height: 42vh; overflow-y: auto; }
+.ai-badge { display: inline-block; margin-bottom: 10rpx; font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a; background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 16rpx; }
+.ai-ans-tx { display: block; font-size: calc(27rpx * var(--fs, 1)); color: var(--t1, #eaeff7); line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+.ai-err { padding: 16rpx 4rpx 0; color: var(--red, #e56a6a); font-size: calc(24rpx * var(--fs, 1)); }

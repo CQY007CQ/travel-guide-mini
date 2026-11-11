@@ -16,6 +16,7 @@
           <text class="sop-tx">{{isFav ? '已收藏' : '收藏'}}</text>
         </view>
         <view class="sop" catchtap="onCopy"><image class="sop-ic" src="/images/icons/copy.png"/><text class="sop-tx">复制</text></view>
+        <view class="sop" catchtap="openAI"><image class="sop-ic" src="/images/icons/sparkle.png"/><text class="sop-tx">AI 答疑</text></view>
         <view class="sop sop-end" catchtap="onEnd"><image class="sop-ic" src="/images/icons/close.png"/><text class="sop-tx">结束</text></view>
       </view>
     </view>
@@ -493,5 +494,22 @@
     <scroll-view scroll-y class="ps-list">
       <view class="ps-li" wx:for="{{moveDays}}" wx:key="i" data-i="{{item.i}}" catchtap="onMovePick">{{item.label}}</view>
     </scroll-view>
+  </view>
+
+  <!-- 行程页 AI 答疑（云端强模型优先 · 离线兜底） -->
+  <view class="pmask" wx:if="{{aiOpen}}" catchtap="closeAI"></view>
+  <view class="psheet aischeet" wx:if="{{aiOpen}}">
+    <view class="ps-h"><text class="ps-t">AI 答疑 · 这趟行程</text><text class="ps-x" catchtap="closeAI">✕</text></view>
+    <view class="ai-tip">基于当前行程的真实信息作答（城市 / 天数 / 景点 / 预算），不编造坐标与票价；无网络时自动回落本地规则库。</view>
+    <view class="ai-inp-row">
+      <input class="ai-inp" placeholder="问点什么，如：第三天怎么安排更省力？" value="{{aiInput}}" bindinput="onAIInput" bindconfirm="sendAI" confirm-type="send"/>
+      <view class="ai-send" bindtap="sendAI">问</view>
+    </view>
+    <view class="ai-loading" wx:if="{{aiLoading}}">AI 思考中…</view>
+    <view class="ai-ans" wx:if="{{aiAnswer}}">
+      <view class="ai-badge" wx:if="{{aiSource}}">AI 生成</view>
+      <text class="ai-ans-tx">{{aiAnswer}}</text>
+    </view>
+    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
   </view>
 </view>

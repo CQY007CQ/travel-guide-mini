@@ -153,6 +153,64 @@ function ensureUid() {
   });
 }
 
+// ── AI 接入（共用云端 llmProxy 强模型网关，fail-closed） ──
+// 组装本地真实上下文（行程 / 景点 / 城市 / 预算），作为 grounding 注入 LLM。
+// 零伪造：这里只读取用户本机已有行程数据，不编造任何坐标 / 票价 / 医院。
+function aiContextOf(plan, page) {
+  const lines = [];
+  if (page) lines.push("当前页面：" + String(page) + "（旅行攻略生成器 App）。");
+  if (!plan || !plan.days || !plan.days.length) {
+    lines.push("用户当前没有行程。");
+    return lines.join("\n");
+  }
+  lines.push("当前行程：" + (plan.cityName || "") + "，" + plan.days.length + " 天；出发日 " + String(plan.depart || "").slice(0, 10) + "。");
+  const paceMap = { leisure: "轻松", balance: "平衡", speed: "特种兵" };
+  if (plan.pace) lines.push("节奏：" + (paceMap[plan.pace] || plan.pace) + "。");
+  if (plan.people) lines.push("同行人数：" + plan.people + " 人。");
+  const seen = new Set(), spots = [];
+  for (const d of plan.days) {
+    if (!d || !Array.isArray(d.items)) continue;
+    for (const it of d.items) {
+      const n = (it && (it.name || it.disp)) || "";
+      if (!n) continue;
+      const k = String(n);
+      if (seen.has(k)) continue;
+      seen.add(k); spots.push(n);
+      if (spots.length >= 30) break;
+    }
+    if (spots.length >= 30) break;
+  }
+  if (spots.length) lines.push("这趟要去的点（去重，" + spots.length + " 个）：" + spots.join("、") + "。");
+  if (plan.customAmt) lines.push("用户自定义预算 ¥" + plan.customAmt + "。");
+  else if (plan.budget) {
+    const bm = { low: "经济", mid: "标准", high: "舒适" };
+    lines.push("预算档位：" + (bm[plan.budget] || plan.budget) + "。");
+  }
+  return lines.join("\n");
+}
+
+// 调云端 llmProxy：传入对话 / 单轮问题 + 本地上下文，返回 { ok, text, model, source }。
+// 任何失败（云未开 / 未配置 / 网络错）都返回 { ok:false }，调用方必须回落离线引擎，绝不白屏。
+function aiChat(opts) {
+  opts = opts || {};
+  return new Promise(function (resolve) {
+    if (!cloudEnabled()) { resolve({ ok: false, err: "cloud-disabled" }); return; }
+    const payload = {
+      messages: Array.isArray(opts.messages) ? opts.messages : null,
+      prompt: (typeof opts.prompt === "string" && opts.prompt.trim()) ? opts.prompt.trim() : null,
+      system: (typeof opts.system === "string" && opts.system.trim()) ? opts.system.trim() : null,
+      context: (typeof opts.context === "string" && opts.context.trim()) ? opts.context.trim() : null,
+      model: (typeof opts.model === "string" && opts.model.trim()) ? opts.model.trim() : null,
+      temperature: (typeof opts.temperature === "number") ? opts.temperature : null,
+      max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : null
+    };
+    callFunction("llmProxy", payload).then(function (r) {
+      if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
+      else resolve({ ok: false, err: (r && r.err) || "ai-failed", raw: r });
+    }).catch(function (e) { resolve({ ok: false, err: String((e && e.message) || e) }); });
+  });
+}
+
 module.exports = {
   isWeb: isWeb,
   cloudEnv: cloudEnv,
@@ -164,5 +222,7 @@ module.exports = {
   ensureUid: ensureUid,
   getPairedUid: getPairedUid,
   setPairedUid: setPairedUid,
-  clearPairedUid: clearPairedUid
+  clearPairedUid: clearPairedUid,
+  aiContextOf: aiContextOf,
+  aiChat: aiChat
 };

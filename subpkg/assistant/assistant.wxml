@@ -57,7 +57,7 @@
 
   <!-- 最近结果 -->
   <view class="card result" wx:if="{{lastResult}}">
-    <view class="h3">最近一次查询</view>
+    <view class="h3">最近一次查询<text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text></view>
     <view class="r-q">问：{{lastQuery}}</view>
     <view class="r-a">{{lastResult}}</view>
     <!-- 增强意图附带的「直达对应页」按钮（对齐网页版 AI 全站导航） -->

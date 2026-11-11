@@ -41,7 +41,8 @@ Page(SafePage({
     actions: [],        // 增强意图附带的「直达对应页」按钮
     planSpots: [],      // 查景点模式：当前行程里的景点（一键查）
     keepN: 0, keepsOpen: false, keeps: [],
-    input: ""
+    input: "",
+    aiSource: ""        // 非空表示最近一次结果来自云端强模型（显示「AI 生成」标识）
   },
 
   // 取当前行程里去重后的真实景点名（查景点模式的一键入口）
@@ -129,7 +130,7 @@ Page(SafePage({
     let r;
     try { r = T.spotLookup(q, city); }
     catch (e) { r = { found: false }; }
-    this.setData({ spotResult: r, input: "", actions: [] });
+    this.setData({ spotResult: r, input: "", actions: [], aiSource: "" });
     if (!r.found) wx.showToast({ title: "没查到这个景点，换个名字试试", icon: "none" });
   },
 
@@ -146,14 +147,46 @@ Page(SafePage({
       this.setData({ lastQuery: q, lastResult: ai.text, lastTileK: tileK, input: "", actions: ai.actions || [] });
       return;
     }
+    // 离线意图未命中：自由查（非一键查卡片）优先走云端强模型（带本行程 grounding）；
+    // 不可用（云未开 / 未配置 / 出错）一律回落本地规则引擎，零白屏、零回归。
+    if (tileK === "" && Cloud.cloudEnabled()) {
+      this._aiQuery(q, plan);
+      return;
+    }
     let r;
     try { r = T.askAssistant(q, plan); }
     catch (e) { r = { text: "查询出错了，换个关键词试试", tag: "info" }; }
     this._lastResult = r.text;
     this.setData({
       lastQuery: q, lastResult: r.text, lastTileK: tileK,
-      input: "", actions: []
+      input: "", actions: [], aiSource: ""
     });
+  },
+
+  _aiQuery(q, plan) {
+    const self = this;
+    try { wx.showLoading({ title: "AI 思考中", mask: false }); } catch (e) {}
+    const ctx = Cloud.aiContextOf(plan, "本地速查助手");
+    Cloud.aiChat({ prompt: q, context: ctx })
+      .then(function (r) {
+        try { wx.hideLoading(); } catch (e) {}
+        if (r.ok && r.text) {
+          self._lastResult = r.text;
+          self.setData({ lastQuery: q, lastResult: r.text, lastTileK: "", input: "", actions: [], aiSource: r.source || "ai" });
+          return;
+        }
+        self._aiFallback(q, plan);
+      })
+      .catch(function () { try { wx.hideLoading(); } catch (e) {} self._aiFallback(q, plan); });
+  },
+
+  _aiFallback(q, plan) {
+    const self = this;
+    let r;
+    try { r = T.askAssistant(q, plan); }
+    catch (e) { r = { text: "查询出错了，换个关键词试试", tag: "info" }; }
+    self._lastResult = r.text;
+    self.setData({ lastQuery: q, lastResult: r.text, lastTileK: "", input: "", actions: [], aiSource: "" });
   },
 
   // 跳转到目标页（action / jump 共用）。tab 用 switchTab，其余 navigateTo；query 拼成 URL 参数。

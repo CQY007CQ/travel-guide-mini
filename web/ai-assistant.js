@@ -644,7 +644,7 @@
           "• <b>接着聊</b>：问完「成都吃什么」，直接说「那有什么好玩的」「改成 5 天」\n" +
           "• <b>写本机数据</b>：「记一笔 打车 32」「把西湖加入想玩」（只写离线库里真实存在的景点）\n" +
           "• <b>全站导航</b>：说「打开美食页」「看第 2 天地图」即可\n\n" +
-          (llmEnabled() ? "已接入大模型，可自由对话。" : "默认纯离线，无需联网、无需 Key。") + "\n" + siteSummary(ctx),
+          (cloudAIEnabled() || llmEnabled() ? "已接入大模型（云端强模型优先，无需在此填 Key），可自由对话。" : "默认纯离线，无需联网、无需 Key。") + "\n" + siteSummary(ctx),
         actions: pageActions(ctx, "general"),
       };
 
@@ -837,7 +837,14 @@
       return s.replace(/\/+$/, "");
     } catch (e) { return null; }
   }
-  function callLLM(history, ctx, onDone, onErr) {
+  function getCloud() {
+    try { return APP.__require("__entry__", "./utils/cloud.js"); } catch (e) { return null; }
+  }
+  function cloudAIEnabled() {
+    try { var c = getCloud(); return !!(c && typeof c.cloudEnabled === "function" && c.cloudEnabled()); } catch (e) { return false; }
+  }
+  /** 用户自有 Key 直连（可选，默认关）；仅在云端网关不可用或失败时作为兜底。 */
+  function callLLMDirect(history, ctx, onDone, onErr) {
     var c = llmCfg();
     var base = safeBaseURL(c.baseURL);
     if (!base) { onErr("Base URL 不合法：仅支持 https，且不能是本机/内网地址"); return; }
@@ -860,6 +867,22 @@
         if (!o.ok || !o.j.choices || !o.j.choices[0]) { onErr("大模型接口返回异常，已切换离线助手"); return; }
         onDone(o.j.choices[0].message.content || "");
       }).catch(function () { onErr("大模型请求失败（多为浏览器跨域/CORS 或 CSP 限制），已切换离线助手"); });
+  }
+  /** 统一入口：优先云端强模型网关（llmProxy，前端零 Key），失败再回落用户自有 Key 直连。 */
+  function callLLM(history, ctx, onDone, onErr) {
+    if (cloudAIEnabled()) {
+      var Cloud = getCloud();
+      var ctxStr = (ctx && ctx.plan)
+        ? Cloud.aiContextOf(ctx.plan, (ctx.title || "") + "（" + (ctx.path || "") + "）")
+        : "当前页面：" + ((ctx && ctx.title) || "未知") + "（旅行攻略生成器网页版）。";
+      var msgs = (history || []).map(function (m) { return { role: m.user ? "user" : "assistant", content: m.text }; });
+      Cloud.aiChat({ messages: msgs, context: ctxStr }).then(function (r) {
+        if (r && r.ok && r.text) onDone(r.text);
+        else callLLMDirect(history, ctx, onDone, onErr);
+      }).catch(function () { callLLMDirect(history, ctx, onDone, onErr); });
+      return;
+    }
+    callLLMDirect(history, ctx, onDone, onErr);
   }
 
   /* ───────── 9. UI 构建 ───────── */
@@ -901,7 +924,7 @@
         "<label>Base URL</label><input type='text' id='aiBase' placeholder='https://api.openai.com/v1'/>" +
         "<label>API Key</label><input type='password' id='aiKey' placeholder='sk-...'/>" +
         "<label>模型名</label><input type='text' id='aiModel' placeholder='gpt-4o-mini'/>" +
-        "<div class='ai-hint'>留空则使用内置离线助手。浏览器直连大模型可能因跨域(CORS)或 CSP 被拦，属正常现象。</div>" +
+        "<div class='ai-hint'>若小程序已开启云端 AI，则自动优先走云端强模型网关，无需在此填 Key。此处仅作为「自有 Key 直连」的可选兜底；浏览器直连可能因跨域(CORS)或 CSP 被拦，属正常现象。</div>" +
         "<button class='ai-save' id='aiSave'>保存设置</button>" +
       "</div>";
 
@@ -1007,7 +1030,8 @@
     });
     if (dom.ctxLine) {
       dom.ctxLine.textContent = "当前：" + ctx.title +
-        (lastPlan ? " · 已记住 " + lastPlan.city + " " + lastPlan.days + " 天" : "") + " · 离线内置";
+        (lastPlan ? " · 已记住 " + lastPlan.city + " " + lastPlan.days + " 天" : "") +
+        (cloudAIEnabled() ? " · 云端 AI" : " · 离线内置");
     }
   }
 
@@ -1107,9 +1131,9 @@
     pushUser(v);
     var ctx = context();
 
-    if (llmEnabled()) {
+    if (cloudAIEnabled() || llmEnabled()) {
       pushTyping();
-      callLLM(history.slice(0, -1), ctx, function (txt) {
+      callLLM(history, ctx, function (txt) {
         clearTyping(); pushBot(escapeHtml(txt).replace(/\n/g, "<br/>"));
       }, function (err) {
         clearTyping(); pushBot("⚠️ " + escapeHtml(err) + "\n已回退到内置离线助手：");
