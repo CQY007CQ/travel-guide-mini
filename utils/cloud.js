@@ -189,8 +189,28 @@ function aiContextOf(plan, page) {
   return lines.join("\n");
 }
 
+// 云端调用超时保护：云函数冷启动 / 网络挂起时，超时即返回 { ok:false } 让调用方回落离线，
+// 避免页面 showLoading 无限转。返回 Promise 永远 resolve，绝不 reject。
+function withTimeout(p, ms) {
+  return new Promise(function (resolve) {
+    let done = false;
+    const timer = setTimeout(function () {
+      if (done) return;
+      done = true;
+      resolve({ ok: false, err: "timeout" });
+    }, ms);
+    const finish = function (v) {
+      if (done) return;
+      done = true;
+      try { clearTimeout(timer); } catch (e) {}
+      resolve(v);
+    };
+    p.then(finish).catch(function (e) { finish({ ok: false, err: String((e && e.message) || e) }); });
+  });
+}
+
 // 调云端 llmProxy：传入对话 / 单轮问题 + 本地上下文，返回 { ok, text, model, source }。
-// 任何失败（云未开 / 未配置 / 网络错）都返回 { ok:false }，调用方必须回落离线引擎，绝不白屏。
+// 任何失败（云未开 / 未配置 / 网络错 / 超时）都返回 { ok:false }，调用方必须回落离线引擎，绝不白屏。
 function aiChat(opts) {
   opts = opts || {};
   return new Promise(function (resolve) {
@@ -204,32 +224,40 @@ function aiChat(opts) {
       temperature: (typeof opts.temperature === "number") ? opts.temperature : null,
       max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : null
     };
-    callFunction("llmProxy", payload).then(function (r) {
+    withTimeout(callFunction("llmProxy", payload), 15000).then(function (r) {
       if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
       else resolve({ ok: false, err: (r && r.err) || "ai-failed", raw: r });
-    }).catch(function (e) { resolve({ ok: false, err: String((e && e.message) || e) }); });
+    });
   });
 }
 
 // 上传本地图片到云存储，返回 fileID（拍照识物用；小程序端）。
 function uploadImage(filePath) {
   return new Promise(function (resolve, reject) {
+    let done = false;
+    const timer = setTimeout(function () {
+      if (done) return;
+      done = true;
+      reject(new Error("upload-timeout"));
+    }, 20000);
+    const ok = function (v) { if (done) return; done = true; try { clearTimeout(timer); } catch (e) {} resolve(v); };
+    const bad = function (e) { if (done) return; done = true; try { clearTimeout(timer); } catch (e2) {} reject(e); };
     try {
-      if (isWeb()) { reject(new Error("web-upload-unsupported")); return; }
+      if (isWeb()) { bad(new Error("web-upload-unsupported")); return; }
       if (typeof wx === "undefined" || !wx.cloud || typeof wx.cloud.uploadFile !== "function") {
-        reject(new Error("cloud-not-ready")); return;
+        bad(new Error("cloud-not-ready")); return;
       }
-      if (!filePath) { reject(new Error("empty-file-path")); return; }
+      if (!filePath) { bad(new Error("empty-file-path")); return; }
       const m = String(filePath).match(/\.(\w+)$/);
       const ext = m ? m[1] : "jpg";
       const cloudPath = "lens/" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "." + ext;
       wx.cloud.uploadFile({
         cloudPath: cloudPath,
         filePath: filePath,
-        success: function (res) { resolve((res && res.fileID) || ""); },
-        fail: function (err) { reject(err); }
+        success: function (res) { ok((res && res.fileID) || ""); },
+        fail: function (err) { bad(err); }
       });
-    } catch (e) { reject(e); }
+    } catch (e) { bad(e); }
   });
 }
 
@@ -248,10 +276,10 @@ function aiVision(opts) {
       max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : 700
     };
     if (!payload.imageFileID && !payload.imageBase64) { resolve({ ok: false, err: "no-image" }); return; }
-    callFunction("llmProxy", payload).then(function (r) {
+    withTimeout(callFunction("llmProxy", payload), 20000).then(function (r) {
       if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
       else resolve({ ok: false, err: (r && r.err) || "vision-failed", raw: r });
-    }).catch(function (e) { resolve({ ok: false, err: String((e && e.message) || e) }); });
+    });
   });
 }
 
