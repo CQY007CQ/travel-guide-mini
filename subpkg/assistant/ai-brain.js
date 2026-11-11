@@ -16,9 +16,17 @@ const T = require("../../utils/travel.js");
 const DATA = require("../../utils/data.js");
 const EMERGENCY = require("../../utils/emergency.js");
 const AI_INTENT = require("../../utils/ai-intent.js");
+const RECOMMEND = require("../../utils/recommend.js");   // 本地离线推荐引擎（零网络）：recommend(text,opts)->{list,prefs,month,...}
 
 /* 与 ai-intent 同款 action 构造器（assistant.onAction 消费 path/query/mode） */
 function act(path, label, query, mode) { return { label: label, path: path, query: query || {}, mode: mode || "push" }; }
+
+/* ───────── 离线命中可观测（对齐 C16 旅客服务中心「AI 接通状态」思路，但零依赖云） ─────────
+ * 计数离线引擎真正解答的次数，让离线 AI 的价值可被看见（无需强模型上线也能体现）。 */
+let _hits = 0;
+const _hitBy = Object.create(null);
+function _bump(k) { _hits++; if (k) _hitBy[k] = (_hitBy[k] || 0) + 1; }
+function offlineStats() { return { hits: _hits, byIntent: Object.assign({}, _hitBy) }; }
 
 /* 本地日期 yyyy-mm-dd */
 function localDate(d) {
@@ -261,9 +269,61 @@ function runToolkit() { return { text: "「旅行百宝箱」有汇率换算、�
 function runGuide() { return { text: "「我的攻略」里保存着你生成过的行程，可随时翻看、复用、再编辑。", actions: [act("pages/myguides/myguides", "打开我的攻略 →")], intent: "guide" }; }
 function runSettings() { return { text: "「更多」页里有主题（深/浅色）、字体大小、偏好、数据管理等设置。", actions: [act("pages/more/more", "打开更多设置 →", {}, "tab")], intent: "settings" }; }
 
+/* ───────── 离线扩面：推荐城市 / 最佳季节（补齐「离线优先」真空，零网络） ───────── */
+
+/* 月份数组 → 紧凑区间文本：如 [3,4,5,9,10,11] → "3-5月、9-11月" */
+function fmtMonths(arr) {
+  if (!Array.isArray(arr) || !arr.length) return "";
+  if (typeof arr[0] === "number") {
+    const nums = arr.slice().sort(function (a, b) { return a - b; });
+    const parts = []; let s = nums[0], p = nums[0];
+    for (let i = 1; i < nums.length; i++) {
+      if (nums[i] === p + 1) { p = nums[i]; }
+      else { parts.push(s === p ? (s + "月") : (s + "-" + p + "月")); s = p = nums[i]; }
+    }
+    parts.push(s === p ? (s + "月") : (s + "-" + p + "月"));
+    return parts.join("、");
+  }
+  return arr.join("、");
+}
+
+/* 推荐城市：复用本地 recommend 引擎（按偏好标签打分，零网络），返回带理由的榜单 */
+function runRecommend(text, city, ctx) {
+  let res = null;
+  try { if (RECOMMEND && RECOMMEND.recommend) res = RECOMMEND.recommend(text, { month: (ctx && ctx.month) || (new Date().getMonth() + 1), topN: 5 }); } catch (e) {}
+  if (!res || res.pending || !res.list || !res.list.length) {
+    return { text: "离线知识库还没法推荐，换个说法（如「推荐几个适合亲子的城市」「想去海边」）或打开「按标签找景点」。", actions: [act("subpkg/spotsearch/spotsearch", "按标签找景点 →")], intent: "recommend" };
+  }
+  const hasTag = res.prefs && res.prefs.tags && res.prefs.tags.length;
+  const lines = ["🌟 离线推荐" + (hasTag ? "（已按你的偏好）" : "") + "："];
+  res.list.slice(0, 5).forEach(function (x, i) {
+    lines.push((i + 1) + ". " + (x.name || "") + (x.province ? "（" + x.province + "）" : "") + " · " + (x.seasonNote || x.reasonTag || "综合推荐"));
+  });
+  lines.push("点城市名可直接生成行程；想更精准就说「海边+亲子+5天」这类组合。");
+  return { text: lines.join("\n"), actions: [act("pages/index/index", "去生成攻略 →", {}, "tab"), act("subpkg/spotsearch/spotsearch", "按标签找景点 →")], intent: "recommend" };
+}
+
+/* 最佳季节：复用 cityBrief + T.bestMonths（零网络），给"几月去最好"类问题接地回答 */
+function runBestTime(text, city, ctx) {
+  if (!city) return null;
+  let cb = null, months = null;
+  try { if (T.cityBrief) cb = T.cityBrief(city); } catch (e) {}
+  try { if (T.bestMonths && cb && cb.best) months = T.bestMonths(cb.best); } catch (e) {}
+  const lines = ["🗓 " + city + " 什么时候去最好"];
+  if (months && months.length) lines.push("最佳月份：" + fmtMonths(months) + "。");
+  else if (cb && cb.best && cb.best !== "四季皆宜") lines.push("最佳：" + cb.best + "。");
+  else lines.push("四季皆宜，全年都能去。");
+  if (cb && cb.climateTxt) lines.push("气候：" + cb.climateTxt + "。");
+  if (cb && cb.costTxt) lines.push("花费参考：" + cb.costTxt + "。");
+  lines.push("具体几天的天气以 App 内天气页为准（联网获取）。");
+  return { text: lines.join("\n"), actions: [act("pages/index/index", "去生成攻略 →", {}, "tab"), act("subpkg/food/food", "看看美食 →", { city: city })], intent: "besttime" };
+}
+
 /* ───────── 扩展意图表（顺序：更具体者优先） ───────── */
 const NEW_INTENTS = [
   { key: "help-emergency", kw: /医院|急救|受伤|骨折|出血|中暑|高原反应|晕倒|胸痛|急诊|食物.*(中毒|过敏)|不舒服|拉肚子|发烧|过敏/, run: runEmergency },
+  { key: "recommend",      kw: /推荐|想去|去哪.*(好|玩|合适|舒服)|哪里.*(好玩|适合|舒服)|适合.*(去|玩|城市|地方|目的地)|小众.*(目的地|城市|玩法)/, run: runRecommend },
+  { key: "besttime",       kw: /几月去|什么时候去|最佳.*(季节|月份|时间)|什么.*(季节|月份).*去|避开.*(人潮|旺季)|(季节|月份).*最好|适合玩几天|最佳出行/, run: runBestTime },
   { key: "planOptimize",   kw: /行程.*(合理|问题|体检|优化|挑毛病|太赶|调整|改一下|有没有|顺不顺)|挑毛病|体检.*行程|排得.*(太|不)/, run: runPlanOptimize },
   { key: "generate",       kw: /生成|做一份|排一份|安排一下|帮我排|来一份|规划|日游|几天|怎么安排|定制行程|排个行程|出个行程/, run: runGenerate },
   { key: "food",           kw: /吃什么|吃啥|美食|必吃|好吃的|当地菜|特色菜|餐厅|馆子|小吃|夜市/, run: runFood },
@@ -287,7 +347,7 @@ function handle(text, ctx) {
   // ① 先委派 ai-intent（photo/near/cityinfo/spot/nav/sync），零回归
   try {
     const delegated = AI_INTENT.handle(text, ctx);
-    if (delegated) return delegated;
+    if (delegated) { _bump(delegated.intent || "delegated"); return delegated; }
   } catch (e) { /* ai-intent 异常不应阻断扩展场景 */ }
   const city = (AI_INTENT.cityOf ? AI_INTENT.cityOf(text, ctx.city) : (ctx.city || "")) || (ctx.city || "");
   // ② 走扩展场景，首个命中即返回
@@ -296,7 +356,7 @@ function handle(text, ctx) {
     if (sc.kw.test(text)) {
       try {
         const r = sc.run(text, city, ctx);
-        if (r) return r;
+        if (r) { _bump(sc.key); return r; }
       } catch (e) { /* 单个场景出错不阻断其它场景 */ }
     }
   }
@@ -352,6 +412,7 @@ module.exports = {
   scenarioFor: scenarioFor,
   pageSuggestions: pageSuggestions,
   allScenarios: allScenarios,
+  offlineStats: offlineStats,
   SCENARIOS: SCENARIOS,
   PAGE_ROUTE: PAGE_ROUTE,
   // 兼容 ai-intent 既有导出

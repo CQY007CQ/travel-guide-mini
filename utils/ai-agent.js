@@ -149,12 +149,19 @@ function clampInt(v, lo, hi, def) {
 }
 
 // 城市名校验：必须命中本地真实 CITIES，杜绝 AI 编造地名。返回规范名或 ""。
+// 城市名数组懒缓存（423+ 城，避免每次调用都 .map 全量重建）。
+let _cityNames = null;
+function _cityNameList() {
+  if (_cityNames) return _cityNames;
+  const list = (DATA && Array.isArray(DATA.CITIES)) ? DATA.CITIES : [];
+  _cityNames = list.map(c => (c && c.name) || "").filter(Boolean);
+  return _cityNames;
+}
 function resolveCity(name) {
   const raw = String(name || "").trim();
   if (!raw || raw.length > 20) return "";
   const n = raw.replace(/[市地区县]$/, "");
-  const list = (DATA && Array.isArray(DATA.CITIES)) ? DATA.CITIES : [];
-  const names = list.map(c => (c && c.name) || "").filter(Boolean);
+  const names = _cityNameList();
   if (names.indexOf(raw) >= 0) return raw;
   if (names.indexOf(raw + "市") >= 0) return raw + "市";
   if (names.indexOf(n) >= 0) return n;

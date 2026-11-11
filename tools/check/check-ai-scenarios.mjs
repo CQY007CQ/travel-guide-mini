@@ -94,5 +94,24 @@ for (const f of ["pages/today/today.js", "pages/plan/plan.js", "pages/help/help.
 const drift = ASK_SRC.filter(function (s) { return !(PROMPTS && PROMPTS.SYSTEMS && PROMPTS.SYSTEMS[s]); });
 log(drift.length === 0, "源码 ask(scene) 均已有提示词（" + ASK_SRC.length + " 处场景字面量）" + (drift.length ? "（缺失：" + drift.join(",") + "）" : ""));
 
+// 6) 离线扩面意图守卫：新增「推荐城市 / 最佳季节」零网络意图必须可解析且接地（不依赖强模型上线）
+const OFFLINE_EXTRA = [
+  { q: "推荐几个适合亲子的海边城市", ctx: {}, key: "recommend" },
+  { q: "杭州几月去最好", ctx: { city: "杭州" }, key: "besttime" }
+];
+let badOff = [];
+for (const o of OFFLINE_EXTRA) {
+  let r = null;
+  try { r = AI.handle(o.q, o.ctx); } catch (e) { r = null; }
+  // 离线引擎契约：非空文本 + 至少一个直达按钮
+  if (!r || !r.text || !(Array.isArray(r.actions) && r.actions.length)) badOff.push(o.key + (r && r.intent ? ":" + r.intent : ""));
+}
+log(badOff.length === 0, "离线扩面意图（推荐/最佳季节）可解析且接地" + (badOff.length ? "（失败：" + badOff.join(",") + "）" : ""));
+
+// 7) 离线命中可观测导出守卫：offlineStats 必须可用（对齐 C16 旅客服务中心 AI 接通状态思路，零云依赖）
+let st = null;
+try { st = AI.offlineStats && AI.offlineStats(); } catch (e) {}
+log(!!st && typeof st.hits === "number" && st.byIntent && typeof st.byIntent === "object", "离线命中可观测 offlineStats 可用（hits/byIntent）");
+
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);
