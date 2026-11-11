@@ -1103,5 +1103,15 @@ AG.clearHistory();
 assert("Agent 全局清空生效", AG.memoryStats().scenes === 0);
 assert("Agent 并发保护存在", req("fs").readFileSync("./utils/ai-agent.js", "utf8").indexOf("_inflight[k]") >= 0);
 
+// ── AI 识物增强（v1.20.7）：多图 / 二次核验 / 离线文字兜底 接线防回潮 ──
+const LENS_JS = req("fs").readFileSync("./subpkg/lens/lens.js", "utf8");
+const LENS_WXML = req("fs").readFileSync("./subpkg/lens/lens.wxml", "utf8");
+const CLOUD_JS = req("fs").readFileSync("./utils/cloud.js", "utf8");
+const PROXY_JS = req("fs").readFileSync("./tools/cloud/llmProxy/index.js", "utf8");
+assert("识物：支持多图（lens 收集 imgs 数组）", /imgs\s*:/.test(LENS_JS) && /wx:for="{{imgs}}"/.test(LENS_WXML));
+assert("识物：多图传入云函数(imageFileIDs)", CLOUD_JS.indexOf("imageFileIDs") >= 0 && PROXY_JS.indexOf("event.imageFileIDs") >= 0);
+assert("识物：自适应二次核验（多链投票）已落地", /_visionWithVote/.test(LENS_JS) && /_promptVerify/.test(LENS_JS));
+assert("识物：离线文字问回落本地 AI 大脑", /AI\.handle/.test(LENS_JS) && /离线/.test(LENS_JS));
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

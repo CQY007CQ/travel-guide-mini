@@ -151,7 +151,7 @@ exports.main = async (event) => {
   event = event || {};
   const messages = Array.isArray(event.messages) ? event.messages : null;
   const prompt = (typeof event.prompt === "string") ? event.prompt : "";
-  const hasImage = !!(event.imageFileID || event.imageBase64);
+  const hasImage = !!(event.imageFileID || event.imageBase64 || (Array.isArray(event.imageFileIDs) && event.imageFileIDs.length));
   if (!messages && !prompt && !hasImage) return { ok: false, err: "empty-input" };
 
   // 视觉能力自检：明确已知不支持图片的模型，直接给可操作的原因，避免页面只拿到「识别失败」。
@@ -169,26 +169,33 @@ exports.main = async (event) => {
     };
   }
 
-  // 图片（可选）：优先 fileID → 云存储下载转 base64；其次直接传 base64
-  let imageDataUrl = "";
-  if (event.imageFileID) {
-    try { imageDataUrl = "data:image/jpeg;base64," + (await downloadFileBase64(event.imageFileID)); }
+  // 图片（可选）：优先 fileID 数组 / 单个 fileID → 云存储下载转 base64；其次直接传 base64。
+  // 支持多张（最多 3 张不同角度）一并送入多模态模型，提升识别准确率。
+  const imageDataUrls = [];
+  const ids = Array.isArray(event.imageFileIDs) ? event.imageFileIDs.filter(Boolean).slice(0, 3) : [];
+  if (ids.length) {
+    for (const fid of ids) {
+      try { imageDataUrls.push("data:image/jpeg;base64," + (await downloadFileBase64(fid))); }
+      catch (e) { return { ok: false, err: "image-download-failed" }; }
+    }
+  } else if (event.imageFileID) {
+    try { imageDataUrls.push("data:image/jpeg;base64," + (await downloadFileBase64(event.imageFileID))); }
     catch (e) { return { ok: false, err: "image-download-failed" }; }
   } else if (event.imageBase64) {
     const s = String(event.imageBase64);
-    imageDataUrl = /^data:/.test(s) ? s : ("data:image/jpeg;base64," + s);
+    imageDataUrls.push(/^data:/.test(s) ? s : ("data:image/jpeg;base64," + s));
   }
 
   const hasContext = !!(event.context && String(event.context).trim());
 
   // 组装 messages：system（含护栏+上下文） + 对话历史（+ 单轮 prompt / 多模态图片）
   const finalMessages = [{ role: "system", content: buildSystem(event, hasContext) }];
-  if (imageDataUrl) {
+  if (imageDataUrls.length) {
     finalMessages.push({
       role: "user",
       content: [
-        { type: "text", text: prompt || "请识别这张图片，并给出旅途实用的小知识。" },
-        { type: "image_url", image_url: { url: imageDataUrl } }
+        { type: "text", text: prompt || "请识别这张（这些）图片，并给出旅途实用的小知识。" },
+        ...imageDataUrls.map(function (u) { return { type: "image_url", image_url: { url: u } }; })
       ]
     });
   } else if (messages) {

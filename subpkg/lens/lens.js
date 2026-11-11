@@ -5,6 +5,7 @@ const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const T = require("../../utils/travel.js");
 const Cloud = require("../../utils/cloud.js");
 const AIAgent = require("../../utils/ai-agent.js");
+const AI = require("../assistant/ai-brain.js");   // 离线 AI 大脑（无云时文字问兜底，零网络）
 const EL = require("../../utils/errlog.js");
 const app = getAppSafe();
 
@@ -12,10 +13,11 @@ Page(SafePage({
   data: {
     fz: 1,
     td: false,
-    img: "",            // 本地临时图（预览用）
+    imgs: [],           // 本地临时图（最多 3 张，多角度提升识别率）
     loading: false,
     result: "",         // AI 识别 / 回答结果
     source: "",         // 来源标识（显示「AI 生成」）
+    voted: false,       // 是否触发二次核验（多链投票）
     err: "",            // 失败/未配置提示
     cloudOn: false,     // 云端是否开启
     textMode: false,    // 文字问模式
@@ -48,22 +50,25 @@ Page(SafePage({
 
   _choose(sourceType) {
     const self = this;
+    const remain = 3 - this.data.imgs.length;
+    if (remain <= 0) { wx.showToast({ title: "最多 3 张，可先删除", icon: "none" }); return; }
     try {
       if (typeof wx.chooseMedia === "function") {
         wx.chooseMedia({
-          count: 1, mediaType: ["image"], sourceType: sourceType, camera: "back",
+          count: remain, mediaType: ["image"], sourceType: sourceType, camera: "back",
           success: (res) => {
-            const f = res && res.tempFiles && res.tempFiles[0];
-            if (f && f.tempFilePath) self._setImg(f.tempFilePath);
+            const fs = (res && res.tempFiles) || [];
+            const paths = fs.map(function (f) { return f.tempFilePath; }).filter(Boolean);
+            if (paths.length) self._addImgs(paths);
           },
           fail: () => {}   // 用户取消不打扰
         });
       } else if (typeof wx.chooseImage === "function") {
         wx.chooseImage({
-          count: 1, sourceType: sourceType,
+          count: remain, sourceType: sourceType,
           success: (res) => {
-            const p = res && res.tempFilePaths && res.tempFilePaths[0];
-            if (p) self._setImg(p);
+            const ps = (res && res.tempFilePaths) || [];
+            if (ps.length) self._addImgs(ps);
           },
           fail: () => {}
         });
@@ -73,17 +78,36 @@ Page(SafePage({
     } catch (e) { wx.showToast({ title: "打开相机失败", icon: "none" }); }
   },
 
-  _setImg(p) { this.setData({ img: p, result: "", source: "", err: "" }); },
-  clearImg() { this.setData({ img: "", result: "", source: "", err: "" }); },
+  _addImgs(paths) {
+    const next = this.data.imgs.concat(paths).slice(0, 3);
+    this.setData({ imgs: next, result: "", source: "", err: "", voted: false });
+  },
+  removeImg(e) {
+    const i = Number(e.currentTarget.dataset.i);
+    if (isNaN(i)) return;
+    const next = this.data.imgs.slice();
+    next.splice(i, 1);
+    this.setData({ imgs: next, result: "", source: "", err: "", voted: false });
+  },
+  clearImgs() { this.setData({ imgs: [], result: "", source: "", err: "", voted: false }); },
 
   _prompt() {
     const city = this.data.cityName ? ("当前所在城市：" + this.data.cityName + "。") : "";
     return city +
-      "请识别这张照片里的主体（植物 / 动物 / 地标 / 建筑 / 美食 / 器物等），用简体中文按以下结构作答：\n" +
-      "1. 最可能的名称（学名或俗名；若不确定请说明置信度）；\n" +
-      "2. 一句话科普（最突出的特点）；\n" +
-      "3. 旅途小贴士（能否触碰、能否食用、观赏或拍摄注意、相关文化典故）。\n" +
-      "若无法可靠识别，直接说「无法确定」并给出可能的类别，绝不编造具体数据。";
+      "请识别这张（这些）照片里的主体（植物 / 动物 / 地标 / 建筑 / 美食 / 器物等）。用简体中文严格按以下结构作答：\n" +
+      "①名称：最可能是什么（俗名或学名），并给出你的置信度（高 / 中 / 低）；\n" +
+      "②关键可辨识特征：列出 2-3 个最有助于现场确认该物体的视觉特征；\n" +
+      "③一句话科普：最突出的特点或趣闻；\n" +
+      "④旅途小贴士：能否触碰、能否食用、观赏或拍摄建议、相关文化典故。\n" +
+      "若无法可靠识别，直接说「无法确定」并给出可能的类别，绝不编造物种名、毒性、价格或坐标。";
+  },
+
+  // 二次核验（多链投票）：换角度重新判断，要求给出明确结论与决定性判别特征
+  _promptVerify() {
+    const city = this.data.cityName ? ("当前所在城市：" + this.data.cityName + "。") : "";
+    return city +
+      "请抛开既有思路，对同一张（同一组）照片做「二次核验」：从形态、生境、颜色、纹理、用途等更客观的角度重新判断主体最可能是什么，" +
+      "并给出置信度（高 / 中 / 低）与 1-2 个决定性判别特征。如果仍不确定，请明确说「无法确定」并列出 2-3 个最相关的可能类别，绝不编造。";
   },
 
   _system() {
@@ -106,29 +130,55 @@ Page(SafePage({
 
   identify() {
     const self = this;
-    if (!this.data.img) { wx.showToast({ title: "先拍一张或从相册选", icon: "none" }); return; }
+    if (!this.data.imgs.length) { wx.showToast({ title: "先拍一张或从相册选", icon: "none" }); return; }
     if (!Cloud.cloudEnabled()) {
-      self.setData({ err: "AI 识物需先开启云端：在云函数 llmProxy 配置 LLM_PROVIDER / LLM_MODEL（需多模态模型，如 gpt-4o、qwen-vl-max）。当前可用下方「文字问」。" });
+      self.setData({ err: "AI 识物需先开启云端：在云函数 llmProxy 配置 LLM_PROVIDER / LLM_MODEL（需多模态模型，如 gpt-4o、qwen-vl-max）。当前可用下方「文字问」（离线也能答）。" });
       return;
     }
-    self.setData({ loading: true, result: "", source: "", err: "" });
+    self.setData({ loading: true, result: "", source: "", err: "", voted: false });
     try { wx.showLoading({ title: "AI 识别中", mask: true }); } catch (e) {}
-    self._compress(self.data.img)
-      .then((p) => Cloud.uploadImage(p))
-      .then((fileID) => {
-        if (!fileID) throw new Error("upload-empty");
-        return Cloud.aiVision({ imageFileID: fileID, prompt: self._prompt(), system: self._system() });
+    Promise.all(this.data.imgs.map(function (p) { return self._compress(p); }))
+      .then(function (paths) { return Promise.all(paths.map(function (p) { return Cloud.uploadImage(p); })); })
+      .then(function (fileIDs) {
+        fileIDs = fileIDs.filter(Boolean);
+        if (!fileIDs.length) throw new Error("upload-empty");
+        return self._visionWithVote(fileIDs);
       })
-      .then((r) => {
+      .then(function (r) {
         try { wx.hideLoading(); } catch (e) {}
-        if (r && r.ok && r.text) self.setData({ result: r.text, loading: false, source: r.source || "ai", err: "" });
+        if (r && r.ok && r.text) self.setData({ result: r.text, loading: false, source: r.source || "ai", err: "", voted: !!r.voted });
         else self.setData({ loading: false, err: "识别失败：" + ((r && r.err) || "未知错误") + "。可改用「文字问」。" });
       })
-      .catch((e) => {
+      .catch(function (e) {
         try { wx.hideLoading(); } catch (_) {}
         try { EL.push("lens.identify", e); } catch (_) {}
         self.setData({ loading: false, err: "识别失败（" + String((e && e.message) || e) + "）。可改用「文字问」。" });
       });
+  },
+
+  // 自适应多链投票：先主识别，若结果不确定（低置信度）再换角度核验一次，提升准确率
+  _visionWithVote(fileIDs) {
+    const self = this;
+    return Cloud.aiVision({ imageFileIDs: fileIDs, prompt: self._prompt(), system: self._system(), max_tokens: 700 })
+      .then(function (r1) {
+        if (!r1 || !r1.ok || !r1.text) return r1;
+        const uncertain = /不确定|可能|疑似|无法确定|不清楚|不太确定|也许|大概|存疑|难以确定|我无法|无法确认|不能确认/.test(r1.text);
+        if (!uncertain) return r1;
+        // 二次核验
+        return Cloud.aiVision({ imageFileIDs: fileIDs, prompt: self._promptVerify(), system: self._system(), max_tokens: 500 })
+          .then(function (r2) {
+            if (r2 && r2.ok && r2.text) return { ok: true, text: r2.text, source: r2.source || "ai", voted: true };
+            return r1; // 二次失败则回退首次结果
+          })
+          .catch(function () { return r1; });
+      });
+  },
+
+  copyResult() {
+    const t = String(this.data.result || "");
+    if (!t) { wx.showToast({ title: "还没有可复制的内容", icon: "none" }); return; }
+    try { wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制", icon: "none" }) }); }
+    catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
   },
 
   toggleText() { this.setData({ textMode: !this.data.textMode, err: "" }); },
@@ -138,13 +188,25 @@ Page(SafePage({
     const q = (this.data.textInput || "").trim();
     if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
     const self = this;
-    if (!Cloud.cloudEnabled()) { self.setData({ err: "云端未开启，暂无法提问。" }); return; }
-    self.setData({ loading: true, err: "", result: "", source: "" });
+    if (!Cloud.cloudEnabled()) {
+      // 离线兜底：先走本地 AI 大脑，再回落本地规则引擎（零网络，不伪造）
+      let r = null;
+      try {
+        const plan = app.globalData && app.globalData.plan;
+        r = AI.handle(q, { city: (plan && (T.activeCityOf(plan) || plan.cityName)) || "", plan: plan, page: "lens" });
+      } catch (e) {}
+      if (r && r.text) { self.setData({ result: r.text, loading: false, source: "", err: "", voted: false }); return; }
+      try { r = T.askAssistant(q, app.globalData && app.globalData.plan); } catch (e) {}
+      if (r && r.text) { self.setData({ result: r.text, loading: false, source: "", err: "", voted: false }); return; }
+      self.setData({ err: "本地也无法识别，请联网后重试，或在「问问 AI」里用文字描述。" });
+      return;
+    }
+    self.setData({ loading: true, err: "", result: "", source: "", voted: false });
     try { wx.showLoading({ title: "AI 思考中", mask: true }); } catch (e) {}
     let ctx = "";
     try { ctx = Cloud.aiContextOf(app.globalData && app.globalData.plan, "AI 识物页"); } catch (e) {}
     AIAgent.ask("lens", q, ctx)
-      .then((r) => {
+      .then(function (r) {
         try { wx.hideLoading(); } catch (e) {}
         if (r && r.ok && r.text) { self.setData({ result: r.text, loading: false, source: r.source || "ai" }); return; }
         // 云端不可用（离线/未配置/超时）属预期降级，给出清晰提示而非误导性的「回答失败」
@@ -156,7 +218,7 @@ Page(SafePage({
             : "回答失败：" + ((r && r.err) || "未知")
         });
       })
-      .catch((e) => {
+      .catch(function (e) {
         try { wx.hideLoading(); } catch (_) {}
         self.setData({ loading: false, err: "回答失败：" + String((e && e.message) || e) });
       });

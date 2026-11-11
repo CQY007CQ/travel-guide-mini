@@ -26,7 +26,20 @@
 .op-go { flex: none; padding-left: 34rpx; padding-right: 34rpx; background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f); color: #14100a; font-weight: 800; }
 .op-dis { opacity: .5; }
 
+/* 多图网格（v1.20.7 增强：最多 3 张不同角度） */
+.grid { display: flex; flex-wrap: wrap; gap: 12rpx; padding: 18rpx 18rpx 0; }
+.cell { position: relative; width: calc((100% - 24rpx) / 3); aspect-ratio: 1 / 1; border-radius: 16rpx; overflow: hidden; background: var(--panel, #18233a); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .16); }
+.cell-img { width: 100%; height: 100%; display: block; }
+.cell-x { position: absolute; right: 8rpx; top: 8rpx; width: 40rpx; height: 40rpx; line-height: 40rpx; text-align: center; font-size: calc(24rpx * var(--fs, 1)); color: #fff; background: rgba(0, 0, 0, .52); border-radius: 999rpx; }
+.cell-add { display: flex; align-items: center; justify-content: center; border: 1rpx dashed rgba(var(--chip-rgb, 212, 169, 78), .5); background: rgba(212, 169, 78, .08); }
+.cell-add .add-t { font-size: calc(23rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); text-align: center; }
+
 /* 结果 */
+.result .h3 { display: flex; align-items: center; gap: 14rpx; font-size: calc(28rpx * var(--fs, 1)); margin-bottom: 12rpx; }
+.vote-badge { font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #d4a94e; border: 1rpx solid rgba(var(--chip-rgb, 212, 169, 78), .5); border-radius: 999rpx; padding: 2rpx 16rpx; }
+.r-ops { display: flex; gap: 14rpx; margin-top: 16rpx; }
+.ai-copy { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); border: 1rpx dashed rgba(var(--ln-rgb, 148, 163, 184), .35); border-radius: 999rpx; padding: 8rpx 22rpx; }
+.ai-copy:active { color: var(--chip-tx, #d4a94e); }
 .result .h3 { display: flex; align-items: center; gap: 14rpx; font-size: calc(28rpx * var(--fs, 1)); margin-bottom: 12rpx; }
 .ai-badge { font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a; background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 16rpx; }
 .r-txt { display: block; font-size: calc(27rpx * var(--fs, 1)); color: var(--t1, #dce5f0); line-height: 1.78; white-space: pre-wrap; word-break: break-word; }

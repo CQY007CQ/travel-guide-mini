@@ -329,21 +329,24 @@ function uploadImage(filePath) {
 }
 
 // 视觉识别：把图片 fileID / base64 交给 llmProxy（多模态强模型），返回同 aiChat 的结构。
+// 支持单张（imageFileID/imageBase64）或多张（imageFileIDs 数组，最多 3 张不同角度，提升识别准确率）。
 function aiVision(opts) {
   opts = opts || {};
   return new Promise(function (resolve) {
     if (!cloudEnabled()) { resolve({ ok: false, err: "cloud-disabled" }); return; }
+    const ids = Array.isArray(opts.imageFileIDs) ? opts.imageFileIDs.filter(Boolean).slice(0, 3) : [];
     const payload = {
       prompt: (typeof opts.prompt === "string" && opts.prompt.trim()) ? opts.prompt.trim() : null,
       system: (typeof opts.system === "string" && opts.system.trim()) ? opts.system.trim() : null,
       context: (typeof opts.context === "string" && opts.context.trim()) ? opts.context.trim() : null,
       imageFileID: opts.imageFileID || null,
+      imageFileIDs: ids.length ? ids : null,
       imageBase64: opts.imageBase64 || null,
       model: (typeof opts.model === "string" && opts.model.trim()) ? opts.model.trim() : null,
       max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : 700
     };
-    if (!payload.imageFileID && !payload.imageBase64) { resolve({ ok: false, err: "no-image" }); return; }
-    withTimeout(callFunction("llmProxy", payload), 20000).then(function (r) {
+    if (!payload.imageFileID && !payload.imageFileIDs && !payload.imageBase64) { resolve({ ok: false, err: "no-image" }); return; }
+    withTimeout(callFunction("llmProxy", payload), 25000).then(function (r) {
       if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
       else resolve({ ok: false, err: (r && (r.hint || r.err)) || "vision-failed", raw: r });
     });

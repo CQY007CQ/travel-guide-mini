@@ -2,31 +2,40 @@
   <!-- 头部说明 -->
   <view class="card head">
     <view class="h2"><image lazy-load class="ic" src="/images/icons/camera.png"/>AI 识物 · 旅途科普</view>
-    <view class="sub">拍一张旅途中的花草、地标或美食，AI 帮你认一认，并讲讲能碰不能碰、值不值得看的小知识。</view>
+    <view class="sub">拍一张或多张（不同角度）旅途中的花草、地标或美食，AI 帮你认一认，并讲讲能碰不能碰、值不值得看的小知识。</view>
     <view class="cloud-tag {{cloudOn ? 'on' : 'off'}}">{{cloudOn ? '云端 AI 已就绪' : '云端未开启 · 可先「文字问」'}}</view>
   </view>
 
-  <!-- 拍照 / 相册 -->
+  <!-- 拍照 / 相册（支持多张不同角度，提升识别准确率） -->
   <view class="card pick">
-    <view class="preview" wx:if="{{img}}">
-      <image lazy-load class="pv-img" src="{{img}}" mode="aspectFill"/>
-      <view class="pv-clear" catchtap="clearImg">✕ 重选</view>
+    <view class="grid" wx:if="{{imgs.length}}">
+      <view class="cell" wx:for="{{imgs}}" wx:key="*this">
+        <image lazy-load class="cell-img" src="{{item}}" mode="aspectFill"/>
+        <view class="cell-x" catchtap="removeImg" data-i="{{index}}">✕</view>
+      </view>
+      <view class="cell cell-add" wx:if="{{imgs.length < 3}}" bindtap="pickAlbum">
+        <text class="add-t">＋ 再加一张</text>
+      </view>
     </view>
     <view class="placeholder" wx:else>
       <image lazy-load class="ph-ic" src="/images/icons/camera.png"/>
-      <text class="ph-t">还没有照片</text>
+      <text class="ph-t">还没有照片（最多 3 张不同角度）</text>
     </view>
     <view class="pick-ops">
       <view class="op op-main" bindtap="takePhoto"><image lazy-load class="op-ic" src="/images/icons/camera.png"/>拍照</view>
       <view class="op" bindtap="pickAlbum"><image lazy-load class="op-ic" src="/images/icons/search.png"/>相册</view>
-      <view class="op op-go {{img ? '' : 'op-dis'}}" bindtap="identify">识别</view>
+      <view class="op op-go {{imgs.length ? '' : 'op-dis'}}" bindtap="identify">识别</view>
     </view>
   </view>
 
   <!-- 识别 / 回答结果 -->
   <view class="card result" wx:if="{{result}}">
-    <view class="h3">识别结果<text class="ai-badge" wx:if="{{source}}">AI 生成</text></view>
+    <view class="h3">识别结果<text class="ai-badge" wx:if="{{source}}">AI 生成</text><text class="vote-badge" wx:if="{{voted}}">二次核验</text></view>
     <text class="r-txt">{{result}}</text>
+    <view class="r-ops">
+      <view class="ai-copy" bindtap="copyResult">复制</view>
+      <view class="ai-copy" bindtap="clearImgs">重选图片</view>
+    </view>
   </view>
   <view class="card loading" wx:if="{{loading}}">AI 思考中…</view>
   <view class="card err" wx:if="{{err}}">{{err}}</view>
