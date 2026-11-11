@@ -44,6 +44,8 @@ Page(SafePage({
     planSpots: [],      // 查景点模式：当前行程里的景点（一键查）
     keepN: 0, keepsOpen: false, keeps: [],
     input: "",
+    // v1.20.7：AI 一句话生成行程（自然语言 → 参数 → 直接生成并跳行程页）
+    nlText: "", nlBusy: false, nlResult: "",
     aiSource: "",       // 非空表示最近一次结果来自云端强模型（显示「AI 生成」标识）
     scenarios: [],      // 全场景 AI 速达：由 ai-brain.allScenarios() 驱动
     deepTip: ""         // 深链进入时的场景提示（?topic=）
@@ -189,6 +191,73 @@ Page(SafePage({
     if (!q) { wx.showToast({ title: "先输入关键词", icon: "none" }); return; }
     if (this.data.mode === "spot") { this._spotSearch(q); return; }
     this._runQuery(q, "");
+  },
+
+  /* ---- v1.20.7：AI 一句话生成行程（自然语言 → 参数 → 直接生成并跳行程页） ----
+   * 走 AIAgent.parsePlanIntent：云已配 → 强模型更准地拆参；云未配/超时 → 回落本地关键字解析。
+   * 零伪造：只产出参数，真实行程一律 T.buildPlan 本地生成；城市名必经 T.findCity 白名单校验。 ---- */
+  onNLInput(e) { this.setData({ nlText: (e.detail && e.detail.value) || "" }); },
+  onNLRun() {
+    const text = (this.data.nlText || "").trim();
+    if (!text) { wx.showToast({ title: "先说一句，如：成都3天亲子穷游", icon: "none" }); return; }
+    if (this.data.nlBusy) return;
+    this.setData({ nlBusy: true, nlResult: "" });
+    AIAgent.parsePlanIntent(text)
+      .then((p) => {
+        this.setData({ nlBusy: false });
+        if (!p || !p.city) { this.setData({ nlResult: "没识别出城市，换个说法，如：成都3天亲子穷游" }); return; }
+        this._nlGenerate(p);
+      })
+      .catch(() => { this.setData({ nlBusy: false, nlResult: "解析失败，换个说法试试" }); });
+  },
+  // 解析结果 → 本地生成行程并跳转到行程页（与首页 generate 同源，零云依赖）
+  _nlGenerate(p) {
+    const self = this;
+    let c = null;
+    try {
+      if (T.findCity) c = T.findCity(p.city);
+      if (!c) {
+        const provs = T.provinces();
+        for (let pi = 0; pi < provs.length && !c; pi++) {
+          const cs = T.citiesOf(provs[pi]) || [];
+          c = cs.find((x) => x.name === p.city) || null;
+        }
+      }
+    } catch (e) {}
+    if (!c) { this.setData({ nlResult: "未收录「" + p.city + "」，换个城市试试" }); return; }
+    const d = new Date(); d.setDate(d.getDate() + 3);
+    const pad = (n) => (n < 10 ? "0" + n : "" + n);
+    const depart = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    const budgetKey = p.budget || "mid";
+    const pace = p.pace || "balance";
+    const tm = p.travelMode || "";
+    const people = p.people || 2;
+    const bias = p.bias || "";
+    const days = Math.max(1, Math.min(14, p.days || 4));
+    try {
+      const oldPlan = app.globalData && app.globalData.plan;
+      if (oldPlan && oldPlan.days && oldPlan.days.length) T.savePlanSlot(oldPlan);
+      const daysArr = T.buildPlan({ city: c, days, depart, budget: budgetKey, pace, travelMode: tm, people, stayMountain: true, picks: [], pickOnly: false, bias });
+      const from = { province: c.province || "", city: c.name };
+      try { T.resetTripPrep(); } catch (e) {}
+      if (app.setPlan) app.setPlan({
+        cityName: c.name, province: c.province || "", totalDays: daysArr.length, depart, days: daysArr,
+        budget: budgetKey, customAmt: 0, people, pace, travelMode: tm, pickOnly: false, isMulti: false,
+        from, savedAt: Date.now(), bias
+      });
+      try { T.pushRecent({ province: c.province || "", city: c.name, days: daysArr.length, depart }); } catch (e) {}
+      const m1 = { family: "亲子", couple: "情侣", solo: "独行", elder: "带老人" };
+      const m2 = { low: "经济", mid: "舒适", high: "高端" };
+      const bits = [];
+      if (p.days) bits.push(days + "天");
+      if (tm && m1[tm]) bits.push(m1[tm]);
+      if (budgetKey && m2[budgetKey]) bits.push(m2[budgetKey]);
+      this.setData({ nlResult: "已生成「" + c.name + "」" + (bits.join(" · ") || "") + "，正在打开…" });
+      wx.showToast({ title: "已生成「" + c.name + "」攻略", icon: "none" });
+      setTimeout(() => { try { wx.switchTab({ url: "/pages/plan/plan" }); } catch (e) {} }, 700);
+    } catch (e) {
+      this.setData({ nlResult: "生成失败：" + ((e && e.message) || "请稍后重试") });
+    }
   },
 
   _spotSearch(q) {

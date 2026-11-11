@@ -1088,6 +1088,13 @@ const IDX_WXML = req("fs").readFileSync("./pages/index/index.wxml", "utf8");
 const IDX_JS = req("fs").readFileSync("./pages/index/index.js", "utf8");
 assert("首页 AI：走模式无关 ai-entry(generate) 入口", /ai-entry[^>]*topic="generate"/.test(IDX_WXML), "index.wxml 缺少 ai-entry topic=generate");
 assert("首页 AI：已移除旧的单城内联生成器(防回潮)", IDX_JS.indexOf("AI 生成暂只支持单城") < 0 && IDX_JS.indexOf("aiGenerate") < 0);
+// v1.20.7：AI 一句话生成（自然语言→行程参数→直接生成行程）接线在 assistant 分包（不占主包体积红线）
+// 强模型在线增强 / 离线本地解析；解析后由 assistant 调 T.buildPlan 自生成，再跳行程页。
+const ASST_JS = req("fs").readFileSync("./subpkg/assistant/assistant.js", "utf8");
+const ASST_WXML = req("fs").readFileSync("./subpkg/assistant/assistant.wxml", "utf8");
+assert("AI 一句话生成：assistant 入口已接线(onNLRun/onNLInput)", /onNLRun/.test(ASST_JS) && /onNLInput/.test(ASST_JS), "assistant.js 缺少 NL 生成 handler");
+assert("AI 一句话生成：assistant 输入框已绑定 wxml(nlText/onNLRun)", /nlText/.test(ASST_WXML) && /onNLRun/.test(ASST_WXML), "assistant.wxml 缺少 NL 输入框绑定");
+assert("Agent：parsePlanIntent 已导出且离线解析器已实现(防回潮)", typeof AG.parsePlanIntent === "function" && req("fs").readFileSync("./utils/ai-agent.js", "utf8").indexOf("function parsePlanIntentLocal") >= 0);
 AG.clearHistory("__m__");
 AG.remember("__m__", "user", "q1"); AG.remember("__m__", "assistant", "a1");
 const ms = AG.memoryStats();

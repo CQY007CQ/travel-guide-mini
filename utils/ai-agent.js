@@ -170,17 +170,53 @@ function resolveCity(name) {
   return hit || "";
 }
 
+// 行程意图解析（本地离线版）：纯关键字/正则抽取，零网络、零云依赖。
+// 与云端版互补：云端未配置时仍能把「成都 3 天亲子穷游」拆成结构化参数，喂给本地 T.buildPlan。
+// 只产出参数，绝不产出景点/路线/价格（内容一律由本地生成器出，零伪造）。
+const PLAN_CN_NUM = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+function parsePlanIntentLocal(text) {
+  const q = String(text || "").trim();
+  if (!q) return null;
+  const out = {};
+  const city = resolveCity(q);
+  if (city) out.city = city;
+  // 天数
+  const dm = q.match(/(\d+|[一二两三两四五六七八九十])\s*(?:天|日|晚|天\d|日游)/);
+  if (dm) { const n = parseInt(dm[1], 10) || PLAN_CN_NUM[dm[1]]; if (n) out.days = Math.max(1, Math.min(14, n)); }
+  // 预算
+  if (/穷游|省钱|便宜|经济|低预算|预算有限|不贵|省一点|学生|低消费/.test(q)) out.budget = "low";
+  else if (/奢华|高端|豪华|不差钱|高预算|精品|贵一点|高消费/.test(q)) out.budget = "high";
+  else if (/舒适|适中|中档|中等预算/.test(q)) out.budget = "mid";
+  // 节奏
+  if (/轻松|慢|躺平|休闲|放松|不赶|度假|佛系/.test(q)) out.pace = "leisure";
+  else if (/特种兵|紧凑|赶|暴走|多玩|效率|满满|压满/.test(q)) out.pace = "speed";
+  // 人群
+  if (/亲子|带娃|孩子|小朋友|儿童|一家三口/.test(q)) out.travelMode = "family";
+  else if (/情侣|蜜月|两个人?.*浪漫|约会/.test(q)) out.travelMode = "couple";
+  else if (/一个人|独行|\bsolo\b|自己一个人| solo/.test(q)) out.travelMode = "solo";
+  else if (/带老人|父母|长辈|老年|爷爷奶奶/.test(q)) out.travelMode = "elder";
+  // 人数
+  const pm = q.match(/(\d+)\s*人/);
+  if (pm) { const n = parseInt(pm[1], 10); if (n >= 1 && n <= 10) out.people = n; }
+  // 偏好主题
+  if (/历史|古迹|博物馆|古镇|人文|文化|古都|遗址/.test(q)) out.bias = "history";
+  else if (/自然|山水|海边|爬山|雪山|草原|风光|看海|海岛/.test(q)) out.bias = "nature";
+  return Object.keys(out).length ? out : null;
+}
+
 // 行程意图解析：返回 { city, days, budget, pace, travelMode, people, bias }（只含可确认字段）或 null。
 // 注意：这里不产出任何行程内容，首页拿到参数后交给本地 T.buildPlan 生成。
+// 云端可用时优先用强模型（更准），不可用/出错时回落本地关键字解析，保证离线也能量化拆参。
 function parsePlanIntent(text) {
   const q = String(text || "").trim();
-  if (!q) return Promise.resolve(null);
-  if (!Cloud.cloudEnabled()) return Promise.resolve(null);
+  const local = parsePlanIntentLocal(q);
+  if (!q) return Promise.resolve(local);
+  if (!Cloud.cloudEnabled()) return Promise.resolve(local);
   return Cloud.aiChat({ prompt: q, system: PLAN_SYS, max_tokens: 300, temperature: 0.2 })
     .then(function (r) {
-      if (!r || !r.ok || !r.text) return null;
+      if (!r || !r.ok || !r.text) return local;
       const o = extractJSON(r.text);
-      if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+      if (!o || typeof o !== "object" || Array.isArray(o)) return local;
       const out = {};
       const city = resolveCity(o.city);
       if (city) out.city = city;
@@ -192,9 +228,9 @@ function parsePlanIntent(text) {
       if (o.bias != null) out.bias = oneOf(o.bias, ["", "history", "nature"], "");
       // 清掉空值 / undefined，避免污染表单
       Object.keys(out).forEach(k => { if (out[k] === "" || out[k] === undefined || out[k] === null) delete out[k]; });
-      return Object.keys(out).length ? out : null;
+      return Object.keys(out).length ? out : (local || null);
     })
-    .catch(function () { return null; });
+    .catch(function () { return local; });
 }
 
 module.exports = {
