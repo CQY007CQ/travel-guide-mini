@@ -146,8 +146,15 @@ Page(SafePage({
     AIAgent.ask("lens", q, ctx)
       .then((r) => {
         try { wx.hideLoading(); } catch (e) {}
-        if (r && r.ok && r.text) self.setData({ result: r.text, loading: false, source: r.source || "ai" });
-        else self.setData({ loading: false, err: "回答失败：" + ((r && r.err) || "未知") });
+        if (r && r.ok && r.text) { self.setData({ result: r.text, loading: false, source: r.source || "ai" }); return; }
+        // 云端不可用（离线/未配置/超时）属预期降级，给出清晰提示而非误导性的「回答失败」
+        const off = !!(r && (r.err === "cloud-disabled" || r.err === "cloud-not-ready" || r.err === "timeout"));
+        self.setData({
+          loading: false,
+          err: off
+            ? "识物需联网：当前未连接云端 AI，请联网后重试；或在「问问 AI」里用文字描述。"
+            : "回答失败：" + ((r && r.err) || "未知")
+        });
       })
       .catch((e) => {
         try { wx.hideLoading(); } catch (_) {}
