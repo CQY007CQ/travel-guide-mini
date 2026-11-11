@@ -65,6 +65,20 @@ function weatherDelta(a, b) {
   return out.slice(0, 4);
 }
 
+// 同一天的「两次预报」对比（预报更新），与 weatherDelta 的「相邻两天」互补
+function forecastDelta(prev, next) {
+  const out = [];
+  if (!prev || !next) return out;
+  const d = (x, y) => (typeof x === "number" && typeof y === "number") ? y - x : null;
+  const hi = d(prev.tmax, next.tmax), lo = d(prev.tmin, next.tmin);
+  if (hi !== null && Math.abs(hi) >= 3) out.push({ k: hi > 0 ? "warm" : "cool", t: "预报更新：最高温" + (hi > 0 ? "上调 " : "下调 ") + Math.abs(hi) + "℃" });
+  if (lo !== null && Math.abs(lo) >= 3) out.push({ k: lo > 0 ? "warm" : "cool", t: "预报更新：最低温" + (lo > 0 ? "上调 " : "下调 ") + Math.abs(lo) + "℃" });
+  const rainy = x => !!(x && (x.isRain || x.isSnow || x.isThunder || (typeof x.code === "number" && x.code >= 51)));
+  if (!rainy(prev) && rainy(next)) out.push({ k: "rain", t: "预报更新：新增降水，记得带伞" });
+  else if (rainy(prev) && !rainy(next)) out.push({ k: "sun", t: "预报更新：降水取消，户外可照常" });
+  return out.slice(0, 3);
+}
+
 // 时段 × 类别经验提示：明确「非实时客流」，不伪装成实时拥挤度
 const CROWD_HINTS = [
   { p: "清晨", t: "多数景区刚开门、团队客未到，古镇/山景/机位通常最松；热门博物馆需看预约时段。", tag: "经验" },
@@ -133,5 +147,5 @@ function t(key, lang) { return (I18N[lang] || I18N.zh)[key] || I18N.zh[key] || k
 module.exports = {
   PRIVACY_SECTIONS, OFFLINE_ITEMS, CROWD_HINTS, CROWD_DISCLAIMER,
   DEFAULT_RATES, CUR_NAMES, PHRASES, I18N,
-  weatherDelta, convert, t
+  weatherDelta, forecastDelta, convert, t
 };

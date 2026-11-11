@@ -512,6 +512,7 @@
     <view class="ai-ans" wx:if="{{aiAnswer}}">
       <view class="ai-badge" wx:if="{{aiSource}}">AI 生成</view>
       <text class="ai-ans-tx">{{aiAnswer}}</text>
+      <view class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
     </view>
     <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
   </view>

@@ -278,7 +278,7 @@ function aiVision(opts) {
     if (!payload.imageFileID && !payload.imageBase64) { resolve({ ok: false, err: "no-image" }); return; }
     withTimeout(callFunction("llmProxy", payload), 20000).then(function (r) {
       if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
-      else resolve({ ok: false, err: (r && r.err) || "vision-failed", raw: r });
+      else resolve({ ok: false, err: (r && (r.hint || r.err)) || "vision-failed", raw: r });
     });
   });
 }

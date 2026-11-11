@@ -12,25 +12,61 @@
 
 const Cloud = require("./cloud.js");
 const DATA = require("./data.js");
+const S = require("./store.js");
 
 const MAX_TURNS = 6;                 // 每场景保留最近 6 轮（12 条消息）
-const _mem = Object.create(null);    // scene -> [{role, content}]
+const MEM_KEY = "aiAgentMemV1";
+const MAX_SCENES = 4;                // 落盘最多 4 个场景，防止 storage 膨胀
+const SAVE_CHARS = 600;              // 落盘单条上限（内存里仍 1200）
+let _mem = null;                     // scene -> [{role, content}]，首次访问时懒加载
+
+function _load() {
+  if (_mem) return _mem;
+  _mem = Object.create(null);
+  try {
+    const v = S.get(MEM_KEY, null);
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      Object.keys(v).slice(-MAX_SCENES).forEach(function (k) {
+        if (Array.isArray(v[k])) _mem[k] = v[k].slice(-MAX_TURNS * 2);
+      });
+    }
+  } catch (e) {}
+  return _mem;
+}
+function _save() {
+  try {
+    const m = _load();
+    const out = {};
+    Object.keys(m).slice(-MAX_SCENES).forEach(function (k) {
+      out[k] = m[k].slice(-MAX_TURNS * 2).map(function (x) {
+        return { role: x.role, content: String(x.content || "").slice(0, SAVE_CHARS) };
+      });
+    });
+    S.set(MEM_KEY, out);
+  } catch (e) {}
+}
 
 function historyOf(scene) {
-  try { return (_mem[scene || "default"] || []).slice(-MAX_TURNS * 2); }
+  try { return (_load()[scene || "default"] || []).slice(-MAX_TURNS * 2); }
   catch (e) { return []; }
 }
 function remember(scene, role, text) {
   try {
     const k = scene || "default";
-    if (!_mem[k]) _mem[k] = [];
-    _mem[k].push({ role: role === "assistant" ? "assistant" : "user", content: String(text || "").slice(0, 1200) });
-    if (_mem[k].length > MAX_TURNS * 2) _mem[k] = _mem[k].slice(-MAX_TURNS * 2);
+    const m = _load();
+    if (!m[k]) m[k] = [];
+    m[k].push({ role: role === "assistant" ? "assistant" : "user", content: String(text || "").slice(0, 1200) });
+    if (m[k].length > MAX_TURNS * 2) m[k] = m[k].slice(-MAX_TURNS * 2);
+    _save();
   } catch (e) {}
 }
 function clearHistory(scene) {
-  try { if (scene) delete _mem[scene]; else Object.keys(_mem).forEach(k => delete _mem[k]); }
-  catch (e) {}
+  try {
+    const m = _load();
+    if (scene) delete m[scene];
+    else Object.keys(m).forEach(k => delete m[k]);
+    _save();
+  } catch (e) {}
 }
 
 // 多轮问答：自动带上该场景最近对话 + 本地上下文；成功后才写入记忆（失败不污染上下文）。
@@ -124,6 +160,7 @@ function parsePlanIntent(text) {
 module.exports = {
   ask: ask,
   historyOf: historyOf,
+  remember: remember,
   clearHistory: clearHistory,
   parsePlanIntent: parsePlanIntent,
   resolveCity: resolveCity

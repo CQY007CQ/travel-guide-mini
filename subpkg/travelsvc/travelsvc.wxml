@@ -28,6 +28,12 @@
         <text class="delta-dot d-{{item.k}}">●</text><text class="delta-t">{{item.t}}</text>
       </view>
       <view class="svc-note dim" wx:if="{{wxNote}}">{{wxNote}}</view>
+      <block wx:if="{{fcUpdates.length}}">
+        <view class="delta" wx:for="{{fcUpdates}}" wx:key="t">
+          <text class="delta-dot d-{{item.k}}">●</text><text class="delta-t">{{item.t}}</text>
+        </view>
+      </block>
+      <view class="svc-note dim" wx:if="{{fcNote}}">{{fcNote}}</view>
 
       <view class="svc-h3 svc-gap">{{tx.crowdTitle}}</view>
       <view class="crowd" wx:for="{{crowd}}" wx:key="p">

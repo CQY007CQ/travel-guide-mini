@@ -230,5 +230,13 @@ Page(SafePage({
     let r;
     try { r = T.askAssistant("吃什么", plan); } catch (e) { r = { text: "" }; }
     this.setData({ aiText: (r && r.text) || "离线模式：从上方必吃清单挑一道，再点菜名筛出做这道菜的名店。", aiSource: "", aiLoading: false, aiErr: "" });
-  }
+  },
+
+  aiCopy() {
+    const t = String(this.data.aiText || this.data.aiAnswer || this.data.lastResult || this.data.result || "");
+    if (!t) { wx.showToast({ title: "还没有可复制的内容", icon: "none" }); return; }
+    try {
+      wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制", icon: "none" }) });
+    } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
+  },
 }));

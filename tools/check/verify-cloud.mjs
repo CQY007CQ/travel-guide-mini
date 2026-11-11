@@ -79,6 +79,32 @@ else ok("cloudEnv 已配置（值不打印）");
 const cloudJs = exists("utils/cloud.js") ? read("utils/cloud.js") : "";
 if (/withTimeout\(callFunction\("llmProxy"/.test(cloudJs)) ok("aiChat / aiVision 有超时保护（挂起自动回落离线）");
 else bad("aiChat / aiVision 缺超时保护");
+
+// AI 场景覆盖统计（只读扫描，不改文件）
+const llm = exists("tools/cloud/llmProxy/index.js") ? read("tools/cloud/llmProxy/index.js") : "";
+if (/model-no-vision/.test(llm)) ok("llmProxy 有视觉能力自检（纯文本模型识物会返回可操作原因）");
+else bad("llmProxy 缺视觉能力自检（识物用错模型会只报『识别失败』）");
+function walk(dir) {
+  let r = [];
+  try {
+    for (const e of fs.readdirSync(P(dir), { withFileTypes: true })) {
+      const p = dir + "/" + e.name;
+      if (e.isDirectory()) r = r.concat(walk(p));
+      else if (/\.js$/.test(e.name)) r.push(p);
+    }
+  } catch (err) {}
+  return r;
+}
+const aiScenes = [];
+["pages", "subpkg", "subai"].forEach(function (d) {
+  walk(d).forEach(function (f) {
+    const s = exists(f) ? read(f) : "";
+    const m = s.match(/AIAgent\.ask\(\s*["']([^"']+)["']/g) || [];
+    m.forEach(x => { const k = x.match(/["']([^"']+)["']/); if (k) aiScenes.push(f + ":" + k[1]); });
+  });
+});
+info("AI 场景覆盖 " + aiScenes.length + " 处：" + aiScenes.map(x => x.split(":").pop()).join(" / "));
+if (aiScenes.length < 8) warn("AI 场景少于 8 处，可能未铺开");
 const photos = exists("utils/spot-photos.js") ? read("utils/spot-photos.js") : "";
 const enabled = /const ENABLED\s*=\s*true/.test(photos);
 info("真实照片映射 ENABLED=" + (enabled ? "true" : "false（未启用，零回归）"));

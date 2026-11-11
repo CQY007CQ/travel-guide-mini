@@ -1047,5 +1047,32 @@ assert("1 字否定『别豪华』不误判为 high", ep40e.budget !== "high", e
 const ep40f = R.extractPrefs("别特种兵，轻松点", {});
 assert("1 字否定+正向→leisure（既有用例不变）", ep40f.pace === "leisure", ep40f.pace);
 
+// ── 旅客服务能力层 + AI Agent 回归（新增能力必配单测） ──
+const SVC = req("./subpkg/utils/travel-service.js");
+const AG = req("./utils/ai-agent.js");
+const wd1 = SVC.weatherDelta(
+  { tmax: 22, tmin: 12, code: 0, isRain: false, isSnow: false, isThunder: false, wind: 10 },
+  { tmax: 14, tmin: 4, code: 61, isRain: true, isSnow: false, isThunder: false, wind: 15 }
+);
+assert("天气变化：降温 + 转雨都识别", wd1.length >= 2 && wd1.some(x => x.k === "cool") && wd1.some(x => x.k === "rain"), JSON.stringify(wd1));
+assert("天气变化：空输入不产出提醒", SVC.weatherDelta(null, null).length === 0);
+assert("天气变化：无变化日不误报", SVC.weatherDelta(
+  { tmax: 20, tmin: 10, code: 0, isRain: false, isSnow: false, isThunder: false, wind: 5 },
+  { tmax: 21, tmin: 10, code: 0, isRain: false, isSnow: false, isThunder: false, wind: 5 }
+).length === 0);
+assert("参考换算：100 CNY → USD 数值正确", SVC.convert(100, "USD") === "14.00", SVC.convert(100, "USD"));
+assert("参考换算：非法金额返回空串不伪造", SVC.convert("abc", "USD") === "" && SVC.convert(10, "XXX") === "");
+assert("参考换算：自定义汇率生效", SVC.convert(100, "USD", { USD: 0.2 }) === "20.00");
+assert("i18n：中英都有标题且缺失 key 回落中文", SVC.t("title", "en") === "Traveller Services" && SVC.t("no_such_key", "en") === "no_such_key");
+assert("离线清单：三态齐全且订单标 na", SVC.OFFLINE_ITEMS.length >= 7 && SVC.OFFLINE_ITEMS.some(x => x.mode === "offline") && SVC.OFFLINE_ITEMS.some(x => x.mode === "online") && SVC.OFFLINE_ITEMS.some(x => x.mode === "na"));
+assert("隐私协议：含无支付与权限分级两节", SVC.PRIVACY_SECTIONS.length >= 6 && SVC.PRIVACY_SECTIONS.some(x => x.t.indexOf("支付") >= 0) && SVC.PRIVACY_SECTIONS.some(x => x.t.indexOf("权限") >= 0));
+assert("时段提示：明确非实时且 5 段齐全", SVC.CROWD_HINTS.length === 5 && /不是实时|非实时/.test(SVC.CROWD_DISCLAIMER));
+assert("Agent：真实城市命中、编造地名拒绝", AG.resolveCity("成都") !== "" && AG.resolveCity("火星幻城") === "");
+AG.clearHistory("__t__");
+AG.remember("__t__", "user", "问一句"); AG.remember("__t__", "assistant", "答一句");
+assert("Agent 记忆：写入后可取回且落盘", AG.historyOf("__t__").length === 2);
+AG.clearHistory("__t__");
+assert("Agent 记忆：清空后为空", AG.historyOf("__t__").length === 0);
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

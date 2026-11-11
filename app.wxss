@@ -375,3 +375,9 @@ page {
   line-height: 1.75; white-space: pre-wrap; word-break: break-word; background: var(--panel, #18233a);
   border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .12); border-radius: 16rpx; padding: 16rpx 20rpx; }
 .ai-card .ai-err { margin-top: 12rpx; font-size: calc(23rpx * var(--fs, 1)); color: var(--red, #e56a6a); line-height: 1.6; }
+
+/* ══ 全局 AI 结果复制按钮 ══ */
+.ai-copy { display: inline-block; margin-top: 12rpx; font-size: calc(22rpx * var(--fs, 1));
+  color: var(--chip-tx, #d4a94e); border: 1rpx dashed rgba(212,169,78,.45);
+  border-radius: 999rpx; padding: 6rpx 20rpx; }
+.ai-copy:active { background: rgba(212,169,78,.14); }

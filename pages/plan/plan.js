@@ -1691,4 +1691,11 @@ Page(SafePage({
   _fit(ctx, text, maxW, fontPx) {
     return PP.fit(ctx, text, maxW, fontPx);
   },
+  aiCopy() {
+    const t = String(this.data.aiText || this.data.aiAnswer || this.data.lastResult || this.data.result || "");
+    if (!t) { wx.showToast({ title: "还没有可复制的内容", icon: "none" }); return; }
+    try {
+      wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制", icon: "none" }) });
+    } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
+  },
 }));

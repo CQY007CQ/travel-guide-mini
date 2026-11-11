@@ -118,6 +118,13 @@ Page(SafePage({
 
   onLoad(options) {
     this.__boot = T.ready().catch(() => null);
+    // AI 行程助手草稿：切走再回来不丢（仅本机、只存解析结果，不含任何密钥）
+    try {
+      const d = S.get("aiPlanDraftV1", null);
+      if (d && typeof d === "object") {
+        this.setData({ aiText: String(d.text || ""), aiParsed: d.parsed || null, aiSummary: String(d.summary || "") });
+      }
+    } catch (e) {}
     let provs = [];
     try { provs = T.provinces() || []; } catch (e) { provs = []; }
     let last = null;
@@ -893,11 +900,16 @@ Page(SafePage({
     self.setData({ aiLoading: true, aiErr: "", aiParsed: null, aiSummary: "" });
     AIAgent.parsePlanIntent(q).then((p) => {
       if (!p) { self.setData({ aiLoading: false, aiErr: "没解析出有效参数。换个说法试试，如「3天成都，预算2000，带老人」" }); return; }
-      self.setData({ aiLoading: false, aiParsed: p, aiSummary: self._aiSummary(p) });
+      const sum = self._aiSummary(p);
+      try { S.set("aiPlanDraftV1", { text: q, parsed: p, summary: sum }); } catch (e) {}
+      self.setData({ aiLoading: false, aiParsed: p, aiSummary: sum });
     }).catch(() => { self.setData({ aiLoading: false, aiErr: "解析失败，可手动选择后生成" }); });
   },
 
-  aiCancel() { this.setData({ aiParsed: null, aiSummary: "", aiErr: "" }); },
+  aiCancel() {
+    try { S.del("aiPlanDraftV1"); } catch (e) {}
+    this.setData({ aiParsed: null, aiSummary: "", aiErr: "" });
+  },
 
   aiGenerate() {
     const p = this.data.aiParsed || {};
@@ -939,6 +951,7 @@ Page(SafePage({
         T.resetTripPrep();
         try { T.pushRecent({ province: c.province || self.data.provName, city: c.name, days: daysArr.length, depart: self.data.depart }); } catch (e) {}
         try { AN.track("plan_generate", { ok: 1, mode: "ai", days: daysArr.length }); } catch (e) {}
+        try { S.del("aiPlanDraftV1"); } catch (e) {}
         try { wx.hideLoading(); } catch (e) {}
         wx.switchTab({ url: "/pages/plan/plan" });
       } catch (err) {

@@ -2,10 +2,13 @@ const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 // 旅客服务中心：AI 行程助手 / 动态提醒 / 离线能力 / 多语言多币种 / 安全与合规
 // 全部离线、零网络、零新增依赖；不可做项如实标注，不夸大、不伪造。
 const T = require("../../utils/travel.js");
+const S = require("../../utils/store.js");
+const EL = require("../../utils/errlog.js");
 const SVC = require("../utils/travel-service.js");
 const app = getAppSafe();
 
 const CURRENCIES = Object.keys(SVC.DEFAULT_RATES).filter(k => k !== "CNY");
+const LANG_KEY = "svcLangV1", RATE_KEY = "svcRatesV1", SNAP_KEY = "svcWxSnapV1";
 
 // 预计算三态标识（离线 / 需联网 / 不适用），WXML 不做嵌套三元
 function offlineView(lang) {
@@ -39,13 +42,24 @@ Page(SafePage({
     offline: [],
     crowd: SVC.CROWD_HINTS,
     phrases: SVC.PHRASES,
-    wxDeltas: [], wxNote: "",
+    wxDeltas: [], wxNote: "", fcUpdates: [], fcNote: "",
     statPlan: 0, statWish: 0, statSpent: 0,
     cny: "", curIdx: 0, curNames: [], curKey: "", curRate: "", convResult: "",
     rates: SVC.DEFAULT_RATES, rateEdit: "", rateOpen: false
   },
 
-  onLoad() { this.__boot = T.ready().catch(() => null); this._applyLang("zh"); },
+  onLoad() {
+    this.__boot = T.ready().catch(() => null);
+    // 恢复本机偏好（语言 / 自定义汇率），失败一律回落默认，绝不阻断启动
+    let lang = "zh", rates = SVC.DEFAULT_RATES;
+    try {
+      lang = S.get(LANG_KEY, "zh") === "en" ? "en" : "zh";
+      const saved = S.get(RATE_KEY, null);
+      if (saved && typeof saved === "object") rates = Object.assign({}, SVC.DEFAULT_RATES, saved);
+    } catch (e) { try { EL.push("travelsvc.onLoad", e); } catch (_) {} }
+    this.setData({ rates });
+    this._applyLang(lang);
+  },
   onShow() { onShowRender(this, "travelsvc", null, () => { this._refresh(); }); },
   _renderShow() { try { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); } catch (e) {} },
 
@@ -58,7 +72,11 @@ Page(SafePage({
       crowdNote: SVC.t("crowdNote", lang)
     });
   },
-  toggleLang() { this._applyLang(this.data.lang === "zh" ? "en" : "zh"); this._refresh(); },
+  toggleLang() {
+    const lang = this.data.lang === "zh" ? "en" : "zh";
+    try { S.set(LANG_KEY, lang); } catch (e) { try { EL.push("travelsvc.lang", e); } catch (_) {} }
+    this._applyLang(lang); this._refresh();
+  },
 
   _refresh() {
     // ① 天气变化：直接用天气模块已落盘的缓存，零网络
@@ -73,12 +91,23 @@ Page(SafePage({
         ? "暂无两天的预报缓存；去「行程」页加载一次天气后回来即可看到变化提醒。"
         : "No cached two-day forecast yet. Load weather on the Plan page first.";
     }
+    // ①b 预报更新：与上次落盘的同一天预报对比；首次只记录，不虚报
+    let fcUpdates = [], fcNote = "";
+    try {
+      if (keys.length) {
+        const today = cache[keys[0]];
+        const snap = S.get(SNAP_KEY, null);
+        if (snap && snap.date === keys[0]) fcUpdates = SVC.forecastDelta(snap.day, today);
+        else fcNote = this.data.lang === "zh" ? "已记录本次预报，下次打开可对比预报更新。" : "Forecast saved; revisit to see updates.";
+        S.set(SNAP_KEY, { date: keys[0], day: today });
+      }
+    } catch (e) { try { EL.push("travelsvc.forecast", e); } catch (_) {} }
     // ② 本地数据统计（真实读取，不编造）
     let plan = 0, wish = 0, spent = 0;
-    try { const p = app.globalData && app.globalData.plan; plan = (p && p.days && p.days.length) || 0; } catch (e) {}
-    try { wish = (T.getWish() || []).length; } catch (e) {}
-    try { spent = Math.round(T.totalSpent()); } catch (e) {}
-    this.setData({ wxDeltas: deltas, wxNote: note, statPlan: plan, statWish: wish, statSpent: spent });
+    try { const p = app.globalData && app.globalData.plan; plan = (p && p.days && p.days.length) || 0; } catch (e) { try { EL.push("travelsvc.statPlan", e); } catch (_) {} }
+    try { wish = (T.getWish() || []).length; } catch (e) { try { EL.push("travelsvc.statWish", e); } catch (_) {} }
+    try { spent = Math.round(T.totalSpent()); } catch (e) { try { EL.push("travelsvc.statSpent", e); } catch (_) {} }
+    this.setData({ wxDeltas: deltas, wxNote: note, fcUpdates, fcNote, statPlan: plan, statWish: wish, statSpent: spent });
     this._convert();
   },
 
@@ -87,11 +116,11 @@ Page(SafePage({
 
   doBackup() {
     let s = "";
-    try { s = T.exportBackup(); } catch (e) { s = ""; }
+    try { s = T.exportBackup(); } catch (e) { s = ""; try { EL.push("travelsvc.export", e); } catch (_) {} }
     if (!s) { wx.showToast({ title: "导出失败", icon: "none" }); return; }
     try {
       wx.setClipboardData({ data: s, success: () => wx.showToast({ title: "备份已复制", icon: "none" }) });
-    } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
+    } catch (e) { try { EL.push("travelsvc.clipboard", e); } catch (_) {} wx.showToast({ title: "复制失败", icon: "none" }); }
   },
 
   // 多币种参考换算（汇率可改，非实时、不参与记账）
@@ -115,6 +144,7 @@ Page(SafePage({
     if (!(n > 0)) { wx.showToast({ title: "汇率须为正数", icon: "none" }); return; }
     const rates = Object.assign({}, this.data.rates);
     rates[cur] = n;
+    try { S.set(RATE_KEY, rates); } catch (e) { try { EL.push("travelsvc.saveRate", e); } catch (_) {} }
     this.setData({ rates, rateOpen: false }, () => this._convert());
     wx.showToast({ title: "已更新（仅本机参考）", icon: "none" });
   },

@@ -154,6 +154,18 @@ exports.main = async (event) => {
   const hasImage = !!(event.imageFileID || event.imageBase64);
   if (!messages && !prompt && !hasImage) return { ok: false, err: "empty-input" };
 
+  // 视觉能力自检：明确已知不支持图片的模型，直接给可操作的原因，避免页面只拿到「识别失败」。
+  const modelForCheck = (typeof event.model === "string" && event.model.trim()) ? event.model.trim() : cfg.model;
+  const NO_VISION = /deepseek|qwen-(max|plus|turbo|long)|moonshot-v1|gpt-3\.5|o1-mini|text-davinci/i;
+  if (hasImage && NO_VISION.test(modelForCheck)) {
+    return {
+      ok: false,
+      err: "model-no-vision",
+      hint: "当前模型 " + modelForCheck + " 不支持图片输入；拍照识物需在云函数环境变量把 LLM_MODEL 改为多模态模型（如 gpt-4o / qwen-vl-max）。",
+      model: modelForCheck
+    };
+  }
+
   // 图片（可选）：优先 fileID → 云存储下载转 base64；其次直接传 base64
   let imageDataUrl = "";
   if (event.imageFileID) {
