@@ -13,6 +13,7 @@
 const Cloud = require("./cloud.js");
 const DATA = require("./data.js");
 const S = require("./store.js");
+const PROMPTS = require("./ai-prompts.js");   // 强模型场景提示词注册表（10 套 + 通用作战协议）
 
 const MAX_TURNS = 6;                 // 每场景保留最近 6 轮（12 条消息）
 const MEM_KEY = "aiAgentMemV1";
@@ -78,7 +79,8 @@ function ask(scene, question, context) {
   if (_inflight[k]) return Promise.resolve({ ok: false, err: "inflight" });
   _inflight[k] = true;
   const msgs = historyOf(scene).concat([{ role: "user", content: q }]);
-  return Cloud.aiChat({ messages: msgs, context: context || null }).then(function (r) {
+  const sys = (PROMPTS && PROMPTS.buildSystem) ? PROMPTS.buildSystem(k, context) : null;
+  return Cloud.aiChat({ messages: msgs, context: context || null, system: sys }).then(function (r) {
     if (r && r.ok && r.text) {
       remember(scene, "user", q);
       remember(scene, "assistant", r.text);

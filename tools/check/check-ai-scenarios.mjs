@@ -68,5 +68,18 @@ let missing = [];
 for (const p of pages) if (!AI.PAGE_ROUTE[p]) missing.push(p);
 log(missing.length === 0, "全部场景目标页均有路由" + (missing.length ? "（缺：" + missing.join(",") + "）" : ""));
 
+// 4) 强模型场景提示词守卫：ai-prompts 必须导出 10 套场景提示词，且覆盖 ask() 真实场景名
+let PROMPTS = null;
+try { PROMPTS = require(resolve(ROOT, "utils/ai-prompts.js")); } catch (e) {}
+log(!!PROMPTS && PROMPTS.count === 10, "ai-prompts 场景提示词数 = " + (PROMPTS && PROMPTS.count) + "（期望 10）");
+const ASK_SCENES = ["assistant", "today", "today-proactive", "plan", "food", "prep", "deep", "help", "toolkit", "lens"];
+let badSys = [];
+for (const s of ASK_SCENES) {
+  let sys = "";
+  try { sys = PROMPTS.buildSystem(s); } catch (e) {}
+  if (!sys || sys.length < 50) badSys.push(s);
+}
+log(badSys.length === 0, "全部 ask(scene) 场景均有有效 system 提示词" + (badSys.length ? "（缺：" + badSys.join(",") + "）" : ""));
+
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);
