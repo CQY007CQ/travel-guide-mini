@@ -1,5 +1,8 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
 
+  <!-- v1.20.7：AI 旅行助手入口（内嵌胶囊卡片，不压 tabBar；让 AI 充满「更多」枢纽页） -->
+  <view class="card"><ai-entry inline topic="settings" label="问问 AI 旅行助手"/></view>
+
   <!-- 分组菜单（减法：顶部行程卡与底部「今天」tab 重复，已移除；行程身份看下方「旅行小结」） -->
   <view class="group" wx:for="{{groups}}" wx:key="title" wx:for-item="g">
     <view class="group-title">{{g.title}}</view>

@@ -1,3 +1,9 @@
-<view class="ai-fab" bindtap="onTap">
+<!-- v1.20.7：inline 形态（内嵌胶囊/横条，用于 tabBar 主包页，不压 tabBar）；fab 形态维持分包内容页悬浮入口 -->
+<view wx:if="{{inline}}" class="ai-inline" bindtap="onTap">
+  <text class="ai-inline-ic">🤖</text>
+  <text class="ai-inline-t">{{label}}</text>
+  <text class="ai-inline-ar">›</text>
+</view>
+<view wx:else class="ai-fab" bindtap="onTap">
   <text class="ai-fab-t">🤖 {{label}}</text>
 </view>

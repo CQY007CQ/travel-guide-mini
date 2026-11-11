@@ -41,13 +41,17 @@ for (const s of scs) {
 }
 log(badTopic.length === 0, "全部场景深链/问答可解析（按钮或跳页）" + (badTopic.length ? "（失败：" + badTopic.join(",") + "）" : ""));
 
-// 2) 页面接线校验：5 个内容页应已引入 ai-entry 组件（topic 与场景 key 对应）
+// 2) 页面接线校验：内容分包页 + 主包 tabBar 页（门面/枢纽）都应已引入 ai-entry 组件（topic 与场景 key 对应）
 const wire = {
   "subpkg/spotsearch/spotsearch.json": "spotsearch",
   "subpkg/ledger/ledger.json": "ledger",
   "subpkg/travelsvc/travelsvc.json": "travelsvc",
   "subpkg/guide/guide.json": "guide",
-  "subpkg/map/map.json": "help-emergency"
+  "subpkg/map/map.json": "help-emergency",
+  // v1.20.7：主包三页（index 门面 / more 枢纽 / myguides 攻略库）补齐统一 AI 入口，让 AI 充满全程序
+  "pages/index/index.json": "generate",
+  "pages/more/more.json": "settings",
+  "pages/myguides/myguides.json": "guide"
 };
 for (const [f, topic] of Object.entries(wire)) {
   let ok = false;

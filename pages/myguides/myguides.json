@@ -1,1 +1,4 @@
-{ "navigationBarTitleText": "我的攻略" }
+{
+  "navigationBarTitleText": "我的攻略",
+  "usingComponents": { "ai-entry": "../../subpkg/ai-entry/ai-entry" }
+}

@@ -8,6 +8,9 @@
     </view>
   </view>
 
+  <!-- v1.20.7：AI 助手入口（内嵌胶囊卡片，不压 tabBar）—— 让 AI 充满程序门面，带当前选中城市进 assistant -->
+  <view class="card"><ai-entry inline topic="generate" city="{{cityName}}" label="问问 AI"/></view>
+
   <!-- v1.19.60：城市数据分包加载失败兜底 —— 展示重试卡片，避免空白死页被误判白屏 -->
   <view class="card data-fail" wx:if="{{dataFailed}}">
     <view class="df-badge">!</view>
@@ -355,29 +358,6 @@
   </view>
 
   <view wx:if="{{hasOld}}" class="tip" bindtap="resumeOld">继续上次行程</view>
-
-  <!-- AI 行程助手：一句话 → 解析参数 → 本地离线库生成真实行程（零伪造） -->
-  <view class="card ai-plan">
-    <view class="ai-h">
-      <image class="ic" src="/images/icons/sparkle.png"/>
-      <text class="ai-t">AI 行程助手</text>
-      <text class="ai-tag">参数解析</text>
-    </view>
-    <view class="ai-sub dim">说一句话，AI 只解析预算 / 天数 / 兴趣等参数；行程仍由本地离线库真实生成，不编造景点。</view>
-    <view class="ai-row">
-      <input class="ai-inp" placeholder="如：3天成都，预算2000，带老人爱吃" value="{{aiText}}"
-             bindinput="onAIPlanInput" bindconfirm="aiParse" confirm-type="done"/>
-      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiParse">{{aiLoading ? '解析中…' : '解析'}}</view>
-    </view>
-    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
-    <view class="ai-res" wx:if="{{aiParsed}}">
-      <view class="ai-res-t">已识别：{{aiSummary}}</view>
-      <view class="ai-res-ops">
-        <view class="ai-res-btn" bindtap="aiCancel">重来</view>
-        <view class="ai-res-btn on" bindtap="aiGenerate">用这些参数生成 →</view>
-      </view>
-    </view>
-  </view>
 
   <view class="action-area">
     <view class="action-row">

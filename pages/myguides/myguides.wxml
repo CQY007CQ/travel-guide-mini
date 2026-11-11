@@ -1,4 +1,7 @@
 <view class="page {{td ? 'td' : ''}}">
+  <!-- v1.20.7：AI 旅行助手入口（内嵌胶囊卡片，不压 tabBar；让 AI 充满「我的攻略」页） -->
+  <view class="card"><ai-entry inline topic="guide" label="问问 AI 旅行助手"/></view>
+
   <view class="head">
     <view class="h-t">我的攻略</view>
     <view class="h-s dim">本地收藏的行程，离线可看、随时再打开</view>
