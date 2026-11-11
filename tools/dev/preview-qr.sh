@@ -20,7 +20,8 @@
 #   ./tools/dev/preview-qr.sh /tmp/demo-qr.png      # 指定输出路径
 
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# 脚本在 tools/dev/ 下，需上两级才是项目根（2026-11-10 tools 重排遗留的路径 bug）
+cd "$(dirname "$0")/../.."
 
 CLI="/Applications/wechatwebdevtools.app/Contents/MacOS/cli"
 if [ ! -x "$CLI" ]; then
@@ -28,8 +29,21 @@ if [ ! -x "$CLI" ]; then
   exit 1
 fi
 
-VER=$(node -e 'process.stdout.write(require("./project.config.json").version)')
+# 托管 node 三级解析，禁止写死版本目录
+if [ -n "${NODE_BIN:-}" ]; then :
+elif command -v node >/dev/null 2>&1; then NODE_BIN="$(command -v node)"
+else NODE_BIN="$(ls -d ~/.workbuddy/binaries/node/versions/*/bin/node 2>/dev/null | sort -V | tail -1)"
+fi
+VER=$("$NODE_BIN" -e 'process.stdout.write(require("./project.config.json").version)')
 OUT="${1:-$(cd .. && pwd)/预览二维码-v${VER}.png}"
+
+# 未登录时 cli preview 必报 code 10「需要重新登录」并甩一长串堆栈；提前探测并给可照做的指引。
+LOGIN_JSON="$("$CLI" islogin 2>/dev/null | grep -o '{\"login\":[a-z]*}' | head -1)"
+if [ "$LOGIN_JSON" != '{"login":true}' ]; then
+  echo "❌ 微信开发者工具未登录（islogin 返回 ${LOGIN_JSON:-无输出}），无法生成预览二维码" >&2
+  echo "   处理：打开微信开发者工具 → 微信扫码登录 → 再重跑本脚本。" >&2
+  exit 1
+fi
 
 echo "▶ 生成 v${VER} 预览二维码（当前本地代码）"
 "$CLI" preview \

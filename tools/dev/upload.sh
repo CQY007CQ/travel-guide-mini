@@ -72,7 +72,7 @@ fi
 
 VERSION="${1:?用法: ./tools/dev/upload.sh <版本号> <说明>}"
 DESC="${2:-手动上传}"
-PROJ="$(cd "$(dirname "$0")/.." && pwd)"
+PROJ="$(cd "$(dirname "$0")/../.." && pwd)"
 LOG="/tmp/upload-$(date +%H%M%S).log"
 
 echo "▶ 登录态前置检查"
