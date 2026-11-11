@@ -148,6 +148,19 @@
 
 </block>
 
+    <!-- AI 今日建议（云端强模型优先 · 离线兜底） -->
+    <view class="card ai-today">
+      <view class="ai-h">
+        <image class="ic" src="/images/icons/sparkle.png"/>
+        <text class="ai-t">AI 今日建议</text>
+        <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+        <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askTodayAI">{{aiLoading ? '思考中…' : (aiText ? '再问一次' : '生成')}}</view>
+      </view>
+      <view class="ai-body" wx:if="{{aiText}}">{{aiText}}</view>
+      <view class="ai-tip" wx:else>基于本趟行程的真实数据给 3 条可执行建议（动线/穿搭/预算）；无网络时自动回落离线规则库。</view>
+      <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
+    </view>
+
     <!-- 减法：行程入口已在底部 tabBar，不再重复提示 -->
   </block>
 </view>

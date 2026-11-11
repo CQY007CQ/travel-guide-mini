@@ -216,3 +216,20 @@
 .ei-best { font-size: calc(20rpx * var(--fs, 1)); color: var(--gold-tx, #8f6a1f); font-weight: 700; }
 .ei-spots { font-size: calc(20rpx * var(--fs, 1)); color: var(--t3, #64748b); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ei-days { font-size: calc(19rpx * var(--fs, 1)); color: var(--t4, #7d92ab); margin-top: 2rpx; }
+
+/* ══ AI 今日建议（强模型优先 · 离线兜底） ══ */
+.ai-today .ai-h { display: flex; align-items: center; gap: 10rpx; }
+.ai-today .ai-h .ic { width: 34rpx; height: 34rpx; }
+.ai-today .ai-t { flex: 1; font-size: calc(28rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); }
+.ai-today .ai-badge { flex: none; font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 14rpx; }
+.ai-today .ai-btn { flex: none; font-size: calc(23rpx * var(--fs, 1)); color: #14100a; font-weight: 700;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f); border-radius: 999rpx; padding: 8rpx 22rpx; }
+.ai-today .ai-btn:active { opacity: .85; }
+.ai-today .ai-btn.ai-busy { opacity: .55; }
+.ai-today .ai-body { margin-top: 14rpx; font-size: calc(26rpx * var(--fs, 1)); color: var(--t1, #dce5f0);
+  line-height: 1.75; white-space: pre-wrap; word-break: break-word;
+  background: var(--panel, #18233a); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .12);
+  border-radius: 16rpx; padding: 16rpx 20rpx; }
+.ai-today .ai-tip { margin-top: 12rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); line-height: 1.6; }
+.ai-today .ai-err { margin-top: 12rpx; font-size: calc(23rpx * var(--fs, 1)); color: var(--red, #e56a6a); }

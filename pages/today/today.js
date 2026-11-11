@@ -2,6 +2,7 @@ const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // today：「今天」行程态卡片（行前待办 / 途中速览+快捷记账 / 结束回顾）
 const T = require("../../utils/travel.js");
+const Cloud = require("../../utils/cloud.js");   // 云端 AI（llmProxy 强模型网关，fail-closed）
 const app = getAppSafe();
 
 Page(SafePage({
@@ -22,7 +23,9 @@ Page(SafePage({
     cats: ["餐饮", "门票", "交通", "住宿", "购物", "其他"],
     // v1.15.3：移除「今天累但很开心 / 风景绝了 / 吃到地道小吃…」这类心情感叹速写短语（用户不需要，手记直接自己写）
     // v1.8.5 C9：每日一句（无行程时陪伴文案）
-    quote: null
+    quote: null,
+    // AI 今日建议（云端强模型优先 · 离线规则库兜底）
+    aiText: "", aiSource: "", aiLoading: false, aiErr: ""
   },
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
@@ -168,6 +171,48 @@ Page(SafePage({
 
   goPlan() { wx.switchTab({ url: "/pages/plan/plan" }); },
   goIndex() { wx.reLaunch({ url: "/pages/index/index" }); },
+
+  // ── AI 今日建议（云端强模型优先 · 离线兜底 · 零白屏） ──
+  askTodayAI() {
+    if (this.data.aiLoading) return;
+    const self = this;
+    const plan = app.globalData && app.globalData.plan;
+    if (!plan || !plan.days || !plan.days.length) { wx.showToast({ title: "先生成行程", icon: "none" }); return; }
+    const v = this.data.view || {};
+    const detail = [];
+    if (this.data.state === "before") {
+      detail.push("阶段：行前，距出发 " + (v.daysLeft != null ? v.daysLeft : "?") + " 天。");
+      if (v.prepItems && v.prepItems.length) detail.push("行前待办完成 " + (v.prepDone || 0) + "/" + v.prepItems.length + "。");
+      if (v.packTotal) detail.push("行李清单已勾选 " + (v.packDone || 0) + "/" + v.packTotal + " 项。");
+    } else if (this.data.state === "during") {
+      detail.push("阶段：行程中，第 " + (v.dayNo || "?") + "/" + (v.total || "?") + " 天。");
+      if (v.now) detail.push("当前：" + v.now.name + "（" + (v.now.time || v.now.period || "") + "）。");
+      if (v.next) detail.push("接下来：" + v.next.name + "（" + (v.next.time || v.next.period || "") + "）。");
+      if (v.walk && v.walk.txt) detail.push(v.walk.txt + "。");
+      if (v.budgetTxt) detail.push(v.budgetTxt + "。");
+      if (v.theme) detail.push("今日主题：" + v.theme + "。");
+    } else {
+      detail.push("阶段：行程已结束。");
+    }
+    const q = "结合本地上下文里的真实行程信息，给我今天最实用的 3 条建议（动线/时间、穿搭或装备、预算或体力各一条），每条一句话，别写套话。";
+    let ctx = "";
+    try { ctx = Cloud.aiContextOf(plan, "今天页") + "\n" + detail.join("\n"); } catch (e) { ctx = detail.join("\n"); }
+    self.setData({ aiLoading: true, aiErr: "" });
+    if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { self._aiTodayOffline(plan); return; }
+    Cloud.aiChat({ prompt: q, context: ctx })
+      .then((r) => {
+        if (r && r.ok && r.text) self.setData({ aiText: r.text, aiSource: r.source || "ai", aiLoading: false, aiErr: "" });
+        else self._aiTodayOffline(plan);
+      })
+      .catch(() => { self._aiTodayOffline(plan); });
+  },
+
+  _aiTodayOffline(plan) {
+    let r;
+    try { r = T.askAssistant("今天安排", plan); } catch (e) { r = { text: "" }; }
+    const txt = (r && r.text) || "离线模式：按行程顺序走，留意体力与预算节奏；详情看「行程」页。";
+    this.setData({ aiText: txt, aiSource: "", aiLoading: false, aiErr: "" });
+  },
 
   // v1.8.5 C10：行程结束后的回顾入口
   goMore() { wx.switchTab({ url: "/pages/more/more" }); },
