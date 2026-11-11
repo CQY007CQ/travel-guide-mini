@@ -1,20 +1,25 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // more：功能聚合（分组）+ 想玩清单（内嵌可管理）
 const T = require("../../utils/travel.js");
 const EL = require("../../utils/errlog.js"); // v1.19.106：本地错误日志（被 SafePage / app.onError 兜住的异常）
 const KEYS = require("../../utils/keys.js"); // v1.19.188：第三方密钥统一出口（含运行时注入 setKeys）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
+const A = require("../../utils/aicontent.js"); // 深度玩法 holder（内容随 subai 分包异步下发，未加载/未收录都安全降级）
 // v1.20.3：insights 仅 more 页用到，已从主包迁到分包 subpkg/utils，按需异步加载（主包瘦身绕开微信 1.5M 软线）。
 // 微信端静态字面量 require.async；Node（allcheck / 单测）无 require.async，回退同步 require。
 let INS = null, PZ = null;
-function _preloadMoreMods() {
+// 2026-11-09：加载完成后主动 refresh 一次 —— 否则异步模块到位了页面不重渲染，
+// 「本机数据洞察」会一直停在首次渲染时的空卡片（用户反馈"洞察怎么是空的"）。
+function _preloadMoreMods(page) {
+  const done = () => { try { page && page.refresh && page.refresh(); } catch (e) {} };
   if (typeof require.async === "function") {
-    require.async("../../subpkg/utils/insights.js").then((m) => { INS = m; }).catch(() => {});
-    require.async("../../subpkg/utils/personalize.js").then((m) => { PZ = m; }).catch(() => {});
+    require.async("../../subpkg/utils/insights.js").then((m) => { INS = m; done(); }).catch(() => {});
+    require.async("../../subpkg/utils/personalize.js").then((m) => { PZ = m; done(); }).catch(() => {});
   } else {
     try { INS = require("../../subpkg/utils/insights.js"); } catch (e) {}
     try { PZ = require("../../subpkg/utils/personalize.js"); } catch (e) {}
+    done();
   }
 }
 // v1.19.138：个性化目的地推荐（真实画像驱动）—— 已从主包迁到分包，随 _preloadMoreMods 异步加载
@@ -23,14 +28,13 @@ const app = getAppSafe();
 
 Page(SafePage({
   data: {
-    fz: 1, td: false, hasPlan: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0 },
+    fz: 1, td: false, hasPlan: false, deepOn: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0,
+    achModal: { show: false, list: [], more: 0 } },
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
-  onLoad() { this.__boot = T.ready().catch(() => null); _preloadMoreMods(); },
-  onShow() {
-    try { AN.pageView("more"); } catch (e) {}
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onLoad() { this.__boot = T.ready().catch(() => null); _preloadMoreMods(this); },
+  onShow() { onShowRender(this, "more"); },
   _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
 
   /* ---------- v1.7 ---------- */
@@ -135,6 +139,21 @@ Page(SafePage({
   refresh() {
     const p = app.globalData.plan;
     const hasPlan = !!(p && p.days && p.days.length);
+    // 深度玩法入口：仅当「目标地（主城或任一串联站）」收录了深度内容时才显示；
+    // 未收录（或没有行程）不占坑 —— 避免点进去发现不是自己的目的地。
+    const _deepCands = [];
+    try { if (p && p.cityName) _deepCands.push(String(p.cityName)); } catch (e) {}
+    try { ((p && p.segments) || []).forEach(function (s) { const c = s && (s.city || s.cityName || s.name); if (c) _deepCands.push(String(c)); }); } catch (e) {}
+    if (hasPlan) {
+      // 有行程才需要判断，避免无计划用户打开「更多」就触发 subai 分包下载
+      A.initDeep().then(() => {
+        let on = false;
+        try { on = _deepCands.some(function (c) { return A.hasDeep(c); }); } catch (e) {}
+        if (on !== this.data.deepOn) { try { this.setData({ deepOn: on }); } catch (e) {} }
+      }).catch(function () {});
+    } else if (this.data.deepOn) {
+      try { this.setData({ deepOn: false }); } catch (e) {}
+    }
     // v1.8.5 C11：想玩清单带状态（已排进当前行程 / 已打卡去过）
     const wish = T.wishStateMark(T.getWish(), p).map((x, i) => ({
       i, name: x.name, city: x.city || "", planned: !!x.planned, visited: !!x.visited
@@ -156,6 +175,7 @@ Page(SafePage({
     // v1.8.5 C14：本地数据积累提示（备份入口文案随数据量变化）
     const bkTip = (savedPlans.length || (foot && (foot.spots || foot.cities)) || T.getNotes().length || wish.length || ledgerLen)
       ? "已积累本地数据，换机 / 卸载前导出一份更安心" : "行程/账本/想玩/待办 全量导出";
+    const ach = T.achievements();
     this.setData({
       dark: T.themeMode() === "dark",
       themePref: T.themePref(),
@@ -167,7 +187,7 @@ Page(SafePage({
       planLibN: savedPlans.length,
       foot,
       notes: T.getNotes().slice(-8).reverse(),
-      ach: T.achievements(),
+      ach: ach,
       // v1.9：省章进度 / 旅行人格 / 想玩骰子
       stamp: T.provStamp(),
       persona: T.travelPersona(),
@@ -188,7 +208,8 @@ Page(SafePage({
         });
       })(),
       backupTip: bkTip,
-      insights: INS ? INS.insights() : [],   // v1.19.137：本机数据洞察（花费结构 / 月度趋势 / 出行节奏 / 省份分布）
+      // 2026-11-09：未加载完回退 null（不是 []）——[] 在 WXML 里为真，会渲染出一个空壳卡片
+      insights: INS ? INS.insights() : null,   // v1.19.137：本机数据洞察（花费结构 / 月度趋势 / 出行节奏 / 省份分布）
       personalized: PZ ? PZ.personalized(5) : {},   // v1.19.138：基于真实画像的个性化目的地推荐
       errN: EL.count(), // v1.19.106：错误日志条数，随页面刷新更新
       // 减法：无行程时只留「记账(可独立用) + 通用」，地图/美食/准备/速查待生成行程后再出现，减少空转入口
@@ -207,7 +228,7 @@ Page(SafePage({
           title: "行前与账本",
           menus: [
             { key: "prep", icon: "ticket", t: "出行准备", d: "票价预约 / 酒店比价 / 团队分工" },
-            { key: "boost", icon: "sparkle", t: "行程增强", d: "体检 / 问答 / 一键换景点 / 成就" },
+            { key: "boost", icon: "sparkle", t: "行程增强", d: "体检 / 问答 / 动线 / 高光 / 成就" },
             { key: "ledger", icon: "wallet", t: "记账 · AA", d: "随手记一笔，对比预算" }
           ]
         },
@@ -236,7 +257,26 @@ Page(SafePage({
         }
       ]
     });
+    // v1.20.6：成就解锁持久化 + 自动授予弹窗（app.onShow 已把跨页新解锁暂存到 globalData.pendingAch）
+    try {
+      const r = T.syncAchievements();
+      let pending = [];
+      try { const app = (typeof getApp === "function") ? getApp() : null; if (app && app.globalData && Array.isArray(app.globalData.pendingAch)) pending = app.globalData.pendingAch; } catch (e) {}
+      const all = (r.newly || []).concat(pending);
+      try { const app = (typeof getApp === "function") ? getApp() : null; if (app && app.globalData) app.globalData.pendingAch = []; } catch (e) {}
+      if (all && all.length) this._showAchPopup(all);
+    } catch (e) {}
   },
+
+  /* v1.20.6：隐藏成就解锁 —— 弹窗自动授予（批量，至多展示 5 枚，其余以「+N」提示） */
+  _showAchPopup(arr) {
+    if (!arr || !arr.length) return;
+    const list = arr.slice(0, 5);
+    const more = arr.length - list.length;
+    this.setData({ achModal: { show: true, list: list, more: more } });
+  },
+  closeAchModal() { try { this.setData({ "achModal.show": false }); } catch (e) {} },
+  noop() {},
 
   /* ---- v1.9：想玩骰子（随机抽一条想玩） ---- */
   onWishDice() {
@@ -285,6 +325,7 @@ Page(SafePage({
 
   // v1.19.179：跳转「我的攻略」本地库
   goMyGuides() { try { wx.navigateTo({ url: "/pages/myguides/myguides" }); } catch (_) {} },
+  goTravelsvc() { try { wx.navigateTo({ url: "/subpkg/travelsvc/travelsvc" }); } catch (_) {} },
 
   /* 数据说明与免责声明：材料里承诺的「公开资料整理 + 免责」必须在产品内可见，
    * 否则计划书与产品不一致，属于评审可当场识破的口径问题。 */
@@ -367,7 +408,7 @@ Page(SafePage({
   onSetKeys() {
     wx.showModal({
       title: "配置和风天气 Key",
-      content: "在 dev.qweather.com 申请免费 Key（须为你本人和风账号）。粘贴后天气即用你的 Key；留空则保持默认。",
+      content: "在 dev.qweather.com 申请免费 Key（须为你本人和风账号）。粘贴后天气即用你的 Key（存本机）；留空则不配置、天气卡不显示。",
       editable: true,
       placeholderText: "粘贴和风天气 Key",
       success: (r1) => {

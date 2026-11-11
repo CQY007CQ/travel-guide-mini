@@ -8,7 +8,7 @@
         <image class="ic" src="/images/icons/city.png"/>
         <text class="dp-title">{{cur.name}}</text>
       </view>
-      <view class="dp-sub dim">{{cur.updated}} 整理 · 共 {{cur.total}} 条 · 票价与班次以官方当日公告为准</view>
+      <view class="dp-sub dim">{{cur.updated}} 整理 · 共 {{cur.total}} 条 · 已收录 {{cities.length}} 城 · 票价与班次以官方当日公告为准</view>
       <view class="dp-copy" bindtap="onCopy"><image class="ic ic-sm" src="/images/icons/copy.png"/>复制这份清单</view>
     </view>
 
@@ -40,4 +40,33 @@
 
     <view class="tip">内容为本产品的离线经验整理，不随时间自动更新</view>
   </block>
+
+  <!-- 目标地未收录：显式告知 + 已收录城市清单（旧实现会静默展示别的城市，容易误解成"这就是我的目的地"） -->
+  <block wx:if="{{ready && !cur}}">
+    <view class="card dp-head">
+      <view class="dp-title-row"><image class="ic" src="/images/icons/city.png"/><text class="dp-title">{{notice || '暂未收录深度玩法'}}</text></view>
+      <view class="dp-sub dim">目前已收录 {{cities.length}} 座城市，点下方城市即可查看；内容在持续扩充中。</view>
+    </view>
+    <view class="dp-wrap">
+      <view class="dp-chip" wx:for="{{cities}}" wx:key="*this" data-c="{{item}}" bindtap="onPick">{{item}}</view>
+    </view>
+  </block>
+  <!-- AI 多轮问答 -->
+  <view class="card ai-card">
+    <view class="ai-h">
+      <image class="ic" src="/images/icons/sparkle.png"/>
+      <text class="ai-t">AI 深度玩法问答</text>
+      <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+      <view class="ai-clear" bindtap="aiClear">清空</view>
+    </view>
+    <view class="ai-tip dim">围绕当前所选城市的深度玩法多轮追问；票价与班次以官方当日公告为准，不编造数字。</view>
+    <view class="ai-row">
+      <input class="ai-inp" placeholder="如：这座城清晨怎么逛最舒服？" value="{{aiQ}}"
+             bindinput="onAIInput" bindconfirm="aiAsk" confirm-type="send"/>
+      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiAsk">{{aiLoading ? '思考中…' : '问'}}</view>
+    </view>
+    <view class="ai-ans" wx:if="{{aiAnswer}}">{{aiAnswer}}</view>
+    <view class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
+    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
+  </view>
 </view>

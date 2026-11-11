@@ -61,7 +61,9 @@
         "assistant/assistant",
         "guide/guide",
         "toolkit/toolkit",
-        "spotsearch/spotsearch"
+        "spotsearch/spotsearch",
+        "lens/lens",
+        "travelsvc/travelsvc"
       ]
     },
     {
@@ -69,6 +71,14 @@
       "pages": [
         "boost/boost"
       ]
+    },
+    {
+      "root": "subdata2",
+      "pages": ["keep/keep"]
+    },
+    {
+      "root": "subdata3",
+      "pages": ["keep/keep"]
     },
     {
       "root": "subai",

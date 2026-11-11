@@ -13,13 +13,12 @@
  *   4. **不可失败**：任何异常都必须吞掉——埋点把主流程搞挂是最典型的低级事故。
  */
 
+const S = require("./store.js");   // v1.20.4 #81：统一存储出口
 const KEY = "miniStatsV1";
 
 function _read() {
   try {
-    const raw = wx.getStorageSync(KEY);
-    if (!raw) return { v: 1, ev: {}, since: Date.now() };
-    const o = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const o = S.getJSON(KEY, null);
     if (!o || typeof o !== "object" || !o.ev) return { v: 1, ev: {}, since: Date.now() };
     return o;
   } catch (e) {
@@ -28,7 +27,7 @@ function _read() {
 }
 
 function _write(o) {
-  try { wx.setStorageSync(KEY, o); } catch (e) {}   // 写失败（如存储满）不能影响调用方
+  S.setJSON(KEY, o);   // 写失败（如存储满）由 store 内部吞掉，绝不抛给调用方
 }
 
 /**

@@ -1,8 +1,12 @@
 // 页面高层接口：组合 data.js + planner.js + 本地存储，让页面尽量薄
 const D = require("./data.js");
 const store = require("./store.js");
+// 真实景点照片映射（Wikimedia Commons CC 图 → 云存储 cloud:// fileID）：默认关闭，见 utils/spot-photos.js
+const SPOT_PHOTOS = require("./spot-photos.js");
 // v1.19.169 收敛地球距离计算：统一走 utils/geo.js（合并原 haversineKm/_havKm/_km2 与 planner.haversine）
 const { haversine, haversineKm } = require("./geo.js");
+// 跨模块纯函数单点真源（cleanSpotName / baikeKeyword），避免与 planner.js 各定义一份
+const { cleanSpotName, baikeKeyword } = require("./_shared.js");
 
 // v1.20 数据拆分包：data-packed.js 移入 subdata/data，主包异步加载。
 // planner.js 在模块顶层对 data.js 做了 36 个字段解构，必须在数据就绪后再 require，
@@ -36,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.3";
+const APP_VER = "1.20.6";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -46,6 +50,7 @@ function bootData() {
   if (_booted && Array.isArray(D.CITIES) && D.CITIES.length) return;
   if (!Array.isArray(D.CITIES) || !D.CITIES.length) { _booted = false; return; } // 数据尚未就绪，留待重试后再跑
   _booted = true;
+  _citiesOfCache = null; // v1.20.6：bootData 改写 c.province，清空 citiesOf 缓存保证一致性
   (Array.isArray(D.CITIES) ? D.CITIES : []).forEach(c => { if (!c.province && D.CITY2PROV && D.CITY2PROV[c.name]) c.province = D.CITY2PROV[c.name]; });
   const real = Array.isArray(D.PREP_CHECKLIST) ? D.PREP_CHECKLIST : null;
   if (real && real.length && Array.isArray(PACK_LIST)) {
@@ -72,6 +77,7 @@ function namedCities() {
 // 46 座精编城走专属攻略数据，其余城市由 planner 用本市景点库/省地标兜底生成）
 // guide=true 的精编城市排前面，方便优先选择
 function citiesOf(prov) {
+ if (_citiesOfCache && _citiesOfCache.has(prov)) return _citiesOfCache.get(prov);
  const names = (D.PROVINCE_CITIES && D.PROVINCE_CITIES[prov]) || [];
  const guide = new Set((Array.isArray(D.CITIES) ? D.CITIES : []).map(c => c.name));
  // v1.19.79：同名「X市」归并 —— 选择列表只展示带数据的 canonical 名，避免用户选到零景点「X市」
@@ -91,9 +97,16 @@ function citiesOf(prov) {
    if (!_seen.has(cn)) { _seen.add(cn); out.push({ name: cn, province: prov, guide: true, limited: true }); }
   }
  });
- return out.sort((a, b) => (b.guide - a.guide) || a.name.localeCompare(b.name, "zh"));
+ const res = out.sort((a, b) => (b.guide - a.guide) || a.name.localeCompare(b.name, "zh"));
+ if (!_citiesOfCache) _citiesOfCache = new Map();
+ _citiesOfCache.set(prov, res);
+ return res;
 }
 
+// v1.20.6：citiesOf 是纯函数、首页会对每个省反复调用（省→城市列表，一次渲染即触发 30+ 次 citiesOf）。
+// 同省结果缓存，避免每次都重建 751 城 Set + 排序。数据启动后不变；bootData 会改写 c.province，
+// 故在其开头清空本缓存，保证「启动前（若有）调用」与「启动后调用」取到一致结果。
+let _citiesOfCache = null;
 // 任意城市解析：46 精编城 → 专属攻略；其它城市 → 本市景点库，本市未收录再回退省级地标
 // （planner.findCity 已实现完整兜底，这里补上 province 推断）
 // v1.11：城市名 → 城市对象索引（原本每次 findCity 都要线性扫 132 城）
@@ -567,23 +580,33 @@ function wishPicksFor(cityName) {
 
 // v1.17.10：就近城市（≤200km 的最近一座）—— 给新城（平遥/婺源等）在缺少独立数据时
 // 回退到所属地级市用（如平遥→晋中、阳朔→桂林）。超出 200km 视为无可回退，返回空串。
- function nearbyCityOf(cityName) {
+// v1.20.6：美食页等场景按「缺数据新城」回退时调用，内部线性扫描全部 751 城算球面距离。
+// 城市名→结果缓存，避免每次打开美食页都对全量城市做一遍 haversine（纯函数、数据启动后不变）。
+const _nearbyCache = new Map();
+function nearbyCityOf(cityName) {
+ const nm = canonCityName(String(cityName || ""));
+ if (_nearbyCache.has(nm)) return _nearbyCache.get(nm);
+ let res = "";
  try {
-  const nm = canonCityName(String(cityName || ""));
-  if (!nm || !findCity(nm)) return "";
-  const g = P.getCoord(nm);
-  if (!g) return "";
-  let best = "", bd = Infinity;
-  for (let i = 0; i < D.CITIES.length; i++) {
-   const x = D.CITIES[i];
-   if (!x || x.name === nm) continue;
-   const gx = P.getCoord(x.name);
-   if (!gx) continue;
-   const d = haversineKm(g, gx);
-   if (d < bd) { bd = d; best = x.name; }
+  if (nm && findCity(nm)) {
+   const g = P.getCoord(nm);
+   if (g) {
+    let best = "", bd = Infinity;
+    for (let i = 0; i < D.CITIES.length; i++) {
+     const x = D.CITIES[i];
+     if (!x || x.name === nm) continue;
+     const gx = P.getCoord(x.name);
+     if (!gx) continue;
+     const d = haversineKm(g, gx);
+     if (d < bd) { bd = d; best = x.name; }
+    }
+    res = bd <= 200 ? best : "";
+   }
   }
-  return bd <= 200 ? best : "";
- } catch (e) { return ""; }
+ } catch (e) { res = ""; }
+ if (_nearbyCache.size > 400) _nearbyCache.clear();
+ _nearbyCache.set(nm, res);
+ return res;
 }
 // 美食店铺（用于地图"美食"图层）
 function foodSpotsFor(cityName) {
@@ -624,6 +647,59 @@ function spotTagOf(name, cityName) {
  if (_tagMemo.size > 20000) _tagMemo.clear();
  _tagMemo.set(mk, res);
  return res;
+}
+
+// v1.20.9：生成式封面（零网络 / 零外链 / 零伪造 / 全量覆盖）
+// 给「没有真实照片」的景点一张确定性封面：按 城市|名称 哈希得到稳定渐变 + 类别图标 + 景点名；
+// 用户真实照（it.img，本地相册）优先级最高。这是诚实的「示意图」占位，不是假照片 ——
+// 渲染层必须标注「示意图」，不得伪装成实拍。
+const COVER_GLYPH = {
+  "历史古迹": "🏯", "博物馆": "🏛️", "宗教": "⛩️", "古镇": "🏘️",
+  "自然风光": "🏞️", "亲子": "🧸", "乐园": "🎡", "美食": "🍜",
+  "海滨": "🏖️", "徒步": "🥾", "其他": "📍"
+};
+function hslHex(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  const to = function (v) { return ('0' + Math.round((v + m) * 255).toString(16)).slice(-2); };
+  return '#' + to(r) + to(g) + to(b);
+}
+function spotCover(city, name, img) {
+  const nm = String(name || '').trim();
+  let h = 0; const key = (city || '') + '|' + nm;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  const hue = h % 360, hue2 = (hue + 34) % 360;
+  const bg = 'linear-gradient(135deg,' + hslHex(hue, 56, 62) + ',' + hslHex(hue2, 64, 44) + ')';
+  let glyph = '🏞️';
+  if (typeof isFrameName === 'function' && isFrameName(nm)) glyph = '🍜';
+  else if (/酒店|民宿|客栈|住宿|青旅|宾馆|旅舍|度假村/.test(nm)) glyph = '🏨';
+  else if (/站|机场|码头|汽车|高铁|港口|枢纽|地铁|轻轨/.test(nm)) glyph = '🚌';
+  else { const tg = spotTagOf(nm, city); const cat = (tg && tg[0]) ? tg[0] : '其他'; glyph = COVER_GLYPH[cat] || '🏞️'; }
+  let cat = '其他';
+  try { const tg = spotTagOf(nm, city); cat = (tg && tg[0]) ? tg[0] : '其他'; } catch (e) {}
+  // 真实照片：优先数据自带的 img，其次查 CC 图映射（cloud:// fileID）。映射默认关闭 → 行为零变化。
+  let photo = null;
+  try {
+    const clean = (typeof cleanSpotName === 'function') ? (cleanSpotName(nm) || nm) : nm;
+    photo = SPOT_PHOTOS.photoOf(clean, city) || SPOT_PHOTOS.photoOf(nm, city) || null;
+  } catch (e) { photo = null; }
+  const effectiveImg = img || (photo && photo.fileID) || '';
+  const isReal = !!effectiveImg;
+  return {
+    bg: bg,
+    glyph: glyph,
+    cat: cat,
+    label: (typeof cleanSpotName === 'function') ? (cleanSpotName(nm) || nm) : nm,
+    img: effectiveImg,
+    photoCredit: photo ? photo.credit : '',
+    photoLicense: photo ? photo.license : '',
+    photoSrc: photo ? photo.src : '',
+    isReal: isReal,
+    placeholder: !isReal,
+    badge: isReal ? '' : '示意图'
+  };
 }
 // 多维检索：按城市 + 标签 + 关键词过滤景点，返回 [{name, city, tags, period, note}]
 function searchSpots(opts) {
@@ -728,21 +804,9 @@ function hotelPortals(cityName, plan, areaName) {
 
 /* ---------- 预算（与网页版同语义） ---------- */
 // 自定义预算：按总金额 ÷ 天数 ÷ 人数 估算每人每天，住宿45%/餐饮22%/交通门票33%分摊
-function customBudgetObj(amt, days, peopleN) {
- if (!amt || amt <= 0) return null;
- const p = Math.max(1, peopleN || 1);
- const per = amt / Math.max(1, days || 1) / p;
- const hotel = Math.round(per * 0.45);
- const food = Math.round(per * 0.22);
- const lo = Math.max(50, Math.round(per * 0.7)), hi = Math.round(per * 1.3);
- return {
-  label: "自定义 ¥" + amt,
-  daily: lo + "-" + hi,
-  hotel: Math.max(60, Math.round(hotel * 0.8)) + "-" + Math.max(80, Math.round(hotel * 1.2)) + "元/晚",
-  food: Math.max(40, Math.round(food * 0.8)) + "-" + Math.max(60, Math.round(food * 1.2)) + "元/人/天",
-  note: "按自定义总预算 ¥" + amt + " 分摊：住宿约45%、餐饮约22%、交通门票约33%"
- };
-}
+// v1.20.7 去重：customBudgetObj 与 planner.js 实现完全一致，改惰性委托到 P（planner 单点真源），
+// 消除 travel.js 中 16 行重复定义；调用方 budgetTotalObj 仍在 plan 就绪后运行，P 已加载。
+function customBudgetObj(amt, days, peopleN) { return P.customBudgetObj(amt, days, peopleN); }
 // 预算档位的 daily 是范围字符串（如"300-600"），乘人数/天数需解析范围
 function scaleRange(s, m) {
  const parts = String(s).split("-").map(x => parseInt(x.trim(), 10));
@@ -830,12 +894,7 @@ function spotDetailText(name, cityName) {
 }
 
 /* ---------- 导航 / 百科 ---------- */
-function cleanSpotName(name) {
- const raw = String(name || "").trim();
- let n = raw.replace(/^(?:继续深度游览|深度游览|出发前往|继续游览|凌晨出发，前往|抵达 \+ 直奔|抵达 \+ )\s*[「]?/, "").replace(/」$/, "");
- n = n.replace(/[（(【].*?[)）】]/g, "").trim();
- return n || raw;
-}
+// cleanSpotName 已收口到 _shared.js（与 planner.js 共用单点真源）
 // 导航目标判定（v1.14）：
 //   approx:false  → 景点精确坐标，直接 wx.openLocation 到点
 //   approx:"city" → 只定位到所在城市中心（真坐标，非景点位），仍可开地图，附提示让用户在地图内搜该点
@@ -853,25 +912,120 @@ function navTarget(name, cityName) {
  }
  return { type: "search", name: n, keyword: (cityName ? cityName : "") + n };
 }
-function baikeUrl(name) {
+/* ---------- 百科（纯离线；v1.20.5 起零外链） ---------- */
+// 2026-11-09 用户反馈「显示有百科、复制链接去网页却打不开」。实测：
+//   baike.baidu.com/item/*、/search/word?word=* → 403「百度安全验证」；
+//   baike.baidu.com/search?word=* → 200 但只回百科首页壳（word 参数被忽略）；
+//   www.baidu.com/s?wd=* → 首访 200 有结果，重复请求即 302 到 wappass 图形验证码。
+// 「复制到浏览器」没有任何一种入口能保证可用，故彻底移除百科外链：
+//   · 随包有该地点真实收录 → 小程序内弹窗展示（不跳网页、不复制任何链接）；
+//   · 随包无该地点收录     → 明确提示「该地点暂未收录百科」。
+// has 只由「地点级真实内容」决定：策展简介 / 本市真实 note / 评分地址 / 真实票价 / 策展 how。
+// 城市级信息（同城医院、名店）只作附加展示，绝不单独把 has 抬成 true；
+// 类型化兜底（typeBasedIntro）与 SPOT_DETAILS_BY_CITY 通用模板不算百科收录。
+function baikeAliasKeys(name) {
  const kw = baikeKeyword(name);
- if (!kw) return "";
- // v1.19.207：改走百科「站内搜索」入口，不再直拼 /item/ 词条页。
- // 实测（2026-11-07）直接建 /item/校尉营关帝庙博物馆 是 403/空白页 —— 行程里
- // 大量景点名带「博物馆 / 旧址馆 / 遗址公园」这类后缀，与百科词条名并不完全一致，
- // 用户复制过去等于拿不到任何内容（就是这个「有些景点点百科没网址」）。
- // search/word 的行为是：命中词条 302 到正文，未命中 302 到搜索结果页，
- // 两种都有内容。实测故宫博物院 / 晋阳湖公园 均 302 到 /item/ 正文本体。
- return "https://baike.baidu.com/search/word?word=" + encodeURIComponent(kw).replace(/'/g, "%27");
+ if (!kw) return [];
+ const keys = [kw];
+ const push = (s) => { const t = String(s || "").trim(); if (t.length >= 2 && keys.indexOf(t) < 0) keys.push(t); };
+ const n = kw.replace(/[（(【].*?[)）】]/g, "").trim();
+ push(n);
+ push(n.replace(/^[\u4e00-\u9fa5]{2,4}(?:市|县|区|州|旗)/, ""));
+ push(n.replace(/(?:风景名胜区|风景区|旅游度假区|旅游区|景区|度假区|遗址公园|博物馆|纪念馆|公园)$/u, ""));
+ return keys;
 }
-function baikeKeyword(name) {
- let n = String(name || "").trim();
- if (!n) return "";
- n = n.replace(/^(?:继续深度游览|深度游览|出发前往|继续游览|凌晨出发，前往|抵达 \+ 直奔|抵达 \+ )\s*[「]?/, "").replace(/」$/, "");
- const parts = n.split(/\s*(?:\+|＋|、|\/)\s*/).map(s => s.trim()).filter(Boolean);
- if (parts.length) n = parts[0];
- return n.trim();
+// SPOT_INFO 有 58 个 2 字短键（豫园/西湖/…），spotInfoText 的子串匹配会误配，
+// 故这里按别名逐个精确查，且只接受 dict 键长度 ≥3 的子串命中。
+function baikeFactText(name) {
+ try {
+  const dict = D.SPOT_INFO || {};
+  for (const k of baikeAliasKeys(name)) {
+   const v = dict[k];
+   if (v && (v.openTime || v.rating || v.cost || v.addr)) return spotInfoText(k);
+  }
+  for (const k of baikeAliasKeys(name)) {
+   if (k.length < 3) continue;
+   for (const s in dict) {
+    if (s.length >= 3 && (s.indexOf(k) >= 0 || k.indexOf(s) >= 0) && dict[s]
+      && (dict[s].openTime || dict[s].rating || dict[s].cost || dict[s].addr)) return spotInfoText(s);
+   }
+  }
+ } catch (e) {}
+ return "";
 }
+function baikeInfo(name, cityName) {
+ const empty = { has: false, title: "", intro: "", extras: [], text: "", card: false };
+ const keys = baikeAliasKeys(name);
+ if (!keys.length) return empty;
+ const title = keys[0];
+ const SD = D.SPOT_DETAILS || {};
+ let intro = "";
+ // ① 精确（含别名）→ ② 子串：只认策展真实文案，不把模板/类型化兜底冒充百科
+ for (const k of keys) { if (SD[k] && SD[k].intro) { intro = String(SD[k].intro).trim(); break; } }
+ if (!intro) {
+  for (const k of keys) {
+   if (k.length < 3) continue;
+   for (const s in SD) { if (s.length >= 3 && (s.indexOf(k) >= 0 || k.indexOf(s) >= 0) && SD[s].intro) { intro = String(SD[s].intro).trim(); break; } }
+   if (intro) break;
+  }
+ }
+ // 本市 experiences 里该景点自己的 note（按城市取，绝不跨城误配）
+ let note = "";
+ if (!intro && cityName) { try { note = String(spotNoteInCity(title, cityName) || "").trim(); } catch (e) {} }
+ const facts = [];
+ try { const t = baikeFactText(title); if (t) facts.push(t); } catch (e) {}
+ try {
+  const lk = spotLookup(title, cityName) || {};
+  const tk = lk.ticket || {};
+  if (tk.known && (tk.text || tk.p)) facts.push("门票 " + (tk.text || tk.p));
+  if (lk.how) facts.push("怎么去 " + lk.how);   // lk.how 只在策展 det 存在时非空
+ } catch (e) {}
+ // v1.20.6 真实景点资料卡：把散在 6 张表的同一景点真实字段聚合成一行，
+ // 让百科弹窗从「一句短标签」升级为「看点 + 省份城市 + 评分 + 门票 + 坐标」。
+ // 只按「本市 → 景名」查，通用名绝不跨城误配；子串匹配要求键长 ≥3（防 2 字短名张冠李戴）。
+ let cardText = "", cardHit = false;
+ try {
+  const CM = D.SPOT_CARDS_BY_CITY || {};
+  const cm = cityName && CM[cityName];
+  if (cm) {
+   let card = null;
+   for (const k of keys) { if (cm[k]) { card = cm[k]; break; } }
+   if (!card) {
+    for (const k of keys) {
+     if (k.length < 3) continue;
+     for (const s in cm) { if (s.length >= 3 && (s.indexOf(k) >= 0 || k.indexOf(s) >= 0) && cm[s]) { card = cm[s]; break; } }
+     if (card) break;
+    }
+   }
+   if (card) {
+    cardHit = true;
+    const cf = [];
+    const prov = (D.CITY2PROV || {})[cityName];
+    if (prov && prov !== cityName) cf.push(prov + "·" + cityName);
+    else if (cityName) cf.push(cityName);       // 直辖市不写「北京·北京」
+    const hasRating = facts.some(f => f.indexOf("评分") >= 0) || /评分/.test(note);
+    const hasTicket = facts.some(f => f.indexOf("门票") >= 0);
+    if (card[1] && !hasRating) cf.push("评分 " + card[1]);
+    if (card[2] && !hasTicket) cf.push("门票 " + card[2]);
+    if (card[3] !== "" && card[4] !== "") cf.push("坐标 " + card[3] + "," + card[4]);
+    if (cf.length) cardText = cf.join(" · ");
+    if (!intro && !note && card[0]) note = String(card[0]).trim();
+   }
+  }
+ } catch (e) {}
+ if (cardText) facts.push("随包资料 " + cardText);
+ // ↓ 地点级真实内容决定「是否收录」；以下城市级附加信息不参与 has 判定
+ const has = !!(intro || note || facts.length);
+ if (!has) return empty;
+ // 2026-11-09：按用户要求移除「同城参考」（同城应急 / 同城名店）——景点详情只保留本景点自身信息。
+ // extras 保留为空数组仅为兼容返回结构（页面/测试不读它）。
+ const extras = [];
+ const text = [intro || note,
+  facts.length ? "已收录信息：" + facts.join("；") : ""]
+  .filter(Boolean).join("\n\n").slice(0, 380);
+ return { has: true, title, intro: intro || note, extras, text, card: cardHit };
+}
+// baikeKeyword 已收口到 _shared.js（与 planner.js 共用单点真源）
 
 /* ---------- 今天卡片状态 ---------- */
 function todayState(plan) {
@@ -922,12 +1076,15 @@ function getLedger() { return store.get(LEDGER_KEY, []); }
 function _genBillId() { return "b" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
 function addLedger(amt, cat, name, payer, share, date, trip) {
  const list = getLedger();
+   // 审计 #14：amt 原先原样入库，Infinity / NaN / 负数 / 字符串会污染账本与导出。
+   const a = Math.round(Number(amt) * 100) / 100;
+   if (!isFinite(a) || a < 0 || a > 99999999) return list;
  const d = (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))) ? String(date) : store.fmtLocalDate(new Date());
  list.unshift({
   id: _genBillId(),
   date: d,
   cat, name: name || "行程中随手记",
-  amt, payer: payer || "0",
+  amt: a, payer: payer || "0",
   share: Math.max(1, parseInt(share, 10) || 1),
   trip: trip || ""
  });
@@ -966,14 +1123,22 @@ function budgetPerDay(plan) {
 function exportLedgerCSV() {
  const list = getLedger();
  if (!list || !list.length) return ""; // 空账本不产出「只有表头」的假 CSV，页面守卫据此提示暂无数据
- const header = "日期,分类,说明,金额(元),付款人,AA人数,人均(元)";
- const lines = list.map(x => {
-  const amt = Number(x.amt) || 0;
-  const share = Math.max(1, parseInt(x.share, 10) || 1);
-  const per = (amt / share).toFixed(2);
-  return [x.date, x.cat || "", (x.name || "").replace(/,/g, "，"),
-   amt.toFixed(2), x.payer || "", share, per].join(",");
- });
+   const header = "日期,分类,说明,金额(元),付款人,AA人数,人均(元)";
+   // 审计 #16：标准 CSV 转义（双引号包裹 + 内部引号翻倍），并阻断 Excel/WPS 公式注入。
+   // 原先只替换半角逗号：备注里带引号/换行会串列，以 = + - @ 开头会被当公式执行。
+   const cell = v => {
+    let s = String(v == null ? "" : v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+   };
+   const lines = list.map(x => {
+    const amt = Number(x.amt) || 0;
+    const share = Math.max(1, parseInt(x.share, 10) || 1);
+    const per = (amt / share).toFixed(2);
+    return [x.date, x.cat || "", x.name || "",
+     amt.toFixed(2), x.payer || "", share, per].map(cell).join(",");
+   });
+
  // 加 BOM 防止 Excel 读 UTF-8 中文乱码
  return "\uFEFF" + header + "\n" + lines.join("\n");
 }
@@ -1123,12 +1288,13 @@ function clothAdvice(city) {
  try {
   const c = city || {};
   const climate = c.climate || "temperate";
-  const sk = SEASON_KEYS[new Date().getMonth() + 1] || "秋";
+  const sk = _clothSeason(new Date().getMonth() + 1, c);
   const wx = (D.SEASON_WX && D.SEASON_WX[climate] && D.SEASON_WX[climate][sk]) || "";
   const cl = (D.CLOTH && D.CLOTH[climate] && D.CLOTH[climate][sk]) || null;
   const lines = [];
   if (wx) lines.push(wx);
-  if (c.best) lines.push("适宜时节：" + c.best);
+  // v1.20.6：穿衣建议只讲「怎么穿」，「适宜时节」交给 askAssistant 在问季节时单独给
+  // （原先这里拼进来，导致「本地速查」问穿衣时混杂最佳季节，与穿衣无关）
   if (cl) {
    lines.push("上衣：" + cl.tops);
    lines.push("下装：" + cl.bottoms);
@@ -1355,6 +1521,10 @@ function askAssistant(rawQ, plan) {
   const adv = clothAdvice(cityObj);
   L(city + "穿衣建议：");
   L(adv || "数据暂缺，按目的地当月气候常识准备即可。");
+  // v1.20.6：只有问「季节/几月/什么时候去」才单独给「适宜时节」，单纯问穿衣不再混入最佳季节
+  if (/季节|几月|月份|什么时候|啥时候|最佳/.test(q) && cityObj && cityObj.best) {
+   L("\n适宜时节：" + cityObj.best);
+  }
   L("\n出发前再看一次预报，如逢雨天优先安排室内的展馆 / 商场路线，调整好衣物。");
   return { text: lines.join("\n"), tag: "ok" };
  }
@@ -1467,9 +1637,23 @@ function importBackup(json) {
  const o = JSON.parse(raw);
  if (!o || o.v !== 1) throw new Error("不是有效的备份内容");
  // v1.20.4：结构防御，避免脏数据写入后渲染期崩溃（审计 #24）
- if (o.plan && (typeof o.plan !== "object" || (o.plan.days && !Array.isArray(o.plan.days)))) throw new Error("备份中行程结构损坏");
- if (o.ledger && !Array.isArray(o.ledger)) throw new Error("备份中账本结构损坏");
- if (o.plan && o.plan.days && o.plan.days.length > 60) o.plan.days = o.plan.days.slice(0, 60);
+   if (o.plan && (typeof o.plan !== "object" || Array.isArray(o.plan) || (o.plan.days && !Array.isArray(o.plan.days)))) throw new Error("备份中行程结构损坏");
+   if (o.ledger && !Array.isArray(o.ledger)) throw new Error("备份中账本结构损坏");
+   // 审计 #15/#65：原先只校验顶层是数组，数组里塞字符串 / null / 超长文本都能写入，渲染期才崩。
+   // 这里逐条净化（丢弃非法条目、限量、限字段长度），不改变合法备份语义。
+   if (o.plan && Array.isArray(o.plan.days)) {
+    o.plan.days = o.plan.days.slice(0, 60).filter(d => d && typeof d === "object" && !Array.isArray(d));
+    o.plan.days.forEach(d => {
+     if (d.items && !Array.isArray(d.items)) d.items = [];
+     if (Array.isArray(d.items)) {
+      d.items = d.items.slice(0, 100).filter(it => it && typeof it === "object" && !Array.isArray(it));
+      d.items.forEach(it => { if (typeof it.name === "string") it.name = it.name.slice(0, 200); });
+     }
+    });
+   }
+   if (Array.isArray(o.ledger)) {
+    o.ledger = o.ledger.slice(0, 200).filter(r => r && typeof r === "object" && !Array.isArray(r));
+   }
  let n = 0;
  // v1.10.1：导入统一按各键容量上限裁剪，与运行时写入保持一致
  const CAP = {};
@@ -1631,6 +1815,22 @@ function footStats() {
  const f = _footRaw();
  const cityList = Object.keys(f.cities || {});
  return { spots: Object.keys(f.spots || {}).length, cities: cityList.length, cityList };
+}
+// v1.20.8：本机数据洞察·兴趣标签偏好。遍历已打卡景点，按 SPOT_TAG_RULES 归类，
+// 聚合出「你更偏爱哪类景点」的真实画像（纯本地、零编造、零外链）。「其他」不计入（无偏好信号）。
+function footTagStats() {
+ const f = _footRaw();
+ const m = {};
+ let total = 0;
+ Object.keys(f.spots || {}).forEach(function (k) {
+  const s = f.spots[k];
+  const tags = spotTagOf(s && s.name ? s.name : k, s && s.city);
+  (tags || []).forEach(function (t) { if (t && t !== "其他") { m[t] = (m[t] || 0) + 1; total++; } });
+ });
+ const rows = Object.keys(m)
+  .map(function (t) { return { tag: t, n: m[t], pct: total ? Math.round(m[t] / total * 100) : 0 }; })
+  .sort(function (a, b) { return b.n - a.n; });
+ return { total: total, rows: rows };
 }
 // v1.19.135：已打卡景点的个人评价（方便下次选择时一眼看到）
 function getFootNote(name) {
@@ -1887,7 +2087,8 @@ function parseQuickBill(str) {
     else chosen = all.slice().sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]))[0];
   }
   const amt = Math.round(parseFloat(chosen[1]) * 100) / 100;
-  if (!(amt > 0)) return null;
+   // 审计 #11/#12：Infinity / 1e999 能穿过 `> 0`（Infinity > 0 为真），入库后 CSV 显示 Infinity、AA 人均变 NaN。
+  if (!(amt > 0) || !isFinite(amt) || amt > 99999999) return null;
   const m = chosen;
   let name = (s.slice(0, m.index) + " " + s.slice(m.index + m[0].length))
     .replace(/[¥￥]/g, " ").replace(/块钱|块|元|rmb|RMB/gi, " ")
@@ -2019,8 +2220,9 @@ function packSmart(plan) {
   const depStr = String((plan && plan.depart) || "").slice(0, 10);
   let month = new Date().getMonth() + 1;
   if (/^\d{4}-\d{2}-\d{2}$/.test(depStr)) month = parseInt(depStr.slice(5, 7), 10) || month;
-  const season = SEASON_KEYS[month] || "秋";
   const city = findCity(activeCityOf(plan) || (plan && plan.cityName) || "");
+  // v1.20.6：行李清单季节同样走区域/气候感知（北方 11/3 月按冬季备羽绒服等）
+  const season = _clothSeason(month, city);
   const climate = (city && city.climate) || "temperate";
   const isMulti = !!(plan && plan.segments && plan.segments.length > 1);
   // 行程特色：山 / 海 / 高原 / 古镇（决定特殊装备）
@@ -2070,28 +2272,274 @@ function packSmart(plan) {
 }
 
 /* ---------- 旅行成就徽章（基于足迹 / 手记 / 账本 / 行程存档） ---------- */
+/* ================= 旅行成就引擎（v1.20.6：200+ 含隐藏成就） =================
+ * 设计：ACH_DEFS 是主清单（数据驱动生成，>=200 条）。
+ *  - hidden:false 为「可见里程碑」：始终在成就页展示进度（沿用旧 8 个）。
+ *  - hidden:true 为「隐藏成就」：达成前不陈列，达成时自动弹出授予，之后在「已解锁隐藏成就」区展示。
+ *  achContext() 从本地数据一次性汇总判定所需上下文（全程保护，缺字段不崩）。
+ *  syncAchievements() 持久化已解锁集合并返回「本次新解锁」（供弹窗）；peekNewAchievements() 仅计算不落盘。
+ */
+const ACH_REGIONS = ["华北", "华东", "华南", "华中", "西南", "西北", "东北"];
+const ACH_TAGS = ["历史古迹", "博物馆", "宗教", "古镇", "自然风光", "亲子", "乐园", "美食", "海滨", "徒步"];
+
+const ACH_DEFS = (function () {
+  const defs = [];
+  const add = (o) => { defs.push(o); };
+
+  // —— 可见里程碑（沿用现有 8 个，始终展示进度 x/y）——
+  add({ id: "first",  t: "初出茅庐", d: "打卡第一个景点", cat: "足迹", hidden: false, target: 1,  cur: c => Math.min(c.spotsN, 1),  test: c => c.spotsN >= 1 });
+  add({ id: "spot5",  t: "小有足迹", d: "累计打卡 5 个景点", cat: "足迹", hidden: false, target: 5,  cur: c => Math.min(c.spotsN, 5),  test: c => c.spotsN >= 5 });
+  add({ id: "spot10", t: "打卡达人", d: "累计打卡 10 个景点", cat: "足迹", hidden: false, target: 10, cur: c => Math.min(c.spotsN, 10), test: c => c.spotsN >= 10 });
+  add({ id: "city3",  t: "城市猎人", d: "点亮 3 座城市", cat: "城市", hidden: false, target: 3,  cur: c => Math.min(c.citiesN, 3), test: c => c.citiesN >= 3 });
+  add({ id: "city6",  t: "走遍四方", d: "点亮 6 座城市", cat: "城市", hidden: false, target: 6,  cur: c => Math.min(c.citiesN, 6), test: c => c.citiesN >= 6 });
+  add({ id: "note5",  t: "记录的人", d: "写下 5 篇旅行手记", cat: "手记", hidden: false, target: 5,  cur: c => Math.min(c.notes, 5),   test: c => c.notes >= 5 });
+  add({ id: "bill20", t: "精打细算", d: "累计记 20 笔账", cat: "账本", hidden: false, target: 20, cur: c => Math.min(c.bills, 20),   test: c => c.bills >= 20 });
+  add({ id: "plan3",  t: "行程规划师", d: "保存 3 份行程", cat: "行程", hidden: false, target: 3,  cur: c => Math.min(c.planN, 3),   test: c => c.planN >= 3 });
+
+  // —— 足迹隐藏阶梯 ——
+  const SPOT_T = [20, 30, 50, 75, 100, 150, 200, 300, 500, 800, 1000, 1500, 2000];
+  const SPOT_N = { 20: "足迹成册", 30: "步履不停", 50: "走南闯北", 75: "山河过客", 100: "百景行者", 150: "阅景无数", 200: "千里走单骑", 300: "踏遍千景", 500: "丈量神州", 800: "山河故人", 1000: "万里同风", 1500: "行走的地图", 2000: "足迹封神" };
+  SPOT_T.forEach(n => add({ id: "spot" + n, t: SPOT_N[n], d: "累计打卡 " + n + " 个景点", cat: "足迹", hidden: true, test: c => c.spotsN >= n }));
+
+  // —— 城市隐藏阶梯 ——
+  const CITY_T = [10, 15, 20, 25, 34, 50, 75, 100, 150, 200, 300];
+  const CITY_N = { 10: "十城记", 15: "十五明月", 20: "纵横四海", 25: "廿五城录", 34: "遍历九州", 50: "半壁江山", 75: "三分天下", 100: "全域游侠", 150: "百城之约", 200: "城城相依", 300: "行走中国" };
+  CITY_T.forEach(n => add({ id: "city" + n, t: CITY_N[n], d: "点亮 " + n + " 座城市", cat: "城市", hidden: true, test: c => c.citiesN >= n }));
+
+  // —— 手记隐藏阶梯 ——
+  const NOTE_T = [10, 15, 20, 30, 50, 80, 100, 150, 200];
+  const NOTE_N = { 10: "笔耕不辍", 15: "游记新秀", 20: "游记作家", 30: "行吟诗人", 50: "字里行间", 80: "万卷书外", 100: "百篇行者", 150: "行走的笔", 200: "游记大宗" };
+  NOTE_T.forEach(n => add({ id: "note" + n, t: NOTE_N[n], d: "写下 " + n + " 篇旅行手记", cat: "手记", hidden: true, test: c => c.notes >= n }));
+
+  // —— 账本隐藏阶梯 ——
+  const BILL_T = [30, 50, 80, 100, 150, 200, 300, 500, 800, 1000];
+  const BILL_N = { 30: "账本初成", 50: "账房先生", 80: "精算学徒", 100: "精算师", 150: "账目了然", 200: "理财达人", 300: "钱程似锦", 500: "千金薄记", 800: "账海舵手", 1000: "财务自由" };
+  BILL_T.forEach(n => add({ id: "bill" + n, t: BILL_N[n], d: "累计记 " + n + " 笔账", cat: "账本", hidden: true, test: c => c.bills >= n }));
+
+  // —— 行程隐藏阶梯 ——
+  const PLAN_T = [5, 6, 8, 10];
+  const PLAN_N = { 5: "行程收藏家", 6: "六六大顺", 8: "八方能旅", 10: "十全行程" };
+  PLAN_T.forEach(n => add({ id: "plan" + n, t: PLAN_N[n], d: "保存 " + n + " 份行程", cat: "行程", hidden: true, test: c => c.planN >= n }));
+
+  // —— 区域覆盖（7 大区，到访即解锁）——
+  const REG_M = { 华北: "北国风光", 华东: "江南拾光", 华南: "南风扑面", 华中: "楚天寥廓", 西南: "西南秘境", 西北: "大漠长歌", 东北: "雪国邮戳" };
+  ACH_REGIONS.forEach(r => add({ id: "reg_" + r, t: REG_M[r], d: "到访「" + r + "」地区", cat: "区域", hidden: true, test: c => c.regions.has(r) }));
+  const REGN_N = { 2: "双区穿越", 3: "三区游历", 4: "四方来客", 5: "五湖四海", 6: "六合行者", 7: "七大区通关" };
+  [2, 3,4, 5, 6, 7].forEach(n => add({ id: "regn" + n, t: REGN_N[n], d: "足迹覆盖 " + n + " 个大区", cat: "区域", hidden: true, test: c => c.regionN >= n }));
+  add({ id: "reg_north", t: "北国巡礼", d: "集齐华北 / 东北 / 西北", cat: "区域", hidden: true, test: c => ["华北", "东北", "西北"].every(r => c.regions.has(r)) });
+  add({ id: "reg_south", t: "南方全勤", d: "集齐华东 / 华南 / 华中 / 西南", cat: "区域", hidden: true, test: c => ["华东", "华南", "华中", "西南"].every(r => c.regions.has(r)) });
+
+  // —— 省份覆盖阶梯 ——
+  const PROV_T = [1, 2, 3, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, 30, 32, 34];
+  const PROV_N = { 1: "初入一省", 2: "两省风情", 3: "三省通衢", 5: "五省打卡", 8: "八方来客", 10: "十省鸿图", 12: "十二锦绣", 15: "十五州记", 18: "十八行省", 20: "廿省游历", 22: "廿二山河", 25: "廿五城录", 28: "廿八省志", 30: "三十行省", 32: "卅二风物", 34: "版图收藏家" };
+  PROV_T.forEach(n => add({ id: "prov" + n, t: PROV_N[n], d: "足迹覆盖 " + n + " 个省份", cat: "省份", hidden: true, test: c => c.provN >= n }));
+
+  // —— 标签（景观 / 体验类型）覆盖 ——
+  const TAG_M = { 历史古迹: "时空旅人", 博物馆: "博古通今", 宗教: "寻踪问道", 古镇: "古镇慢摇", 自然风光: "山水知音", 亲子: "亲子时光", 乐园: "童心未泯", 美食: "寻味之旅", 海滨: "向海而居", 徒步: "徒步上瘾" };
+  ACH_TAGS.forEach(tg => add({ id: "tag_" + tg, t: TAG_M[tg], d: "体验「" + tg + "」类景点", cat: "体验", hidden: true, test: c => c.tags.has(tg) }));
+  const TAGN_N = { 2: "双修玩家", 3: "三味行者", 4: "四艺俱全", 5: "五感旅行", 6: "六艺傍身", 7: "七巧旅人", 8: "八面玲珑", 9: "九流宾客", 10: "十全体验" };
+  [2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(n => add({ id: "tagn" + n, t: TAGN_N[n], d: "足迹覆盖 " + n + " 类体验", cat: "体验", hidden: true, test: c => c.tagN >= n }));
+
+  // —— 单类深度（某类景点数量）——
+  const deepTag = (tag, n, id, t, d) => add({ id, t, d, cat: "深度", hidden: true, test: c => (c.tagCounts[tag] || 0) >= n });
+  deepTag("自然风光", 5, "deep_nat5", "山系青年", "自然风光类打卡 5 处");
+  deepTag("自然风光", 10, "deep_nat10", "山野老饕", "自然风光类打卡 10 处");
+  deepTag("历史古迹", 5, "deep_his5", "读城人", "历史古迹类打卡 5 处");
+  deepTag("历史古迹", 10, "deep_his10", "古迹猎人", "历史古迹类打卡 10 处");
+  deepTag("博物馆", 3, "deep_mus3", "博物馆日", "博物馆类打卡 3 处");
+  deepTag("博物馆", 6, "deep_mus6", "馆藏控", "博物馆类打卡 6 处");
+  deepTag("美食", 5, "deep_food5", "美食猎人", "美食类打卡 5 处");
+  deepTag("海滨", 3, "deep_sea3", "海岛迷情", "海滨类打卡 3 处");
+  deepTag("宗教", 3, "deep_rel3", "信仰之旅", "宗教类打卡 3 处");
+  deepTag("古镇", 3, "deep_town3", "烟雨江南", "古镇类打卡 3 处");
+  deepTag("乐园", 2, "deep_fun2", "乐园童心", "乐园类打卡 2 处");
+  deepTag("徒步", 3, "deep_hike3", "栈道行者", "徒步类打卡 3 处");
+
+  // —— 单城深度（同城打卡数）——
+  const DC_N = { 5: "一城千面", 8: "深耕一城", 10: "城熟于心", 12: "同城百事", 15: "一城之主", 20: "故地重游", 25: "城事悠悠", 30: "城之眷恋" };
+  [5, 8, 10, 12, 15, 20, 25, 30].forEach(n => add({ id: "depth" + n, t: DC_N[n], d: "同一城市打卡 " + n + " 个景点", cat: "深度", hidden: true, test: c => c.maxCitySpots >= n }));
+
+  // —— 同省多城 ——
+  [3, 5, 8, 10].forEach(n => add({ id: "provcity" + n, t: (n === 3 ? "一省三城" : n === 5 ? "一省五城" : n === 8 ? "一省八城" : "一省十城"), d: "同一省份点亮 " + n + " 座城市", cat: "省份", hidden: true, test: c => c.maxProvCities >= n }));
+
+  // —— 季节 ——
+  const SEA = { 春: "春之旅", 夏: "夏之旅", 秋: "秋之旅", 冬: "冬之旅" };
+  Object.keys(SEA).forEach(s => add({ id: "sea_" + s, t: SEA[s], d: "在「" + s + "」季出行", cat: "时节", hidden: true, test: c => c.seasons.has(s) }));
+  add({ id: "sea_2", t: "两季过客", d: "足迹跨 2 个季节", cat: "时节", hidden: true, test: c => c.seasonN >= 2 });
+  add({ id: "sea_3", t: "三季行者", d: "足迹跨 3 个季节", cat: "时节", hidden: true, test: c => c.seasonN >= 3 });
+  add({ id: "sea_4", t: "四季轮回", d: "足迹踏遍春夏秋冬", cat: "时节", hidden: true, test: c => c.seasonN >= 4 });
+
+  // —— 跨年 ——
+  const YR_N = { 2: "跨年旅人", 3: "三载游历", 4: "四年之约", 5: "五载同行", 6: "六度春秋", 8: "八载流年", 10: "十年行者" };
+  [2, 3, 4, 5, 6, 8, 10].forEach(n => add({ id: "yr" + n, t: YR_N[n], d: "足迹跨 " + n + " 个年份", cat: "时节", hidden: true, test: c => c.yearN >= n }));
+
+  // —— 想玩 / 收藏 / 队友 ——
+  const W_N = { 1: "种草第一步", 3: "心愿萌芽", 5: "想玩清单", 8: "向往之地", 10: "清单渐丰", 15: "环游心愿", 20: "种草达人", 30: "心愿收集家", 40: "百愿成行", 50: "清单狂魔" };
+  [1, 3, 5, 8, 10, 15, 20, 30, 40, 50].forEach(n => add({ id: "wish" + n, t: W_N[n], d: "想玩清单添加 " + n + " 个", cat: "心愿", hidden: true, test: c => c.wish >= n }));
+  const F_N = { 1: "初见收藏", 3: "收藏夹初成", 5: "心水清单", 8: "珍藏旅程", 10: "收藏家", 15: "甄选之旅", 20: "百里挑一", 30: "藏宝阁", 40: "万中选一", 50: "臻藏旅人", 60: "收藏满仓" };
+  [1, 3, 5, 8, 10, 15, 20, 30, 40, 50, 60].forEach(n => add({ id: "fav" + n, t: F_N[n], d: "收藏 " + n + " 个目的地", cat: "心愿", hidden: true, test: c => c.favs >= n }));
+  const M_N = { 1: "结伴而行", 2: "呼朋唤友", 3: "三人成行", 4: "四人行", 5: "团队作战", 6: "小队远征", 8: "八方来客", 10: "旅团团长" };
+  [1, 2, 3, 4, 5, 6, 8, 10].forEach(n => add({ id: "mate" + n, t: M_N[n], d: "同行伙伴 " + n + " 人", cat: "社交", hidden: true, test: c => c.mates >= n }));
+
+  // —— 消费金额 ——
+  const AMT_N = { 100: "初尝花费", 300: "小试开销", 500: "破费一笔", 1000: "千金一掷", 2000: "潇洒出行", 5000: "阔绰旅程", 10000: "万元户", 20000: "两万足迹", 50000: "五万行者", 100000: "十万之旅", 200000: "廿万豪旅", 500000: "五十万里程", 1000000: "百万人生" };
+  [100, 300, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000].forEach(n => add({ id: "amt" + n, t: AMT_N[n], d: "累计花费 ¥" + n, cat: "账本", hidden: true, test: c => c.billAmt >= n }));
+  add({ id: "bigbill", t: "一掷千金", d: "单笔消费 ≥ ¥1000", cat: "账本", hidden: true, test: c => c.maxBill >= 1000 });
+  add({ id: "cat2", t: "开销入门", d: "涉及 2 类消费", cat: "账本", hidden: true, test: c => c.billCatN >= 2 });
+  add({ id: "cat4", t: "精明消费者", d: "涉及 4 类消费", cat: "账本", hidden: true, test: c => c.billCatN >= 4 });
+  add({ id: "cat6", t: "全维开支", d: "涉及 6 类消费", cat: "账本", hidden: true, test: c => c.billCatN >= 6 });
+  add({ id: "aa2", t: "AA 达人", d: "与 2 人及以上 AA 结算", cat: "账本", hidden: true, test: c => c.billPayerN >= 2 });
+  add({ id: "aa4", t: "分账高手", d: "与 4 人及以上 AA 结算", cat: "账本", hidden: true, test: c => c.billPayerN >= 4 });
+  add({ id: "food500", t: "美食家", d: "美食类累计 ≥ ¥500", cat: "账本", hidden: true, test: c => (c.catAmt["美食"] || 0) >= 500 });
+  add({ id: "stay500", t: "住宿控", d: "住宿类累计 ≥ ¥500", cat: "账本", hidden: true, test: c => (c.catAmt["住宿"] || 0) >= 500 });
+  add({ id: "trans500", t: "交通控", d: "交通类累计 ≥ ¥500", cat: "账本", hidden: true, test: c => (c.catAmt["交通"] || 0) >= 500 });
+
+  // —— 行程属性（基于已存档行程）——
+  add({ id: "budget_low", t: "穷游党", d: "规划过「经济」行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.budget) === "low") });
+  add({ id: "budget_high", t: "轻奢游", d: "规划过「舒适 / 豪华」行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.budget) === "high" || (p && p.budget) === "custom") });
+  add({ id: "pace_leisure", t: "慢旅行", d: "规划过「悠闲」节奏", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.pace) === "leisure") });
+  add({ id: "pace_speed", t: "暴走族", d: "规划过「紧凑」节奏", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.pace) === "speed") });
+  add({ id: "mode_family", t: "亲子时光", d: "规划过亲子行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.travelMode) === "family") });
+  add({ id: "mode_couple", t: "二人世界", d: "规划过情侣行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.travelMode) === "couple") });
+  add({ id: "mode_solo", t: "独行侠", d: "规划过 solo 行程", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.travelMode) === "solo") });
+  add({ id: "mode_elder", t: "银发同游", d: "规划过长辈同行", cat: "行程", hidden: true, test: c => c.plans.some(p => (p && p.travelMode) === "elder") });
+  add({ id: "multi_seg", t: "跨省串联", d: "规划过多城多段行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.segments) && p.segments.length >= 2) });
+  add({ id: "multi_seg3", t: "三城记", d: "规划过 3 城及以上行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.segments) && p.segments.length >= 3) });
+  add({ id: "short3", t: "周末快闪", d: "规划过 ≤3 天行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.days) && p.days.length <= 3) });
+  add({ id: "long10", t: "深度长居", d: "规划过 ≥10 天行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.days) && p.days.length >= 10) });
+  add({ id: "long14", t: "半月悠游", d: "规划过 ≥14 天行程", cat: "行程", hidden: true, test: c => c.plans.some(p => Array.isArray(p.days) && p.days.length >= 14) });
+  add({ id: "longroute", t: "长途跋涉", d: "单行程串联 ≥1000km", cat: "行程", hidden: true, test: c => c.plans.some(p => { try { return routeKmOf(p) >= 1000; } catch (e) { return false; } }) });
+  add({ id: "collab", t: "协作达人", d: "导入过同行人行程", cat: "社交", hidden: true, test: c => c.hasCollab });
+
+  // —— 人格 / 综合 ——
+  add({ id: "persona", t: "找到自己", d: "生成专属旅行人格", cat: "综合", hidden: true, test: c => !!c.persona });
+  add({ id: "combo_ancient", t: "古今同游", d: "同涉历史古迹与博物馆", cat: "体验", hidden: true, test: c => c.tags.has("历史古迹") && c.tags.has("博物馆") });
+  add({ id: "combo_nature", t: "山水之间", d: "同涉自然风光与历史古迹", cat: "体验", hidden: true, test: c => c.tags.has("自然风光") && c.tags.has("历史古迹") });
+  add({ id: "combo_sea", t: "海与古", d: "同涉海滨与古镇", cat: "体验", hidden: true, test: c => c.tags.has("海滨") && c.tags.has("古镇") });
+  add({ id: "combo_mountain_sea", t: "山海相连", d: "同涉自然风光与海滨", cat: "体验", hidden: true, test: c => c.tags.has("自然风光") && c.tags.has("海滨") });
+  add({ id: "combo_full", t: "十项全能", d: "十类体验 + 50 足迹", cat: "体验", hidden: true, test: c => c.tagN >= 10 && c.spotsN >= 50 });
+
+  return defs;
+})();
+
+// 成就上下文：从本地数据一次性汇总（全部带保护，缺字段不崩）
+function achContext() {
+  const ctx = {
+    spotsN: 0, citiesN: 0, regions: new Set(), provinces: new Set(), tags: new Set(),
+    tagCounts: {}, seasons: new Set(), years: new Set(), notes: 0, bills: 0, billAmt: 0,
+    billCats: new Set(), billPayers: new Set(), catAmt: {}, maxBill: 0, planN: 0, plans: [],
+    wish: 0, favs: 0, mates: 0, persona: null, maxCitySpots: 0, maxProvCities: 0, hasCollab: false,
+    regionN: 0, provN: 0, tagN: 0, seasonN: 0, yearN: 0, billCatN: 0, billPayerN: 0
+  };
+  try {
+    const f = _footRaw();
+    const spots = f.spots || {}; const cities = f.cities || {};
+    const cityList = Object.keys(cities);
+    ctx.spotsN = Object.keys(spots).length;
+    ctx.citiesN = cityList.length;
+    const citySpots = {}; const provCities = {};
+    cityList.forEach(c => {
+      const ci = _cityIndex().get(c) || null;
+      let region = "", prov = "";
+      if (ci) { region = ci.region || ""; prov = ci.province || (D.CITY2PROV && D.CITY2PROV[c]) || ""; }
+      if (region && region !== "远方") ctx.regions.add(region);
+      if (prov) { ctx.provinces.add(prov); provCities[prov] = (provCities[prov] || 0) + 1; }
+    });
+    ctx.maxProvCities = Object.keys(provCities).length ? Math.max.apply(null, Object.values(provCities)) : 0;
+    Object.keys(spots).forEach(k => {
+      const s = spots[k];
+      const city = s.city || "";
+      if (city) citySpots[city] = (citySpots[city] || 0) + 1;
+      try { (spotTagOf(s.name || k, city) || []).forEach(t => { if (t && t !== "其他") { ctx.tags.add(t); ctx.tagCounts[t] = (ctx.tagCounts[t] || 0) + 1; } }); } catch (e) {}
+      const ts = s.ts;
+      if (ts) {
+        const d = new Date(ts); const m = d.getMonth() + 1;
+        const ssn = (m >= 3 && m <= 5) ? "春" : (m >= 6 && m <= 8) ? "夏" : (m >= 9 && m <= 11) ? "秋" : "冬";
+        ctx.seasons.add(ssn); ctx.years.add(d.getFullYear());
+      }
+    });
+    ctx.maxCitySpots = Object.keys(citySpots).length ? Math.max.apply(null, Object.values(citySpots)) : 0;
+    ctx.notes = (getNotes() || []).length;
+    const ledger = getLedger() || [];
+    ctx.bills = ledger.length;
+    ledger.forEach(b => {
+      const amt = Number(b.amt) || 0;
+      ctx.billAmt += amt;
+      if (amt > ctx.maxBill) ctx.maxBill = amt;
+      if (b.cat) { ctx.billCats.add(b.cat); ctx.catAmt[b.cat] = (ctx.catAmt[b.cat] || 0) + amt; }
+      if (b.payer) ctx.billPayers.add(String(b.payer));
+    });
+    const plans = listSavedPlans() || [];
+    ctx.planN = plans.length; ctx.plans = plans;
+    ctx.hasCollab = plans.some(p => p && typeof p.name === "string" && p.name.indexOf("同行人") >= 0);
+    ctx.wish = (getWish() || []).length;
+    ctx.favs = (getFavs() || []).length;
+    ctx.mates = (getMates() || []).length;
+    ctx.persona = travelPersona();
+  } catch (e) {}
+  ctx.regionN = ctx.regions.size; ctx.provN = ctx.provinces.size;
+  ctx.tagN = ctx.tags.size; ctx.seasonN = ctx.seasons.size; ctx.yearN = ctx.years.size;
+  ctx.billCatN = ctx.billCats.size; ctx.billPayerN = ctx.billPayers.size;
+  return ctx;
+}
+
+const ACH_UNLOCKED_KEY = "miniAchGotV1";
+function _achStored() { try { return new Set(store.get(ACH_UNLOCKED_KEY, []) || []); } catch (e) { return new Set(); } }
+function _achPersist(set) { try { store.set(ACH_UNLOCKED_KEY, Array.from(set)); } catch (e) {} }
+
 function achievements() {
-  const f = footStats();
-  const notes = getNotes().length;
-  const bills = getLedger().length;
-  const plans = listSavedPlans().length;
-  const DEF = [
-    { id: "first", t: "初出茅庐", d: "打卡第一个景点", cur: f.spots, need: 1 },
-    { id: "spot5", t: "小有足迹", d: "累计打卡 5 个景点", cur: f.spots, need: 5 },
-    { id: "spot10", t: "打卡达人", d: "累计打卡 10 个景点", cur: f.spots, need: 10 },
-    { id: "city3", t: "城市猎人", d: "点亮 3 座城市", cur: f.cities, need: 3 },
-    { id: "city6", t: "走遍四方", d: "点亮 6 座城市", cur: f.cities, need: 6 },
-    { id: "note5", t: "记录的人", d: "写下 5 篇旅行手记", cur: notes, need: 5 },
-    { id: "bill20", t: "精打细算", d: "累计记 20 笔账", cur: bills, need: 20 },
-    { id: "plan3", t: "行程规划师", d: "保存 3 份行程", cur: plans, need: 3 }
-  ];
-  const list = DEF.map(x => Object.assign({}, x, {
-    ok: x.cur >= x.need,
-    pct: Math.min(100, Math.round(x.cur / x.need * 100)),
-    ptxt: Math.min(x.cur, x.need) + "/" + x.need
-  }));
-  const got = list.filter(x => x.ok).length;
-  return { list: list, got: got, total: list.length, pct: Math.round(got / list.length * 100) };
+  const ctx = achContext();
+  const got = [];
+  const visList = [];
+  const hidList = [];
+  ACH_DEFS.forEach(def => {
+    let ok = false;
+    try { ok = !!def.test(ctx); } catch (e) { ok = false; }
+    if (ok) got.push(def.id);
+    if (def.hidden) {
+      if (ok) hidList.push({ id: def.id, t: def.t, d: def.d, cat: def.cat, ok: true, pct: 100, ptxt: "已解锁" });
+    } else {
+      const tg = def.target || 1;
+      const cu = def.cur ? Math.min(def.cur(ctx), tg) : (ok ? tg : 0);
+      visList.push({ id: def.id, t: def.t, d: def.d, cat: def.cat, ok: ok, pct: Math.round(cu / tg * 100), ptxt: cu + "/" + tg });
+    }
+  });
+  const total = ACH_DEFS.length;
+  const gotN = got.length;
+  return {
+    list: visList,
+    hiddenList: hidList,
+    hiddenGot: hidList.length,
+    hiddenTotal: ACH_DEFS.filter(d => d.hidden).length,
+    got: gotN, total: total, pct: total ? Math.round(gotN / total * 100) : 0
+  };
+}
+
+// 持久化已解锁集合，返回「本次新解锁」（用于自动授予弹窗）
+function syncAchievements() {
+  const ctx = achContext();
+  const stored = _achStored();
+  const now = new Set();
+  const newly = [];
+  ACH_DEFS.forEach(def => {
+    let ok = false;
+    try { ok = !!def.test(ctx); } catch (e) {}
+    if (ok) { now.add(def.id); if (!stored.has(def.id)) newly.push(def); }
+  });
+  _achPersist(now);
+  return { newly: newly.map(d => ({ id: d.id, t: d.t, d: d.d, cat: d.cat })) };
+}
+
+// 仅计算「新解锁」不落盘（供 app.onShow 即时提示，避免重复持久化与重复弹窗）
+function peekNewAchievements() {
+  const ctx = achContext();
+  const stored = _achStored();
+  const newly = [];
+  ACH_DEFS.forEach(def => {
+    let ok = false; try { ok = !!def.test(ctx); } catch (e) {}
+    if (ok && !stored.has(def.id)) newly.push(def);
+  });
+  return newly.map(d => ({ id: d.id, t: d.t, d: d.d, cat: d.cat }));
 }
 
 /* ---------- 行程强度总览（plan 页头部：景点数 / 城市数 / 天数 / 强度标签） ---------- */
@@ -2193,13 +2641,35 @@ function dayAddSpot(plan, di, name) {
   //          出现「傍晚返程 → 晚上再去某景点」的荒谬顺序。
   // 时段同理：当天已有返程/转场时，新景点跟随最后一个真实景点的时段（不晚于返程），
   // 避免出现「晚上景点 → 傍晚返程」这种时序倒挂。
-  const hasReturn = (day.items || []).some(it => /返程|前往/.test(String(it && it.name || "")));
-  let newPeriod = _dayPeriodAfter(day);
+  // 2026-11-09：只把「真正的返程/转场」当墙。「出发前往 / 出发去 / 凌晨出发，前往」是当日出发行，
+  // 若误判成返程会把新增景点的时段钉在上一个景点上（表现为"删空后连加都排上午"）。
+  const hasReturn = (day.items || []).some(it => {
+    const n = String((it && it.name) || "");
+    if (/返程/.test(n)) return true;
+    return /前往/.test(n) && !/出发/.test(n);
+  });
+  // 2026-11-09：优先落在「第一个空闲时段」，避免删空某天后连续加景点都堆在同一时段（用户反馈总在同一年时段）
+  const _ords = ["上午", "下午", "晚上"];
+  const _usedP = {};
+  daySpots(day).forEach(x => { const p = String((x && x.period) || ""); if (p) _usedP[p] = 1; });
+  let newPeriod = _ords.find(p => !_usedP[p]) || _dayPeriodAfter(day);
   if (hasReturn) {
-    const lastSpot = daySpots(day);
-    const lp = lastSpot.length ? String(lastSpot[lastSpot.length - 1].period || "") : "";
-    if (lp === "上午" || lp === "下午") newPeriod = lp;
-    else if (newPeriod === "晚上") newPeriod = "下午";
+    // 2026-11-09：用「返程/转场行的时段」作为上限，而不是把时段钉在最后一个景点上。
+    // 钉死会导致删空某天后连加都排同一时段；上限法既能避免「景点 → 返程 → 再景点」，又能依次填上午/下午。
+    const _ordOf = p => (D.PERIOD_ORDER && D.PERIOD_ORDER[p] != null ? D.PERIOD_ORDER[p] : 99);
+    let capOrd = 99;
+    (day.items || []).forEach(it => {
+      const n = String((it && it.name) || "");
+      const isRet = /返程/.test(n) || (/前往/.test(n) && !/出发/.test(n));
+      if (isRet) capOrd = Math.min(capOrd, _ordOf(it.period));
+    });
+    if (capOrd < 99) {
+      const allowed = _ords.filter(p => _ordOf(p) < capOrd);
+      if (allowed.length) {
+        const free = allowed.find(p => !_usedP[p]);
+        newPeriod = free || allowed[allowed.length - 1];
+      }
+    }
   }
   const newItem = {
     name: pick,
@@ -2729,11 +3199,40 @@ function fxConvert(amt, from, to) {
 function footHeatmap() {
   const f = _footRaw();
   const cs = f.cities || {};
+  // 2026-11-09：足迹不只算打卡 —— 把「已结束的历史行程」城市也计入（用户要求，图才有内容）。
+  // 只统计结束日期 < 今天的行程；未来/在途行程不算（避免把计划当足迹）。
+  const citySet = {};
+  Object.keys(cs).forEach(name => { if (name) citySet[name] = (citySet[name] || 0) + 1; });
+  const todayYMD = store.fmtLocalDate(new Date());
+  const seenSig = {};
+  let trips = 0;
+  const addPlan = function (p) {
+    try {
+      if (!p || !p.days || !p.days.length) return;
+      const lastD = p.days[p.days.length - 1] && p.days[p.days.length - 1].date;
+      const end = String(lastD || "").slice(0, 10);
+      if (!end || end >= todayYMD) return; // 只计已结束的行程
+      const firstD = String((p.days[0] && p.days[0].date) || "").slice(0, 10);
+      const sig = String(p.cityName || "") + "|" + p.days.length + "|" + firstD;
+      if (seenSig[sig]) return; // 存档与当前行程可能是同一份，避免 trips 重复
+      seenSig[sig] = 1;
+      const add = function (c) { const s = String(c || "").trim(); if (s) citySet[s] = (citySet[s] || 0) + 1; };
+      if (Array.isArray(p.segments) && p.segments.length) p.segments.forEach(function (s) { add(s && s.cityName); });
+      add(p.cityName);
+      (p.days || []).forEach(function (d) { add(d && d.cityName); });
+      trips++;
+    } catch (e) {}
+  };
+  try { (listSavedPlans() || []).forEach(function (x) { addPlan(x && (x.plan || x)); }); } catch (e) {}
+  try { addPlan(store.get("planV1", null)); } catch (e) {}
+
   const agg = {};
-  Object.keys(cs).forEach(name => {
+  const cityRows = [];
+  Object.keys(citySet).forEach(name => {
     const prov = (D.CITY2PROV && D.CITY2PROV[name]) || (cs[name] && cs[name].province) || "";
     if (!prov) return;
     agg[prov] = (agg[prov] || 0) + 1;
+    cityRows.push({ name: name, prov: prov, n: citySet[name] });
   });
   // v1.8.4 B14：全量 34 省级宫格（没去过的置灰 level0），一眼看清「点亮全国」的进度
   const PROVS = D.PROVINCES || [];
@@ -2742,7 +3241,9 @@ function footHeatmap() {
     return { name: p, n: n, level: n === 0 ? 0 : (n >= 4 ? 4 : (n === 3 ? 3 : (n === 2 ? 2 : 1))) };
   });
   const visited = list.filter(x => x.n > 0).length;
-  return { provs: list, visited: visited, cities: Object.keys(cs).length };
+  // v1.20.7：足迹城市榜（按访问次数排序 top10）—— 比省级更细的个人画像维度，供「本机数据洞察」消费
+  const cityList = cityRows.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, "zh")).slice(0, 10);
+  return { provs: list, visited: visited, cities: Object.keys(citySet).length, trips: trips, cityList: cityList };
 }
 
 /* ---------- 4. 账本月度汇总 ---------- */
@@ -3098,6 +3599,18 @@ function dateHintsForPlan(plan) {
 
 /* ---------- A2 穿衣指数：按出行月份（dressForMonth）或当日实时温度（dressForTemp） ---------- */
 function _seasonKeyOf(month) { return ({ 12: "冬", 1: "冬", 2: "冬", 3: "春", 4: "春", 5: "春", 6: "夏", 7: "夏", 8: "夏", 9: "秋", 10: "秋", 11: "秋" })[month] || "秋"; }
+// v1.20.6：区域/气候感知的季节判定 —— 修「北方 11 月被当成秋季给薄外套」。
+// 11 月：东北/华北/西北 或 cold/plateau 气候，实际已入冬（0℃上下），按「冬」给羽绒服；
+//        华东/华中/华南/西南（温和）仍按「秋」。3 月同理（北方仍冷，按「冬」）。
+// 只用于穿衣/行李这类保暖相关判定，不改动 SEASON_KEYS 全表（其它功能口径不变）。
+function _clothSeason(month, city) {
+  const base = _seasonKeyOf(month);
+  const c = city || {};
+  const cold = c.climate === "cold" || c.climate === "plateau";
+  const north = c.region === "东北" || c.region === "华北" || c.region === "西北";
+  if ((month === 11 || month === 3) && (cold || north)) return "冬";
+  return base;
+}
 // v1.19.12：dressForMonth 纯函数（气候+月份→结果不变），今日页/行前多次调用 → memo
 const _dressMemo = new Map();
 function dressForMonth(city, dateStr) {
@@ -3109,7 +3622,7 @@ function dressForMonth(city, dateStr) {
   const c = city || {};
   const climate = c.climate || "temperate";
   const m = dateStr ? Number(String(dateStr).slice(5, 7)) : (new Date().getMonth() + 1);
-  const sk = _seasonKeyOf(m);
+  const sk = _clothSeason(m, c);
   const cl = (D.CLOTH && D.CLOTH[climate] && D.CLOTH[climate][sk]) || null;
   const wx = (D.SEASON_WX && D.SEASON_WX[climate] && D.SEASON_WX[climate][sk]) || "";
   if (cl) _res = { season: sk + "季出行", weather: wx, lines: [cl.tops, cl.bottoms, cl.shoes].filter(Boolean), acc: cl.accessories || "", tip: cl.tip || "" };
@@ -3588,7 +4101,7 @@ function footCityDetail(city) {
 
 /* ================================================================
  * v1.9.0 · 四十项新功能（数据层）
- * 原则：纯函数、无网络、可单测（tools/check-new.mjs 有对应断言）
+ * 原则：纯函数、无网络、可单测（tools/check/check-new.mjs 有对应断言）
  * ================================================================ */
 // —— 周一闭馆预警：常见「馆」类每周一闭（法定假日除外简化处理） ——
 const CLOSED_MON_WORDS = ["博物馆", "博物院", "美术馆", "科技馆", "纪念馆", "展览馆", "艺术馆"];
@@ -6096,11 +6609,11 @@ module.exports = {
  badgesOf, yearReportNew, chinaLite, transportEstimate,
  provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
- spotTagOf, searchSpots,
- customBudgetObj, budgetTotalObj,
+ spotTagOf, searchSpots, spotCover,
+ customBudgetObj: function (amt, days, peopleN) { return P.customBudgetObj(amt, days, peopleN); }, budgetTotalObj,
  isFrameName, isDetailable, stripHtml, spotDetailText, spotNoteDisp, spotInfo, spotInfoText,
  normalizeDayItems,
- cleanSpotName, navTarget, baikeUrl, baikeKeyword,
+ cleanSpotName, navTarget, baikeKeyword, baikeInfo, baikeAliasKeys,
  todayState, currentPeriodOrder, daySpots, nextActivity,
  LEDGER_KEY, getLedger, addLedger, delLedger, todaySpent, totalSpent, budgetPerDay, exportLedgerCSV,
  PREP_KEY, getPrepChecks, togglePrepCheck, resetPackChecks, resetTripPrep, prepPhaseList, PACK_LIST,
@@ -6113,11 +6626,11 @@ module.exports = {
  RECENT_KEY, getRecent, pushRecent, delRecent,
  PLANS_KEY, listSavedPlans, savePlanSlot, restorePlanSlot, delPlanSlot,
  exportCollabPlan, mergeCollabPlan,
- FOOT_KEY, isVisited, markVisited, footStats, tripFoot, setFootNote, getFootNote,
+ FOOT_KEY, isVisited, markVisited, footStats, footTagStats, tripFoot, setFootNote, getFootNote,
   segCityOfDay, settleUp, swapCandidates, swapSpot, swapCandidatesByTag, swapSpotByTag,
   spendByDay, NOTES_KEY, getNotes, noteOf, addNote, delNote,
   budgetGauge,
-  parseQuickBill, guessCat, budgetSplit, SPLIT_BASE, tripCheck, tripHealth, packSmart, achievements, tripOverview, tripStatsText,
+  parseQuickBill, guessCat, budgetSplit, SPLIT_BASE, tripCheck, tripHealth, packSmart, achievements, syncAchievements, peekNewAchievements, tripOverview, tripStatsText,
   // v1.6.0
   dayAddCandidates, dayAddSpot, dayRemoveSpot,
   dailyBudget, spendForecast, tripReview,

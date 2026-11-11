@@ -3,16 +3,31 @@
 > 括号内为「功能引入版本」，不是当前版本；当前版本见本文件头部，回归步数与单测条数以 `./allcheck.sh` 实跑为准。
 
 
-一个**全程离线**的行程生成小程序：不调用任何大模型 API，所有行程由端上算法在本地算出。
+一个**默认全程离线**的行程生成小程序：行程、坐标、百科、账本全部由端上算法与随包数据算出，
+装机后不需要网络也能用。云端 AI 是**可选增强**：只有主动配置云开发环境后才启用，
+未配置 / 断网 / 超时一律自动回落离线规则库，绝不白屏；AI 只产出建议与参数，
+不编造景点、坐标、票价或医院。
 
 输入「城市 + 天数 + 预算 + 出行偏好」，输出一份可执行的逐日攻略：每天的时段安排、景点间的
 交通动线与步行量、能直接导航的真实坐标、预算拆解、打包清单、逐日天气（联网时才有，
 断网自动降级）。城市数据与坐标随分包下发，**装机后完全不需要网络**。
 
-- 版本：`1.20.3`
+- 版本：`1.20.6`
 - AppID：`wxa365d49bc3366f95`（个人主体）
 - 基础库：`3.8.12`
 - 页面：主包 6 页（含 4 个 tabBar）+ 分包 12 页（功能 8 / 数据 3 / 内容 1）
+
+**近期能力（可选云端 AI，不配置则全部回落离线）**
+- AI 行程助手：一句话解析预算 / 天数 / 兴趣，行程仍由本地引擎真实生成。
+- AI 覆盖速查、行程、今天、美食、工具箱、应急、出行准备、深度玩法、拍照识物与网页版；
+  统一 Agent 支持多轮会话记忆（落盘、可清空）与超时保护。
+- 拍照识物：拍照 → 云存储 → 多模态模型科普，结果标「AI 生成」并提示以专业鉴定为准。
+- 真实景点照片：Wikimedia Commons CC 图源 → 云开发存储 `cloud://` → 分级启用；
+  Commons 不可达时可用 `import-local.mjs` 导入已获授权图片。
+- 旅客服务中心（分包）：天气变化 / 预报更新提醒、时段经验提示、离线能力三态清单、
+  中英双语、多币种参考换算、隐私协议与权限说明。不提供实时订单与支付（个人主体边界）。
+- 云部署与发版：`tools/check/verify-cloud.mjs`、`tools/check/release-readiness.mjs` 自检；
+  `tools/dev/release-and-qr.sh` 登录后一键上传并生成预览码。
 
 ---
 
@@ -58,7 +73,7 @@ cd miniprogram-travel
 **首次修改代码前，请先看这两件事**（都是踩过线上事故的坑，见 `docs/design/ARCHITECTURE.md` 第七节）：
 
 - 改 `utils/data.js` 无效 —— 它是生成产物，真源在 `tools/_src-backup/data.js`
-- 增量改数据只能走 `tools/_apply-safe.mjs`，**禁用 `merge-data-patch.mjs`**
+- 增量改数据只能走 `tools/build/_apply-safe.mjs`，**禁用 `merge-data-patch.mjs`**
 
 ---
 
@@ -101,8 +116,8 @@ miniprogram-travel/
 数据改动**只能**走这条链，顺序不能颠倒：
 
 ```bash
-node tools/_apply-safe.mjs        # 1. 以当前 packed 为底，叠加 tools/v19N-*.js 增量补丁
-node tools/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data/data-packed*.js
+node tools/build/_apply-safe.mjs        # 1. 以当前 packed 为底，叠加 tools/v19N-*.js 增量补丁
+node tools/build/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data/data-packed*.js
 ./allcheck.sh                     # 3. 全量回归
 ```
 
@@ -113,7 +128,7 @@ node tools/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data
 | 打包器内置"脏键清理" | 自动剔除 `SPOT_COORDS` / `CITY2PROV` 里的非直辖市省名键，否则跨省解析会串城 |
 | `require.async()` 实参必须是静态字符串字面量 | 传变量会导致微信解析不到分包 → 数据永不加载 → **首页白屏**（线上事故根因） |
 | 键别名压缩已停用 | 与 `_apply-safe` 的读写不同源，会互相污染导致键损坏 |
-| 坐标与美食去重走 `tools/lib-near-dup.mjs` | 「同一景点」的判定只有一处真源，避免扫描器与写入端规则漂移（曾导致每日任务连续多天空转） |
+| 坐标与美食去重走 `tools/data/lib-near-dup.mjs` | 「同一景点」的判定只有一处真源，避免扫描器与写入端规则漂移（曾导致每日任务连续多天空转） |
 | 美食增量批次 `v202-food-shops2.js` | 店名来自公开资料、坐标由 `geocode/geo` 取得并经质量闸门（地址含预期街道 / 非公交站 / 距城中心 ≤25km） |
 
 ---
@@ -121,21 +136,21 @@ node tools/pack-data.mjs          # 2. 重新打包、分块、写 subdata*/data
 ## 五、回归链
 
 ```bash
-./allcheck.sh        # 59 项：语法/依赖完整性/JSON/数据健康/重名/11 组单测/模糊测试/启动冒烟/泛词扫描/行政区审计/全省生成/压测/WXML 结构/事件配对/包体/发布门禁
+./allcheck.sh        # 61 项：语法/依赖完整性/JSON/数据健康/重名/11 组单测/模糊测试/启动冒烟/泛词扫描/行政区审计/全省生成/压测/WXML 结构/事件配对/包体/发布门禁/合并门禁/审计整改防回潮断言
 ```
 
 专项回归（新增，`v1.19.78` 起常态化，已覆盖 deep / ad / remind / 今日正当时 / 转发卡 / 分享种草 等）：
 
 ```bash
-node tools/_test-recommend.mjs         # 推荐引擎（61 项断言）
-node tools/_fuzz-recommend.mjs         # 推荐引擎模糊测试（171 组标签组合 + 极端输入）
-node tools/_test-emergency.mjs         # 旅途应急（288 条断言：分诊正确性 / 数据完整性 / 禁词红线）
-node tools/_test-foodmap.mjs           # 菜名→店铺匹配（16 条断言）
+node tools/test/_test-recommend.mjs         # 推荐引擎（61 项断言）
+node tools/test/_fuzz-recommend.mjs         # 推荐引擎模糊测试（171 组标签组合 + 极端输入）
+node tools/test/_test-emergency.mjs         # 旅途应急（288 条断言：分诊正确性 / 数据完整性 / 禁词红线）
+node tools/test/_test-foodmap.mjs           # 菜名→店铺匹配（16 条断言）
 node tools/_test-v11987-insp-ui.mjs    # 今日正当时 灵感卡接线
-node tools/_test-v11988-sharecard.mjs  # 转发黑金卡生成
+node tools/test/_test-v11988-sharecard.mjs  # 转发黑金卡生成
 node tools/_test-v11989-sharetitle.mjs # 分享即种草
-node tools/_test-plan-handlers.mjs     # 行程页 14 个交互 handler
-node tools/_test-v11993-bootsmoke.mjs  # 17 页启动冒烟（抓分包 require 层级错误）
+node tools/test/_test-plan-handlers.mjs     # 行程页 14 个交互 handler
+node tools/test/_test-v11993-bootsmoke.mjs  # 17 页启动冒烟（抓分包 require 层级错误）
 ```
 
 写回归脚本的约定：**从源码里 `indexOf` 抽出真实 handler 文本，塞进 vm 沙盒跑**，而不是照着逻辑另抄一份 —— 否则源码改了测试照样是绿的，等于没测。
@@ -145,7 +160,7 @@ node tools/_test-v11993-bootsmoke.mjs  # 17 页启动冒烟（抓分包 require 
 ## 六、发版
 
 ```bash
-cli upload --project "$(pwd)" --version 1.20.3 --desc "说明"
+cli upload --project "$(pwd)" --version 1.20.6 --desc "说明"
 ```
 
 - **不要传 `--info-output`**（本环境会触发 `二维码输出路径无效 code 17`）
@@ -185,3 +200,5 @@ cli upload --project "$(pwd)" --version 1.20.3 --desc "说明"
 | `docs/changelog/v1.19.107-变更清单.md` | 本次使用指南与可观测性更新记录 |
 | `docs/changelog/v1.19.77-审核描述.md` | 提审说明模板 |
 | `docs/changelog/v1.xx-变更清单.md` | 各版本变更记录 |
+| `docs/assessment/功能清单.md` | 功能字典（考核 / 评审附件，按模块梳理已实现功能 + 考后规划） |
+| `docs/assessment/演示讲稿.md` | 演示讲稿（疑问式开场 + 边看边讲 双版本合一，含演示点击顺序与未来规划） |

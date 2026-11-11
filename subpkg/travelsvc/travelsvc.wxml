@@ -1,0 +1,109 @@
+<view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <!-- 头部 -->
+  <view class="svc-head">
+    <view class="sh-row">
+      <view class="sh-main">
+        <view class="sh-t">{{tx.title}}</view>
+        <view class="sh-s dim">{{tx.sub}}</view>
+      </view>
+      <view class="lang-btn" bindtap="toggleLang">{{lang === 'zh' ? 'EN' : '中文'}}</view>
+    </view>
+  </view>
+
+  <!-- ① AI 行程助手 -->
+  <view class="group">
+    <view class="group-title">① {{tx.s1}}</view>
+    <view class="card">
+      <view class="svc-p">{{tx.aiNote}}</view>
+      <view class="svc-cta" bindtap="goIndex">{{tx.goIndex}} →</view>
+    </view>
+  </view>
+
+  <!-- ② 动态提醒 -->
+  <view class="group">
+    <view class="group-title">② {{tx.s2}}</view>
+    <view class="card">
+      <view class="svc-h3">{{tx.wxTitle}}</view>
+      <view class="delta" wx:for="{{wxDeltas}}" wx:key="k">
+        <text class="delta-dot d-{{item.k}}">●</text><text class="delta-t">{{item.t}}</text>
+      </view>
+      <view class="svc-note dim" wx:if="{{wxNote}}">{{wxNote}}</view>
+      <block wx:if="{{fcUpdates.length}}">
+        <view class="delta" wx:for="{{fcUpdates}}" wx:key="t">
+          <text class="delta-dot d-{{item.k}}">●</text><text class="delta-t">{{item.t}}</text>
+        </view>
+      </block>
+      <view class="svc-note dim" wx:if="{{fcNote}}">{{fcNote}}</view>
+
+      <view class="svc-h3 svc-gap">{{tx.crowdTitle}}</view>
+      <view class="crowd" wx:for="{{crowd}}" wx:key="p">
+        <text class="crowd-p">{{item.p}}</text><text class="crowd-t">{{item.t}}</text>
+      </view>
+      <view class="svc-note dim">{{crowdNote}}</view>
+      <view class="svc-na">{{tx.noOrder}}</view>
+    </view>
+  </view>
+
+  <!-- ③ 离线能力 -->
+  <view class="group">
+    <view class="group-title">③ {{tx.s3}} <text class="gt-badge">{{tx.offlineBadge}}</text></view>
+    <view class="card">
+      <view class="stats">
+        <view class="stat"><text class="stat-n">{{statPlan}}</text><text class="stat-l dim">行程天数</text></view>
+        <view class="stat"><text class="stat-n">{{statWish}}</text><text class="stat-l dim">想玩清单</text></view>
+        <view class="stat"><text class="stat-n">¥{{statSpent}}</text><text class="stat-l dim">累计记账</text></view>
+      </view>
+      <view class="off-item" wx:for="{{offline}}" wx:key="t">
+        <text class="off-tag {{item.tagCls}}">{{item.badgeTx}}</text>
+        <view class="off-txt"><view class="off-t">{{item.t}}</view><view class="off-d dim">{{item.d}}</view></view>
+      </view>
+      <view class="svc-cta" bindtap="doBackup">{{tx.backup}}</view>
+      <view class="svc-note dim">{{tx.backupTip}}</view>
+      <view class="svc-h3 svc-gap">{{tx.memTitle}}</view>
+      <view class="svc-note dim">{{tx.memStat}}：{{memScenes}} / {{memTurns}} / {{memChars}}</view>
+      <view class="ai-copy" bindtap="clearAllChats">{{tx.clearChats}}</view>
+    </view>
+  </view>
+
+  <!-- ④ 多语言 / 多币种 -->
+  <view class="group">
+    <view class="group-title">④ {{tx.s4}}</view>
+    <view class="card">
+      <view class="svc-h3">{{tx.currency}}</view>
+      <view class="conv-row">
+        <input class="conv-inp" type="digit" placeholder="{{tx.amount}}" value="{{cny}}" bindinput="onCny"/>
+        <picker class="conv-pick" range="{{curNames}}" value="{{curIdx}}" bindchange="onCurChange">
+          <view class="conv-pick-t">{{curNames[curIdx]}} ▾</view>
+        </picker>
+      </view>
+      <view class="conv-res" wx:if="{{convResult}}">{{tx.result}}：{{convResult}} {{curKey}}</view>
+      <view class="rate-line" bindtap="toggleRate">汇率：1 ¥ = {{curRate}} {{curKey}} · 修改 ▾</view>
+      <view class="ai-copy" bindtap="resetRates">恢复默认汇率</view>
+      <view class="conv-row" wx:if="{{rateOpen}}">
+        <input class="conv-inp" type="digit" value="{{rateEdit}}" bindinput="onRateInput"/>
+        <view class="conv-btn" bindtap="saveRate">保存</view>
+      </view>
+      <view class="svc-note dim">{{tx.rateTip}}</view>
+
+      <view class="svc-h3 svc-gap">{{tx.phrase}}</view>
+      <view class="phrase" wx:for="{{phrases}}" wx:key="zh">
+        <view class="ph-zh">{{item.zh}}</view><view class="ph-en dim">{{item.en}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ⑤ 安全与合规 -->
+  <view class="group">
+    <view class="group-title">⑤ {{tx.s5}}</view>
+    <view class="card">
+      <view class="svc-h3">{{tx.privacy}}</view>
+      <view class="pv" wx:for="{{privacy}}" wx:key="t">
+        <view class="pv-t">{{item.t}}</view><view class="pv-b dim">{{item.b}}</view>
+      </view>
+      <view class="svc-cta" bindtap="goMore">{{tx.clear}} →</view>
+      <view class="svc-note dim">{{tx.clearTip}}</view>
+    </view>
+  </view>
+
+  <view class="svc-foot dim">本页能力全部离线运行；标注「不适用」的项目不做，也不伪造。</view>
+</view>

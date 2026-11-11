@@ -1,4 +1,5 @@
 const { getAppSafe, SafePage } = require("../../utils/app.js");
+const S = require("../../utils/store.js");   // v1.20.4 #81：统一存储出口
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // help：旅途应急（受伤 / 突发不适）—— 分诊常识 + 就近医疗机构
 // 边界：只给「该挂什么科」与「就近有哪些医院」，不给诊疗结论、不评价医院优劣
@@ -7,10 +8,13 @@ const T = require("../../utils/travel.js");
 const E = require("../../utils/emergency.js");
 const CP = require("../../utils/corpus.js");
 const app = getAppSafe();
+const AIAgent = require("../../utils/ai-agent.js");
+const Cloud = require("../../utils/cloud.js");
 
 Page(SafePage({
   data: {
     fz: 1,
+    aiQ: "", aiAnswer: "", aiLoading: false, aiSource: "", aiErr: "",
     td: false,
     text: "",
     quick: E.QUICK,
@@ -59,7 +63,7 @@ Page(SafePage({
       const p = getApp().globalData.plan;
       if (p && p.city) c = p.city;
     } catch (e) {}
-    if (!c) { try { c = wx.getStorageSync("lastCityName") || ""; } catch (e) {} }
+    if (!c) { try { c = S.get("lastCityName", "") || ""; } catch (e) {} }
     const list = E.cities();
     if (!c || list.indexOf(c) < 0) {
       // 默认落到首个「有具名医院」的城市，避免一进来就是降级态
@@ -175,5 +179,39 @@ Page(SafePage({
 
   onShareAppMessage() {
     return { title: "旅途应急：受伤了该挂什么科、附近有哪些医院", path: "/pages/help/help" };
+  },
+  // ── AI 多轮问答（Agent 记忆 + 云端强模型优先 · 离线兜底） ──
+  onAIInput(e) { this.setData({ aiQ: e.detail.value }); },
+  _aiCtx() {
+    let s = "";
+    try { s = Cloud.aiContextOf(app.globalData && app.globalData.plan, "旅途应急页"); } catch (e) {}
+    return s + "\n【场景护栏】本页只做旅途应急科普：不给诊疗结论、不评价医院优劣、不编造医院名称/药品剂量/电话号码；急症一律建议拨打 120 并就近就医。";
+  },
+  aiAsk() {
+    const q = String(this.data.aiQ || "").trim();
+    if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
+    const self = this;
+    if (!Cloud.cloudEnabled()) { self._aiOffline(q); return; }
+    self.setData({ aiLoading: true, aiErr: "" });
+    AIAgent.ask("help", q, self._aiCtx()).then((r) => {
+      if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiSource: r.source || "ai", aiLoading: false });
+      else self._aiOffline(q);
+    }).catch(() => { self._aiOffline(q); });
+  },
+  _aiOffline(q) {
+    let r;
+    try { r = T.askAssistant(q, app.globalData && app.globalData.plan); } catch (e) { r = { text: "" }; }
+    this.setData({ aiAnswer: (r && r.text) || "离线模式：急症请立即拨打 120 并就近就医；本地应急资料见上方。", aiSource: "", aiLoading: false, aiErr: "" });
+  },
+  aiClear() {
+    try { AIAgent.clearHistory("help"); } catch (e) {}
+    this.setData({ aiQ: "", aiAnswer: "", aiSource: "", aiErr: "" });
+  },
+  aiCopy() {
+    const t = String(this.data.aiText || this.data.aiAnswer || this.data.lastResult || this.data.result || "");
+    if (!t) { wx.showToast({ title: "还没有可复制的内容", icon: "none" }); return; }
+    try {
+      wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制", icon: "none" }) });
+    } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
   },
 }));

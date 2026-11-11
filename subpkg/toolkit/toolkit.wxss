@@ -48,3 +48,18 @@
   padding: 2rpx 12rpx; border-radius: 99rpx;
 }
 .g-chev { flex: none; font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #64748b); }
+
+/* ══ AI 自由问答（强模型优先 · 离线兜底） ══ */
+.ai-tk .ai-h { display: flex; align-items: center; gap: 10rpx; margin-bottom: 14rpx; }
+.ai-tk .ai-h .ic { width: 34rpx; height: 34rpx; }
+.ai-tk .ai-t { flex: 1; font-size: calc(28rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); }
+.ai-tk .ai-badge { flex: none; font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 14rpx; }
+.ai-tk .ai-row { display: flex; align-items: center; gap: 12rpx; }
+.ai-tk .ai-inp { flex: 1; background: var(--card, #131d31); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .18);
+  border-radius: 999rpx; padding: 16rpx 26rpx; font-size: calc(26rpx * var(--fs, 1)); color: var(--t1, #eaeff7); }
+.ai-tk .ai-btn { flex: none; font-size: calc(25rpx * var(--fs, 1)); color: #14100a; font-weight: 700;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f); border-radius: 999rpx; padding: 16rpx 30rpx; }
+.ai-tk .ai-btn:active { opacity: .85; }
+.ai-tk .ai-btn.ai-busy { opacity: .55; }
+.ai-tk .ai-tip { margin-top: 12rpx; font-size: calc(21rpx * var(--fs, 1)); line-height: 1.6; }

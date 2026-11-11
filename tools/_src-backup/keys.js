@@ -7,18 +7,24 @@
 //  3) Fail-closed：Key 缺失 / 为占位符 / 格式非法 → 返回 null，对应功能静默降级，绝不抛错阻断主流程。
 //  4) 配额常识：高德配额按账号维度共享，轮换多把 Key 不增容量、反增封禁风险；只用本人账号一把 Key。
 //
-// 如何接入合规 Key（二选一，推荐①）：
-//  ① 直接改下方 DEFAULT（编译期生效，一行搞定，最稳）；
-//  ② 运行时通过 storage 注入：wx.setStorageSync("__app_keys__", { qweatherKey:"...", qweatherHost:"...", amapKey:"..." })
-//     —— 便于不重新发版临时换 Key，但 Key 仍须是本人账号、且勿外泄到明文仓库。
+// 如何接入合规 Key（v1.20.4 合规整改 #1/#19）：
+//   ★ 仓库不再存放任何明文 Key —— DEFAULT 全部为空串（审计 #1/#19「密钥明文进公开仓库」已修复）。
+//   ★ 唯一接入路径：运行时通过 storage 注入（fail-closed，缺失即静默降级）：
+//       wx.setStorageSync("__app_keys__", { qweatherKey:"...", qweatherHost:"...", amapKey:"..." })
+//     —— 注入的 Key 仍须是注册在本人 / 本小程序主体账号下的 Key（严禁借用他人 Key，见上方铁律②）。
+//   ★ 若要重新编译进包（不推荐，会重新引入明文），把下方对应字段填上本人账号 Key 即可。
 //
-// 现状（v1.19.184）：和风 Key 为 v1.19.157 接入的免费 Key，须确认归属本人和风账号；
-// 高德 Key 当前为空 —— 小程序地图用的是微信内置腾讯地图（<map> 组件无需 Key），
-// 仅当未来调用高德地理 / 地图 JS API 时才需填本人账号申请的 Key。
+// 现状（v1.20.4）：和风 Key 已移出仓库，改为运行时注入。高德 Key 当前未使用（<map> 组件无需 Key）。
+// 未注入 Key 时天气功能 fail-closed 静默降级（qweatherConfigured() 返回 false，绝不抛错阻断主流程）。
 const DEFAULT = {
-  qweatherKey: "d84611f29a4d48d48a36227b613de255", // 和风免费 Key（v1.19.157 接入；须确认在本人和风账号下）
-  qweatherHost: "https://j864228fx2.re.qweatherapi.com", // 和风专属域名（devapi.qweather.com 对本 Key 返回 Invalid Host）
-  amapKey: "" // 高德 Key：当前未使用；未来若用高德须填本人账号申请的 Key
+  qweatherKey: "", // v1.20.4 #1/#19：明文移出仓库，改运行时注入（setKeys）
+  qweatherHost: "", // 同上，须与 qweatherKey 配对注入
+  amapKey: "", // 高德 Key：当前未使用；未来若用高德须填本人账号申请的 Key
+  // 云环境 ID（CloudBase）：个人主体也能开云开发（约 ¥19.9/月）。
+  // 未填 → 云能力整体 fail-closed 降级（本地优先，绝不抛错，见 utils/cloud.js）。
+  // 接入：运行时 wx.setStorageSync("__app_keys__", { cloudEnv: "你的环境ID" })，
+  //   或直接在此填入（环境 ID 是标识符非密钥，风险低；但公开仓库仍建议用运行时注入避免泄露）。
+  cloudEnv: ""
 };
 
 // 占位符特征：未真正配置的 Key
@@ -50,6 +56,9 @@ function amapKey() { return _resolve("amapKey"); }
 // 是否已有可用的和风 Key（fail-closed 判据，供 weather 跳过 / 降级）
 function qweatherConfigured() { return !!qweatherKey(); }
 
+// 云环境 ID（fail-closed：空白 / 占位符 → null → 云能力整体关闭，绝不抛错）
+function cloudEnv() { return _resolve("cloudEnv"); }
+
 // 运行时注入（见上方②）。仅落内存 + storage，不写文件、不回传任何服务器。
 function setKeys(patch) {
   try {
@@ -63,4 +72,4 @@ function setKeys(patch) {
   return false;
 }
 
-module.exports = { qweatherKey, qweatherHost, amapKey, qweatherConfigured, setKeys, DEFAULT };
+module.exports = { qweatherKey, qweatherHost, amapKey, qweatherConfigured, cloudEnv, setKeys, DEFAULT };

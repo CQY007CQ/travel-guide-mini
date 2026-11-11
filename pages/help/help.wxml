@@ -92,13 +92,15 @@
     <view class="er-h">离线数据来源 · 规模</view>
     <view class="cp-head">{{corpus.headline}}</view>
     <view class="cp-grid">
-      <view class="cp-n"><text class="cp-v">{{corpus.cities}}</text><text class="cp-l">城市</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.cities}}</text><text class="cp-l">真实城市</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.cityEntries}}</text><text class="cp-l">城市池条目</text></view>
       <view class="cp-n"><text class="cp-v">{{corpus.spots}}</text><text class="cp-l">景点</text></view>
-      <view class="cp-n"><text class="cp-v">{{corpus.foods}}</text><text class="cp-l">美食城</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.foods}}</text><text class="cp-l">有美食店城</text></view>
       <view class="cp-n"><text class="cp-v gold">{{corpus.hospitals}}</text><text class="cp-l">具名医院</text></view>
       <view class="cp-n"><text class="cp-v">{{corpus.approxCities}}</text><text class="cp-l">搜索降级城</text></view>
       <view class="cp-n"><text class="cp-v">{{corpus.provinces}}</text><text class="cp-l">省级区</text></view>
     </view>
+    <view class="cp-tip dim">城市池 {{corpus.cityEntries}} 条 = {{corpus.cities}} 座不同城市 + {{corpus.aliasEntries}} 条全称别名（如「阿坝 / 阿坝藏族羌族自治州」指向同一地）。其中 {{corpus.foods}} 城有真实美食店、{{corpus.spotCities}} 城有景点坐标；未收录具体店铺或坐标的城市走城心降级，不编造店名与坐标。</view>
     <view class="cp-sec" wx:if="{{corpus.climate.length}}">
       <view class="cp-h">气候带分布</view>
       <view class="cp-row" wx:for="{{corpus.climate}}" wx:key="k">
@@ -112,4 +114,22 @@
     <view class="cp-tip dim">全部为随包下发的离线结构化数据，无需联网即可规划</view>
   </view>
 
+  <!-- AI 多轮问答 -->
+  <view class="card ai-card">
+    <view class="ai-h">
+      <image class="ic" src="/images/icons/sparkle.png"/>
+      <text class="ai-t">AI 应急问答</text>
+      <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+      <view class="ai-clear" bindtap="aiClear">清空</view>
+    </view>
+    <view class="ai-tip dim">带上当前行程上下文的多轮问答；不给诊疗结论，急症请拨 120。无网络时自动回落本地资料。</view>
+    <view class="ai-row">
+      <input class="ai-inp" placeholder="如：爬山崴脚了该先怎么处理？" value="{{aiQ}}"
+             bindinput="onAIInput" bindconfirm="aiAsk" confirm-type="send"/>
+      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiAsk">{{aiLoading ? '思考中…' : '问'}}</view>
+    </view>
+    <view class="ai-ans" wx:if="{{aiAnswer}}">{{aiAnswer}}</view>
+    <view class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
+    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
+  </view>
 </view>

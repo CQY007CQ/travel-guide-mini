@@ -16,6 +16,7 @@
           <text class="sop-tx">{{isFav ? '已收藏' : '收藏'}}</text>
         </view>
         <view class="sop" catchtap="onCopy"><image class="sop-ic" src="/images/icons/copy.png"/><text class="sop-tx">复制</text></view>
+        <view class="sop" catchtap="openAI"><image class="sop-ic" src="/images/icons/sparkle.png"/><text class="sop-tx">AI 答疑</text></view>
         <view class="sop sop-end" catchtap="onEnd"><image class="sop-ic" src="/images/icons/close.png"/><text class="sop-tx">结束</text></view>
       </view>
     </view>
@@ -23,6 +24,13 @@
     <!-- 元信息 chips（对齐网页 banner：日期段/倒计时/季节/最佳月份/出行模式/预算） -->
     <view class="chips" wx:if="{{metaChips.length}}">
       <text class="chip" wx:for="{{metaChips}}" wx:key="*this">{{item}}</text>
+    </view>
+
+    <!-- 2026-11-09（#482）：示例行程标识 —— 明确这不是你的行程，一键去生成自己的 -->
+    <view class="sample-bar" wx:if="{{sampleTip}}" bindtap="onLeaveSample">
+      <text class="sb-ic">✦</text>
+      <text class="sb-tx">这是示例行程（成都 5 天），点这里生成你自己的</text>
+      <text class="sb-ar">›</text>
     </view>
 
     <!-- v1.8.4 A1：人流提示（公假 / 暑假 / 周末） -->
@@ -196,10 +204,11 @@
   <view class="wx-off" wx:if="{{wxOff}}">
     <image class="ic ic-sm" src="/images/icons/cloud.png"/>
     <view class="wx-off-t">
-      <view class="wx-off-h">{{wxErrType === 'no_key' ? '天气服务未启用' : (wxErrType === 'window' ? '暂无可用预报' : '天气暂不可用')}}</view>
+      <view class="wx-off-h">{{wxErrType === 'no_key' ? '天气服务未启用' : (wxErrType === 'window' ? '出发日超出 7 天预报' : '天气暂不可用')}}</view>
       <view class="wx-off-d dim">{{wxErrMsg || '离线或超预报期 · 其他功能不受影响'}}</view>
     </view>
     <view class="wx-off-acts">
+      <view class="wx-retry" wx:if="{{wxErrType === 'no_key'}}" catchtap="goKeyConfig">填入 Key</view>
       <view class="wx-retry" wx:if="{{wxErrRetry}}" catchtap="onWxRetry">重试</view>
       <view class="wx-close" catchtap="closeWxOff">✕</view>
     </view>
@@ -340,6 +349,17 @@
               wx:for="{{day.items}}" wx:key="ix" wx:for-index="i" wx:for-item="it"
               style="{{dragOn && dragDi === di ? dragSh[i] : ''}}"
               data-di="{{di}}" data-ix="{{it.ix}}" bindtap="onToggle">
+          <view class="tl-thumb-wrap">
+            <image wx:if="{{it.img}}" class="tl-thumb" src="{{it.img}}" mode="aspectFill" lazy-load
+                   data-di="{{di}}" data-i="{{i}}" binderror="onImgError"/>
+            <view wx:if="{{it.img && it.photoCredit}}" class="tl-credit" catchtap="onPhotoCredit"
+                  data-credit="{{it.photoCredit}}" data-license="{{it.photoLicense}}">©</view>
+            <view wx:else class="tl-thumb gen" style="background:{{it.thumbBg}}">
+              <text class="tl-thumb-emoji">{{it.thumbEmoji}}</text>
+              <view class="tl-thumb-name">{{it.coverLabel}}</view>
+              <view class="tl-thumb-badge" wx:if="{{it.coverBadge}}">{{it.coverBadge}}</view>
+            </view>
+          </view>
           <view class="tl-main">
             <view class="tl-top">
               <text class="tl-period {{it.f ? 'p-f' : ''}}">{{it.period}}</text>
@@ -350,7 +370,8 @@
             <view wx:if="{{it.fnote && !it.f}}" class="tl-fnote">我评：{{it.fnote}}</view>
             <view wx:if="{{open === i + di * 100 && detailText}}" class="spot-detail">
               <view class="detail-acts">
-                <text wx:if="{{!it.f}}" class="d-btn d-btn-main" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onSwap">换一个</text>
+                <text wx:if="{{!it.f}}" class="d-btn d-btn-main" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onSwap">换一个 ▾</text>
+                <text wx:if="{{!it.f}}" class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onMoveTo">移到其他天</text>
                 <text wx:if="{{!it.f}}" class="d-btn d-btn-del" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onDelSpot">删掉</text>
                 <text class="d-btn" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onBaike">百科</text>
                 <text class="d-btn {{it.wished ? 'd-wish-on' : ''}}" data-di="{{di}}" data-ix="{{it.ix}}" catchtap="onWish">{{it.wished ? '已在想玩' : '加想玩'}}</text>
@@ -443,4 +464,57 @@
 
   <!-- v1.19.76：分享长图离屏画布（不参与布局，仅用于生成分享图片） -->
   <canvas type="2d" id="shareCanvas" class="share-canvas"></canvas>
+
+  <!-- 2026-11-09：换景点选择面板 —— 本城候选 / 我的想玩收藏 / 随机 -->
+  <view class="pmask" wx:if="{{swapOpen}}" catchtap="closeSwap"></view>
+  <view class="psheet" wx:if="{{swapOpen}}">
+    <view class="ps-h">
+      <text class="ps-t">换掉「{{swapCur}}」</text>
+      <text class="ps-x" catchtap="closeSwap">✕</text>
+    </view>
+    <view class="ps-ops">
+      <view class="ps-btn" catchtap="onSwapRandom">随机换一个</view>
+    </view>
+    <block wx:if="{{swapWish.length}}">
+      <view class="ps-sec">我的想玩 / 收藏</view>
+      <scroll-view scroll-y class="ps-list">
+        <view class="ps-li ps-li-wish" wx:for="{{swapWish}}" wx:key="*this" data-name="{{item}}" catchtap="onSwapPick">{{item}}</view>
+      </scroll-view>
+    </block>
+    <block wx:if="{{swapList.length}}">
+      <view class="ps-sec">本城可换（{{swapList.length}}）</view>
+      <scroll-view scroll-y class="ps-list">
+        <view class="ps-li" wx:for="{{swapList}}" wx:key="*this" data-name="{{item}}" catchtap="onSwapPick">{{item}}</view>
+      </scroll-view>
+    </block>
+    <view class="ps-empty" wx:if="{{!swapWish.length && !swapList.length}}">本城景点都排进来啦：可用下方「加个景点」，或先从「按标签找景点」加入想玩再回来换</view>
+  </view>
+
+  <!-- 2026-11-09：把这个点移到别的天 -->
+  <view class="pmask" wx:if="{{moveOpen}}" catchtap="closeMove"></view>
+  <view class="psheet" wx:if="{{moveOpen}}">
+    <view class="ps-h"><text class="ps-t">把这个点移到…</text><text class="ps-x" catchtap="closeMove">✕</text></view>
+    <scroll-view scroll-y class="ps-list">
+      <view class="ps-li" wx:for="{{moveDays}}" wx:key="i" data-i="{{item.i}}" catchtap="onMovePick">{{item.label}}</view>
+    </scroll-view>
+  </view>
+
+  <!-- 行程页 AI 答疑（云端强模型优先 · 离线兜底） -->
+  <view class="pmask" wx:if="{{aiOpen}}" catchtap="closeAI"></view>
+  <view class="psheet aischeet" wx:if="{{aiOpen}}">
+    <view class="ps-h"><text class="ps-t">AI 答疑 · 这趟行程</text><text class="ps-x" catchtap="closeAI">✕</text></view>
+    <view class="ai-tip">基于当前行程的真实信息作答（城市 / 天数 / 景点 / 预算），不编造坐标与票价；无网络时自动回落本地规则库。</view>
+    <view class="ai-inp-row">
+      <input class="ai-inp" placeholder="问点什么，如：第三天怎么安排更省力？" value="{{aiInput}}" bindinput="onAIInput" bindconfirm="sendAI" confirm-type="send"/>
+      <view class="ai-send" bindtap="sendAI">问</view>
+    </view>
+    <view class="ai-loading" wx:if="{{aiLoading}}">AI 思考中…</view>
+    <view class="ai-ans" wx:if="{{aiAnswer}}">
+      <view class="ai-badge" wx:if="{{aiSource}}">AI 生成</view>
+      <text class="ai-ans-tx">{{aiAnswer}}</text>
+      <view class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
+      <view class="ai-copy" bindtap="aiClearChat">清空会话</view>
+    </view>
+    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
+  </view>
 </view>

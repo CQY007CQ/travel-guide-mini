@@ -18,4 +18,3 @@
 .qinput { flex: 1; min-width: 0; height: 64rpx; padding: 0 16rpx; font-size: calc(26rpx * var(--fs, 1)); background: var(--color-background-primary, #f7f7f7); border: 1rpx solid var(--color-border-tertiary, rgba(0,0,0,0.12)); border-radius: 12rpx; }
 .mini-btn { margin: 0; flex-shrink: 0; }
 .ans { margin-top: 12rpx; padding: 14rpx 16rpx; font-size: calc(26rpx * var(--fs, 1)); line-height: 1.5; color: var(--color-text-primary, #333); background: var(--color-background-info, rgba(24,95,165,0.08)); border-radius: 12rpx; }
-.btn-row { display: flex; gap: 12rpx; margin-top: 12rpx; }

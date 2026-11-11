@@ -50,8 +50,11 @@ step "JS 语法检查" bash -c '
   err=0
   while IFS= read -r f; do
     if ! '"$NODE"' --check "$f" 2>/dev/null; then echo "语法错误: $f"; err=1; fi
-  done < <(find app.js utils pages -name "*.js" -o -name "*.mjs" | sort)
-  for f in tools/*.mjs tools/*.js tools/*.cjs; do
+  # 补齐 subpkg/ 与网页版手写源码。原先只扫 app.js/utils/pages，
+  # web/app.js 与 web/lib/runtime.js 有语法错误时回归链仍全绿，直到打开网页白屏才发现。
+  # 只显式加这两个手写文件，不要把 lib/modules.js|data.js|tpl.js（MB 级生成产物）纳入。
+  done < <(find app.js utils pages subpkg web/app.js web/lib/runtime.js -name "*.js" -o -name "*.mjs" | sort)
+  find tools/check tools/test tools/build tools/data tools/audit tools/dev -type f \( -name "*.mjs" -o -name "*.js" -o -name "*.cjs" \) 2>/dev/null | sort | while IFS= read -r f; do
     if ! '"$NODE"' --check "$f" 2>/dev/null; then echo "语法错误: $f"; err=1; fi
   done
   [ $err -eq 0 ] && echo "全部 JS 语法通过"
@@ -59,11 +62,12 @@ step "JS 语法检查" bash -c '
 '
 
 # 依赖完整性：任何相对 require/import 都必须可解析（防"移文件移断管线"，见 check-v112 事故）
-step "依赖完整性 (相对引用可解析)" "$NODE" tools/check-deps.mjs
-# 凭据泄露：随包目录不得出现明文 key / 高德接口 / 未登记外链（自检发现该检查只存在于手工脚本，故固化）
-step "凭据泄露 (随包无明文 key)" "$NODE" tools/check-secrets.mjs
+step "依赖完整性 (相对引用可解析)" "$NODE" tools/check/check-deps.mjs
+# 凭据泄露：全仓（含 docs/ 与 tools/）不得出现明文 key；随包额外查高德接口 / 未登记外链。
+# 2026-11-09 修正：旧版只扫随包目录，公开仓库 docs/ 里的明文 key 因此整轮漏检。
+step "凭据泄露 (全仓无明文 key)" "$NODE" tools/check/check-secrets.mjs
 # 图片引用：缺失不会编译报错，只会在特定主题下显示破图（深色 tabBar 图标曾整组缺失）
-step "图片引用 (无缺失图标)" "$NODE" tools/check-assets.mjs
+step "图片引用 (无缺失图标)" "$NODE" tools/check/check-assets.mjs
 step "JSON 合法性" bash -c '
   err=0
   for f in app.json project.config.json sitemap.json pages/*/*.json; do
@@ -125,56 +129,58 @@ step "重名定义检查 (防静默覆盖)" bash -c '
   exit $?
 '
 
-step "单测 selfcheck" "$NODE" tools/selfcheck.mjs
-step "单测 check-new (v1.3+ 新 API)" "$NODE" tools/check-new.mjs
-step "单测 check-more (v1.10 扩容+36 新函数)" "$NODE" tools/check-more.mjs
-step "单测 check-v111 (20 新功能+数据护栏)" "$NODE" tools/check-v111.mjs
-step "单测 check-v112 (100 城扩容+100 新功能)" "$NODE" tools/check-v112.mjs
-step "单测 check-boundary (跨年/同名)" "$NODE" tools/check-boundary.mjs
-step "单测 daily-insp (函数保留·UI 已下线)" "$NODE" tools/_test-daily-insp.mjs
-step "单测 recommend (个性推荐引擎)" "$NODE" tools/_test-recommend.mjs
-# 模糊测试：171 组标签组合 + 极端输入 + 全量城市不变量。曾借此抓到 topN=0 未被夹取的 bug。
-step "模糊测试 recommend (标签组合/极端输入)" "$NODE" tools/_fuzz-recommend.mjs
+step "单测 selfcheck" "$NODE" tools/test/selfcheck.mjs
+step "单测 check-new (v1.3+ 新 API)" "$NODE" tools/check/check-new.mjs
+step "单测 check-more (v1.10 扩容+36 新函数)" "$NODE" tools/check/check-more.mjs
+step "单测 check-v111 (20 新功能+数据护栏)" "$NODE" tools/check/check-v111.mjs
+step "单测 check-v112 (100 城扩容+100 新功能)" "$NODE" tools/check/check-v112.mjs
+step "单测 check-boundary (跨年/同名)" "$NODE" tools/check/check-boundary.mjs
+step "单测 daily-insp (函数保留·UI 已下线)" "$NODE" tools/test/_test-daily-insp.mjs
+step "单测 recommend (个性推荐引擎)" "$NODE" tools/test/_test-recommend.mjs
+# 模糊测试：171 组标签组合 + 极端输入 + 全量城市不变量 (#382 推荐引擎，曾借此抓到 topN=0 未夹取)。
+# 行程生成模糊核心引擎 (#491)：buildPlan/buildProvPlan 海量组合捕获异常 / NaN / 越界 / 空天。
+# 两者同属「模糊测试」类，串在同一 step 跑，不新增 step（保持 61 步口径与考核材料不变）。
+step "模糊测试 (recommend 引擎 + 行程生成 #491)" bash -c '"$1" tools/test/_fuzz-recommend.mjs && "$1" tools/test/_test-fuzz-plan.mjs' _ "$NODE"
 # 旅途应急：分诊正确性 + 医院数据完整性 + 「不得出现医疗断言」红线
-step "单测 emergency (旅途应急分诊)" "$NODE" tools/_test-emergency.mjs
+step "单测 emergency (旅途应急分诊)" "$NODE" tools/test/_test-emergency.mjs
 # 菜名→店铺匹配：命中正确性 + 无命中不瞎给 + 品牌联想不被词根覆盖
-step "单测 foodmap (菜名→店铺)" "$NODE" tools/_test-foodmap.mjs
+step "单测 foodmap (菜名→店铺)" "$NODE" tools/test/_test-foodmap.mjs
 # 美食菜单/口碑试点（10 热门城市）：每城每家 menu(1-3)/rep/note 完整，经分块真实加载校验
-step "单测 food-menu (菜单·口碑·点评 试点)" "$NODE" tools/_test-food-menu.mjs
+step "单测 food-menu (菜单·口碑·点评 试点)" "$NODE" tools/test/_test-food-menu.mjs
 # 酒店住宿多片区推荐 + 平台门户（v1.19.145）：精选城/退化/地图多点/门户搜索词
-step "单测 hotel (多片区·门户 v1.19.145)" "$NODE" tools/_test-hotel.mjs
+step "单测 hotel (多片区·门户 v1.19.145)" "$NODE" tools/test/_test-hotel.mjs
 # plan 页 summary 卡精简（v1.19.146）：stats 去重 + 倒计时 label/tip
-step "单测 plan146 (summary 精简)" "$NODE" tools/_test-plan146.mjs
+step "单测 plan146 (summary 精简)" "$NODE" tools/test/_test-plan146.mjs
 # 天气多城按各天所在城市预报（v1.19.151）：mergeWeatherByDay 对齐 + rainyDaySpots 形态/室内命中
-step "单测 weather151 (多城天气对齐)" "$NODE" tools/_test-weather151.mjs
-step "单测 spotsearch (按标签找景点·倒排检索 v1.19.163)" "$NODE" tools/_test-spotsearch.mjs
+step "单测 weather151 (多城天气对齐)" "$NODE" tools/test/_test-weather151.mjs
+step "单测 spotsearch (按标签找景点·倒排检索 v1.19.163)" "$NODE" tools/test/_test-spotsearch.mjs
 # 「今日正当时」已于 2026-10-29 按用户要求下线，原接线测试改为「下线守卫」（防被无意加回）
-step "单测 insp 下线守卫" "$NODE" tools/_test-insp-removed.mjs
-step "单测 气候补充去重" "$NODE" tools/_test-climate-dedupe.mjs
-step "单测 景点去重 (v1.19.167)" "$NODE" tools/_test-dedup.mjs
-step "单测 模糊POI坐标补录 (v1.19.172)" "$NODE" tools/_test-fuzzy-poi.mjs
-step "单测 坐标完整性自检 (v1.19.173)" "$NODE" tools/_test-coord-integrity.mjs
-step "单测 稀疏县景点补全 (v1.19.174)" "$NODE" tools/_test-spot-enrich.mjs
-step "单测 动线优化 (v1.19.176 最近邻贪心重排)" "$NODE" tools/_test-route-opt.mjs
-step "单测 攻略自评分 (v1.19.177 评分+建议)" "$NODE" tools/_test-score.mjs
-step "单测 跨会话偏好学习 (v1.19.178 记/取/回填)" "$NODE" tools/_test-prefs.mjs
-step "单测 字号无障碍 (v1.19.181 跟随系统字号)" "$NODE" tools/_test-a11y.mjs
+step "单测 insp 下线守卫" "$NODE" tools/test/_test-insp-removed.mjs
+step "单测 气候补充去重" "$NODE" tools/test/_test-climate-dedupe.mjs
+step "单测 景点去重 (v1.19.167)" "$NODE" tools/test/_test-dedup.mjs
+step "单测 模糊POI坐标补录 (v1.19.172)" "$NODE" tools/test/_test-fuzzy-poi.mjs
+step "单测 坐标完整性自检 (v1.19.173)" "$NODE" tools/test/_test-coord-integrity.mjs
+step "单测 稀疏县景点补全 (v1.19.174)" "$NODE" tools/test/_test-spot-enrich.mjs
+step "单测 动线优化 (v1.19.176 最近邻贪心重排)" "$NODE" tools/test/_test-route-opt.mjs
+step "单测 攻略自评分 (v1.19.177 评分+建议)" "$NODE" tools/test/_test-score.mjs
+step "单测 跨会话偏好学习 (v1.19.178 记/取/回填)" "$NODE" tools/test/_test-prefs.mjs
+step "单测 字号无障碍 (v1.19.181 跟随系统字号)" "$NODE" tools/test/_test-a11y.mjs
 # v1.19.182：全量城市空天 / 稀疏扫描门禁（守护 cityDayCap 上限，防稀疏县末天空天回归）
-step "单测 全量空天扫描 (v1.19.182)" "$NODE" tools/_scan-sparse.mjs
+step "单测 全量空天扫描 (v1.19.182)" "$NODE" tools/test/_scan-sparse.mjs
 # v1.19.182：批量生成冒烟门禁（多城 × 多天数 × 多节奏，统计异常率 / 空天率 / 评分基线）
-step "单测 批量生成冒烟 (v1.19.182)" "$NODE" tools/_smoke-batch.mjs
+step "单测 批量生成冒烟 (v1.19.182)" "$NODE" tools/test/_smoke-batch.mjs
 # v1.19.182：分享深链出发日边界（过期顺延今天，保证 auto=1 复现有效行程）
-step "单测 分享过期日期边界 (v1.19.182)" "$NODE" tools/_test-clamp-depart.mjs
+step "单测 分享过期日期边界 (v1.19.182)" "$NODE" tools/test/_test-clamp-depart.mjs
 # v1.19.182：美食富信息扩城（加载期增量合并，字段完整 / 同城幂等）
-step "单测 美食富信息扩城 (v1.19.182)" "$NODE" tools/_test-food-enrich.mjs
-step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/_test-v11988-sharecard.mjs
-step "单测 plan-handlers (行程页交互回归 v1.19.109)" "$NODE" tools/_test-plan-handlers.mjs
+step "单测 美食富信息扩城 (v1.19.182)" "$NODE" tools/test/_test-food-enrich.mjs
+step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/test/_test-v11988-sharecard.mjs
+step "单测 plan-handlers (行程页交互回归 v1.19.109)" "$NODE" tools/test/_test-plan-handlers.mjs
 # v1.19.93：全页面启动冒烟——vm 模拟 17 个注册页「被打开」（Page 构造+onLoad+onShow）。
 # 抓上传工具链与静态扫描都查不到的运行时级问题（曾抓到 7 个分包页 require 路径层级错误→白屏）。
-step "全页面启动冒烟 (v1.19.93)" "$NODE" tools/_test-v11993-bootsmoke.mjs
-step "文案质量 泛化/雷同扫描 (v1.15)" "$NODE" tools/scan-generic.mjs
+step "全页面启动冒烟 (v1.19.93)" "$NODE" tools/test/_test-v11993-bootsmoke.mjs
+step "文案质量 泛化/雷同扫描 (v1.15)" "$NODE" tools/test/scan-generic.mjs
 step "行政区覆盖审计 (v1.15)" bash -c '
-  out=$('"$NODE"' tools/cities-census.mjs 2>&1)
+  out=$('"$NODE"' tools/dev/cities-census.mjs 2>&1)
   rc=$?
   echo "$out" | head -5
   # 主缺口必须为 0（缺失城市会导致全省游/生成链缺数据）
@@ -202,19 +208,19 @@ step "全省生成回归 (v1.15)" bash -c '
   echo "$out" | tail -2
   exit $rc
 '
-step "高强度压测 (v1.17.5)" "$NODE" tools/stress-test.mjs
-step "WXML 结构校验" "$NODE" tools/check-wxml.mjs
-step "页面结构 + 事件配对" "$NODE" tools/check-handlers.mjs
+step "高强度压测 (v1.17.5)" "$NODE" tools/test/stress-test.mjs
+step "WXML 结构校验" "$NODE" tools/check/check-wxml.mjs
+step "页面结构 + 事件配对" "$NODE" tools/check/check-handlers.mjs
 # v1.19.147：导航死链 + 跳转合规审计（按键能否正常跳转：死链 / switchTab 误用 / 动态 url 列出）
-step "导航死链审计 (按键跳转)" "$NODE" tools/_nav-audit.mjs
+step "导航死链审计 (按键跳转)" "$NODE" tools/audit/_nav-audit.mjs
 
 # 【v1.19.78 修正】微信约束是「每包独立 2MB 压缩后红线」，旧版把全项目（含 1.7MB 数据分包）
-# 累加成一个数去比对 2MB → 必然误报。改为按 app.json 主包+各分包逐包核算（tools/check-pkgsize.mjs）。
-step "分包体积体检 (每包 2MB 红线)" "$NODE" tools/check-pkgsize.mjs
+# 累加成一个数去比对 2MB → 必然误报。改为按 app.json 主包+各分包逐包核算（tools/check/check-pkgsize.mjs）。
+step "分包体积体检 (每包 2MB 红线)" "$NODE" tools/check/check-pkgsize.mjs
 
 # 【v1.19.196 新增】preloadRule 任一页面预下载分包「源码体积」合计不得超 2MB，否则上传报
 # 系统错误 80058（本地编译/真机调试都发现不了，只在上传时由微信平台校验），故固化为 fail-fast。
-step "预下载体积门禁 (preloadRule ≤ 2MB)" "$NODE" tools/check-preload.mjs
+step "预下载体积门禁 (preloadRule ≤ 2MB)" "$NODE" tools/check/check-preload.mjs
 
 # 【v1.19.182 体积预算门禁】把「数据分包被静默撑爆 / 主包逻辑膨胀」从「上传后盯尺寸表」升级为 fail-fast。
 # data-packed.js 硬红线：v1.19.182 初设为 1800KB（留 180KB 余量给 1980KB 自动拆分阈值）；
@@ -236,30 +242,55 @@ step "体积预算门禁 (data≤1950KB / utils≤1000KB)" bash -c '
 '
 
 # 【P0-2 发布安全门禁】把「数据分包被 ignoreUploadUnusedFiles 静默剥离成 10KB 残包」这条
-# 最危险的静默灾难型 footgun 从「上传后人工盯尺寸表」升级为 fail-fast。详见 tools/verify-release.mjs。
-step "发布安全门禁 (数据必随包发布)" "$NODE" tools/verify-release.mjs
+# 最危险的静默灾难型 footgun 从「上传后人工盯尺寸表」升级为 fail-fast。详见 tools/build/verify-release.mjs。
+step "发布安全门禁 (数据必随包发布)" "$NODE" tools/build/verify-release.mjs
 
 # 【v1.19.197 新增】演示质量 / Console 告警防回潮：废弃 API 误调用、跨分包同步 require、
 # setData undefined、recents 重复 wx:key、分包专用 JS 滞留主包、三处版本号不一致。
 # 这些本地编译 + 原有门禁都发现不了，只在开发者工具 Console / 代码质量面板暴露。
-step "演示质量门禁 (Console 告警防回潮)" "$NODE" tools/check-demo-quality.mjs
+step "演示质量门禁 (Console 告警防回潮)" "$NODE" tools/check/check-demo-quality.mjs
 # v1.19.198：「换一批」曾因算法确定性而点了没反应，固化为运行时回归
-step "单测 换景点分批 (换一批真的会变)" "$NODE" tools/_test-swap-batch.mjs
+step "单测 换景点分批 (换一批真的会变)" "$NODE" tools/test/_test-swap-batch.mjs
 # v1.19.199：「生成分享图」真机稳定失败，固化为运行时回归
-step "单测 分享图导出 (生成失败防回潮)" "$NODE" tools/_test-share-img.mjs
+step "单测 分享图导出 (生成失败防回潮)" "$NODE" tools/test/_test-share-img.mjs
 # v1.19.200：美食页对象方法裸调用导致整页假空态，固化为运行时 + 全仓静态回归
-step "单测 美食页渲染 (假空态防回潮)" "$NODE" tools/_test-food-render.mjs
+step "单测 美食页渲染 (假空态防回潮)" "$NODE" tools/test/_test-food-render.mjs
 # v1.19.201：推荐引擎月份漂移 + 考核材料数字口径漂移，固化为「动态真值 vs 材料文本」门禁
-step "材料口径一致性 (版本/回归项/单测数/榜单)" "$NODE" tools/check-doc-consistency.mjs
+step "材料口径一致性 (版本/回归项/单测数/榜单)" "$NODE" tools/check/check-doc-consistency.mjs
 # v1.19.203：门票清单长票价把景点名挤成逐字竖排，固化为「全量数据拆分 + CSS 限宽」回归
-step "单测 门票清单布局 (逐字竖排防回潮)" "$NODE" tools/_test-ticket-layout.mjs
+step "单测 门票清单布局 (逐字竖排防回潮)" "$NODE" tools/test/_test-ticket-layout.mjs
 # v1.19.204：帮助页离线规模统计把医院读成 0（数据真源在 emergency-data 而非 data.js），
 #             固化为「统计 vs 真源逐项一致 + 帮助页渲染 + 指南无静态数字」回归
-step "单测 离线数据规模口径 (医院统计为 0 防回潮)" "$NODE" tools/_test-corpus.mjs
+step "单测 离线数据规模口径 (医院统计为 0 防回潮)" "$NODE" tools/test/_test-corpus.mjs
+# 【v1.20.4 #106 合并门禁】本仓 utils/*.js（travel/planner/weather/store/geo/corpus/pako-inflate/toolkit-groups）
+# 是 tools/build/build-min.mjs 的压缩产物，不是手改文件。若「改了 tools/_src-backup 漏跑 build-min」或
+# 「手改了 utils 应改 _src-backup」，随包上线的 utils 就会与源码不一致（静默 footgun）。
+# 做法：构建前把 8 个目标快照到 /tmp，跑 build-min 后再逐文件 cmp；任一不一致即说明漏构建 / 改错文件。
+step "合并门禁 (utils 与 _src-backup 一致)" bash -c '
+  mkdir -p /tmp/mg106
+  for f in utils/travel.js utils/planner.js utils/weather.js utils/store.js utils/geo.js utils/corpus.js utils/pako-inflate.js utils/toolkit-groups.js; do
+    cp "$f" "/tmp/mg106/$(basename "$f").before" 2>/dev/null
+  done
+  "$1" tools/build/build-min.mjs >/dev/null 2>&1 || { echo "  ✗ build-min 执行失败"; exit 1; }
+  BAD=0
+  for f in utils/travel.js utils/planner.js utils/weather.js utils/store.js utils/geo.js utils/corpus.js utils/pako-inflate.js utils/toolkit-groups.js; do
+    if ! cmp -s "$f" "/tmp/mg106/$(basename "$f").before"; then echo "  ✗ $f 构建前后不一致（漏跑 build-min，或手改了 utils 应改 tools/_src-backup）"; BAD=1; fi
+  done
+  # 手写双源（keys.js / data.js 经 cp 同步，非 build-min 产物）：与 _src-backup 字节一致，否则「改了 _src-backup 忘 cp」会静默漂移
+  for f in utils/keys.js utils/data.js; do
+    if ! cmp -s "$f" "tools/_src-backup/$(basename "$f")"; then echo "  ✗ $f 与 tools/_src-backup/$(basename "$f") 不一致（手写双源漂移：改了 _src-backup 忘 cp 到 utils）"; BAD=1; fi
+  done
+  [ $BAD -eq 0 ] && echo "  ✓ utils 与 _src-backup 一致（含手写 keys.js/data.js）"
+  exit $BAD
+' _ "$NODE"
+
 # v1.20.0：网页版 —— 把小程序同一份源码（utils + 页面 JS + WXML + WXSS）编译到浏览器。
 # 核心保障是「同源」：任何改动都先构建再用引擎冒烟验证，网页端不会悄悄漂移。
 # NODE 是父 shell 局部变量（未 export），bash -c 子 shell 里取不到 → 曾报 "bash: : command not found"；
 # 必须用位置参数传进去。管道必须开 pipefail，否则 smoke 失败会被 tail 的退出码吞掉，门禁假绿。
+# 审计加固的运行时单测串在同一 step 里跑，不新增 step —— 61 步口径与考核材料无需跟着改
+step "审计整改防回潮断言 (#1/#19/#56/#81 不回潮)" bash -c '"$1" tools/audit/_test-audit-guards.mjs && "$1" tools/audit/_test-hardening.mjs && "$1" tools/audit/_test-roster-integrity.mjs' _ "$NODE"
+
 step "网页版 构建与引擎冒烟 (与小程序同源)" bash -c 'set -o pipefail; "$1" tools/web/build.mjs >/dev/null && "$1" tools/web/smoke.mjs | tail -4' _ "$NODE"
 
 echo ""

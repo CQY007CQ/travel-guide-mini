@@ -79,6 +79,10 @@
         <view wx:if="{{view.next}}" class="next-line">之后：{{view.next.clean}}</view>
         <view wx:else class="next-line dim"><image class="ic" src="/images/icons/moon.png"/>今天的安排已经走完了</view>
         <view wx:if="{{view.now}}" class="left-line">今天还剩 <text class="gold">{{view.left}}</text> 项安排</view>
+        <!-- v1.20.7：今日动线与步行量（与行程页同源的真实坐标估算，点击去行程看逐日动线） -->
+        <view wx:if="{{view.walk}}" class="walk-line" bindtap="goPlan">
+          <image class="ic ic-sm" src="/images/icons/route.png"/>{{view.walk.txt}}<text class="wl-go">看动线 ›</text>
+        </view>
         <!-- v1.9：超支轻提醒 + 今日装备 -->
         <view wx:if="{{view.overHint}}" class="over-line {{view.overHint.lv}}"><image class="ic ic-sm" src="/images/icons/wallet.png"/>{{view.overHint.txt}}</view>
         <view wx:if="{{view.gear.length}}" class="gear-row">
@@ -143,6 +147,21 @@
       </view>
 
 </block>
+
+    <!-- AI 今日建议（云端强模型优先 · 离线兜底） -->
+    <view class="card ai-today">
+      <view class="ai-h">
+        <image class="ic" src="/images/icons/sparkle.png"/>
+        <text class="ai-t">AI 今日建议</text>
+        <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+        <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askTodayAI">{{aiLoading ? '思考中…' : (aiText ? '再问一次' : '生成')}}</view>
+      </view>
+      <view class="ai-body" wx:if="{{aiText}}">{{aiText}}</view>
+      <view class="ai-copy" wx:if="{{aiText}}" bindtap="aiCopy">复制回答</view>
+      <view class="ai-copy" bindtap="aiClearChat">清空会话</view>
+      <view class="ai-tip" wx:else>基于本趟行程的真实数据给 3 条可执行建议（动线/穿搭/预算）；无网络时自动回落离线规则库。</view>
+      <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
+    </view>
 
     <!-- 减法：行程入口已在底部 tabBar，不再重复提示 -->
   </block>

@@ -3,10 +3,14 @@
 // 票价、班次、开放时间以官方渠道当日公告为准。
 const A = require("../../utils/aicontent.js");
 const AD = require("../utils/ad.js");
+const AIAgent = require("../../utils/ai-agent.js");
+const Cloud = require("../../utils/cloud.js");
 
 // 打包提示：内容文件与本页同属 subai 分包，用静态字面量 require 一次，
 // 确保 ignoreUploadUnusedFiles 开启时也不会被当成未使用文件剔除。
 require("../data/ai-deep.js");
+require("../data/ai-deep-extra.js");
+require("../data/ai-deep-auto.js");
 
 const BLOCK_ICON = {
   "本地人的节奏": "bulb",
@@ -50,10 +54,12 @@ Page({
 
   data: {
     ready: false,
+    aiQ: "", aiAnswer: "", aiLoading: false, aiSource: "", aiErr: "",
     cities: [],
     curName: "",
     cur: null,
     msg: "",
+    notice: "",   // 「目标地未收录」的显式提示（与 msg 的加载错误分开）
     // 免费城（从行程页带进来的那座，永远免费）+ 广告位状态
     freeCity: "",
     adOn: false,
@@ -61,15 +67,27 @@ Page({
   },
 
   onLoad(q) {
-    const want = (q && q.city) ? String(q.city) : "";
+    // 2026-11-09：路由参数可能是 URL 编码的（plan 页用 encodeURIComponent 传入，微信不会自动解码），
+    // 之前会把 %E5%8C%97%E4%BA%AC 当成城市名显示成「未收录」。这里统一解码（失败保留原值）。
+    let want = (q && q.city) ? String(q.city) : "";
+    try { want = decodeURIComponent(want); } catch (e) {}
     A.initDeep().then(() => {
       const cities = A.deepCities();
-      let curName = want;
-      if (!curName || !A.hasDeep(curName)) curName = cities[0] || "";
+      if (!cities.length) { this.setData({ ready: true, cities: [], curName: "", msg: "内容暂未就绪" }); return; }
+      // 目标地未收录：明确告知并给出已收录城市清单。
+      // 旧实现会静默换成 cities[0]，用户会误以为看到的就是自己目的地 → 不显示 ≠ 没有，改为显式提示。
+      if (want && !A.hasDeep(want)) {
+        this.setData({
+          ready: true, cities: cities, curName: "", cur: null, freeCity: want,
+          adOn: AD.available(), allUnlocked: AD.unlocked(), msg: "",
+          notice: "「" + want + "」暂未收录深度玩法"
+        });
+        return;
+      }
+      const curName = want || cities[0];
       this.setData({
         ready: true, cities: cities, curName: curName, freeCity: curName,
-        adOn: AD.available(), allUnlocked: AD.unlocked(),
-        msg: cities.length ? "" : "内容暂未就绪"
+        adOn: AD.available(), allUnlocked: AD.unlocked(), msg: "", notice: ""
       });
       if (curName) this._pick(curName);
     }).catch(() => {
@@ -125,5 +143,36 @@ Page({
     try {
       wx.setClipboardData({ data: lines.join("\n") });
     } catch (e) {}
-  }
+  },
+
+  // ── AI 多轮问答（Agent 记忆 + 云端强模型优先 · 离线兜底） ──
+  onAIInput(e) { this.setData({ aiQ: e.detail.value }); },
+  _aiCtx() {
+    return "当前页面：城市深度玩法（离线策展内容）。\n【场景护栏】只做旅行玩法科普；票价/班次/开放时间一律写「以官方当日公告为准」，不编造具体数字；中国台湾城市只写风物美食，不写行政区划表述。";
+  },
+  aiAsk() {
+    const q = String(this.data.aiQ || "").trim();
+    if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
+    const self = this;
+    if (!Cloud.cloudEnabled()) { self._aiOffline(q); return; }
+    self.setData({ aiLoading: true, aiErr: "" });
+    AIAgent.ask("deep", q, self._aiCtx()).then((r) => {
+      if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiSource: r.source || "ai", aiLoading: false });
+      else self._aiOffline(q);
+    }).catch(() => { self._aiOffline(q); });
+  },
+  _aiOffline(q) {
+    this.setData({ aiAnswer: "离线模式：本页深度玩法由团队人工整理，请从上方城市列表选择查看；票价与班次以官方当日公告为准。", aiSource: "", aiLoading: false, aiErr: "" });
+  },
+  aiClear() {
+    try { AIAgent.clearHistory("deep"); } catch (e) {}
+    this.setData({ aiQ: "", aiAnswer: "", aiSource: "", aiErr: "" });
+  },
+  aiCopy() {
+    const t = String(this.data.aiText || this.data.aiAnswer || this.data.lastResult || this.data.result || "");
+    if (!t) { wx.showToast({ title: "还没有可复制的内容", icon: "none" }); return; }
+    try {
+      wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制", icon: "none" }) });
+    } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
+  },
 });

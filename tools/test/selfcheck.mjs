@@ -1,0 +1,118 @@
+// 共享逻辑单测（node + wx stub，模拟小程序环境可复用的部分）
+const mem = {};
+global.wx = {
+  getStorageSync: k => (k in mem ? mem[k] : ""),
+  setStorageSync: (k, v) => { mem[k] = v; },
+  removeStorageSync: k => { delete mem[k]; },
+  showToast: () => {}, showModal: () => {}, openLocation: () => {}, setClipboardData: () => {},
+  navigateTo: () => {}, switchTab: () => {}, reLaunch: () => {}, navigateBack: () => {}
+};
+import { createRequire } from "module";
+const req = createRequire(process.cwd() + "/");
+const T = req("./utils/travel.js");
+const D = T.D;
+
+let pass = 0, fail = 0;
+const assert = (n, c, ex) => { if (c) { pass++; console.log("  ✓ " + n); } else { fail++; console.log("  ✗ FAIL: " + n + (ex ? " → " + ex : "")); } };
+
+// 用「本地日期」构造 DEP（勿用 toISOString：本地 00:00-08:00 时 UTC 日期滞后一天，
+// 会与 todayState 的 fmtLocalDate(本地) 语义错位，导致 daysLeft/dayNo 差 1 的偶发失败）
+const _depD = new Date(Date.now() + 8 * 86400000);
+const DEP = _depD.getFullYear() + "-" + String(_depD.getMonth() + 1).padStart(2, "0") + "-" + String(_depD.getDate()).padStart(2, "0");
+const BJ = D.CITIES.find(c => c.name === "北京");
+
+console.log("== 1. 生成（复用 planner）==");
+const days = T.buildPlan({ city: BJ, days: 4, depart: DEP, pace: "balance" });
+assert("北京 4 天", days.length === 4);
+const names = days.flatMap(d => d.items.map(i => i.name));
+assert("无脏值", !names.some(n => /undefined|NaN/.test(String(n))));
+
+console.log("== 2. 名称清洗 / 导航判定 ==");
+assert("cleanSpotName 去前缀", T.cleanSpotName("深度游览「天安门广场 + 故宫博物院」") === "天安门广场 + 故宫博物院");
+assert("isFrameName 抵达", T.isFrameName("抵达 + 入住「市中心」"));
+assert("isFrameName 出发前往", T.isFrameName("出发前往「故宫」"));
+assert("isFrameName 景点否", !T.isFrameName("故宫博物院"));
+const nav = T.navTarget("故宫博物院", "北京");
+assert("故宫可坐标导航", nav && nav.type === "coord");
+const nav2 = T.navTarget("某个未收录小众点", "北京");
+assert("未收录点走城锚兜底", nav2 && nav2.type === "city" && nav2.city === "北京" && typeof nav2.lat === "number", JSON.stringify(nav2));
+assert("baikeKeyword 组合名取主段", T.baikeKeyword("天安门广场 + 故宫博物院") === "天安门广场");
+
+// v1.20.5 百科彻底离线化：实测 baike.baidu.com/item/* 与 /search/word?word=* 均 403「安全验证」，
+// /search?word=* 只回首页壳，www.baidu.com/s?wd=* 首访 200 但重复请求 302 到 wappass 图形验证码。
+// 「复制链接到浏览器」没有任何入口能保证可用 → 零外链；有收录弹窗展示，无收录明确提示。
+const _planSrc = req("fs").readFileSync("pages/plan/plan.js", "utf8");
+const _plannerSrc = req("fs").readFileSync("tools/_src-backup/planner.js", "utf8");
+assert("baikeUrl 已移除，不再生成任何百科外链", typeof T.baikeUrl === "undefined");
+// 2026-11-09：用户明确要求「有弹窗的同时也把网址复制」→ 恢复复制（仍保留离线弹窗与未收录提示）。
+assert("行程页 onBaike 弹窗 + 复制景点网址（2026-11-09 用户要求）",
+  /onBaike\([\s\S]{0,1200}?setClipboardData/.test(_planSrc)
+  && _planSrc.indexOf("baike.baidu.com") >= 0
+  && _planSrc.indexOf("该地点暂未收录百科") >= 0 && _planSrc.indexOf("showCancel: false") >= 0);
+assert("planner.spotBaikeBar 不再生成 <a href> 外链",
+  _plannerSrc.indexOf("www.baidu.com/s") < 0 && _plannerSrc.indexOf("baike.baidu.com") < 0);
+// 门禁查字面量会被「历史说明注释」误伤（旧注释里就写着 /item/），先滤注释行再匹配
+const _plannerCode = _plannerSrc.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+assert("planner 不再出现 403 的百科站内入口",
+  _plannerCode.indexOf("search/word") < 0 && _plannerCode.indexOf("/item/") < 0
+  && _plannerCode.indexOf("www.baidu.com") < 0);
+const _bi1 = T.baikeInfo("故宫博物院", "北京");
+assert("baikeInfo 有策展收录 → has=true", _bi1 && _bi1.has === true, JSON.stringify(_bi1));
+assert("baikeInfo 返回纯离线文本且不含 url 字段",
+  !!(_bi1 && _bi1.text) && !("url" in _bi1) && !/https?:\/\//.test(_bi1.text));
+const _bi2 = T.baikeInfo("我自己加的一个完全虚构的地点XYZ", "西安");
+assert("baikeInfo 无地点级收录 → has=false（同城医院/名店不得抬升）",
+  _bi2 && _bi2.has === false && _bi2.text === "", JSON.stringify(_bi2));
+assert("baikeInfo 空名/组合名不崩且空名无收录",
+  T.baikeInfo("", "北京").has === false && T.baikeInfo("天安门广场 + 故宫博物院", "北京").has === true);
+
+console.log("== 3. 今天状态 ==");
+const mkPlan = off => { const d = new Date(DEP); const p = JSON.parse(JSON.stringify({ cityName: "北京", days, depart: DEP })); p.days.forEach(x => { const dt = new Date(DEP); dt.setDate(dt.getDate() + off + (x.date ? 0 : 0)); }); return p; };
+// 行前：DEP = 今天+8 → before
+const stBefore = T.todayState({ cityName: "北京", days });
+assert("DEP(+8) 是行前", stBefore && stBefore.phase === "before" && stBefore.daysLeft === 8, JSON.stringify(stBefore));
+// 途中：把日期改成昨天开始
+const daysPast = JSON.parse(JSON.stringify(days));
+daysPast.forEach(x => { const dt = new Date(x.date); dt.setDate(dt.getDate() - 9); x.date = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0") + "-" + String(dt.getDate()).padStart(2,"0"); });
+const stMid = T.todayState({ cityName: "北京", days: daysPast });
+assert("前移 9 天后是途中", stMid && stMid.phase === "during", JSON.stringify(stMid));
+assert("途中第 2 天", stMid.dayNo === 2, String(stMid.dayNo));
+// 结束
+const daysEnd = JSON.parse(JSON.stringify(days));
+daysEnd.forEach(x => { const dt = new Date(x.date); dt.setDate(dt.getDate() - 30); x.date = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0") + "-" + String(dt.getDate()).padStart(2,"0"); });
+const stAfter = T.todayState({ cityName: "北京", days: daysEnd });
+assert("前移 30 天是结束", stAfter && stAfter.phase === "after", JSON.stringify(stAfter));
+
+console.log("== 4. 途中当日活动 ==");
+const act = T.nextActivity(daysPast[1]);
+assert("nextActivity 有结构", typeof act === "object");
+assert("剩余数 ≥0", act.left >= 0 && act.spotsN > 0);
+
+console.log("== 5. 记账 ==");
+T.addLedger(50, "餐饮", "早餐");
+T.addLedger(88.5, "门票");
+assert("记账 2 笔", T.getLedger().length === 2);
+assert("今日花费", T.todaySpent() === 138.5, String(T.todaySpent()));
+T.delLedger(0);
+assert("删除后 1 笔", T.getLedger().length === 1);
+
+console.log("== 6. 待办勾选 ==");
+const ph = T.prepPhaseList(5);
+assert("5 天 → 抢预约档", ph.items.some(([k]) => k === "p_book"));
+T.togglePrepCheck("p_book");
+assert("勾选持久化", T.getPrepChecks().p_book === true);
+
+console.log("== 7. 想玩 ==");
+T.toggleWish("故宫博物院", "北京");
+assert("加入想玩", T.isWished("故宫博物院"));
+T.toggleWish("故宫博物院", "北京");
+assert("再点取消", !T.isWished("故宫博物院"));
+
+console.log("== 8. 详情/美食/票务数据 ==");
+const dt = T.spotDetailText("故宫博物院", "北京");
+assert("详情纯文本非空", !!dt && !dt.includes("<"));
+assert("美食覆盖北京", (D.FOOD_SPOTS["北京"] || []).length >= 5);
+assert("PREP_CHECKLIST 行李", T.PACK_LIST.length >= 6);
+
+console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
+process.exit(fail ? 1 : 0);

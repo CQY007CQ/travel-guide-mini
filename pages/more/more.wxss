@@ -151,6 +151,26 @@
 
 .ach-it.on .ach-p { color: var(--chip-tx, #8f6a1f); font-weight: 700; }
 
+/* ===== v1.20.6 · 隐藏成就区 + 解锁弹窗 ===== */
+.ach-hd { display: flex; flex-direction: column; padding: 18rpx 26rpx 2rpx; margin-top: 8rpx; }
+.ach-hd-t { font-size: calc(22rpx * var(--fs, 1)); font-weight: 700; color: var(--t2, #c3cfe0); }
+.ach-hd-sub { font-size: calc(17rpx * var(--fs, 1)); color: var(--t4, #5b6b82); margin-top: 4rpx; }
+.ach-grid-hide { padding-top: 12rpx; }
+.ach-hide { background: linear-gradient(180deg, rgba(120, 140, 200, .14), rgba(120, 140, 200, .02)); border: 1rpx dashed rgba(var(--ln-rgb, 148, 163, 184), .3); }
+.ach-hide-tag { color: var(--accent, #7aa2ff) !important; }
+.ach-hide .ach-ic { opacity: 1; filter: none; }
+
+.ach-mask { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; z-index: 999; }
+.ach-pop { width: 560rpx; max-height: 76vh; background: var(--card, #1b2230); border-radius: 24rpx; padding: 34rpx 30rpx 26rpx; box-sizing: border-box; box-shadow: 0 18rpx 60rpx rgba(0, 0, 0, .4); display: flex; flex-direction: column; }
+.ach-pop-h { font-size: calc(34rpx * var(--fs, 1)); font-weight: 800; color: var(--gold-tx, #e2b65c); text-align: center; }
+.ach-pop-sub { font-size: calc(19rpx * var(--fs, 1)); color: var(--t4, #5b6b82); text-align: center; margin-top: 8rpx; }
+.ach-pop-list { margin: 22rpx 0 6rpx; max-height: 46vh; overflow-y: auto; }
+.ach-pop-it { display: flex; align-items: center; gap: 16rpx; padding: 14rpx 12rpx; border-radius: 16rpx; background: rgba(var(--ln-rgb, 148, 163, 184), .07); margin-bottom: 12rpx; }
+.ach-pop-tx { display: flex; flex-direction: column; flex: 1; }
+.ach-pop-t { font-size: calc(24rpx * var(--fs, 1)); font-weight: 700; color: var(--t2, #c3cfe0); }
+.ach-pop-d { font-size: calc(18rpx * var(--fs, 1)); color: var(--t4, #5b6b82); margin-top: 2rpx; }
+.ach-pop-btn { margin-top: 12rpx; text-align: center; font-size: calc(26rpx * var(--fs, 1)); font-weight: 700; color: #1b2230; background: linear-gradient(90deg, #e2b65c, #d4a94e); border-radius: 16rpx; padding: 18rpx 0; }
+
 /* ===== v1.6 · 外观三态 ===== */
 .theme-row { display: flex; gap: 12rpx; margin: 0 26rpx 20rpx; }
 
@@ -349,6 +369,12 @@
 .ins-my { font-size: calc(18rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 6rpx; line-height: 1; }
 .ins-chips { display: flex; flex-wrap: wrap; gap: 12rpx; }
 .ins-chip { font-size: calc(22rpx * var(--fs, 1)); color: var(--t2, #3a4759); background: rgba(var(--ln-rgb, 148,163,184), .10); border-radius: 999rpx; padding: 8rpx 18rpx; }
+.ins-city { display: flex; align-items: center; gap: 14rpx; margin-bottom: 6rpx; padding: 8rpx 0; border-bottom: 1rpx solid rgba(var(--ln-rgb, 148,163,184), .10); }
+.ins-city:last-child { border-bottom: none; }
+.ins-rank { width: 36rpx; height: 36rpx; line-height: 36rpx; text-align: center; border-radius: 999rpx; font-size: calc(20rpx * var(--fs, 1)); color: #fff; background: #b8892f; flex-shrink: 0; }
+.ins-city-name { flex: 1; font-size: calc(23rpx * var(--fs, 1)); color: var(--t2, #3a4759); }
+.ins-city-prov { font-size: calc(20rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); }
+.ins-city-n { font-size: calc(20rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); width: 84rpx; text-align: right; }
 
 /* v1.19.186 · 以下 .cp-* 已迁至 app.wxss（全局，供 help 页复用） */
 

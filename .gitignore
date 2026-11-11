@@ -22,7 +22,7 @@ tools/geocode-curated-cache.json
 tools/geocode-promote-cache.json
 tools/geocode-pending*.json
 tools/*-cache.json
-tools/province-lists.json
+tools/data/province-lists.json
 
 # ---------- 3. 备份与一次性修复脚本产物 ----------
 tools/_bak-*/
@@ -30,17 +30,17 @@ tools/_bak*/
 tools/.tone-bak/
 tools/_dl/
 tools/_img-unused/
-tools/*.bak
-tools/*.bak.js
-tools/*.bak-*
+tools/**/*.bak
+tools/**/*.bak.js
+tools/**/*.bak-*
 tools/*.orig
 tools/*.pre-*
 
 # ---------- 4. 超大历史数据快照（>1MB，已合并进 utils/data.js） ----------
-tools/data-before-merge.bak.js
-tools/v199-amap-spots.js
-tools/v199-amap-spots.js.bak-before-scrape
-tools/v200-official-import.js
+tools/**/data-before-merge.bak.js
+tools/data/v199-amap-spots.js
+tools/data/v199-amap-spots.js.bak-before-scrape
+tools/data/v200-official-import.js
 tools/v199-coords-geocoded.js
 tools/_imported-*.json
 
@@ -65,3 +65,5 @@ project.private.config.json
 # ---------- 7. 本地临时脚本（下划线开头的一次性脚本不入库） ----------
 tools/_tmp-*
 tools/_scratch-*
+# 官方名录抓取缓存（可随时用 --fetch 重建，候选池 candidates.json 已进 git 且自带来源 URL）
+tools/official-roster/cache/

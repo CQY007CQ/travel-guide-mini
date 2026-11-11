@@ -16,14 +16,17 @@
         <view class="th-chip {{themePref==='light'?'on':''}}" data-m="light" bindtap="onThemePref">浅色</view>
         <view class="th-chip {{themePref==='dark'?'on':''}}" data-m="dark" bindtap="onThemePref">深色</view>
       </view>
-      <view class="menu" wx:for="{{g.menus}}" wx:key="key" data-k="{{item.key}}" bindtap="go">
-        <image class="m-ic" src="/images/icons/{{item.icon}}.png"/>
-        <view class="m-txt">
-          <view class="m-t">{{item.t}}</view>
-          <view class="m-d dim">{{item.d}}</view>
+      <block wx:for="{{g.menus}}" wx:key="key">
+        <!-- 深度玩法仅当「目标地」有收录时显示（deepOn 由 more.js 按行程城市异步判定） -->
+        <view class="menu" wx:if="{{item.key !== 'deep' || deepOn}}" data-k="{{item.key}}" bindtap="go">
+          <image class="m-ic" src="/images/icons/{{item.icon}}.png"/>
+          <view class="m-txt">
+            <view class="m-t">{{item.t}}</view>
+            <view class="m-d dim">{{item.d}}</view>
+          </view>
+          <text class="arrow">›</text>
         </view>
-        <text class="arrow">›</text>
-      </view>
+      </block>
     </view>
   </view>
 
@@ -153,12 +156,36 @@
             <text class="ins-chip" wx:for="{{insights.fp.rows}}" wx:key="prov">{{item.prov}} {{item.n}}</text>
           </view>
         </view>
-        <view class="ins-sec" wx:if="{{insights.rhythm.tripN}}">
-          <view class="ins-h">出行节奏</view>
+        <view class="ins-sec" wx:if="{{insights.fc.rows.length}}">
+          <view class="ins-h">足迹城市榜（Top）</view>
+          <view class="ins-city" wx:for="{{insights.fc.rows}}" wx:key="name">
+            <text class="ins-rank">{{index + 1}}</text>
+            <text class="ins-city-name">{{item.name}}</text>
+            <text class="ins-city-prov">{{item.prov}}</text>
+            <text class="ins-city-n">{{item.n}} 次</text>
+          </view>
+        </view>
+        <view class="ins-sec" wx:if="{{insights.tags.rows.length}}">
+          <view class="ins-h">兴趣偏好（按打卡景点）</view>
+          <view class="ins-chips">
+            <text class="ins-chip" wx:for="{{insights.tags.rows}}" wx:key="tag">{{item.tag}} {{item.n}}</text>
+          </view>
+        </view>
+        <view class="ins-sec" wx:if="{{insights.span.km}}">
+          <view class="ins-h">足迹地理跨度</view>
+          <view class="ins-chips">
+            <text class="ins-chip">横跨约 {{insights.span.km}} km</text>
+            <text class="ins-chip" wx:if="{{insights.span.cities}}">{{insights.span.cities}} 座城市连线</text>
+          </view>
+        </view>
+        <view class="ins-sec" wx:if="{{insights.rhythm.tripN || insights.wf.wishN || insights.wf.favN}}">
+          <view class="ins-h">出行节奏 · 意愿</view>
           <view class="ins-chips">
             <text class="ins-chip" wx:if="{{insights.rhythm.avgDays}}">平均一趟 {{insights.rhythm.avgDays}} 天</text>
             <text class="ins-chip" wx:if="{{insights.rhythm.season}}">{{insights.rhythm.season}}季最多</text>
-            <text class="ins-chip" wx:if="{{insights.tendency.topCat}}">偏好 {{insights.tendency.topCat}}</text>
+            <text class="ins-chip" wx:if="{{insights.tendency.topCat}}">花费偏好 {{insights.tendency.topCat}}</text>
+            <text class="ins-chip" wx:if="{{insights.wf.wishCities}}">想玩 {{insights.wf.wishCities}} 城 · 去过 {{insights.wf.wishVisited}}</text>
+            <text class="ins-chip" wx:if="{{insights.wf.favN}}">收藏 {{insights.wf.favN}} 个 · 去过 {{insights.wf.favVisited}}</text>
           </view>
         </view>
       </block>
@@ -250,6 +277,8 @@
     <view class="card group-card">
       <view class="foot-line">
         <text class="foot-big">{{heat.visited}}<text class="foot-lb">/34</text></text><text class="foot-lb"> 个省份已点亮 · {{heat.cities}} 座城市</text>
+        <!-- 2026-11-09：说明口径 —— 已结束的历史行程城市也计入（不只打卡） -->
+        <text class="foot-lb" wx:if="{{heat.trips}}"> · 含历史行程 {{heat.trips}} 趟</text>
       </view>
       <view class="heat-grid">
         <view class="heat-cell l{{item.level}}" wx:for="{{heat.provs}}" wx:key="name">
@@ -313,6 +342,36 @@
           <text class="ach-p">{{item.ptxt}}</text>
         </view>
       </view>
+      <view class="ach-hd" wx:if="{{ach.hiddenGot}}">
+        <text class="ach-hd-t">🔒 隐藏成就（已解锁 {{ach.hiddenGot}} / {{ach.hiddenTotal}}）</text>
+        <text class="ach-hd-sub">达成即自动授予，未达成前不公开</text>
+      </view>
+      <view class="ach-grid ach-grid-hide" wx:if="{{ach.hiddenGot}}">
+        <view class="ach-it on ach-hide" wx:for="{{ach.hiddenList}}" wx:key="id">
+          <image class="ach-ic" src="/images/icons/medal.png"/>
+          <text class="ach-t">{{item.t}}</text>
+          <text class="ach-d dim">{{item.d}}</text>
+          <text class="ach-p ach-hide-tag">已解锁</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- v1.20.6：隐藏成就解锁弹窗（自动授予） -->
+  <view class="ach-mask" wx:if="{{achModal.show}}" bindtap="closeAchModal">
+    <view class="ach-pop" catchtap="noop">
+      <view class="ach-pop-h">🎉 解锁新成就</view>
+      <view class="ach-pop-sub" wx:if="{{achModal.more > 0}}">本次共解锁 {{achModal.list.length}} 枚，另有 {{achModal.more}} 枚已记入隐藏成就</view>
+      <view class="ach-pop-list">
+        <view class="ach-pop-it" wx:for="{{achModal.list}}" wx:key="id">
+          <image class="ach-ic" src="/images/icons/medal.png"/>
+          <view class="ach-pop-tx">
+            <text class="ach-pop-t">{{item.t}}</text>
+            <text class="ach-pop-d dim">{{item.d}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="ach-pop-btn" bindtap="closeAchModal">收下</view>
     </view>
   </view>
 
@@ -359,6 +418,14 @@
   <view class="group">
     <view class="group-title">数据与隐私</view>
     <view class="card group-card">
+      <view class="menu" bindtap="goTravelsvc">
+        <image class="m-ic" src="/images/icons/shield.png"/>
+        <view class="m-txt">
+          <view class="m-t">旅客服务与隐私协议</view>
+          <view class="m-d dim">离线能力 / 动态提醒 / 多语言多币种 / 合规说明</view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
       <view class="menu" bindtap="clearAllData">
         <image class="m-ic" src="/images/icons/close.png"/>
         <view class="m-txt">
@@ -370,8 +437,8 @@
     </view>
   </view>
 
-  <!-- 合规与密钥（v1.19.188）：主体一致铁律——第三方 Key 须本人账号申请；
-       默认已内置可用的和风免费 Key，如需换成你自己的 Key 可在此填入，无需改代码 / 重发版 -->
+  <!-- 合规与密钥（v1.19.188 / v1.20.4）：主体一致铁律——第三方 Key 须本人账号申请。
+       仓库不内置任何明文 Key（已做凭据清理），需在此填入本人账号的和风 Key，即时生效、无需重发版 -->
   <view class="group">
     <view class="group-title">合规与密钥</view>
     <view class="card group-card">
@@ -379,11 +446,11 @@
         <image class="m-ic" src="/images/icons/shield.png"/>
         <view class="m-txt">
           <view class="m-t">配置天气 / 地图密钥</view>
-          <view class="m-d dim">换成你本人账号申请的 Key（和风天气 / 高德）</view>
+          <view class="m-d dim">填入本人账号的和风 Key（默认未内置，天气需它才显示）</view>
         </view>
         <text class="arrow">›</text>
       </view>
-      <view class="m-note dim">小程序合规要求：第三方服务 Key 须注册在本人 / 本小程序主体下，严禁借用他人 Key。默认内置的和风 Key 请确认归属你本人和风账号；若你自备了 Key，点上方填入即可即时生效（无需重发版）。</view>
+      <view class="m-note dim">小程序合规要求：第三方服务 Key 须注册在本人 / 本小程序主体下，严禁借用他人 Key。仓库为安全起见不内置任何明文 Key：在 dev.qweather.com 用本人账号申请免费 Key，点上方填入即可即时生效（存在本机，无需重发版）。</view>
     </view>
   </view>
 

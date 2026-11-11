@@ -2,8 +2,9 @@
   "compileType": "miniprogram",
   "libVersion": "3.8.12",
   "appid": "wxa365d49bc3366f95",
+  "cloudfunctionRoot": "tools/cloud/",
   "projectname": "travel-guide-mini",
-  "version": "1.20.3",
+  "version": "1.20.6",
   "setting": {
     "es6": true,
     "enhance": true,

@@ -93,4 +93,20 @@ const delDraft = (id) => {
   return list;
 };
 
-module.exports = { get, getArr, getObj, set, del, usage, sizeOf, fmtLocalDate, getDrafts, saveDraft, delDraft };
+// v1.20.4 #81：JSON 序列化读写 —— 收敛散落各处的 `JSON.parse(wx.getStorageSync(...))` / `wx.setStorageSync(..., JSON.stringify(...))`。
+// 读：空 / 非法 JSON 一律回落默认，绝不把异常抛给调用方或返回 undefined 透传炸弹（与 getArr/getObj 同设计）。
+const getJSON = (k, def) => {
+  try {
+    const raw = wx.getStorageSync(k);
+    if (raw === "" || raw === undefined || raw === null) return def;
+    if (typeof raw !== "string") return raw;            // 已是对象（旧版本直存）则直接返回
+    try { return JSON.parse(raw); } catch (e) { return def; }
+  } catch (e) { return def; }
+};
+
+// 写：序列化失败（循环引用 / 不可序列化）回落 false，由调用方决定降级；不抛错。
+const setJSON = (k, v) => {
+  try { return set(k, JSON.stringify(v)); } catch (e) { return false; }
+};
+
+module.exports = { get, getArr, getObj, set, del, usage, sizeOf, fmtLocalDate, getDrafts, saveDraft, delDraft, getJSON, setJSON };

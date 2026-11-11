@@ -1,4 +1,4 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // ledger：旅行记账 · 当日与总计对比 · 日期/付款人/AA 分账/导出 CSV
 const T = require("../../utils/travel.js");
@@ -62,9 +62,7 @@ Page(SafePage({
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
   onLoad() { this.__boot = T.ready().catch(() => null); },
-  onShow() {
-    try { AN.pageView("ledger"); } catch (e) {}
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "ledger"); },
   _renderShow() {
     try { this._theme(); } catch (e) {}
     // v1.19.204：凭证照片迁移（旧「日期#下标」键 → 账单 id）并清理孤儿照片，杜绝串图与残留

@@ -50,25 +50,7 @@
     </view>
 
     <!-- 自动行李清单（按天数 / 出发季节 / 目的地气候 / 行程特色生成） -->
-    <!-- v1.7 · 证件与出行必备 -->
-    <view class="card">
-      <view class="h3 h3-row">
-        <view class="h3-l"><image class="ic" src="/images/icons/badge.png"/>证件与出行必备</view>
-        <text class="doc-n">{{docDone}}/{{docList.length}}</text>
-      </view>
-      <view class="prog">
-        <view class="bar"><view class="fill" style="width:{{docPct}}%"></view></view>
-      </view>
-      <view class="doc-item {{item.done ? 'done' : ''}}" wx:for="{{docList}}" wx:key="k"
-            data-k="{{item.k}}" bindtap="onDocTap">
-        <view class="box {{item.done ? 'on' : ''}}">{{item.done ? '✓' : ''}}</view>
-        <view class="doc-txt">
-          <text class="doc-t">{{item.t}}</text>
-          <text class="doc-x dim">{{item.x}}</text>
-        </view>
-      </view>
-    </view>
-
+    <!-- 2026-11-09：删除上方重复的「证件与出行必备」手工清单（与下方「证件与钱」分组重复，用户反馈"上下重复"） -->
     <view class="card" wx:if="{{pack}}">
       <view class="h3 h3-row"><image class="ic" src="/images/icons/backpack.png"/>自动行李清单</view>
       <view class="pk-sum">
@@ -112,5 +94,23 @@
       </view>
     </view>
     <view class="sp-tip dim">境外出行请在出行前查好当地急救与使馆电话</view>
+  </view>
+  <!-- AI 多轮问答 -->
+  <view class="card ai-card">
+    <view class="ai-h">
+      <image class="ic" src="/images/icons/sparkle.png"/>
+      <text class="ai-t">AI 行前顾问</text>
+      <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+      <view class="ai-clear" bindtap="aiClear">清空</view>
+    </view>
+    <view class="ai-tip dim">结合本趟行程天数/目的地/预算给打包与行前建议；多轮可追问，无网络时回落本地清单。</view>
+    <view class="ai-row">
+      <input class="ai-inp" placeholder="如：去高原要额外带什么？" value="{{aiQ}}"
+             bindinput="onAIInput" bindconfirm="aiAsk" confirm-type="send"/>
+      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiAsk">{{aiLoading ? '思考中…' : '问'}}</view>
+    </view>
+    <view class="ai-ans" wx:if="{{aiAnswer}}">{{aiAnswer}}</view>
+    <view class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
+    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
   </view>
 </view>

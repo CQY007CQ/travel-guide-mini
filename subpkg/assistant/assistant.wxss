@@ -4,6 +4,14 @@
 .h2 .ic { width: 36rpx; height: 36rpx; vertical-align: -4rpx; margin-right: 10rpx; }
 .ctx { font-size: calc(23rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin: 10rpx 0 18rpx; line-height: 1.6; }
 
+/* AI 识物入口 */
+.lens-entry { display: flex; align-items: center; gap: 12rpx; margin: 0 0 18rpx; padding: 18rpx 20rpx; border-radius: 16rpx;
+  background: rgba(212,169,78,.10); border: 1rpx solid rgba(212,169,78,.32); }
+.lens-entry:active { background: rgba(212,169,78,.20); }
+.le-ic { width: 36rpx; height: 36rpx; }
+.le-t { flex: 1; font-size: calc(25rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); font-weight: 600; }
+.le-a { flex: none; font-size: calc(26rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); }
+
 /* 一键查：卡片网格（2 列） */
 .tiles { display: flex; flex-wrap: wrap; margin: 0 -10rpx 18rpx; }
 .tile { width: calc(25% - 20rpx); margin: 0 10rpx 18rpx; padding: 18rpx 6rpx; border-radius: 16rpx;
@@ -23,6 +31,9 @@
 .btn:active { opacity: .85; }
 
 /* 结果区 */
+.result .h3 { display: flex; align-items: center; gap: 14rpx; }
+.result .ai-badge { font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 16rpx; }
 .result .r-q { font-size: calc(23rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-bottom: 12rpx; }
 .result .r-a { font-size: calc(27rpx * var(--fs, 1)); color: var(--t1, #dce5f0); line-height: 1.7; white-space: pre-wrap;
   word-break: break-word; padding: 18rpx 22rpx; background: var(--panel, #18233a);
@@ -34,6 +45,13 @@
   border-radius: 999rpx; padding: 6rpx 20rpx; }
 .keep-btn:active { color: var(--chip-tx, #d4a94e); }
 .keep-btn-2 { border-style: solid; }
+
+/* 增强意图的「直达对应页」按钮（对齐网页版 AI 全站导航） */
+.actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 16rpx; }
+.act-btn { font-size: calc(22rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e);
+  background: rgba(var(--ln-rgb, 148, 163, 184), .08);
+  border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .22); border-radius: 999rpx; padding: 8rpx 22rpx; }
+.act-btn:active { background: rgba(var(--chip-rgb, 212, 169, 78), .18); }
 
 /* 收藏列表 */
 .keeps .keep-it { font-size: calc(24rpx * var(--fs, 1)); color: var(--t2, #c9d4e4); line-height: 1.6; padding: 12rpx 0;

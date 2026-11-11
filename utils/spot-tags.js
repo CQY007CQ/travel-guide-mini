@@ -1,6 +1,6 @@
 /* 景点多维标签词库（utils/spot-tags.js）
  *
- * 这是「按标签找景点」体系的共享词库，构建期标注器（tools/build-spot-tags.mjs）与
+ * 这是「按标签找景点」体系的共享词库，构建期标注器（tools/build/build-spot-tags.mjs）与
  * 运行时检索（utils/spotsearch.js）都依赖它，保证「标注用的词」与「解析用户 query 用的词」
  * 是同一套，杜绝"标了 A 但搜不到 A"的语义漂移。
  *

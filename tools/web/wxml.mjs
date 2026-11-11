@@ -33,7 +33,11 @@ const EVT_MAP = {
   tap: "click", input: "input", change: "change", confirm: "keydown",
   blur: "blur", focus: "focus", longpress: "contextmenu", longtap: "contextmenu",
   scroll: "scroll", scrolltolower: "scroll", touchstart: "touchstart",
-  touchmove: "touchmove", touchend: "touchend", submit: "submit", reset: "reset",
+  touchmove: "touchmove", touchend: "touchend", touchcancel: "touchcancel",
+  submit: "submit", reset: "reset",
+  // 原生 map 组件事件：网页端不是 addEventListener 派发，由 runtime 的 SVG 示意图
+  // 点击委托读 __ev["on:markertap"] 还原 markerId（见 runtime.js __h 的 the-map 分支）
+  markertap: "markertap", callouttap: "callouttap",
 };
 
 /* ────────────────────────────── 解析 ────────────────────────────── */
@@ -290,10 +294,20 @@ function compileNode(n) {
   const events = {};
   const dataset = {};
   const extra = [];
+  let scrollCls = "";
 
   for (const a of n.attrs) {
     const name = a.name;
     if (ATTR_SKIP.has(name)) continue;
+
+    // scroll-view 的 scroll-x/y 在小程序里由原生组件提供横向/纵向滚动；
+    // 网页端编译成普通 div 后若不补 overflow，横向列表会直接溢出到相邻列
+    // （两列布局下尤其明显：热门路线会压到右边卡片上）。这里转成 class，
+    // 由 shell.css 的 #app .w-sx / .w-sy 补上等价的浏览器滚动。
+    if (name === "scroll-x" || name === "scroll-y") {
+      if (a.value !== "false") scrollCls += (scrollCls ? " " : "") + (name === "scroll-x" ? "w-sx" : "w-sy");
+      continue;
+    }
 
     // 事件绑定
     const evm = name.match(/^(bind|catch|capture-bind|capture-catch|mut-bind):?(.+)$/);
@@ -332,6 +346,11 @@ function compileNode(n) {
     }
   }
 
+  if (scrollCls) {
+    const base = props.class ? "(" + props.class + ")" : '""';
+    props.class = "(" + base + " + " + JSON.stringify(" " + scrollCls) + ").trim()";
+  }
+
   const propPairs = Object.entries(props).map(([k, v]) => JSON.stringify(k) + ":" + v);
   for (const [k, v] of extra) propPairs.push(JSON.stringify(k) + ":" + v);
   if (Object.keys(dataset).length) {
@@ -341,12 +360,22 @@ function compileNode(n) {
     propPairs.push('"__ev":{' + Object.entries(events).map(([k, v]) => JSON.stringify(k) + ":" + JSON.stringify(v)).join(",") + "}");
   }
 
+  // <navigator url="/xxx"> → <a href="#/xxx">：网页端不必依赖 JS 才能跳转，
+  // 且搜索引擎/新标签页打开都能落到正确的 hash 路由。
+  if (n.tag === "navigator" && attrs.url !== undefined) {
+    propPairs.push('"href":("#/"+String(' + compileMixed(String(attrs.url)) + ').replace(/^\\//,""))');
+  }
+
   const children = n.children.length ? compileChildren(n.children) : "null";
   let call = "__h(" + JSON.stringify(htmlTag === undefined ? "div" : htmlTag) + ",{" + propPairs.join(",") + "}," + children + ")";
-  // picker 特殊：mode=date 渲染成 date input
+  // picker 特殊：把 range / value / start / end 的真实表达式交给运行时的 __pick，
+  // 由它生成 option 或原生 date input（旧版传的是 "{{depart}}" 字面量 + 空 select）。
   if (n.tag === "picker") {
     const mode = attrs.mode || "selector";
-    call = "__pick(" + JSON.stringify(mode) + "," + JSON.stringify(attrs.value !== undefined ? attrs.value : "") + "," + call + ")";
+    const expr = (k, dflt) => (attrs[k] !== undefined ? compileMixed(String(attrs[k])) : dflt);
+    call = "__pick(" + JSON.stringify(mode) + "," + expr("value", '""') + "," + call + "," +
+      expr("range", "null") + "," + JSON.stringify(attrs["range-key"] || "") + "," +
+      expr("start", "null") + "," + expr("end", "null") + ")";
   }
   return call;
 }

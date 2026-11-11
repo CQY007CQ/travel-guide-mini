@@ -18,6 +18,8 @@
     <view class="df-btn {{loadingData ? 'df-loading' : ''}}" bindtap="retryData">{{loadingData ? '重试中…' : '重试加载'}}</view>
   </view>
 
+  <!-- 首页桌面布局：以下小卡成对排布（见 web/shell.css 的 .home-aux） -->
+  <view class="home-aux">
   <!-- v1.7 · 快捷入口（更多页可自定义显示哪些；老用户默认折叠，减负首屏） -->
   <view class="quick-bar card" wx:if="{{tiles.length}}">
     <view class="qb-head" bindtap="toggleQuick">
@@ -65,6 +67,7 @@
       <view class="rb-foot">点城市名填入表单</view>
     </view>
     <view class="rb-empty" wx:if="{{recTried && !recList.length}}">没找到合适的，换个说法试试</view>
+  </view>
   </view>
   <!-- 行程状态：出发倒计时 + 预约提醒 合并为一卡（v1.19.59 减法） -->
   <view class="card plan-status" wx:if="{{countdown || remind}}">
@@ -278,6 +281,7 @@
   </view>
 
   <!-- 想玩景点池（折叠卡片） -->
+  <view class="home-aux" wx:if="{{(cityName && poolCount && !multiMode && !provMode) || favs.length || recents.length}}">
   <view wx:if="{{cityName && poolCount && !multiMode && !provMode}}" class="card pool fb-fade-d2">
     <view class="pool-bar" bindtap="onPoolTap">
       <view class="pool-l">
@@ -348,7 +352,32 @@
     </view>
   </view>
 
+  </view>
+
   <view wx:if="{{hasOld}}" class="tip" bindtap="resumeOld">继续上次行程</view>
+
+  <!-- AI 行程助手：一句话 → 解析参数 → 本地离线库生成真实行程（零伪造） -->
+  <view class="card ai-plan">
+    <view class="ai-h">
+      <image class="ic" src="/images/icons/sparkle.png"/>
+      <text class="ai-t">AI 行程助手</text>
+      <text class="ai-tag">参数解析</text>
+    </view>
+    <view class="ai-sub dim">说一句话，AI 只解析预算 / 天数 / 兴趣等参数；行程仍由本地离线库真实生成，不编造景点。</view>
+    <view class="ai-row">
+      <input class="ai-inp" placeholder="如：3天成都，预算2000，带老人爱吃" value="{{aiText}}"
+             bindinput="onAIPlanInput" bindconfirm="aiParse" confirm-type="done"/>
+      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiParse">{{aiLoading ? '解析中…' : '解析'}}</view>
+    </view>
+    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
+    <view class="ai-res" wx:if="{{aiParsed}}">
+      <view class="ai-res-t">已识别：{{aiSummary}}</view>
+      <view class="ai-res-ops">
+        <view class="ai-res-btn" bindtap="aiCancel">重来</view>
+        <view class="ai-res-btn on" bindtap="aiGenerate">用这些参数生成 →</view>
+      </view>
+    </view>
+  </view>
 
   <view class="action-area">
     <view class="action-row">
@@ -360,6 +389,11 @@
     <view class="draft-link" bindtap="openDrafts">
       <image class="ic ic-sm" src="/images/icons/copy.png"/>
       <text>草稿箱（{{draftCount}}）</text>
+    </view>
+    <!-- 2026-11-09（#482 示例行程画廊）：一键载入一份精排示例，演示/首次使用不必等生成 -->
+    <view class="draft-link sample-link" bindtap="onSample">
+      <image class="ic ic-sm" src="/images/icons/compass.png"/>
+      <text>没有灵感？看看示例行程（成都 5 天）</text>
     </view>
   </view>
 

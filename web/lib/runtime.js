@@ -19,6 +19,15 @@
   var LS = global.localStorage;
   var toastTimer = null;
 
+  /* 审计 #44/#46：任何进入 innerHTML 的动态文本都必须转义。
+     导入的 JSON、URL hash、异常消息都可能携带标签，直接拼接等于 DOM 注入。 */
+  function escHtml(v) {
+    return String(v == null ? "" : v)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+
   /* ────────────────────────── 渲染原语 ────────────────────────── */
 
   var TEXT = "__t";
@@ -50,6 +59,55 @@
     return out;
   }
 
+  /* ── 网页版地图示意图 ──
+     合规红线：离线零 key，不加载任何在线地图 SDK / 底图。
+     但空 div 会让演示与用户以为页面坏了，故用真实经纬度把「编号标点 + 当天连线」
+     等距投影成 SVG 示意图（非底图），既保留合规又让地图页有内容、可讲解。
+     数据来源：WXML <map> 已被编译为 __h("div",{id:"map",class:"the-map",markers,polyline,...})。 */
+  function __schematic(props) {
+    var markers = Array.isArray(props && props.markers) ? props.markers : [];
+    var lines = Array.isArray(props && props.polyline) ? props.polyline : [];
+    var pts = [];
+    markers.forEach(function (m) { if (m && isFinite(m.latitude) && isFinite(m.longitude)) pts.push([+m.latitude, +m.longitude]); });
+    lines.forEach(function (l) { ((l && l.points) || []).forEach(function (q) { if (q && isFinite(q.latitude) && isFinite(q.longitude)) pts.push([+q.latitude, +q.longitude]); }); });
+    if (!pts.length) return '<div class="map-schem-empty">该天暂无精确坐标标点<br/>到当地后点下方列表行即可导航</div>';
+    var minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    pts.forEach(function (p) {
+      if (p[0] < minLat) minLat = p[0]; if (p[0] > maxLat) maxLat = p[0];
+      if (p[1] < minLon) minLon = p[1]; if (p[1] > maxLon) maxLon = p[1];
+    });
+    var W = 750, H = 470, PAD = 60, iw = W - 2 * PAD, ih = H - 2 * PAD;
+    var cosLat = Math.cos((minLat + maxLat) / 2 * Math.PI / 180) || 1;
+    var latS = Math.max(0.0025, maxLat - minLat), lonS = Math.max(0.0025, maxLon - minLon);
+    var s = Math.min(iw / (lonS * cosLat), ih / latS);
+    var cx = PAD + iw / 2, cy = PAD + ih / 2, midLat = (minLat + maxLat) / 2, midLon = (minLon + maxLon) / 2;
+    function X(lon) { return cx + (lon - midLon) * cosLat * s; }
+    function Y(lat) { return cy - (lat - midLat) * s; }
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" class="map-svg" xmlns="http://www.w3.org/2000/svg">';
+    for (var gx = PAD; gx <= W - PAD + 1; gx += iw / 4) svg += '<line x1="' + gx.toFixed(1) + '" y1="' + PAD + '" x2="' + gx.toFixed(1) + '" y2="' + (H - PAD) + '" stroke="rgba(148,163,184,.18)" stroke-width="1"/>';
+    for (var gy = PAD; gy <= H - PAD + 1; gy += ih / 4) svg += '<line x1="' + PAD + '" y1="' + gy.toFixed(1) + '" x2="' + (W - PAD) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(148,163,184,.18)" stroke-width="1"/>';
+    lines.forEach(function (l) {
+      var ps = ((l && l.points) || []).filter(function (q) { return q && isFinite(q.latitude) && isFinite(q.longitude); });
+      if (ps.length < 2) return;
+      var d = ps.map(function (q, i) { return (i ? "L" : "M") + X(+q.longitude).toFixed(1) + " " + Y(+q.latitude).toFixed(1); }).join(" ");
+      svg += '<path d="' + d + '" fill="none" stroke="' + escHtml(l.color || "#d4a94e") + '" stroke-width="' + (l.width || 3) + '" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>';
+    });
+    markers.forEach(function (m) {
+      if (!(m && isFinite(m.latitude) && isFinite(m.longitude))) return;
+      var x = X(+m.longitude), y = Y(+m.latitude);
+      var label = (m.callout && m.callout.content != null) ? String(m.callout.content) : "";
+      var isNum = /^\d+$/.test(label);
+      var fill = label.indexOf("美食") === 0 ? "#e07a5f" : (label.indexOf("住") === 0 ? "#3d7eff" : "#d4a94e");
+      // data-mid 保留原始 marker id：网页版没有原生 map 组件，靠点击委托还原 markerId
+      var mid = m.id == null ? "" : escHtml(String(m.id));
+      svg += '<circle class="map-mk" data-mid="' + mid + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (isNum ? 13 : 8) + '" fill="' + fill + '" stroke="#fff" stroke-width="2"/>';
+      if (isNum) svg += '<text x="' + x.toFixed(1) + '" y="' + (y + 4.5).toFixed(1) + '" text-anchor="middle" font-size="13" font-weight="700" fill="#1a1a1a">' + escHtml(label) + "</text>";
+      else if (label) svg += '<text x="' + x.toFixed(1) + '" y="' + (y - 14).toFixed(1) + '" text-anchor="middle" font-size="11" fill="#3b4657">' + escHtml(label.slice(0, 12)) + "</text>";
+    });
+    svg += '<text x="' + (W - PAD) + '" y="' + (H - 16) + '" text-anchor="end" font-size="11" fill="rgba(120,132,150,.75)">示意图 · 真实坐标 · 不加载在线底图</text>';
+    return svg + "</svg>";
+  }
+
   var inputSeq = 0;
   function __h(tag, props, children) {
     if (tag === "#text") return __t(props);
@@ -71,6 +129,9 @@
     // 输入类元素做焦点保持编号
     if (tag === "input" || tag === "textarea" || tag === "select") {
       el.__fkey = "f" + (inputSeq++);
+      // paint() 用 [data-fkey="fN"] 选择器恢复焦点，只写 JS 属性 el.__fkey 是找不到的，
+      // 必须同步写 DOM 属性，否则每次输入触发整页重建后输入框都会失焦。
+      el.setAttribute("data-fkey", el.__fkey);
       if (props.value !== undefined && el.value !== props.value) el.value = props.value;
       if (props.placeholder && tag !== "select") el.placeholder = props.placeholder;
     }
@@ -84,23 +145,81 @@
         el.appendChild(document.createTextNode(String(c)));
       }
     }
+    // 网页版地图：把编译后的 map 占位 div 换成「真实坐标示意图」（散点+连线，非底图）。
+    if (tag === "div" && el.classList && el.classList.contains("the-map") && props && props.id === "map") {
+      try {
+        el.classList.add("map-schem");
+        el.innerHTML = __schematic(props);
+        // WXML 的 bindmarkertap / bindcallouttap 由原生 map 组件派发；网页端是 SVG 示意图，
+        // 这里补一层点击委托，把点中的编号还原成 markerId，让「点标点直接唤起导航」
+        // 在网页版同样可用（旧版事件被编译出来却永不触发，点了没反应）。
+        var evm = props.__ev || {};
+        var mkHandler = evm["on:markertap"] || evm["catch:markertap"] || evm["on:callouttap"] || evm["catch:callouttap"];
+        if (mkHandler) {
+          el.addEventListener("click", function (e) {
+            var hit = e.target && e.target.closest ? e.target.closest(".map-mk[data-mid]") : null;
+            if (!hit || !current || typeof current[mkHandler] !== "function") return;
+            var rawId = hit.getAttribute("data-mid");
+            var markerId = rawId;
+            var mk = props.markers || [];
+            for (var mi = 0; mi < mk.length; mi++) {
+              if (String(mk[mi] && mk[mi].id) === rawId) { markerId = mk[mi].id; break; }
+            }
+            try {
+              current[mkHandler].call(current, {
+                type: "markertap", detail: { markerId: markerId },
+                currentTarget: { id: el.id, dataset: {} }, target: { id: el.id, dataset: {} },
+                timeStamp: Date.now()
+              });
+            } catch (err) { console.error("[web] markertap 异常", err); }
+          });
+        }
+      } catch (e) { /* 任何异常都退回原占位，不影响页面 */ }
+    }
     return el;
   }
 
-  /** picker：selector → select；date/time → input[type]；否则退化为只读容器 */
-  function __pick(mode, value, el) {
+  /**
+   * picker 降级：
+   *   selector → 真正的 <select>（option 由 range 生成，value = 索引，与小程序 e.detail.value 一致）
+   *   date/time → 原生 <input type=date|time>，并把 __ev / dataset 复制到 input，
+   *               否则用户操作的是 input、事件却挂在被隐藏的 select 上，bindchange 永不触发。
+   * 2026-11-10：旧版 selector 是空 <select>（0 个 option）、date 初值是 "{{depart}}" 字面量、
+   * 且 change handler 找不到 —— 网页版所有下拉与日期选择都点不动。
+   */
+  function __pick(mode, value, el, range, rangeKey, start, end) {
     try {
       if (mode === "selector" || mode === "multiSelector") {
         el.classList.add("w-picker-select");
+        var arr = Array.isArray(range) ? range : [];
+        el.innerHTML = "";
+        arr.forEach(function (it, i) {
+          var op = document.createElement("option");
+          op.value = String(i);                       // 小程序 selector 返回索引，不是显示文本
+          var txt = (rangeKey && it && typeof it === "object") ? it[rangeKey] : it;
+          op.textContent = txt == null ? "" : String(txt);
+          el.appendChild(op);
+        });
+        var idx = Number(value);
+        el.selectedIndex = (isFinite(idx) && idx >= 0 && idx < arr.length) ? idx : 0;
+        el.__fkey = "f" + (inputSeq++);
+        el.setAttribute("data-fkey", el.__fkey);
         return el;
       }
       var wrap = document.createElement("div");
       wrap.className = "w-picker-wrap";
       var input = document.createElement("input");
-      input.type = (mode === "time" || mode === "time") ? "time" : (mode === "date" ? "date" : "text");
+      input.type = (mode === "time") ? "time" : (mode === "date" ? "date" : "text");
       input.className = "w-picker-input";
-      input.value = String(value || "");
+      input.value = String(value == null ? "" : value);
+      if (start != null && start !== "") input.min = String(start);
+      if (end != null && end !== "") input.max = String(end);
+      // 事件与数据集必须随「真正被操作的元素」走
+      if (el.__ev) input.__ev = el.__ev;
+      if (el.dataset) { for (var d in el.dataset) input.dataset[d] = el.dataset[d]; }
       input.__fkey = "f" + (inputSeq++);
+      input.setAttribute("data-fkey", input.__fkey);
+      el.classList.add("w-picker-native");
       wrap.appendChild(el);
       wrap.appendChild(input);
       return wrap;
@@ -122,7 +241,7 @@
     if (old) old.remove();
     if (toastTimer) clearTimeout(toastTimer);
     var d = layer("w-toast");
-    var icon = o.icon && o.icon !== "none" ? '<i class="w-ti w-ti-' + o.icon + '"></i>' : "";
+    var icon = o.icon && o.icon !== "none" ? '<i class="w-ti w-ti-' + escHtml(o.icon) + '"></i>' : "";
     d.innerHTML = '<div class="w-toast-box">' + icon + '<span></span></div>';
     d.querySelector("span").textContent = o.title || "";
     d.style.display = "flex";
@@ -151,9 +270,9 @@
     o = o || {};
     var d = layer("w-modal");
     var btns = o.showCancel === false
-      ? '<button class="w-mb w-mb-ok">' + (o.confirmText || "确定") + "</button>"
-      : '<button class="w-mb w-mb-cancel">' + (o.cancelText || "取消") + "</button>" +
-        '<button class="w-mb w-mb-ok">' + (o.confirmText || "确定") + "</button>";
+      ? '<button class="w-mb w-mb-ok">' + escHtml(o.confirmText || "确定") + "</button>"
+      : '<button class="w-mb w-mb-cancel">' + escHtml(o.cancelText || "取消") + "</button>" +
+        '<button class="w-mb w-mb-ok">' + escHtml(o.confirmText || "确定") + "</button>";
     d.innerHTML = '<div class="w-modal-box"><div class="w-mtitle"></div><div class="w-mcontent"></div>' +
       '<div class="w-mbtns">' + btns + "</div></div>";
     d.querySelector(".w-mtitle").textContent = o.title || "提示";
@@ -175,7 +294,7 @@
     o = o || {};
     var d = layer("w-sheet");
     var items = (o.itemList || []).map(function (t, i) {
-      return '<button class="w-sh-item" data-i="' + i + '">' + String(t) + "</button>";
+      return '<button class="w-sh-item" data-i="' + i + '">' + escHtml(t) + "</button>";
     }).join("");
     d.innerHTML = '<div class="w-sh-box">' + items + '<button class="w-sh-cancel">取消</button></div>';
     d.addEventListener("click", function (e) {
@@ -206,10 +325,15 @@
 
   var PAGES = {};      // path → config（Page 注册）
   var ROUTER = null;   // app.js 注入
+  var navDepth = 0;    // 网页端简易页面栈深度：决定 navigateBack 能否真的退回
 
   function route(path, mode) {
-    if (!ROUTER) { location.hash = "#" + path; return; }
-    ROUTER(path, mode || "push");
+    mode = mode || "push";
+    if (mode === "push") navDepth++;
+    else if (mode === "tab") navDepth = 0;
+    // replace / reLaunch：用当前页替换，深度不变
+    if (!ROUTER) { location.hash = "#/" + String(path).replace(/^\//, ""); return; }
+    ROUTER(path, mode);
   }
 
   /* ────────────────────────── wx 适配 ────────────────────────── */
@@ -224,6 +348,31 @@
   function lsSet(k, v) {
     LS.setItem("wx:" + k, JSON.stringify(v === undefined ? "" : v));
   }
+
+  /* 本地演示用：允许通过 URL 参数一次性注入第三方 Key（**仅 localhost / 127.0.0.1 生效**）。
+     目的：仓库与代码里绝不含明文 Key（合规），但演示机可临时启用天气 / 高德。
+     用法： index.html?qwk=<和风Key>&qwh=<和风专属Host>
+     注入后写入 localStorage，之后的访问无需再带参数；生产域名下这段逻辑直接跳过。 */
+  (function () {
+    try {
+      var h = String((global.location && global.location.hostname) || "");
+      if (h !== "localhost" && h !== "127.0.0.1") return;
+      var qs = String((global.location && global.location.search) || "").replace(/^\?/, "");
+      if (!qs) return;
+      var p = {};
+      qs.split("&").forEach(function (kv) {
+        var i = kv.indexOf("=");
+        if (i < 0) return;
+        try { p[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1)); } catch (e) {}
+      });
+      if (!p.qwk) return;
+      var cur = lsGet("__app_keys__");
+      var next = (cur && typeof cur === "object") ? cur : {};
+      next.qweatherKey = p.qwk;
+      if (p.qwh) next.qweatherHost = p.qwh;
+      lsSet("__app_keys__", next);
+    } catch (e) {}
+  })();
 
   function ok(name, res) {
     return Object.assign({ errMsg: name + ":ok" }, res || {});
@@ -297,7 +446,15 @@
     redirectTo: function (o) { route(cleanUrl(o && o.url), "replace"); o && o.success && o.success(ok("redirectTo")); },
     reLaunch: function (o) { route(cleanUrl(o && o.url), "replace"); o && o.success && o.success(ok("reLaunch")); },
     switchTab: function (o) { route(cleanUrl(o && o.url), "tab"); o && o.success && o.success(ok("switchTab")); },
-    navigateBack: function () { history.back(); },
+    navigateBack: function (o) {
+      o = o || {};
+      // 网页端直接打开 /#/subpkg/food/food 时 history 里没有上一页，
+      // history.back() 会「点了没反应」；退回首页给用户一个明确去处。
+      if (navDepth > 0) { navDepth--; history.back(); }
+      else route("pages/index/index", "tab");
+      o.success && o.success(ok("navigateBack"));
+      o.complete && o.complete(ok("navigateBack"));
+    },
     openLocation: function (o) {
       o = o || {};
       var name = encodeURIComponent(o.name || "目的地");
@@ -342,13 +499,28 @@
       o = o || {};
       var ctrl = new AbortController();
       var to = setTimeout(function () { ctrl.abort(); }, o.timeout || 12000);
-      fetch(o.url, { method: (o.method || "GET").toUpperCase(), headers: o.header || {}, body: o.data && o.method === "POST" ? JSON.stringify(o.data) : undefined, signal: ctrl.signal })
-        .then(function (r) { return r.text(); })
-        .then(function (t) {
+      var method = String(o.method || "GET").toUpperCase();
+      var url = String(o.url || "");
+      // 小程序 GET 的 data 会自动拼到 query，浏览器 fetch 不会 —— 旧版天气/地理请求因此丢参数。
+      if (method === "GET" && o.data && typeof o.data === "object") {
+        var qs = Object.keys(o.data).map(function (k) {
+          return encodeURIComponent(k) + "=" + encodeURIComponent(o.data[k] == null ? "" : o.data[k]);
+        }).join("&");
+        if (qs) url += (url.indexOf("?") >= 0 ? "&" : "?") + qs;
+      }
+      var body;
+      if (method !== "GET" && method !== "HEAD" && o.data != null) {
+        var hdr = o.header || {}, isJson = false;
+        for (var hk in hdr) if (/content-type/i.test(hk) && /json/i.test(String(hdr[hk]))) isJson = true;
+        body = (isJson || typeof o.data === "object") ? JSON.stringify(o.data) : String(o.data);
+      }
+      fetch(url, { method: method, headers: o.header || {}, body: body, signal: ctrl.signal })
+        .then(function (r) { return r.text().then(function (t) { return { status: r.status, text: t }; }); })
+        .then(function (rr) {
           clearTimeout(to);
-          var data = t;
-          try { data = JSON.parse(t); } catch (e) {}
-          var res = ok("request", { statusCode: 200, data: data });
+          var data = rr.text;
+          try { data = JSON.parse(rr.text); } catch (e) {}
+          var res = ok("request", { statusCode: rr.status, data: data });
           o.success && o.success(res); o.complete && o.complete(res);
         })
         .catch(function (e) {
@@ -366,7 +538,7 @@
         select: function (sel) {
           return {
             boundingClientRect: function (cb) { tasks.push({ sel: sel, cb: cb, type: "rect" }); return q; },
-            fields: function (o, cb) { tasks.push({ sel: sel, cb: cb, type: "fields" }); return q; },
+            fields: function (o, cb) { tasks.push({ sel: sel, cb: cb, type: "fields", opts: o || {} }); return q; },
             node: function (cb) { tasks.push({ sel: sel, cb: cb, type: "node" }); return q; },
             scrollOffset: function (cb) { tasks.push({ sel: sel, cb: cb, type: "scroll" }); return q; },
           };
@@ -374,7 +546,7 @@
         selectAll: function (sel) {
           return {
             boundingClientRect: function (cb) { tasks.push({ sel: sel, cb: cb, type: "rectAll" }); return q; },
-            fields: function (o, cb) { tasks.push({ sel: sel, cb: cb, type: "fieldsAll" }); return q; },
+            fields: function (o, cb) { tasks.push({ sel: sel, cb: cb, type: "fieldsAll", opts: o || {} }); return q; },
           };
         },
         selectViewport: function () {
@@ -391,6 +563,21 @@
                 var r = el.getBoundingClientRect();
                 return { left: r.left, top: r.top, width: r.width, height: r.height, right: r.right, bottom: r.bottom, id: el.id };
               });
+            }
+            // fields({node:true}) 必须返回真实 DOM 节点：分享长图 / canvas 2d 导出
+            // 会用它取 context；旧版只回 rect，导出在网页端永远失败。
+            if (t.type === "fields" || t.type === "fieldsAll") {
+              var all = t.type === "fieldsAll";
+              var els = all ? Array.prototype.slice.call(document.querySelectorAll(t.sel))
+                            : [t.sel ? document.querySelector(t.sel) : null];
+              var arr = els.filter(Boolean).map(function (node) {
+                var rr = node.getBoundingClientRect();
+                var out = { id: node.id, left: rr.left, top: rr.top, right: rr.right, bottom: rr.bottom,
+                            width: rr.width, height: rr.height, dataset: node.dataset };
+                if (t.opts && t.opts.node) out.node = node;
+                return out;
+              });
+              return all ? arr : (arr[0] || null);
             }
             var el = t.sel ? document.querySelector(t.sel) : null;
             if (!el) return null;
@@ -499,7 +686,9 @@
     return (global.matchMedia && global.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
   }
   function cleanUrl(u) {
-    return String(u || "").replace(/^\//, "").split("?")[0];
+    // 保留 query：小程序 navigateTo({url:"/subpkg/map/map?di=2"}) 的参数必须到 onLoad，
+    // 旧版 split("?")[0] 把 di 吞掉，网页版地图永远只显示第 1 天、AI 带参跳转也失效。
+    return String(u || "").replace(/^\//, "");
   }
   function fallbackCopy(text) {
     var ta = document.createElement("textarea");
@@ -650,6 +839,7 @@
   var root = null;
   var current = null;
   var pending = false;
+  var lastQuery = {};     // 当前页 onLoad 收到的 query（AI / 导航抽屉读它感知上下文）
 
   function schedule() {
     if (pending) return;
@@ -688,7 +878,7 @@
     if (!current || !root) return;
     var tpl = global.__TPL && global.__TPL[current.__path];
     if (!tpl) {
-      root.innerHTML = '<div class="w-err">页面模板缺失：' + current.__path + "</div>";
+      root.innerHTML = '<div class="w-err">页面模板缺失：' + escHtml(current.__path) + "</div>";
       return;
     }
     // 记录焦点与滚动，重建后恢复（整页重建最怕输入框失焦）
@@ -703,7 +893,7 @@
       node = tpl(__h, __c, __t, __pick, scopeOf(current.data));
     } catch (e) {
       console.error("[web] 渲染异常", current.__path, e);
-      root.innerHTML = '<div class="w-err">渲染异常：' + (e && e.message) + "</div>";
+      root.innerHTML = '<div class="w-err">渲染异常：' + escHtml(e && e.message) + "</div>";
       return;
     }
     var kids = (node == null) ? [] : (Array.isArray(node) ? node : [node]);
@@ -725,7 +915,11 @@
 
   /** 事件委托：把 DOM 事件翻译成小程序的 e.currentTarget.dataset / e.detail */
   function bindEvents() {
-    var map = { click: "click", input: "input", change: "change", blur: "blur", focus: "focus", submit: "submit", contextmenu: "contextmenu", touchstart: "touchstart", touchmove: "touchmove", touchend: "touchend", keydown: "keydown", scroll: "scroll" };
+    // touchcancel / reset 原在 wxml 编译器里有映射，这里却没监听 → 拖拽中断收尾、表单重置永不触发
+    var map = { click: "click", input: "input", change: "change", blur: "blur", focus: "focus",
+      submit: "submit", reset: "reset", contextmenu: "contextmenu", touchstart: "touchstart",
+      touchmove: "touchmove", touchend: "touchend", touchcancel: "touchcancel",
+      keydown: "keydown", scroll: "scroll" };
     Object.keys(map).forEach(function (domEvt) {
       root.addEventListener(domEvt, function (ev) {
         // scroll 事件不冒泡到 handler 名，需要单独找带 __ev 的祖先
@@ -782,7 +976,11 @@
   /* ────────────────────────── 对外入口 ────────────────────────── */
 
   global.__bootWeb = function (appConfig, router) {
-    APP = { globalData: (appConfig && appConfig.globalData) || {} };
+    // 必须复制 appConfig 的方法（setPlan / clearPlan / _archiveOld…），不能只给 globalData：
+    // 各页经 getAppSafe() 调 app.setPlan(...) 生成行程，旧版网页端拿到的是 undefined，
+    // 首页「生成攻略」点了必然报错，AI 也无法真正把行程落到页面上。
+    // globalData 保持同一引用，index.html 的备份导入写 __APP_CONFIG.globalData.plan 仍同步生效。
+    APP = Object.assign({}, appConfig || {}, { globalData: (appConfig && appConfig.globalData) || {} });
     if (appConfig && typeof appConfig.onLaunch === "function") {
       try { appConfig.onLaunch.call(APP, { scene: 1001, query: {} }); } catch (e) { console.warn("[web] app.onLaunch 异常", e); }
     }
@@ -793,7 +991,8 @@
     root = document.getElementById("app");
     bindEvents();
 
-    global.__mountPage = function (pagePath) {
+    global.__mountPage = function (pagePath, query) {
+      lastQuery = query || {};
       if (current && typeof current.onUnload === "function") {
         try { current.onUnload(); } catch (e) {}
       }
@@ -805,17 +1004,17 @@
         if (!PAGES[pagePath]) global.__require("__entry__", "./" + pagePath + ".js");
       } catch (e) {
         console.error("[web] 页面加载失败", pagePath, e);
-        root.innerHTML = '<div class="w-err">页面加载失败：' + pagePath + "<br/>" + (e && e.message) + "</div>";
+        root.innerHTML = '<div class="w-err">页面加载失败：' + escHtml(pagePath) + "<br/>" + escHtml(e && e.message) + "</div>";
         return;
       }
       LOADING = null;
       if (!PAGES[pagePath]) {
-        root.innerHTML = '<div class="w-err">页面未注册：' + pagePath + "</div>";
+        root.innerHTML = '<div class="w-err">页面未注册：' + escHtml(pagePath) + "</div>";
         return;
       }
       current = createInstance(pagePath);
       if (typeof current.onLoad === "function") {
-        try { current.onLoad({ scene: 1001, query: {} }); } catch (e) { console.error("[web] onLoad 异常", e); }
+        try { current.onLoad({ scene: 1001, query: lastQuery }); } catch (e) { console.error("[web] onLoad 异常", e); }
       }
       if (typeof current.onShow === "function") {
         try { current.onShow(); } catch (e) { console.error("[web] onShow 异常", e); }
@@ -828,6 +1027,7 @@
 
     global.__webRefresh = paint;
     global.__webCurrent = function () { return current; };
+    global.__webQuery = function () { return lastQuery; };
   };
 
   global.__wxError = function (msg) { showToast({ title: msg, icon: "none" }); };

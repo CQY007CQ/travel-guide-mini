@@ -18,8 +18,15 @@ const S = {
 
 function applyMod(m) {
   const d = (m && m.default) || m;
-  if (d && d.cities && typeof d.cities === "object") S.data = d;
-  S.ready = !!(S.data && S.data.cities);
+  if (!d || !d.cities || typeof d.cities !== "object") return;
+  // 多内容文件合并：ai-deep.js（基线 28 城）+ ai-deep-extra.js（扩 72 城）。
+  // 同名城市后者覆盖前者（扩展文件优先），其余累加。
+  if (!S.data) S.data = { v: d.v, updated: d.updated, cities: {} };
+  for (const k in d.cities) {
+    if (d.cities[k] && typeof d.cities[k] === "object") S.data.cities[k] = d.cities[k];
+  }
+  if (d.updated) S.data.updated = d.updated;
+  S.ready = true;
 }
 
 let _p = null;
@@ -30,8 +37,15 @@ function initDeep() {
   _p = (async () => {
     if (typeof require.async === "function") {
       try {
-        const m = await require.async("../subai/data/ai-deep.js");
-        applyMod(m);
+        // 静态字面量（微信编译期必须静态，否则分包内容加载不到 → 白屏）
+        const [m1, m2, m3] = await Promise.all([
+          require.async("../subai/data/ai-deep.js"),
+          require.async("../subai/data/ai-deep-extra.js"),
+          require.async("../subai/data/ai-deep-auto.js")
+        ]);
+        applyMod(m1);
+        applyMod(m2);
+        applyMod(m3);
       } catch (e) {
         S.err = true;
         if (typeof console !== "undefined" && console.warn) console.warn("[aicontent] 深度内容加载失败:", e && e.message);
@@ -40,6 +54,8 @@ function initDeep() {
       // Node / 测试端：同步读（此处不受微信「静态字面量」约束，但同样写成字面量保持一致）
       try {
         applyMod(require("../subai/data/ai-deep.js"));
+        applyMod(require("../subai/data/ai-deep-extra.js"));
+        applyMod(require("../subai/data/ai-deep-auto.js"));
       } catch (e) {
         S.err = true;
       }

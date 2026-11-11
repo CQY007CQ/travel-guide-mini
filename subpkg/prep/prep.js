@@ -1,9 +1,11 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕
 // prep：出行准备（票价/预约渠道 可勾跟踪 / 酒店比价 / 团队分工）
 // 每个景点的「已订 / 预约日期 / 备注」按 城市·景点名 记本机，回来再看不丢
 const T = require("../../utils/travel.js");
 const app = getAppSafe();
+const AIAgent = require("../../utils/ai-agent.js");
+const Cloud = require("../../utils/cloud.js");
 
 const HOTEL_TIPS = [
   "携程 / 美团 / 飞猪 / 去哪儿四平台比价，同一酒店价差可达 10-30%",
@@ -26,7 +28,7 @@ Page(SafePage({
 
   data: {
     fz: 1,
-    docList: [], docDone: 0, docPct: 0,
+    aiQ: "", aiAnswer: "", aiLoading: false, aiSource: "", aiErr: "",
     td: false,
     hasPlan: false, cityName: "", isMulti: false,
     tickets: [], tkDone: 0, bookN: 0,
@@ -43,8 +45,7 @@ Page(SafePage({
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
   onLoad() { this.__boot = T.ready().catch(() => null); },
-  onShow() {
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "prep"); },
   _renderShow() {
     this._theme();
     // v1.10.1：refresh 内有多处对 plan/dict 的解引用，一旦脏数据抛错会整页白屏；
@@ -118,7 +119,6 @@ Page(SafePage({
       duties.push({ who, list });
     }
 
-    const checks = T.getPrepChecks();
     this.setData({
       hasPlan: true, cityName: plan.cityName, isMulti,
       tickets, duties,
@@ -127,12 +127,8 @@ Page(SafePage({
       tkSum, peopleN: peopleN0,
       tkPct: tickets.length ? Math.round(tickets.filter(x => x.done).length / tickets.length * 100) : 0,
       // v1.5：智能行李清单
-      pack: T.packSmart(plan), planDays: plan.days.length,
-      // v1.7：证件与出行必备
-      docList: T.docItems().map(x => Object.assign({}, x, { done: !!checks[x.k] })),
-      docDone: T.docDone()
+      pack: T.packSmart(plan), planDays: plan.days.length
     });
-    this._syncDocPct();
   },
 
   /* ---- 行李清单勾选（与 today 页共用 miniPrepV1 的 pg_ 前缀，两处同步） ---- */
@@ -198,26 +194,45 @@ Page(SafePage({
 
   goToday() { wx.switchTab({ url: "/pages/today/today" }); },
 
-  /* ---- v1.7：证件与出行必备清单 ---- */
-  // v1.12 UI 减法：文档进度条百分比预计算，避免 WXML 内除法表达式
-  _syncDocPct() {
-    const d = this.data;
-    this.setData({ docPct: d.docList.length ? Math.round(d.docDone / d.docList.length * 100) : 0 });
-  },
-  onDocTap(e) {
-    const k = e.currentTarget.dataset.k;
-    if (!k) return;
-    T.togglePrepCheck(k);
-    const checks = T.getPrepChecks();
-    const docList = (this.data.docList || []).map(x => Object.assign({}, x, { done: !!checks[x.k] }));
-    this.setData({ docList: docList, docDone: docList.filter(x => x.done).length });
-    this._syncDocPct();
-  },
-
   /* ---- 应急电话直拨 ---- */
   onCall(e) {
     const tel = String(e.currentTarget.dataset.tel || "");
     if (!tel) return;
     wx.makePhoneCall({ phoneNumber: tel, fail: () => {} });
-  }
+  },
+
+  // ── AI 多轮问答（Agent 记忆 + 云端强模型优先 · 离线兜底） ──
+  onAIInput(e) { this.setData({ aiQ: e.detail.value }); },
+  _aiCtx() {
+    let s = "";
+    try { s = Cloud.aiContextOf(app.globalData && app.globalData.plan, "出行准备页"); } catch (e) {}
+    return s + "\n【场景护栏】只给行前准备/打包/证件/交通的通用建议，不编造具体航班车次、票价、营业时间或政策条款；涉及签证/证件一律提示以官方最新规定为准。";
+  },
+  aiAsk() {
+    const q = String(this.data.aiQ || "").trim();
+    if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
+    const self = this;
+    if (!Cloud.cloudEnabled()) { self._aiOffline(q); return; }
+    self.setData({ aiLoading: true, aiErr: "" });
+    AIAgent.ask("prep", q, self._aiCtx()).then((r) => {
+      if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiSource: r.source || "ai", aiLoading: false });
+      else self._aiOffline(q);
+    }).catch(() => { self._aiOffline(q); });
+  },
+  _aiOffline(q) {
+    let r;
+    try { r = T.askAssistant(q, app.globalData && app.globalData.plan); } catch (e) { r = { text: "" }; }
+    this.setData({ aiAnswer: (r && r.text) || "离线模式：按上方行李清单与应急电话逐项核对；证件与政策以官方最新规定为准。", aiSource: "", aiLoading: false, aiErr: "" });
+  },
+  aiClear() {
+    try { AIAgent.clearHistory("prep"); } catch (e) {}
+    this.setData({ aiQ: "", aiAnswer: "", aiSource: "", aiErr: "" });
+  },
+  aiCopy() {
+    const t = String(this.data.aiText || this.data.aiAnswer || this.data.lastResult || this.data.result || "");
+    if (!t) { wx.showToast({ title: "还没有可复制的内容", icon: "none" }); return; }
+    try {
+      wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制", icon: "none" }) });
+    } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
+  },
 }));

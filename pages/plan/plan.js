@@ -1,4 +1,5 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
+const S = require("../../utils/store.js");   // v1.20.4 #81：统一存储出口
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // plan：每日行程浏览 + 详情 + 导航/百科/想玩 + 手动调整 + 按想玩重新生成
 const T = require("../../utils/travel.js");
@@ -18,9 +19,27 @@ function _preloadSubMods() {
   }
 }
 const EL = require("../../utils/errlog.js");        // v1.19.199：分享图失败分阶段留痕（真机可回溯）
+const Cloud = require("../../utils/cloud.js");      // 云端 AI（llmProxy 强模型网关，fail-closed）
+const AIAgent = require("../../utils/ai-agent.js");
 const app = getAppSafe();
 
 function isFrame(n) { return T.isFrameName(n); }
+// v1.20.8→v1.20.9：路线缩略图（零网络 / 零域名白名单 / 全量覆盖）
+// 收口到 utils/travel.js 的 spotCover()：稳定渐变 + 分类图标 + 名称，真图 it.img 优先。
+// 无真图时由渲染层标注「示意图」，杜绝伪装成实拍。
+function thumbFor(name, img, city) {
+  const cv = T.spotCover(city || "", name, img);
+  return {
+    thumbBg: cv.bg,
+    thumbEmoji: cv.glyph,
+    img: cv.img || "",            // 数据自带真图 / CC 图映射的 cloud:// fileID
+    photoCredit: cv.photoCredit || "",
+    photoLicense: cv.photoLicense || "",
+    coverLabel: cv.label,
+    coverBadge: cv.badge,
+    coverCat: cv.cat
+  };
+}
 const MODE_LABEL = { family: "亲子游", couple: "情侣游", solo: "独行", elder: "带老人" };
 function getSeason(month) {
  if (month >= 3 && month <= 5) return { name: "春", emoji: "" };
@@ -68,18 +87,21 @@ Page(SafePage({
   topDays: [], dsActive: -1,
   // v1.19.77：拖动排序（dragSh 为逐条预计算的 transform 字符串，WXML 只做数组取值）
   dragOn: false, dragDi: -1, dragI: -1, dragSh: [],
+  // 2026-11-09：换景点选择面板 / 移到其他天
+  swapOpen: false, swapDi: -1, swapIx: -1, swapCur: "", swapList: [], swapWish: [],
+  moveOpen: false, moveDi: -1, moveIx: -1, moveDays: [],
   // v1.19.78：城市深度玩法（随 subai 分包懒加载；未收录城市保持 null → UI 自动不显示）
   deep: null,
   // v1.19.179：「我的攻略」本地库——当前行程是否已保存到库（命中签名则回显「已保存」）
-  savedId: "", savedAt: 0
+  savedId: "", savedAt: 0,
+  // 行程页 AI 答疑（云端强模型优先，离线规则引擎兜底）
+  aiOpen: false, aiInput: "", aiAnswer: "", aiLoading: false, aiSource: "", aiErr: ""
  },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：onShow 是行程页唯一入口，任何异常都不得导致白屏（无数据时优雅回首页）
   onLoad() { this.__boot = T.ready().catch(() => null); _preloadSubMods(); },
-  onShow() {
-    try { AN.pageView("plan"); } catch (e) {}
-    this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._renderShow(); } catch (e) { try { wx.showToast({ title: "数据加载中，请稍后重试", icon: "none" }); } catch (_) {} } }); },
+  onShow() { onShowRender(this, "plan"); },
   _renderShow() {
    // v1.20.3：消费首页磁贴的定位意图（酒店/百科/天气），在任何分支前先读并清除，避免空行程回首页后残留再误触发
    this._applyFocus();
@@ -157,7 +179,9 @@ Page(SafePage({
    route: T.routeAdvice(plan, di),
    load: T.dayLoad(plan, di),   // v1.8.4 B12：单日参考时长 / 超时预警
    mv: (!plan.isProv) ? T.dayMove(d, segs ? segs[segByDay[di]].cityName : (plan.cityName || "")) : null,
-   items: (d.items || []).map((it, ix) => ({
+   items: (d.items || []).map((it, ix) => {
+    const _th = thumbFor(it.name, it.img, plan.cityName);
+    return {
     ix,
     period: it.period || "",
     name: it.name || "",
@@ -171,8 +195,11 @@ Page(SafePage({
     effort: T.P.spotEffort ? T.P.spotEffort(it.name) : 0,
     // v1.11：体力档位文案预计算（WXML 里原本是两层嵌套三元，每个条目渲染都要判一遍）
     effortTx: ["轻走", "徒步", "费腿"][T.P.spotEffort ? T.P.spotEffort(it.name) : 0] || "轻走",
-    hour: T.P.spotHours ? T.P.spotHours(it.name) || "" : ""
-   }))
+    hour: T.P.spotHours ? T.P.spotHours(it.name) || "" : "",
+    // v1.20.8：缩略图（生成配图 / 真实照片字段透传）
+    thumbBg: _th.thumbBg, thumbEmoji: _th.thumbEmoji, img: _th.img, coverLabel: _th.coverLabel, coverBadge: _th.coverBadge, coverCat: _th.coverCat
+   };
+  })
   }));
   let spots = 0;
   try { spots = T.P.countPlanStats(plan.days).spots; } catch (e) {}
@@ -275,6 +302,7 @@ Page(SafePage({
    })(),
    overview: ov,
    segs,
+   sampleTip: !!plan.isSample, // 2026-11-09（#482）：示例行程标识
    metaChips: chips, budgetLine, mixTxt,
    modeTxt: plan.travelMode ? MODE_LABEL[plan.travelMode] || "" : "",
    pickTxt: plan.pickOnly ? "本次按「只玩勾选」生成 · 未勾选的推荐已跳过" : "",
@@ -328,18 +356,34 @@ Page(SafePage({
   } catch (e) {}
   return out;
  },
+ // 行程指纹：用于丢弃「已切走」的异步结果（城市/天数/首日/站点串）
+ _planSig(plan) {
+  try {
+   const days = (plan && plan.days) || [];
+   const d0 = (days[0] && days[0].date) || "";
+   return String((plan && plan.cityName) || "") + "|" + days.length + "|" + String(d0).slice(0, 10) + "|" + this._planCities(plan).join(",");
+  } catch (e) { return ""; }
+ },
  _loadDeep(plan) {
   const cands = this._planCities(plan);
-  if (!cands.length) return;
+  const clear = () => { try { this.setData({ deep: null }); } catch (e) {} };
+  if (!cands.length) { clear(); return; }
+  const sig = this._planSig(plan);
   try {
    A.initDeep().then(() => {
+    // 2026-11-09：异步落地前核对行程是否已切换 —— 否则旧城市的深度卡会贴到新行程上
+    //（用户反馈：井冈山行程里显示了「太原 · 深度玩法」）。
+    let cur = null;
+    try { cur = app.globalData && app.globalData.plan; } catch (e) {}
+    if (this._planSig(cur) !== sig) return;
     let hit = null;
     for (let i = 0; i < cands.length; i++) {
      if (A.hasDeep(cands[i])) { hit = cands[i]; break; }
     }
-    if (!hit) return;
+    // 新城市没有深度内容时必须清空，不能保留上一份行程的卡片
+    if (!hit) { clear(); return; }
     const raw = A.deepOf(hit);
-    if (!raw) return;
+    if (!raw) { clear(); return; }
     let total = 0;
     const bs = raw.blocks || [];
     for (let i = 0; i < bs.length; i++) total += ((bs[i].items || []).length + (bs[i].trips || []).length);
@@ -381,7 +425,9 @@ Page(SafePage({
      if (idx === 0) {
       R.addToCalendar(item).then((okd) => {
        R.add(Object.assign({}, item, { via: "calendar" }));
-       wx.showToast({ title: okd ? "已加入手机日历" : "日历写入失败，可改用自己手机日历手动添加", icon: "none" });
+       if (okd) { wx.showToast({ title: "已加入手机日历", icon: "none" }); return; }
+       // 2026-11-09：小程序没有写系统日历的 API → 直接给 .ics 文件（发送到聊天，点开即可导入）
+       this._shareICS(plan);
       });
      } else if (idx === 1) {
       R.requestSubscribe().then(() => {
@@ -495,9 +541,9 @@ Page(SafePage({
  // 读后即清除，避免来回切 tab 重复触发。
  _applyFocus() {
   let f = "";
-  try { f = (wx.getStorageSync("miniFocusV1") || "").toString().trim(); } catch (e) {}
+  try { f = (S.get("miniFocusV1", "") || "").toString().trim(); } catch (e) {}
   if (!f) return;
-  try { wx.setStorageSync("miniFocusV1", ""); } catch (e) {}   // 消费即清除
+  try { S.set("miniFocusV1", ""); } catch (e) {}   // 消费即清除
   const self = this;
   // 等 WXML 把新数据画完再滚动/展开，避免节点还没生成就 scrollTo 失效
   setTimeout(() => {
@@ -553,6 +599,7 @@ Page(SafePage({
        if (err.type === "empty") msg = "暂无行程，先生成一份攻略";
        else if (err.type === "env") msg = "当前环境不支持天气加载";
        else if (err.type === "nocity") msg = "未识别到行程城市";
+       else if (err.type === "no_key") msg = "去「更多 → 合规与密钥」填入本人和风免费 Key，即时生效";
        else msg = "天气服务暂时异常";
      }
      // 仅「可能恢复」的失败（网络/额度/授权/服务异常/参数）才给重试；no_key/window/env/empty/nocity 重试无意义
@@ -634,6 +681,10 @@ Page(SafePage({
     this._wxSig = "";           // 强制重新拉取（失败未缓存，重试会真实发请求）
     this.setData({ wxOff: false });
     this._maybeLoadWx(plan);
+  },
+  // 2026-11-09：天气未配置时给出可操作入口 —— 切到「更多」页配置和风 Key（仓库不内置明文 Key）
+  goKeyConfig() {
+    try { wx.switchTab({ url: "/pages/more/more" }); } catch (e) {}
   },
 
   /* ---- v1.8.4 B17：城市打分 + 避坑小贴士（自存，下次来这座城会回显） ---- */
@@ -786,11 +837,11 @@ Page(SafePage({
      try { isWeb = !!(wx.getAccountInfoSync && wx.getAccountInfoSync().miniProgram.appId === "web"); } catch (e) {}
      wx.showToast({ title: isWeb ? "已下载日历文件（.ics）" : "已加入手机日历", icon: "success" });
     },
-    fail: () => this._icsCopy(plan)
+    fail: () => this._shareICS(plan)
    });
    return;
   }
-  this._icsCopy(plan);
+  this._shareICS(plan);
  },
  // 兜底：旧版微信/不支持 addPhoneCalendar 时，退回「复制 .ics」
  _icsCopy(plan) {
@@ -804,6 +855,30 @@ Page(SafePage({
     showCancel: false, confirmText: "好的"
    })
   });
+ },
+
+ // 2026-11-09：小程序里没有 wx.addPhoneCalendar（写系统日历）→ 生成 .ics 并调起「发送到聊天」，
+  // 用户在手机上点开该文件即可导入系统日历。任何异常都退回「复制 .ics 文本」。
+ _shareICS(plan) {
+  let ics = "";
+  try { ics = T.exportICS(plan) || ""; } catch (e) { ics = ""; }
+  if (!ics) { wx.showToast({ title: "暂无行程可导出", icon: "none" }); return; }
+  try {
+   const fsm = wx.getFileSystemManager ? wx.getFileSystemManager() : null;
+   const dir = (wx.env && wx.env.USER_DATA_PATH) || "";
+   if (!fsm || !dir) return this._icsCopy(plan);
+   const path = dir + "/trip_" + Date.now() + ".ics";
+   fsm.writeFileSync(path, ics, "utf8");
+   if (typeof wx.shareFileMessage === "function") {
+    wx.shareFileMessage({
+     filePath: path,
+     fileName: "行程日历.ics",
+     fail: () => this._icsCopy(plan)
+    });
+   } else {
+    this._icsCopy(plan);
+   }
+  } catch (e) { this._icsCopy(plan); }
  },
 
  onEnd() {
@@ -858,6 +933,27 @@ Page(SafePage({
   const plan = app.globalData.plan;
   app.setPlan({ ...plan, days: plan.days });
   this._render(plan);
+ },
+
+ /* ---- 真实照片：加载失败兜底回退示意图 / 署名 ---- */
+ onImgError(e) {
+  const d = e.currentTarget.dataset || {};
+  const di = Number(d.di), i = Number(d.i);
+  if (!isFinite(di) || !isFinite(i)) return;
+  const patch = {};
+  patch["view[" + di + "].items[" + i + "].img"] = "";
+  try { this.setData(patch); } catch (err) {}
+ },
+ onPhotoCredit(e) {
+  const d = e.currentTarget.dataset || {};
+  wx.showModal({
+    title: "照片来源",
+    content: "摄影/作者：" + (d.credit || "Wikimedia Commons") +
+      "\n许可：" + (d.license || "CC") +
+      "\n图源：Wikimedia Commons（云存储托管）",
+    showCancel: false,
+    confirmText: "知道了"
+  });
  },
 
  /* ---- 详情 ---- */
@@ -943,10 +1039,27 @@ Page(SafePage({
   const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
   const plan = app.globalData && app.globalData.plan;
   if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items || !plan.days[di].items[ix]) return;
-  const url = T.baikeUrl(plan.days[di].items[ix].name);
-  // v1.19.207：景点名为空/整段被清洗掉时，不能什么都不发生（用户点了没反应）
-  if (!url) { wx.showToast({ title: "这条没有可搜的景点名", icon: "none" }); return; }
-  wx.setClipboardData({ data: url, success: () => wx.showToast({ title: "百科链接已复制，到浏览器打开", icon: "none" }) });
+  const it = plan.days[di].items[ix];
+  const city = (T.segCityOfDay ? T.segCityOfDay(plan, di) : "") || plan.cityName || "";
+  const info = T.baikeInfo ? T.baikeInfo(it.name, city) : null;
+  // 2026-11-09：按用户要求，弹窗展示的同时把「景点网址」也复制到剪贴板（恢复原有习惯）。
+  // 静默复制（不弹 toast，避免与弹窗抢层），改为在弹窗正文末尾提示"已复制网址"。
+  let copied = false;
+  try {
+   const kw = T.baikeKeyword ? T.baikeKeyword(it.name) : "";
+   // 注意：这里不用 /'/g 正则 —— check-handlers 的简易 tokenizer 会把单引号当字符串起点而吞掉后续代码。
+   const url = kw ? ("https://baike.baidu.com/search/word?word=" + encodeURIComponent(kw).split("'").join("%27")) : "";
+   if (url) { wx.setClipboardData({ data: url }); copied = true; }
+  } catch (err) {}
+  if (!info || info.has === false || !info.text) {
+   wx.showToast({ title: "该地点暂未收录百科" + (copied ? "，网址已复制" : ""), icon: "none" });
+   return;
+  }
+  const content = info.text + (copied ? "\n\n（景点网址已复制，可粘贴到浏览器打开）" : "");
+  wx.showModal({
+   title: info.title || it.name, content: content,
+   confirmText: "知道了", showCancel: false
+  });
  },
  onWish(e) {
   const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
@@ -1048,21 +1161,144 @@ Page(SafePage({
   try { T.normalizeDayItems(items); } catch (e) {} // 移除后行文归一：防止「继续深度游览」等前缀悬在段首
   this._save();
  },
- /* ---- 换一个景点：同城池里挑一个本行程没排过的，替换后自动重排当天行文 ---- */
+ /* ---- 2026-11-09：换一个景点改为「弹面板选择」——本城候选 / 我的想玩收藏 / 随机 ---- */
  onSwap(e) {
   const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
   const plan = app.globalData.plan;
-  if (!plan || !plan.days[di]) return;
-  const cands = T.swapCandidates(plan, di, ix);
-  if (!cands.length) {
-   wx.showToast({ title: "这座城市的景点都排进来啦", icon: "none" });
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items) return;
+  const it = plan.days[di].items[ix];
+  if (!it || isFrame(it.name)) { wx.showToast({ title: "这条换不了（抵达/返程等框架安排）", icon: "none" }); return; }
+  const cands = T.swapCandidates(plan, di, ix) || [];
+  const curKey = T.cleanSpotName(String(it.name || ""));
+  // 我的想玩/收藏：排除本行程已排过的与当前点，避免换出重复景点
+  const used = {};
+  (plan.days || []).forEach(d => (d.items || []).forEach(x => { const k = T.cleanSpotName(x && x.name); if (k) used[k] = 1; }));
+  let wish = [];
+  try {
+   // 2026-11-09：只换「当天这座城」的想玩/收藏，避免把外城景点塞进当天（地理一致性）
+   const dayCity = (T.segCityOfDay ? T.segCityOfDay(plan, di) : "") || plan.cityName || "";
+   wish = (T.getWish() || [])
+    .filter(w => {
+     const wc = String((w && w.city) || "");
+     return !wc || !dayCity || wc === dayCity; // 老数据无 city 的保留（无法判定，别一刀切隐藏）
+    })
+    .map(w => String((w && w.name) || "").trim())
+    .filter(n => n && T.cleanSpotName(n) !== curKey && !used[T.cleanSpotName(n)]);
+  } catch (err) { wish = []; }
+  this.setData({
+   swapOpen: true, swapDi: di, swapIx: ix,
+   swapCur: curKey || String(it.name || ""),
+   swapList: cands.slice(0, 80),
+   swapWish: Array.from(new Set(wish)).slice(0, 80)
+  });
+ },
+ closeSwap() { this.setData({ swapOpen: false, swapDi: -1, swapIx: -1, swapList: [], swapWish: [] }); },
+ onSwapRandom() {
+  const list = this.data.swapList || [];
+  if (!list.length) { wx.showToast({ title: "本城没有更多可换景点", icon: "none" }); return; }
+  this._applySwap(list[Math.floor(Math.random() * list.length)]);
+ },
+ onSwapPick(e) {
+  const name = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.name) || "");
+  if (name) this._applySwap(name);
+ },
+ // 真正执行替换：保留原条目的时段/结构，只换核心景点名（可来自本城候选或想玩收藏）
+ _applySwap(name) {
+  const plan = app.globalData.plan;
+  const di = this.data.swapDi, ix = this.data.swapIx;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items || !name) { this.closeSwap(); return; }
+  const it = plan.days[di].items[ix];
+  if (!it) { this.closeSwap(); return; }
+  const oldRaw = String(it.name || "");
+  const curKey = T.cleanSpotName(oldRaw);
+  const newName = (curKey && oldRaw.indexOf(curKey) >= 0) ? oldRaw.replace(curKey, name) : name;
+  plan.days[di].items[ix] = Object.assign({}, it, { name: newName });
+  try { T.normalizeDayItems(plan.days[di].items); } catch (err) {}
+  this.closeSwap();
+  this.setData({ open: -1, detailText: "", detailName: "" });
+  this._save();
+  wx.showToast({ title: "已换成「" + name + "」", icon: "none", duration: 1800 });
+ },
+
+ /* ---- 2026-11-09：把这个点移到别的天（第2天 → 第3天） ---- */
+ onMoveTo(e) {
+  const di = Number(e.currentTarget.dataset.di), ix = Number(e.currentTarget.dataset.ix);
+  const plan = app.globalData.plan;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items) return;
+  const it = plan.days[di].items[ix];
+  if (!it || isFrame(it.name)) { wx.showToast({ title: "这条移不了（抵达/返程等框架安排）", icon: "none" }); return; }
+  if ((plan.days || []).length < 2) { wx.showToast({ title: "只有一天，没法移动", icon: "none" }); return; }
+  const moveDays = [];
+  plan.days.forEach((d, i) => {
+   if (i === di) return;
+   moveDays.push({ i: i, label: "第" + (i + 1) + "天" + (d && d.date ? " · " + String(d.date).slice(5) : "") });
+  });
+  this.setData({ moveOpen: true, moveDi: di, moveIx: ix, moveDays: moveDays });
+ },
+ closeMove() { this.setData({ moveOpen: false, moveDi: -1, moveIx: -1, moveDays: [] }); },
+
+ // ── 行程页 AI 答疑（云端强模型优先 · 离线规则引擎兜底 · 零白屏） ──
+ openAI() {
+  const plan = app.globalData && app.globalData.plan;
+  if (!plan || !plan.days || !plan.days.length) { wx.showToast({ title: "先生成行程再问 AI", icon: "none" }); return; }
+  this.setData({ aiOpen: true, aiErr: "" });
+ },
+ closeAI() { this.setData({ aiOpen: false }); },
+ onAIInput(e) { this.setData({ aiInput: e.detail.value }); },
+ _aiCtx() {
+  try { return Cloud.aiContextOf(app.globalData && app.globalData.plan, "每日行程页"); }
+  catch (e) { return ""; }
+ },
+ _aiOffline(q) {
+  const plan = app.globalData && app.globalData.plan;
+  let r;
+  try { r = T.askAssistant(q, plan); } catch (e) { r = { text: "暂时答不上来，换个问法试试" }; }
+  this.setData({ aiAnswer: (r && r.text) || "", aiLoading: false, aiSource: "", aiErr: "" });
+ },
+ sendAI() {
+  const q = (this.data.aiInput || "").trim();
+  if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
+  const self = this;
+  // 云未开启 → 直接离线，不做无谓等待
+  if (typeof Cloud.cloudEnabled === "function" && !Cloud.cloudEnabled()) {
+   self.setData({ aiLoading: true });
+   setTimeout(() => { self._aiOffline(q); }, 0);
    return;
   }
-  const r = T.swapSpot(plan, di, ix);
-  if (!r) { wx.showToast({ title: "这条换不了（抵达/返程等框架安排）", icon: "none" }); return; }
-  this.setData({ open: -1, detailText: "", detailName: "" }); // 重排后顺序会变，收起详情避免指错行
+  self.setData({ aiLoading: true, aiErr: "" });
+  AIAgent.ask("plan", q, self._aiCtx())
+   .then((r) => {
+    if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiLoading: false, aiSource: r.source || "ai", aiErr: "" });
+    else self._aiOffline(q);
+   })
+   .catch(() => { self._aiOffline(q); });
+ },
+ onMovePick(e) {
+  const to = Number(e.currentTarget.dataset.i);
+  const plan = app.globalData.plan;
+  const di = this.data.moveDi, ix = this.data.moveIx;
+  if (!plan || !plan.days || !plan.days[di] || !plan.days[to] || di === to) { this.closeMove(); return; }
+  const src = plan.days[di], tgt = plan.days[to];
+  const it = src.items && src.items[ix];
+  if (!it) { this.closeMove(); return; }
+  src.items.splice(ix, 1);
+  const ords = ["上午", "下午", "晚上"];
+  const used = {};
+  try { (T.daySpots(tgt) || []).forEach(x => { const p = String((x && x.period) || ""); if (p) used[p] = 1; }); } catch (err) {}
+  let period = ords.find(p => !used[p]) || "下午";
+  const hasReturn = (tgt.items || []).some(x => /返程|前往/.test(String((x && x.name) || "")));
+  if (hasReturn && period === "晚上") period = "下午";
+  const newItem = Object.assign({}, it, { period: period });
+  let at = -1;
+  (tgt.items || []).forEach((x, i) => { if (!isFrame(x && x.name)) at = i; });
+  if (at >= 0) tgt.items.splice(at + 1, 0, newItem); else tgt.items.push(newItem);
+  try { T.normalizeDayItems(src.items); T.normalizeDayItems(tgt.items); } catch (err) {}
+  const sync = d => { try { const n = T.daySpots(d).length; d.spotCount = n; d.pace = n <= 2 ? "轻松" : (n <= 3 ? "适中" : "紧凑"); } catch (err) {} };
+  sync(src); sync(tgt);
+  this.closeMove();
+  this.setData({ open: -1, detailText: "", detailName: "" });
   this._save();
-  wx.showToast({ title: "已换成「" + r.name + "」" + (r.left > 0 ? " · 还有 " + r.left + " 个可换" : ""), icon: "none", duration: 1800 });
+  wx.showToast({ title: "已把「" + (T.cleanSpotName(String(it.name || "")) || it.name) + "」移到第" + (to + 1) + "天", icon: "none", duration: 1800 });
  },
  /* ---- v1.15：详情里点标签 → 换一个同标签的当地景点 ---- */
  onTagSwap(e) {
@@ -1104,6 +1340,8 @@ Page(SafePage({
   this._save();
   wx.showToast({ title: "已加入 D" + (di + 1) + "：" + r.name, icon: "none", duration: 1800 });
  },
+ // 2026-11-09（#482）：示例行程 → 回「出发」页生成自己的
+ onLeaveSample() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) {} },
  toggleBrief() { this.setData({ briefOpen: !this.data.briefOpen }); },
  // v1.18：天气卡 / 想玩未排上列表默认收起，点击标题展开
  toggleWx() { this.setData({ wxOpen: !this.data.wxOpen }); },
@@ -1323,7 +1561,8 @@ Page(SafePage({
       });
     };
 
-    const draw = (canvas) => {
+    const draw = (canvas, attempt) => {
+      attempt = attempt || 0;
       try {
         // 高 dpr(3) 会让像素画布与输出图过大，钳到 2 兼顾清晰度与真机内存
         let dpr = 2;
@@ -1331,7 +1570,12 @@ Page(SafePage({
         const m = that._posterModel();
         canvas.width = m.W * dpr; canvas.height = m.H * dpr;
         const ctx = canvas.getContext("2d");
-        if (!ctx) return fail("draw", "getContext(2d) returned null", "绘图失败，请重试");
+        if (!ctx) {
+          // 2026-11-09 真机：canvas 刚挂载/尚未绘制时部分机型会返回 null。
+          // 已把 .share-canvas 从 z-index:-1 改到正层级，这里再给两次短重试兜底。
+          if (attempt < 2) { setTimeout(() => draw(canvas, attempt + 1), 120); return; }
+          return fail("draw", "getContext(2d) returned null after retries", "绘图失败，请重试");
+        }
         // setTransform 而非 scale：共用节点时避免残留变换叠加
         if (ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0); else ctx.scale(dpr, dpr);
         that._drawPoster(ctx, m.W, m);
@@ -1446,5 +1690,18 @@ Page(SafePage({
 
   _fit(ctx, text, maxW, fontPx) {
     return PP.fit(ctx, text, maxW, fontPx);
+  },
+  aiCopy() {
+    const t = String(this.data.aiText || this.data.aiAnswer || this.data.lastResult || this.data.result || "");
+    if (!t) { wx.showToast({ title: "还没有可复制的内容", icon: "none" }); return; }
+    try {
+      wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制", icon: "none" }) });
+    } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
+  },
+  aiClearChat() {
+    try { AIAgent.clearHistory("plan"); } catch (e) {}
+    this.setData({ aiText: "", aiAnswer: "", lastResult: "", result: "", out: null,
+      aiSource: "", source: "", aiQ: "", aiInput: "", aiErr: "" });
+    wx.showToast({ title: "会话已清空", icon: "none" });
   },
 }));

@@ -3,9 +3,12 @@
  * 配色与小程序一致：中性黑 #0d0d0d + 金色 #d4a94e，不引入蓝黑。
  */
 :root {
-  /* rpx 基准必须跟画布宽度走：桌面端 #app 被限制在 520px，
-     若用 100vw（整窗宽）所有尺寸会被放大 1.5 倍以上，标题直接断行。 */
-  --rpx: calc(min(100vw, 520px) / 750);
+  /* 2026-11-10 桌面自适应：旧版 --rpx = min(100vw,1024px)/750，宽屏时 1rpx≈1.365px，
+     28rpx 的正文被放大到 38px，整屏只放得下两三大张卡 —— 这正是「竖屏难受」的根因。
+     改为以可读字号为锚的刻度（28rpx 在手机约 14px、在桌面约 18px），把「尺寸刻度」
+     与「容器宽度」解耦：宽屏靠多列布局填满屏幕，而不是靠放大字号。 */
+  --rpx: clamp(0.5px, calc(100vw / 1100), 0.64px);
+  --sidebar-w: 224px;
   --shell-bg: #f4f5f7;
   --shell-card: #ffffff;
   --shell-tx: #18233a;
@@ -38,21 +41,208 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 a { text-decoration: none; color: inherit; }
 button { font-family: inherit; }
 
-/* ── 桌面端居中成一个「手机画布」，避免宽屏下布局散架 ── */
+/* 自定义滚动条：降低视觉重量，贴合中性黑 + 金的设计语言（Firefox 用 scrollbar-*，WebKit 用伪元素） */
+* { scrollbar-width: thin; scrollbar-color: rgba(148, 163, 184, .42) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, .40); border-radius: 8px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, .62); }
+
+/* ── 桌面自适应布局（2026-11-10） ──
+   旧版是「一台被放大的手机竖屏」：内容列固定在 1024px 居中、字号随屏宽线性放大，
+   电脑上两侧大片留白、一屏只放得下两张卡。现在改为：
+     · #app 始终铺满可用宽度，去掉 1024px 手机画布；
+     · 顶层 .card 在 ≥820px 自动两列、≥1700px 三列，横向空间真正被利用；
+     · ≥1100px 用左侧常驻侧栏替代底部 tabBar，形成桌面应用的横屏结构；
+     · <820px 保持单列手机布局；用户可用「宽屏 / 单列」按钮随时覆盖，偏好本地记住。 */
 #app {
-  max-width: 520px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--shell-bg);
   position: relative;
   overflow-x: hidden;
+  transition: margin .26s ease, width .26s ease;
 }
-@media (min-width: 700px) {
-  body { background: #0b0b0d; }
-  #app {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 30px 80px rgba(0, 0, 0, .55);
-    min-height: 100vh;
+@media (min-width: 1024px) {
+  body {
+    background:
+      radial-gradient(1200px 620px at 50% -12%, rgba(212, 169, 78, .12), transparent 60%),
+      radial-gradient(900px 500px at 110% 110%, rgba(125, 211, 252, .06), transparent 55%),
+      var(--shell-bg);
   }
+}
+
+/* 多列内容网格：只重排页面顶层的 .card；头部 / 空态 / 工具条等仍占整行。
+   用 #app 前缀提高特异性，压过页面级 wxss 的 [data-page] .card 规则。
+   横屏自由铺展：列数随视口宽度自动增加，卡片宽度恒定适中，屏越宽铺得越多、
+   单张却不会拉得过长 —— 这是「自由铺展」与「可读性」的平衡点。 */
+@media (min-width: 820px) {
+  #app > .page {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    column-gap: 18px;
+    row-gap: 0;
+  }
+  #app > .page > * { grid-column: 1 / -1; }
+  #app > .page > .card {
+    grid-column: auto;
+    align-self: start;
+    margin: 14px;   /* 统一覆盖 .card 的 20rpx 24rpx 与 .card + .card 的叠加 */
+    border-radius: 18px;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, .06), 0 6px 18px rgba(16, 24, 40, .05);
+    transition: transform .22s ease, box-shadow .22s ease;
+  }
+  #app > .page > .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(16, 24, 40, .10), 0 16px 40px rgba(16, 24, 40, .12);
+  }
+}
+@media (min-width: 1700px) {
+  #app > .page { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* 超宽屏：四列，把横向空间进一步铺满、单卡宽度仍守在舒适区间 */
+@media (min-width: 2400px) {
+  #app > .page { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* 极致宽屏：自适应列数，每增加约 440px 宽就多铺一列，永不把单卡拉得过宽 */
+@media (min-width: 3200px) {
+  #app > .page { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); align-content: start; }
+}
+/* 文字型页面（设置 / 使用指南等）：超宽屏收成舒适阅读栏，避免一行拉太长 */
+@media (min-width: 1500px) {
+  #app > .page[data-page="pages/more/more"],
+  #app > .page[data-page="subpkg/guide/guide"] {
+    display: block; max-width: 960px; margin: 0 auto;
+  }
+}
+
+/* ── 首页（pages/index）专属桌面布局：消掉「主卡高、副卡矮」造成的错位空格 ──
+   思路：主配置卡（.hero 行程配置）整行铺满；其余小卡（快捷入口 / 智能推荐 / 想玩 / 快捷回填）
+   用 auto-fit 网格两两成对，单卡自动撑满整行 —— 不出现「右栏大片留白 / 底截一刀」。
+   仅 ≥820px 接管；<820px 回落手机单列（.home-aux 用 auto-fit 自然塌成单列）。 */
+@media (min-width: 820px) {
+  #app > .page[data-page="pages/index/index"] {
+    display: block;
+    max-width: 1560px;
+    margin: 0 auto;
+    padding: 0 12px;
+  }
+  #app > .page[data-page="pages/index/index"] .home-aux {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 18px;
+    margin: 0 14px;
+  }
+  #app > .page[data-page="pages/index/index"] .home-aux > .card {
+    margin: 0;
+    border-radius: 18px;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, .06), 0 6px 18px rgba(16, 24, 40, .05);
+    transition: transform .22s ease, box-shadow .22s ease;
+  }
+  #app > .page[data-page="pages/index/index"] .home-aux > .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(16, 24, 40, .10), 0 16px 40px rgba(16, 24, 40, .12);
+  }
+}
+
+/* 手动「单列」覆盖自动分栏（用户偏好优先） */
+body.single-col #app > .page { display: block; max-width: 980px; margin: 0 auto; }
+body.single-col #app > .page > .card { margin: 20rpx 24rpx; }
+
+/* 手动「强制宽屏多列」：预览面板 / 竖条窗口等窄视口也能主动切成横屏布局。
+   与 body.single-col 互斥（由 app.js 保证），二者特异性相同，靠 JS 不并存。 */
+body.force-wide #app > .page {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  column-gap: 6px;
+}
+body.force-wide #app > .page > * { grid-column: 1 / -1; }
+body.force-wide #app > .page > .card {
+  grid-column: auto; align-self: start; margin: 10px;
+}
+/* 极窄视口（<700px）即使手动选了宽屏也回退单列：两列时每列不足 350px 会挤成一团 */
+@media (max-width: 699px) {
+  body.force-wide #app > .page { display: block; }
+  body.force-wide #app > .page > .card { margin: 20rpx 24rpx; }
+}
+
+/* ── 左侧常驻侧栏：桌面横屏结构 ── */
+#webSidebar {
+  display: none;
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w);
+  z-index: 9402; flex-direction: column;
+  background: var(--shell-card); border-right: 1px solid var(--shell-line);
+  font: 13px/1.4 -apple-system, system-ui, "PingFang SC", sans-serif;
+  box-shadow: 2px 0 18px rgba(0, 0, 0, .06);
+  transition: transform .26s ease, box-shadow .26s ease;
+}
+/* 侧栏收起按钮（在品牌区右上角，让出全宽用） */
+#webSidebar .ws-collapse {
+  position: absolute; top: 14px; right: 12px;
+  width: 30px; height: 30px; border: 1px solid var(--shell-line); background: transparent;
+  color: var(--shell-tx2); border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1;
+}
+#webSidebar .ws-collapse:hover { color: var(--gold); border-color: rgba(212, 169, 78, .5); }
+#webSidebar .ws-collapse:active { transform: scale(.94); }
+/* 侧栏收起后的「展开菜单」浮钮：平时隐藏，折叠态才出现 */
+#wsExpand {
+  display: none;
+  position: fixed; top: 10px; left: 10px; z-index: 9403;
+  align-items: center; gap: 6px;
+  border: 1px solid var(--shell-line); background: var(--shell-card); color: var(--shell-tx);
+  border-radius: 10px; padding: 8px 12px; cursor: pointer;
+  font: 13px/1 -apple-system, system-ui, "PingFang SC", sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .16);
+}
+#wsExpand:hover { color: var(--gold); border-color: rgba(212, 169, 78, .5); }
+#wsExpand:active { transform: scale(.97); }
+#webSidebar .ws-brand {
+  padding: 18px 16px 14px; border-bottom: 1px solid var(--shell-line);
+  position: relative;
+}
+#webSidebar .ws-brand b { display: block; color: var(--shell-tx); font-size: 15px; letter-spacing: .5px; }
+#webSidebar .ws-brand span { display: block; color: var(--shell-tx3); font-size: 11px; margin-top: 4px; }
+#webSidebar .ws-scroll { flex: 1; overflow-y: auto; padding: 6px 8px 12px; }
+#webSidebar .ws-group {
+  color: var(--shell-tx3); font-size: 11px; letter-spacing: 1px;
+  margin: 12px 8px 5px; padding-bottom: 4px; border-bottom: 1px solid var(--shell-line);
+}
+#webSidebar .ws-item {
+  display: flex; align-items: center; width: 100%; text-align: left;
+  border: 0; border-radius: 8px; padding: 8px 10px; margin: 1px 0;
+  background: transparent; color: var(--shell-tx); cursor: pointer; font-size: 13px;
+}
+#webSidebar .ws-item:hover { background: rgba(212, 169, 78, .12); }
+#webSidebar .ws-item.on { color: var(--gold); font-weight: 700; background: rgba(212, 169, 78, .14); }
+#webSidebar .ws-item .ws-dot { margin-left: auto; color: var(--shell-tx3); font-size: 10px; font-weight: 400; }
+#webSidebar .ws-foot { border-top: 1px solid var(--shell-line); padding: 10px 12px; display: grid; gap: 6px; }
+#webSidebar .ws-btn {
+  border: 1px solid var(--shell-line); background: transparent; color: var(--shell-tx);
+  border-radius: 8px; padding: 8px 10px; cursor: pointer; font-size: 12px; text-align: left;
+}
+#webSidebar .ws-btn:hover { border-color: rgba(212, 169, 78, .5); color: var(--gold); }
+@media (min-width: 1100px) {
+  #app { margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); }
+  body.has-tabbar #app { padding-bottom: 0; }
+  #tabbar { display: none !important; }
+  #webSidebar { display: flex; }
+  #webTopBar { left: var(--sidebar-w); }
+  #webNavPanel { left: calc(var(--sidebar-w) + 12px); right: auto; }
+  /* 侧栏已常驻全部页面清单，左下角重复入口收起 */
+  #webNavOpen { display: none; }
+  /* 侧栏收起：让出全宽，内容铺满屏幕；侧栏滑出视口外，仅留左上「展开菜单」浮钮 */
+  body.sidebar-collapsed #app { margin-left: 0; width: 100%; }
+  body.sidebar-collapsed #webSidebar { transform: translateX(-100%); box-shadow: none; }
+  body.sidebar-collapsed #webTopBar { left: 0; }
+  body.sidebar-collapsed #wsExpand { display: flex; }
 }
 
 /* ── 启动层 ── */
@@ -78,7 +268,7 @@ button { font-family: inherit; }
 /* ── tabBar ── */
 #tabbar {
   position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: 0; width: 100%; max-width: 520px;
+  bottom: 0; width: 100%; max-width: 1024px;
   display: flex; z-index: 900;
   background: rgba(13, 13, 13, .94);
   border-top: 1px solid rgba(255, 255, 255, .08);
@@ -162,12 +352,28 @@ input, textarea, select {
   -webkit-appearance: none; appearance: none;
 }
 input::placeholder, textarea::placeholder { color: var(--shell-tx3); }
-.w-picker-wrap { position: relative; }
-.w-picker-input {
-  width: 100%; margin-top: 6px; padding: 9px 10px; border: 1px solid var(--shell-line);
-  background: rgba(148, 163, 184, .08); color: var(--shell-tx);
+.w-picker-wrap { position: relative; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.w-picker-input, .w-picker-select {
+  flex: 1; min-width: 0; width: 100%; margin-top: 6px; padding: 9px 10px;
+  border: 1px solid var(--shell-line); border-radius: 8px;
+  background: rgba(148, 163, 184, .08); color: var(--shell-tx); font: inherit;
 }
-.w-picker-select { display: none; }
+/* 2026-11-10 修正：selector 已由 range 生成 option，必须可见、可选。
+   旧版是 0 个 option 的空 select，只能靠 display:none 遮丑，导致所有下拉点不动。 */
+.w-picker-select { display: block; -webkit-appearance: none; appearance: none; padding-right: 24px; }
+/* date/time 模式：原 select 退化为占位，真正可操作的是原生 input */
+.w-picker-native { display: none !important; }
+
+/* scroll-view 横向/纵向滚动降级：wxml.mjs 把 scroll-x/y 转成 class。
+   小程序由原生组件提供滚动，网页端只是普通 div；缺 overflow 时横向列表
+   会溢出容器，在多列布局下直接压到相邻列的卡片上。 */
+#app .w-sx {
+  overflow-x: auto; overflow-y: hidden; max-width: 100%;
+  white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+#app .w-sy { overflow-y: auto; max-height: 100%; -webkit-overflow-scrolling: touch; }
+#app .w-sx::-webkit-scrollbar { height: 5px; }
+#app .w-sx::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, .45); border-radius: 4px; }
 
 /* ── 网页版地图占位 ──
    合规红线：离线零 key，不内嵌任何在线地图 SDK / 底图。
@@ -191,3 +397,72 @@ input::placeholder, textarea::placeholder { color: var(--shell-tx3); }
   content: "下方点位清单、顺路度评分与逐条导航照常可用\A 点任意一行会打开高德地图查看位置";
   white-space: pre-line; color: var(--shell-tx3); font-size: 12px; line-height: 1.9;
 }
+/* 网页版地图示意图（真实坐标散点 + 当天连线）：有示意图时收起文字占位，让 SVG 铺满 */
+[data-page="subpkg/map/map"] .the-map.map-schem {
+  display: block; position: relative; padding: 0; border: 1px solid var(--shell-line);
+  background: rgba(148, 163, 184, .05);
+}
+[data-page="subpkg/map/map"] .the-map.map-schem::before,
+[data-page="subpkg/map/map"] .the-map.map-schem::after { content: none; }
+[data-page="subpkg/map/map"] .the-map .map-svg { display: block; width: 100%; height: 100%; }
+[data-page="subpkg/map/map"] .the-map .map-schem-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; color: var(--shell-tx3); font-size: 13px; line-height: 1.9;
+}
+
+/* ── 网页端全站导航（顶部返回栏 + 页面抽屉，2026-11-10） ──
+   非 tab 页显示顶部栏；tab 页靠左下角「全部页面」常驻按钮进抽屉。
+   层级低于 w-layer(9500) / AI 面板(9990)，避免遮住 toast 与助手。 */
+body.has-topbar { padding-top: 46px; }
+#webTopBar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9400; height: 46px;
+  display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  background: var(--shell-card); border-bottom: 1px solid var(--shell-line);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .08);
+  font: 14px/1 -apple-system, system-ui, "PingFang SC", sans-serif;
+}
+#webTopBar.hidden { display: none; }
+#webTopBar button {
+  border: 1px solid var(--shell-line); background: transparent; color: var(--shell-tx);
+  border-radius: 8px; padding: 7px 11px; cursor: pointer; font-size: 13px;
+}
+#webTopBar button:active { transform: scale(.97); }
+#webTopBar .wt-back { color: var(--gold); border-color: rgba(212, 169, 78, .4); }
+#webTopBar .wt-title {
+  flex: 1; text-align: center; font-weight: 700; color: var(--shell-tx);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#webNavPanel {
+  position: fixed; right: 10px; bottom: 64px; z-index: 9401; width: min(300px, 88vw);
+  max-height: min(70vh, 560px); overflow-y: auto; padding: 12px;
+  background: var(--shell-card); border: 1px solid var(--shell-line); border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .28);
+  font: 13px/1.4 -apple-system, system-ui, "PingFang SC", sans-serif;
+}
+#webNavPanel.hidden { display: none; }
+#webNavPanel .wn-head {
+  display: flex; align-items: center; justify-content: space-between;
+  color: var(--shell-tx); font-size: 14px; margin-bottom: 8px;
+}
+#webNavPanel .wn-head button {
+  border: 0; background: transparent; color: var(--shell-tx2); font-size: 20px; cursor: pointer;
+}
+#webNavPanel .wn-g {
+  color: var(--shell-tx3); font-size: 11px; letter-spacing: 1px;
+  margin: 12px 0 5px; padding-bottom: 4px; border-bottom: 1px solid var(--shell-line);
+}
+#webNavPanel .wn-item {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  text-align: left; border: 0; border-radius: 8px; padding: 8px 10px; margin: 2px 0;
+  background: transparent; color: var(--shell-tx); cursor: pointer; font-size: 13px;
+}
+#webNavPanel .wn-item:hover { background: rgba(212, 169, 78, .12); }
+#webNavPanel .wn-item.on { color: var(--gold); font-weight: 700; background: rgba(212, 169, 78, .14); }
+#webNavPanel .wn-home { color: var(--gold); }
+#webNavPanel .wn-tab { color: var(--shell-tx3); font-size: 10px; font-weight: 400; }
+#webNavPanel .wn-foot { color: var(--shell-tx3); font-size: 11px; margin-top: 12px; line-height: 1.7; }
+@media (min-width: 720px) { #webNavPanel { bottom: 18px; } }
+
+/* 地图示意图标点可点：点编号直接唤起高德导航（对齐小程序 bindmarkertap） */
+[data-page="subpkg/map/map"] .the-map .map-mk { cursor: pointer; }
+[data-page="subpkg/map/map"] .the-map .map-mk:hover { stroke: var(--gold); stroke-width: 3; }

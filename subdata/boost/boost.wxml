@@ -1,7 +1,7 @@
 <view class="page fz{{fz}}">
   <view class="hd">
     <text class="hd-title">行程增强</text>
-    <text class="hd-sub">体检 / 问答 / 换景点 / 动线 / 高光</text>
+    <text class="hd-sub">体检 / 问答 / 动线 / 高光 / 提醒</text>
   </view>
 
   <view class="card">
@@ -26,16 +26,6 @@
       <button class="mini-btn" size="mini" bindtap="askQ">问</button>
     </view>
     <view wx:if="{{qAns}}" class="ans">{{qAns}}</view>
-  </view>
-
-  <view class="card">
-    <view class="card-head"><text class="card-title">一键换景点</text></view>
-    <view wx:for="{{alts}}" wx:key="name" class="row">
-      <text class="row-txt">{{item.name}} · {{item.tags}}</text>
-    </view>
-    <view wx:if="{{alts.length}}" class="btn-row">
-      <button size="mini" bindtap="refreshAlts">换一批</button>
-    </view>
   </view>
 
   <view class="card">
@@ -65,16 +55,6 @@
   </view>
 
   <view class="card">
-    <view class="card-head"><text class="card-title">交通</text></view>
-    <view class="qbar">
-      <input class="qinput" placeholder="出发城市" value="{{cityA}}" bindinput="onAInput" />
-      <input class="qinput" placeholder="到达城市" value="{{cityB}}" bindinput="onBInput" />
-      <button class="mini-btn" size="mini" bindtap="calcTrans">估</button>
-    </view>
-    <view wx:if="{{trans}}" class="ans">{{trans}}</view>
-  </view>
-
-  <view class="card">
     <view class="card-head"><text class="card-title">快捷记账</text></view>
     <view class="qbar">
       <input class="qinput" type="digit" placeholder="金额" value="{{amt}}" bindinput="onAmtInput" />
@@ -84,12 +64,4 @@
     </view>
   </view>
 
-  <view class="card">
-    <view class="card-head"><text class="card-title">照片与分享</text></view>
-    <view class="btn-row">
-      <button size="mini" bindtap="pickPhoto">给行程加一张照片</button>
-      <button size="mini" bindtap="copyPlan">复制攻略文本</button>
-    </view>
-    <view wx:if="{{photoN}}" class="ans">已添加 {{photoN}} 张照片</view>
-  </view>
 </view>

@@ -1,4 +1,4 @@
-const { getAppSafe, SafePage } = require("../../utils/app.js");
+const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 // index：目的地选择 → 生成攻略
 // 对齐网页版：城市搜索选择器 / 出行模式 / 想玩景点池自选 / 收藏目的地 / 总预算语义
@@ -6,6 +6,8 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一存储封装（失败有提示，不再静默丢数据）
 const R = require("../../utils/recommend.js");   // 智能推荐引擎（端侧计算，纯本地，不联网）
+const AIAgent = require("../../utils/ai-agent.js");   // 统一 AI Agent（意图解析 / 多轮记忆）
+const Cloud = require("../../utils/cloud.js");
 
 // v1.19.100 修复：模块顶层 `getApp()` 在 lazyCodeLoading 下可能返回 undefined（App 尚未注册完），
 // 会导致 onLoad 整段初始化被抛错跳过、且本页 10 处 handler（goPlan / generate / 回填 等）访问
@@ -109,11 +111,20 @@ Page(SafePage({
     // ---- 2026-09 v1.8.4 ----
     blindOpen: false, blind3: [],   // A8 目的地盲盒
     remind: null,                  // B18 预约横幅
-    guideSeen: false              // v1.18：首访引导看过即不再常驻（一次性轻提示）
+    guideSeen: false,              // v1.18：首访引导看过即不再常驻（一次性轻提示）
+    // AI 行程助手：一句话 → 解析参数 → 本地 T.buildPlan 生成真实行程（零伪造）
+    aiText: "", aiLoading: false, aiParsed: null, aiSummary: "", aiErr: ""
   },
 
   onLoad(options) {
     this.__boot = T.ready().catch(() => null);
+    // AI 行程助手草稿：切走再回来不丢（仅本机、只存解析结果，不含任何密钥）
+    try {
+      const d = S.get("aiPlanDraftV1", null);
+      if (d && typeof d === "object") {
+        this.setData({ aiText: String(d.text || ""), aiParsed: d.parsed || null, aiSummary: String(d.summary || "") });
+      }
+    } catch (e) {}
     let provs = [];
     try { provs = T.provinces() || []; } catch (e) { provs = []; }
     let last = null;
@@ -125,7 +136,9 @@ Page(SafePage({
     try {
       this._initFrom();
       this.setData({
-        depart: iso(new Date(new Date().getTime() + 7 * 86400000)),
+        // 2026-11-09：默认出发日从 +7 改为 +3 —— 和风免费档只有未来 7 天(today..+6)，
+        // 默认 +7 会让「按默认日期生成」的行程整段落在预报窗口外，天气卡永远显示不可用。
+        depart: iso(new Date(new Date().getTime() + 3 * 86400000)),
         departMin: iso(new Date()),
         hasOld: !!(app.globalData && app.globalData.plan && app.globalData.plan.days),
         recents: _uniqRecent(T.getRecent()),
@@ -141,7 +154,9 @@ Page(SafePage({
     } catch (e) {
       try {
         this.setData({
-          depart: iso(new Date(new Date().getTime() + 7 * 86400000)),
+          // 2026-11-09：默认出发日从 +7 改为 +3 —— 和风免费档只有未来 7 天(today..+6)，
+        // 默认 +7 会让「按默认日期生成」的行程整段落在预报窗口外，天气卡永远显示不可用。
+        depart: iso(new Date(new Date().getTime() + 3 * 86400000)),
           departMin: iso(new Date()),
           provinces: provs
         });
@@ -787,6 +802,11 @@ Page(SafePage({
     this.setData({ pickKw2: "" });
     this._filterPool();
   },
+  // 180ms 防抖定时器在页面卸载后仍会触发 _filterPool → 对已卸载实例 setData，
+  // 小程序报「setData on unloaded page」，网页版则会多一次无谓的整页重绘。
+  onUnload() {
+    if (this._kwTimer) { clearTimeout(this._kwTimer); this._kwTimer = null; }
+  },
   // v1.15：想玩池按标签筛选（再次点击取消）
   onPoolTag(e) {
     const tag = String(e.currentTarget.dataset.tag || "");
@@ -848,6 +868,102 @@ Page(SafePage({
   resumeOld() {
     if (!app.globalData.plan) return;
     wx.switchTab({ url: "/pages/today/today" });
+  },
+
+  // ── AI 行程助手（LLM 只解析参数，行程一律由本地引擎生成，零伪造） ──
+  onAIPlanInput(e) { this.setData({ aiText: e.detail.value }); },
+
+  _aiSummary(p) {
+    const L = { low: "经济", mid: "舒适", high: "高端" };
+    const P = { leisure: "轻松", balance: "平衡", speed: "特种兵" };
+    const M = { "": "不指定", family: "亲子游", couple: "情侣游", solo: "独行", elder: "带老人" };
+    const B = { "": "不偏好", history: "偏历史古迹", nature: "偏自然风光" };
+    const a = [];
+    if (p.city) a.push(p.city);
+    if (p.days) a.push(p.days + " 天");
+    if (p.budget) a.push(L[p.budget] || p.budget);
+    if (p.pace) a.push(P[p.pace] || p.pace);
+    if (p.people) a.push(p.people + " 人");
+    if (p.travelMode) a.push(M[p.travelMode] || p.travelMode);
+    if (p.bias) a.push(B[p.bias] || p.bias);
+    return a.join(" · ");
+  },
+
+  aiParse() {
+    const q = String(this.data.aiText || "").trim();
+    if (!q) { wx.showToast({ title: "先说一句话，如：3天成都，预算2000，爱吃", icon: "none" }); return; }
+    if (!Cloud.cloudEnabled()) {
+      this.setData({ aiErr: "云端 AI 未开启：需先在云开发部署 llmProxy 并配置云环境 ID。当前可手动选城市生成。" });
+      return;
+    }
+    const self = this;
+    self.setData({ aiLoading: true, aiErr: "", aiParsed: null, aiSummary: "" });
+    AIAgent.parsePlanIntent(q).then((p) => {
+      if (!p) { self.setData({ aiLoading: false, aiErr: "没解析出有效参数。换个说法试试，如「3天成都，预算2000，带老人」" }); return; }
+      const sum = self._aiSummary(p);
+      try { S.set("aiPlanDraftV1", { text: q, parsed: p, summary: sum }); } catch (e) {}
+      self.setData({ aiLoading: false, aiParsed: p, aiSummary: sum });
+    }).catch(() => { self.setData({ aiLoading: false, aiErr: "解析失败，可手动选择后生成" }); });
+  },
+
+  aiCancel() {
+    try { S.del("aiPlanDraftV1"); } catch (e) {}
+    this.setData({ aiParsed: null, aiSummary: "", aiErr: "" });
+  },
+
+  aiGenerate() {
+    const p = this.data.aiParsed || {};
+    const self = this;
+    if (!this.data.depart || this.data.depart < this.data.departMin) {
+      wx.showToast({ title: "出发日期不能早于今天", icon: "none" }); return;
+    }
+    // AI 生成只走单城分支；多站/全省模式下先明确提示，避免静默把用户切回单城
+    if (this.data.multiMode || this.data.provMode) {
+      wx.showToast({ title: "AI 生成暂只支持单城，请先切回「城市」", icon: "none" }); return;
+    }
+    let c = null;
+    try { c = p.city ? T.findCity(p.city) : null; } catch (e) {}
+    if (!c) c = this.data.cities[this.data.cityIdx];
+    if (!c || !c.name) { wx.showToast({ title: "城市无效，请手动选择目的地", icon: "none" }); return; }
+    const days = p.days || this.data.days || 4;
+    const budget = p.budget || this.data.budgetKeys[this.data.budgetIdx] || "mid";
+    const pace = p.pace || this.data.paceVals[this.data.paceIdx] || "balance";
+    const tm = (p.travelMode !== undefined && p.travelMode !== null) ? p.travelMode : (this.data.travelModeVals[this.data.travelModeIdx] || "");
+    const people = p.people || this.data.people || 2;
+    const bias = (p.bias !== undefined && p.bias !== null) ? p.bias : (this.data.biasVals[this.data.biasIdx] || "");
+    try { const old = app.globalData.plan; if (old && old.days && old.days.length) T.savePlanSlot(old); } catch (e) {}
+    try { wx.showLoading({ title: "正在生成攻略…", mask: true }); } catch (e) {}
+    // 让 loading 先渲染：buildPlan 是同步计算，大城/多天会明显停顿
+    setTimeout(function () {
+      try {
+        const picks = T.getWish().filter(x => !x.city || x.city === c.name).map(x => x.name);
+        const pickOnly = self.data.pickOnly && picks.length > 0;
+        const daysArr = T.buildPlan({
+          city: c, days: days, depart: self.data.depart, budget: budget, pace: pace,
+          travelMode: tm, people: people, stayMountain: self.data.stayMtn,
+          picks: picks, pickOnly: pickOnly, bias: bias
+        });
+        const fo = self.data.fromCityObj || null;
+        const from = fo ? { province: fo.province, city: fo.name } : { province: "山西省", city: "太原" };
+        app.globalData.from = { province: c.province || self.data.provName, city: c.name };
+        app.setPlan({
+          cityName: c.name, province: c.province || self.data.provName,
+          totalDays: daysArr.length, depart: self.data.depart, days: daysArr,
+          budget: budget, customAmt: 0, people: people, pace: pace, travelMode: tm,
+          pickOnly: pickOnly, isMulti: false, from: from, savedAt: Date.now(), bias: bias
+        });
+        T.resetTripPrep();
+        try { T.pushRecent({ province: c.province || self.data.provName, city: c.name, days: daysArr.length, depart: self.data.depart }); } catch (e) {}
+        try { AN.track("plan_generate", { ok: 1, mode: "ai", days: daysArr.length }); } catch (e) {}
+        try { S.del("aiPlanDraftV1"); } catch (e) {}
+        try { wx.hideLoading(); } catch (e) {}
+        wx.switchTab({ url: "/pages/plan/plan" });
+      } catch (err) {
+        try { wx.hideLoading(); } catch (e) {}
+        try { console.error("[aiGenerate] 生成失败：", err); } catch (e) {}
+        wx.showToast({ title: "生成失败，请手动生成", icon: "none" });
+      }
+    }, 30);
   },
 
   generate() {
@@ -1013,6 +1129,9 @@ Page(SafePage({
       try { AN.track("plan_generate", { ok: 1, mode: this.data.multiMode ? "multi" : (this.data.isGuide ? "prov" : "city"), days: this.data.days }); } catch (e) {}
       wx.switchTab({ url: "/pages/plan/plan" });
     } catch (err) {
+      // v1.20.6：把被吞的真实异常透出来，否则「生成失败」永远是无头案。
+      // 与 web/lib/runtime.js 的 handler 错误日志保持一致（属错误上报，非调试噪音）。
+      try { console.error("[generate] 生成攻略真实异常：", err); } catch (e) {}
       // 埋点：生成失败（这是最该盯的指标——主路径走不通，其他优化都是白费）
       try { AN.track("plan_generate", { ok: 0 }); } catch (e) {}
        // v1.11：生产包不留 console.log（错误已通过 toast 告知用户）
@@ -1037,15 +1156,7 @@ Page(SafePage({
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
 
-  onShow() {
-    try { AN.pageView("index"); } catch (e) {}
-    this.setData({ fz: T.fontScale() });
-    (this.__boot || Promise.resolve()).then(() => {
-      try { this._ensureForm(); } catch (e) {}
-      try { this._renderShow(); } catch (e) {}
-      try { this.maybeShowGuideModal(); } catch (e) {}
-    });
-  },
+  onShow() { onShowRender(this, "index", () => this._ensureForm(), () => this.maybeShowGuideModal()); },
 
   // v1.19.60：数据就绪自愈 —— onLoad 内的省/市填充是同步执行的，若冷启动分包数据尚未到位
   // （或上次加载被吞错），选择器会渲染为空且 onShow._renderShow 不重填 → 永久空白误判白屏。
@@ -1220,6 +1331,36 @@ Page(SafePage({
     }
   },
   goPlan() { wx.switchTab({ url: "/pages/plan/plan" }); },
+
+  // 2026-11-09（#482 示例行程）：一键载入「成都 5 天」精排示例，复用正常生成路径（离线可出）
+  onSample() {
+    try {
+      const c = T.findCity ? T.findCity("成都") : null;
+      if (!c) { wx.showToast({ title: "示例城市暂未收录", icon: "none" }); return; }
+      // 示例行程用 +2 出发：5 天正好落在和风 7 天预报窗口(today..+6)内，演示能直接看到天气
+      const d = new Date(); d.setDate(d.getDate() + 2);
+      const pad = n => (n < 10 ? "0" + n : "" + n);
+      const depart = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      const oldPlan = app.globalData && app.globalData.plan;
+      if (oldPlan && oldPlan.days && oldPlan.days.length) { try { T.savePlanSlot(oldPlan); } catch (e) {} }
+      const daysArr = T.buildPlan({
+        city: c, days: 5, depart: depart, budget: "mid", pace: "balance",
+        travelMode: "", people: 2, picks: [], pickOnly: false, bias: ""
+      });
+      const from = { province: c.province || "", city: c.name };
+      app.globalData.from = from;
+      app.setPlan({
+        cityName: c.name, province: c.province || "", totalDays: daysArr.length, depart: depart,
+        days: daysArr, budget: "mid", customAmt: 0, people: 2, pace: "balance", travelMode: "",
+        pickOnly: false, isMulti: false, from: from, savedAt: Date.now(), bias: "", isSample: true
+      });
+      try { T.resetTripPrep(); } catch (e) {}
+      wx.showToast({ title: "已载入示例：成都 · 5 天", icon: "none" });
+      wx.switchTab({ url: "/pages/plan/plan" });
+    } catch (err) {
+      try { wx.showToast({ title: "示例载入失败，请稍后重试", icon: "none" }); } catch (e) {}
+    }
+  },
   // v1.8.4 B18：预约提醒 → 出行准备页
   goPrep() { wx.navigateTo({ url: "/subpkg/prep/prep" }); },
   // 使用指南（独立页，随时可看）
@@ -1251,7 +1392,7 @@ Page(SafePage({
     const url = ds.url;
     const focus = ds.focus;
     // v1.20.3：磁贴带定位意图时先写入存储，plan 页 onShow 读后自动滚动/展开对应区块
-    if (focus) { try { wx.setStorageSync("miniFocusV1", String(focus)); } catch (_) {} }
+    if (focus) { S.set("miniFocusV1", String(focus)); }
     if (!url) { wx.showToast({ title: "该入口暂不可用", icon: "none" }); return; }
     const isTab = ["/pages/plan/plan", "/pages/today/today", "/pages/more/more"].indexOf(url) >= 0;
     if (isTab) {

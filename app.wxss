@@ -354,3 +354,30 @@ page {
 .cp-chips { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 16rpx; }
 .cp-chip { font-size: calc(22rpx * var(--fs, 1)); color: var(--t2, #3a4759); background: rgba(var(--ln-rgb, 148,163,184), .10); border-radius: 999rpx; padding: 8rpx 18rpx; }
 .cp-tip { margin: 16rpx 8rpx 0; }
+
+/* ══ 全局 AI 多轮问答卡片（help / prep / deep 共用） ══ */
+.ai-card .ai-h { display: flex; align-items: center; gap: 10rpx; }
+.ai-card .ai-h .ic { width: 34rpx; height: 34rpx; }
+.ai-card .ai-t { flex: 1; font-size: calc(28rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); }
+.ai-card .ai-badge { flex: none; font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 14rpx; }
+.ai-card .ai-clear { flex: none; font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc);
+  border: 1rpx dashed rgba(var(--ln-rgb, 148, 163, 184), .4); border-radius: 999rpx; padding: 4rpx 16rpx; }
+.ai-card .ai-tip { margin: 10rpx 0 14rpx; font-size: calc(22rpx * var(--fs, 1)); line-height: 1.6; }
+.ai-card .ai-row { display: flex; align-items: center; gap: 12rpx; }
+.ai-card .ai-inp { flex: 1; background: var(--card, #131d31); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .18);
+  border-radius: 999rpx; padding: 16rpx 26rpx; font-size: calc(26rpx * var(--fs, 1)); color: var(--t1, #eaeff7); }
+.ai-card .ai-btn { flex: none; font-size: calc(25rpx * var(--fs, 1)); color: #14100a; font-weight: 700;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f); border-radius: 999rpx; padding: 16rpx 30rpx; }
+.ai-card .ai-btn:active { opacity: .85; }
+.ai-card .ai-btn.ai-busy { opacity: .55; }
+.ai-card .ai-ans { margin-top: 14rpx; font-size: calc(26rpx * var(--fs, 1)); color: var(--t1, #dce5f0);
+  line-height: 1.75; white-space: pre-wrap; word-break: break-word; background: var(--panel, #18233a);
+  border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .12); border-radius: 16rpx; padding: 16rpx 20rpx; }
+.ai-card .ai-err { margin-top: 12rpx; font-size: calc(23rpx * var(--fs, 1)); color: var(--red, #e56a6a); line-height: 1.6; }
+
+/* ══ 全局 AI 结果复制按钮 ══ */
+.ai-copy { display: inline-block; margin-top: 12rpx; font-size: calc(22rpx * var(--fs, 1));
+  color: var(--chip-tx, #d4a94e); border: 1rpx dashed rgba(212,169,78,.45);
+  border-radius: 999rpx; padding: 6rpx 20rpx; }
+.ai-copy:active { background: rgba(212,169,78,.14); }
