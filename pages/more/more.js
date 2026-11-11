@@ -325,6 +325,7 @@ Page(SafePage({
 
   // v1.19.179：跳转「我的攻略」本地库
   goMyGuides() { try { wx.navigateTo({ url: "/pages/myguides/myguides" }); } catch (_) {} },
+  goTravelsvc() { try { wx.navigateTo({ url: "/subpkg/travelsvc/travelsvc" }); } catch (_) {} },
 
   /* 数据说明与免责声明：材料里承诺的「公开资料整理 + 免责」必须在产品内可见，
    * 否则计划书与产品不一致，属于评审可当场识破的口径问题。 */

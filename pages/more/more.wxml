@@ -418,6 +418,14 @@
   <view class="group">
     <view class="group-title">数据与隐私</view>
     <view class="card group-card">
+      <view class="menu" bindtap="goTravelsvc">
+        <image class="m-ic" src="/images/icons/shield.png"/>
+        <view class="m-txt">
+          <view class="m-t">旅客服务与隐私协议</view>
+          <view class="m-d dim">离线能力 / 动态提醒 / 多语言多币种 / 合规说明</view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
       <view class="menu" bindtap="clearAllData">
         <image class="m-ic" src="/images/icons/close.png"/>
         <view class="m-txt">

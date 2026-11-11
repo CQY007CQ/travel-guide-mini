@@ -62,7 +62,8 @@
         "guide/guide",
         "toolkit/toolkit",
         "spotsearch/spotsearch",
-        "lens/lens"
+        "lens/lens",
+        "travelsvc/travelsvc"
       ]
     },
     {
