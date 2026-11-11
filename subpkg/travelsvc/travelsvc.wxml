@@ -62,6 +62,7 @@
       <view class="svc-note dim">{{tx.backupTip}}</view>
       <view class="svc-h3 svc-gap">{{tx.memTitle}}</view>
       <view class="svc-note dim">{{tx.memStat}}：{{memScenes}} / {{memTurns}} / {{memChars}}</view>
+      <view class="svc-note dim">{{aiEnabled ? 'AI 通道 · 云端已启用（成功 '+aiOk+' / 失败 '+aiFail+'）' : 'AI 通道 · 离线模式（本地引擎，未配云端）'}}</view>
       <view class="ai-copy" bindtap="clearAllChats">{{tx.clearChats}}</view>
     </view>
   </view>

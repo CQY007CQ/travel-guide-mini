@@ -269,12 +269,19 @@ function withTimeout(p, ms) {
   });
 }
 
+// 云端 AI 调用本地计数器（仅云端实际启用时计数，避免把"未配置"误记成失败；供旅客服务中心展示通道健康）
+let _aiCalls = 0, _aiOk = 0, _aiFail = 0;
+function aiChannelStats() {
+  return { enabled: cloudEnabled(), calls: _aiCalls, ok: _aiOk, fail: _aiFail };
+}
+
 // 调云端 llmProxy：传入对话 / 单轮问题 + 本地上下文，返回 { ok, text, model, source }。
 // 任何失败（云未开 / 未配置 / 网络错 / 超时）都返回 { ok:false }，调用方必须回落离线引擎，绝不白屏。
 function aiChat(opts) {
   opts = opts || {};
   return new Promise(function (resolve) {
     if (!cloudEnabled()) { resolve({ ok: false, err: "cloud-disabled" }); return; }
+    _aiCalls++;
     const payload = {
       messages: Array.isArray(opts.messages) ? opts.messages : null,
       prompt: (typeof opts.prompt === "string" && opts.prompt.trim()) ? opts.prompt.trim() : null,
@@ -285,8 +292,8 @@ function aiChat(opts) {
       max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : null
     };
     withTimeout(callFunction("llmProxy", payload), 15000).then(function (r) {
-      if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
-      else resolve({ ok: false, err: (r && r.err) || "ai-failed", raw: r });
+      if (r && r.ok && r.text) { _aiOk++; resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" }); }
+      else { _aiFail++; resolve({ ok: false, err: (r && r.err) || "ai-failed", raw: r }); }
     });
   });
 }
@@ -357,6 +364,7 @@ module.exports = {
   clearPairedUid: clearPairedUid,
   aiContextOf: aiContextOf,
   aiChat: aiChat,
+  aiChannelStats: aiChannelStats,
   uploadImage: uploadImage,
   aiVision: aiVision
 };

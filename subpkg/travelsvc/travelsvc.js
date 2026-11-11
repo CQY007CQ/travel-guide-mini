@@ -6,6 +6,7 @@ const S = require("../../utils/store.js");
 const EL = require("../../utils/errlog.js");
 const SVC = require("../utils/travel-service.js");
 const AG = require("../../utils/ai-agent.js");
+const Cloud = require("../../utils/cloud.js");   // 云端 AI 通道统计（仅本地计数，零网络、零合规风险）
 const app = getAppSafe();
 
 const CURRENCIES = Object.keys(SVC.DEFAULT_RATES).filter(k => k !== "CNY");
@@ -50,6 +51,7 @@ Page(SafePage({
     wxDeltas: [], wxNote: "", fcUpdates: [], fcNote: "",
     statPlan: 0, statWish: 0, statSpent: 0,
     memScenes: 0, memTurns: 0, memChars: 0,
+    aiEnabled: false, aiCalls: 0, aiOk: 0, aiFail: 0,
     cny: "", curIdx: 0, curNames: [], curKey: "", curRate: "", convResult: "",
     rates: SVC.DEFAULT_RATES, rateEdit: "", rateOpen: false
   },
@@ -118,8 +120,11 @@ Page(SafePage({
     try { spent = Math.round(T.totalSpent()); } catch (e) { try { EL.push("travelsvc.statSpent", e); } catch (_) {} }
     let mem = { scenes: 0, turns: 0, chars: 0 };
     try { mem = AG.memoryStats() || mem; } catch (e) { try { EL.push("travelsvc.memStats", e); } catch (_) {} }
+    let ai = { enabled: false, calls: 0, ok: 0, fail: 0 };
+    try { ai = Cloud.aiChannelStats() || ai; } catch (e) { try { EL.push("travelsvc.aiStats", e); } catch (_) {} }
     this.setData({ wxDeltas: deltas, wxNote: note, fcUpdates, fcNote, statPlan: plan, statWish: wish, statSpent: spent,
-      memScenes: mem.scenes, memTurns: mem.turns, memChars: mem.chars });
+      memScenes: mem.scenes, memTurns: mem.turns, memChars: mem.chars,
+      aiEnabled: ai.enabled, aiCalls: ai.calls, aiOk: ai.ok, aiFail: ai.fail });
     this._convert();
   },
 
