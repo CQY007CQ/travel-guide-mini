@@ -152,6 +152,17 @@ button { font-family: inherit; }
   }
 }
 
+/* ── 顺序型页面（行程时间线 / 今天安排 / 地图）桌面保持单列 ──
+   通用 2 列网格会把 day-card / 时间线 / 地图清单左右错开，打断「从上往下读」的顺序，
+   单列居中（≤1080px）既避免错位，又比手机全宽更舒展；特异性高于通用网格规则，优先命中。 */
+@media (min-width: 820px) {
+  #app > .page[data-page="pages/plan/plan"],
+  #app > .page[data-page="pages/today/today"],
+  #app > .page[data-page="subpkg/map/map"] {
+    display: block; max-width: 1080px; margin: 0 auto; padding: 0 12px;
+  }
+}
+
 /* 手动「单列」覆盖自动分栏（用户偏好优先） */
 body.single-col #app > .page { display: block; max-width: 980px; margin: 0 auto; }
 body.single-col #app > .page > .card { margin: 20rpx 24rpx; }
@@ -243,6 +254,15 @@ body.force-wide #app > .page > .card {
   body.sidebar-collapsed #webSidebar { transform: translateX(-100%); box-shadow: none; }
   body.sidebar-collapsed #webTopBar { left: 0; }
   body.sidebar-collapsed #wsExpand { display: flex; }
+}
+
+/* ── 桌面侧栏常驻时：页面级 modal 必须压过侧栏 ──
+   旧版页面浮层（.pmask z998 / .psheet z999 / .ach-mask z999 / .mask z99）低于侧栏 z9402，
+   在 ≥1100px 侧栏常驻时，遮罩压不住侧栏、底部操作面板左 224px 被侧栏盖住。
+   这里把页面 modal 提到侧栏之上（仍低于 AI 面板 9990 / toast 9500），保证弹窗覆盖全屏含侧栏。 */
+@media (min-width: 1100px) {
+  [data-page] .pmask, [data-page] .ach-mask, [data-page] .mask { z-index: 9450; }
+  [data-page] .psheet { z-index: 9451; }
 }
 
 /* ── 启动层 ── */
