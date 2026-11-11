@@ -1083,7 +1083,11 @@ assert("视觉护栏：视觉模型不误拦", ["gpt-4o", "qwen-vl-max", "deepse
 const SVCJS = req("fs").readFileSync("./subpkg/travelsvc/travelsvc.js", "utf8");
 assert("天气缓存：有 6 小时硬过期", SVCJS.indexOf("6 * 3600 * 1000") >= 0);
 assert("预报快照：校验城市 cacheKey", SVCJS.indexOf("snap.key === cacheKey") >= 0);
-assert("首页 AI：多站/全省模式收口", req("fs").readFileSync("./pages/index/index.js", "utf8").indexOf("AI 生成暂只支持单城") >= 0);
+// 首页 AI 已重构为模式无关的 ai-entry→assistant 路径，旧的「仅单城」内联生成器已移除
+const IDX_WXML = req("fs").readFileSync("./pages/index/index.wxml", "utf8");
+const IDX_JS = req("fs").readFileSync("./pages/index/index.js", "utf8");
+assert("首页 AI：走模式无关 ai-entry(generate) 入口", /ai-entry[^>]*topic="generate"/.test(IDX_WXML), "index.wxml 缺少 ai-entry topic=generate");
+assert("首页 AI：已移除旧的单城内联生成器(防回潮)", IDX_JS.indexOf("AI 生成暂只支持单城") < 0 && IDX_JS.indexOf("aiGenerate") < 0);
 AG.clearHistory("__m__");
 AG.remember("__m__", "user", "q1"); AG.remember("__m__", "assistant", "a1");
 const ms = AG.memoryStats();
