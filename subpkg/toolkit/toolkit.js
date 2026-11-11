@@ -3,6 +3,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // 旅行百宝箱：灵感 / 体检 / 文案 / 打包，一键生成（v1.10 功能落地页）
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
+const Cloud = require("../../utils/cloud.js");   // 云端 AI（llmProxy 强模型网关，fail-closed）
 const app = getAppSafe();
 
 // 工具分组抽到 utils/toolkit-groups.js，与指南页共用（避免页面模块互相 require）
@@ -25,7 +26,9 @@ Page(SafePage({
   // 改为分组折叠、默认只展开第一组：首屏从 33 行降到 6 行，功能一个没少。
   openMap: ITEM_GROUPS.map((g, i) => i === 0),
   // v1.19 P2-9：工具结果闭环 —— 收藏 + 加入想玩
-  favs: [], favOpen: false, favIdx: -1, outAddable: false },
+  favs: [], favOpen: false, favIdx: -1, outAddable: false,
+  // AI 自由问答（结果复用 out 区，自动获得复制/收藏/加入想玩）
+  aiQ: "", aiLoading: false },
 
  // v1.11：onLoad 里 theme() 尚未跑，直接 refresh 会因 setData 早于初始化报警；改为安全包裹
  onLoad() {
@@ -33,6 +36,7 @@ Page(SafePage({
    // 工具 key → 标题，供收藏展示
    this._toolTitle = {};
    ITEM_GROUPS.forEach(g => (g.items || []).forEach(it => { this._toolTitle[it.k] = it.t; }));
+   this._toolTitle.ai = "AI 问答";   // AI 自由问答的收藏标题
    try { this.refresh(); } catch (e) {}
  },
  _theme() { try { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); } catch (e) {} },
@@ -302,6 +306,32 @@ Page(SafePage({
   return out.slice(0, 20);
  },
  toggleFavList() { this.setData({ favOpen: !this.data.favOpen, favIdx: -1 }); },
+
+ // ── AI 自由问答（云端强模型优先 · 离线兜底 · 结果复用 out 区） ──
+ onAIInput(e) { this.setData({ aiQ: e.detail.value }); },
+ askAI() {
+  if (this.data.aiLoading) return;
+  const q = String(this.data.aiQ || "").trim();
+  if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
+  const self = this;
+  const plan = app.globalData && app.globalData.plan;
+  const local = () => {
+   let r;
+   try { r = T.askAssistant(q, plan); } catch (e) { r = { text: "" }; }
+   const txt = (r && r.text) || "离线模式：这个问题暂时没有本地答案，试试上方工具箱里的具体工具，或换更具体的问法。";
+   self.setData({ out: { k: "ai", txt: txt }, outAddable: false, aiLoading: false });
+  };
+  self.setData({ aiLoading: true });
+  if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { local(); return; }
+  let ctx = "";
+  try { ctx = Cloud.aiContextOf(plan, "旅行百宝箱") + "\n当前城市：" + (this.data.cityName || "未知") + "。"; } catch (e) { ctx = ""; }
+  Cloud.aiChat({ prompt: q, context: ctx })
+   .then((r) => {
+    if (r && r.ok && r.text) self.setData({ out: { k: "ai", txt: r.text }, outAddable: false, aiLoading: false });
+    else local();
+   })
+   .catch(() => { local(); });
+ },
  expandFav(e) {
   const i = Number(e.currentTarget.dataset.i);
   this.setData({ favIdx: this.data.favIdx === i ? -1 : i });

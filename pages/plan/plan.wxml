@@ -350,7 +350,10 @@
               style="{{dragOn && dragDi === di ? dragSh[i] : ''}}"
               data-di="{{di}}" data-ix="{{it.ix}}" bindtap="onToggle">
           <view class="tl-thumb-wrap">
-            <image wx:if="{{it.img}}" class="tl-thumb" src="{{it.img}}" mode="aspectFill" lazy-load/>
+            <image wx:if="{{it.img}}" class="tl-thumb" src="{{it.img}}" mode="aspectFill" lazy-load
+                   data-di="{{di}}" data-i="{{i}}" binderror="onImgError"/>
+            <view wx:if="{{it.img && it.photoCredit}}" class="tl-credit" catchtap="onPhotoCredit"
+                  data-credit="{{it.photoCredit}}" data-license="{{it.photoLicense}}">©</view>
             <view wx:else class="tl-thumb gen" style="background:{{it.thumbBg}}">
               <text class="tl-thumb-emoji">{{it.thumbEmoji}}</text>
               <view class="tl-thumb-name">{{it.coverLabel}}</view>

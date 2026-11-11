@@ -909,3 +909,8 @@
 .ai-badge { display: inline-block; margin-bottom: 10rpx; font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a; background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 16rpx; }
 .ai-ans-tx { display: block; font-size: calc(27rpx * var(--fs, 1)); color: var(--t1, #eaeff7); line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
 .ai-err { padding: 16rpx 4rpx 0; color: var(--red, #e56a6a); font-size: calc(24rpx * var(--fs, 1)); }
+
+/* ══ 真实照片署名角标（Wikimedia Commons CC 授权） ══ */
+.tl-thumb-wrap { position: relative; }
+.tl-credit { position: absolute; right: 8rpx; bottom: 8rpx; width: 30rpx; height: 30rpx; line-height: 30rpx;
+  text-align: center; border-radius: 50%; font-size: 20rpx; color: #fff; background: rgba(0, 0, 0, .55); z-index: 2; }

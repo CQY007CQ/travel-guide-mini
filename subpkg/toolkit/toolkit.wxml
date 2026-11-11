@@ -6,6 +6,17 @@
 
   <view class="tk-hint dim" wx:if="{{!hasPlan}}">行程类工具会提示先回「出发」页生成攻略；城市灵感池随时可用。</view>
 
+  <!-- AI 自由问答（云端强模型优先 · 离线兜底 · 结果复用下方「生成结果」区） -->
+  <view class="card ai-tk">
+    <view class="ai-h"><image class="ic" src="/images/icons/sparkle.png"/><text class="ai-t">AI 自由问答</text>
+      <text class="ai-badge" wx:if="{{out && out.k === 'ai'}}">AI 生成</text></view>
+    <view class="ai-row">
+      <input class="ai-inp" placeholder="随便问：这城玩几天合适？带老人怎么排？" value="{{aiQ}}" bindinput="onAIInput" bindconfirm="askAI" confirm-type="send"/>
+      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askAI">{{aiLoading ? '思考中…' : '问'}}</view>
+    </view>
+    <view class="ai-tip dim">回答会带上当前城市与行程上下文；无网络时自动回落本地规则库，结果可复制 / 收藏。</view>
+  </view>
+
   <view class="group" wx:for="{{groups}}" wx:key="title" wx:for-item="g" wx:for-index="gi">
     <view class="group-title g-tap" data-gi="{{gi}}" bindtap="toggleGroup">
       <text class="g-name">{{g.title}}</text>

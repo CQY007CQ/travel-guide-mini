@@ -1,6 +1,8 @@
 // 页面高层接口：组合 data.js + planner.js + 本地存储，让页面尽量薄
 const D = require("./data.js");
 const store = require("./store.js");
+// 真实景点照片映射（Wikimedia Commons CC 图 → 云存储 cloud:// fileID）：默认关闭，见 utils/spot-photos.js
+const SPOT_PHOTOS = require("./spot-photos.js");
 // v1.19.169 收敛地球距离计算：统一走 utils/geo.js（合并原 haversineKm/_havKm/_km2 与 planner.haversine）
 const { haversine, haversineKm } = require("./geo.js");
 // 跨模块纯函数单点真源（cleanSpotName / baikeKeyword），避免与 planner.js 各定义一份
@@ -675,14 +677,25 @@ function spotCover(city, name, img) {
   else if (/酒店|民宿|客栈|住宿|青旅|宾馆|旅舍|度假村/.test(nm)) glyph = '🏨';
   else if (/站|机场|码头|汽车|高铁|港口|枢纽|地铁|轻轨/.test(nm)) glyph = '🚌';
   else { const tg = spotTagOf(nm, city); const cat = (tg && tg[0]) ? tg[0] : '其他'; glyph = COVER_GLYPH[cat] || '🏞️'; }
-  const isReal = !!img;
   let cat = '其他';
   try { const tg = spotTagOf(nm, city); cat = (tg && tg[0]) ? tg[0] : '其他'; } catch (e) {}
+  // 真实照片：优先数据自带的 img，其次查 CC 图映射（cloud:// fileID）。映射默认关闭 → 行为零变化。
+  let photo = null;
+  try {
+    const clean = (typeof cleanSpotName === 'function') ? (cleanSpotName(nm) || nm) : nm;
+    photo = SPOT_PHOTOS.photoOf(clean, city) || SPOT_PHOTOS.photoOf(nm, city) || null;
+  } catch (e) { photo = null; }
+  const effectiveImg = img || (photo && photo.fileID) || '';
+  const isReal = !!effectiveImg;
   return {
     bg: bg,
     glyph: glyph,
     cat: cat,
     label: (typeof cleanSpotName === 'function') ? (cleanSpotName(nm) || nm) : nm,
+    img: effectiveImg,
+    photoCredit: photo ? photo.credit : '',
+    photoLicense: photo ? photo.license : '',
+    photoSrc: photo ? photo.src : '',
     isReal: isReal,
     placeholder: !isReal,
     badge: isReal ? '' : '示意图'

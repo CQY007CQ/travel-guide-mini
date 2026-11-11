@@ -4,6 +4,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // 多站行程：顶部城市切换条，逐站看美食（默认定位到今天所在站）
 // v1.20.x：必吃清单的每个菜名可点 —— 点「北京烤鸭」直接筛出做这道菜的店（utils/food-map.js）
 const T = require("../../utils/travel.js");
+const Cloud = require("../../utils/cloud.js");   // 云端 AI（llmProxy 强模型网关，fail-closed）
 const FM = require("../utils/food-map.js");
 const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕，不再静默伪装成「没生成攻略」
 const app = getAppSafe();
@@ -19,7 +20,9 @@ Page(SafePage({
     // v1.8.4 A3：按时段看吃什么（早 / 正餐 / 夜宵）
     slotFilter: "all", slots: [{ k: "all", t: "全部" }, { k: "early", t: "早餐" }, { k: "main", t: "正餐" }, { k: "night", t: "夜宵" }],
     // 菜名筛选：activeDish 非空时，名店列表只显示"做这道菜"的店
-    activeDish: "", dishNote: "", shopHead: "" },
+    activeDish: "", dishNote: "", shopHead: "",
+    // AI 吃什么（云端强模型优先 · 离线兜底）
+    aiText: "", aiSource: "", aiLoading: false, aiErr: "" },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
   // 口碑标签 → 样式 key（与 food.wxss 的 .rep-* 对应）
@@ -191,5 +194,40 @@ Page(SafePage({
     } else {
       wx.showToast({ title: "该店暂无坐标，用地图搜店名吧", icon: "none" });
     }
+  },
+
+  // ── AI 吃什么（云端强模型优先 · 离线兜底 · 零白屏） ──
+  askFoodAI() {
+    if (this.data.aiLoading) return;
+    const self = this;
+    const plan = app.globalData && app.globalData.plan;
+    if (!plan || !plan.days || !plan.days.length) { wx.showToast({ title: "先生成行程", icon: "none" }); return; }
+    const d = this.data;
+    const lines = [];
+    lines.push("当前城市：" + (d.cityName || "未知") + "。");
+    const foods = (d.foods || []).slice(0, 12).map(x => x.n).filter(Boolean);
+    if (foods.length) lines.push("本地必吃清单（真实离线数据）：" + foods.join("、") + "。");
+    const shops = (d.shops || []).slice(0, 8).map(x => x.shop).filter(Boolean);
+    if (shops.length) lines.push("本地收录名店（真实离线数据）：" + shops.join("、") + "。");
+    if (d.budgetTxt) lines.push(d.budgetTxt + "。");
+    if (d.activeDish) lines.push("用户当前正在看这道菜：" + d.activeDish + "。");
+    if (d.slotFilter && d.slotFilter !== "all") lines.push("当前筛选时段：" + ({ early: "早餐", main: "正餐", night: "夜宵" }[d.slotFilter] || d.slotFilter) + "。");
+    const q = "结合本地上下文里的真实数据，给我这顿饭最实用的 3 条建议：点什么菜、去哪类店、怎么避开踩坑（各一句话）。不要编造具体店名、价格、地址或评分；本地清单里没有的就别提。";
+    let ctx = "";
+    try { ctx = Cloud.aiContextOf(plan, "美食页") + "\n" + lines.join("\n"); } catch (e) { ctx = lines.join("\n"); }
+    self.setData({ aiLoading: true, aiErr: "" });
+    if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { self._aiFoodOffline(plan); return; }
+    Cloud.aiChat({ prompt: q, context: ctx })
+      .then((r) => {
+        if (r && r.ok && r.text) self.setData({ aiText: r.text, aiSource: r.source || "ai", aiLoading: false, aiErr: "" });
+        else self._aiFoodOffline(plan);
+      })
+      .catch(() => { self._aiFoodOffline(plan); });
+  },
+
+  _aiFoodOffline(plan) {
+    let r;
+    try { r = T.askAssistant("吃什么", plan); } catch (e) { r = { text: "" }; }
+    this.setData({ aiText: (r && r.text) || "离线模式：从上方必吃清单挑一道，再点菜名筛出做这道菜的名店。", aiSource: "", aiLoading: false, aiErr: "" });
   }
 }));

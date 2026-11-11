@@ -31,7 +31,9 @@ function thumbFor(name, img, city) {
   return {
     thumbBg: cv.bg,
     thumbEmoji: cv.glyph,
-    img: cv.isReal ? (img || "") : "",
+    img: cv.img || "",            // 数据自带真图 / CC 图映射的 cloud:// fileID
+    photoCredit: cv.photoCredit || "",
+    photoLicense: cv.photoLicense || "",
     coverLabel: cv.label,
     coverBadge: cv.badge,
     coverCat: cv.cat
@@ -930,6 +932,27 @@ Page(SafePage({
   const plan = app.globalData.plan;
   app.setPlan({ ...plan, days: plan.days });
   this._render(plan);
+ },
+
+ /* ---- 真实照片：加载失败兜底回退示意图 / 署名 ---- */
+ onImgError(e) {
+  const d = e.currentTarget.dataset || {};
+  const di = Number(d.di), i = Number(d.i);
+  if (!isFinite(di) || !isFinite(i)) return;
+  const patch = {};
+  patch["view[" + di + "].items[" + i + "].img"] = "";
+  try { this.setData(patch); } catch (err) {}
+ },
+ onPhotoCredit(e) {
+  const d = e.currentTarget.dataset || {};
+  wx.showModal({
+    title: "照片来源",
+    content: "摄影/作者：" + (d.credit || "Wikimedia Commons") +
+      "\n许可：" + (d.license || "CC") +
+      "\n图源：Wikimedia Commons（云存储托管）",
+    showCancel: false,
+    confirmText: "知道了"
+  });
  },
 
  /* ---- 详情 ---- */
