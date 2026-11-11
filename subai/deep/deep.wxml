@@ -51,4 +51,21 @@
       <view class="dp-chip" wx:for="{{cities}}" wx:key="*this" data-c="{{item}}" bindtap="onPick">{{item}}</view>
     </view>
   </block>
+  <!-- AI 多轮问答 -->
+  <view class="card ai-card">
+    <view class="ai-h">
+      <image class="ic" src="/images/icons/sparkle.png"/>
+      <text class="ai-t">AI 深度玩法问答</text>
+      <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+      <view class="ai-clear" bindtap="aiClear">清空</view>
+    </view>
+    <view class="ai-tip dim">围绕当前所选城市的深度玩法多轮追问；票价与班次以官方当日公告为准，不编造数字。</view>
+    <view class="ai-row">
+      <input class="ai-inp" placeholder="如：这座城清晨怎么逛最舒服？" value="{{aiQ}}"
+             bindinput="onAIInput" bindconfirm="aiAsk" confirm-type="send"/>
+      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiAsk">{{aiLoading ? '思考中…' : '问'}}</view>
+    </view>
+    <view class="ai-ans" wx:if="{{aiAnswer}}">{{aiAnswer}}</view>
+    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
+  </view>
 </view>

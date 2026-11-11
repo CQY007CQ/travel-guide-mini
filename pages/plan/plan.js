@@ -20,6 +20,7 @@ function _preloadSubMods() {
 }
 const EL = require("../../utils/errlog.js");        // v1.19.199：分享图失败分阶段留痕（真机可回溯）
 const Cloud = require("../../utils/cloud.js");      // 云端 AI（llmProxy 强模型网关，fail-closed）
+const AIAgent = require("../../utils/ai-agent.js");
 const app = getAppSafe();
 
 function isFrame(n) { return T.isFrameName(n); }
@@ -1265,7 +1266,7 @@ Page(SafePage({
    return;
   }
   self.setData({ aiLoading: true, aiErr: "" });
-  Cloud.aiChat({ prompt: q, context: self._aiCtx() })
+  AIAgent.ask("plan", q, self._aiCtx())
    .then((r) => {
     if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiLoading: false, aiSource: r.source || "ai", aiErr: "" });
     else self._aiOffline(q);

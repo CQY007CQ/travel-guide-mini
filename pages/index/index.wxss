@@ -633,3 +633,27 @@
 .rb-empty { margin-top: 14rpx; font-size: calc(21rpx * var(--fs, 1)); color: var(--t4, #7d92ab); }
 
 
+
+/* ══ AI 行程助手（LLM 只解析参数，行程由本地引擎生成） ══ */
+.ai-plan .ai-h { display: flex; align-items: center; gap: 10rpx; }
+.ai-plan .ai-h .ic { width: 34rpx; height: 34rpx; }
+.ai-plan .ai-t { flex: 1; font-size: calc(28rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); }
+.ai-plan .ai-tag { flex: none; font-size: calc(20rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e);
+  border: 1rpx solid rgba(212,169,78,.45); border-radius: 999rpx; padding: 2rpx 14rpx; }
+.ai-plan .ai-sub { margin: 10rpx 0 14rpx; font-size: calc(22rpx * var(--fs, 1)); line-height: 1.6; }
+.ai-plan .ai-row { display: flex; align-items: center; gap: 12rpx; }
+.ai-plan .ai-inp { flex: 1; background: var(--card, #131d31); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .18);
+  border-radius: 999rpx; padding: 16rpx 26rpx; font-size: calc(26rpx * var(--fs, 1)); color: var(--t1, #eaeff7); }
+.ai-plan .ai-btn { flex: none; font-size: calc(25rpx * var(--fs, 1)); color: #14100a; font-weight: 700;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f); border-radius: 999rpx; padding: 16rpx 30rpx; }
+.ai-plan .ai-btn:active { opacity: .85; }
+.ai-plan .ai-btn.ai-busy { opacity: .55; }
+.ai-plan .ai-err { margin-top: 12rpx; font-size: calc(23rpx * var(--fs, 1)); color: var(--red, #e56a6a); line-height: 1.6; }
+.ai-plan .ai-res { margin-top: 14rpx; background: var(--panel, #18233a); border: 1rpx solid rgba(212,169,78,.28);
+  border-radius: 16rpx; padding: 16rpx 20rpx; }
+.ai-plan .ai-res-t { font-size: calc(25rpx * var(--fs, 1)); color: var(--t1, #dce5f0); line-height: 1.6; }
+.ai-plan .ai-res-ops { display: flex; gap: 12rpx; margin-top: 14rpx; }
+.ai-plan .ai-res-btn { flex: 1; text-align: center; font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #8fa3bc);
+  border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .3); border-radius: 999rpx; padding: 12rpx 0; }
+.ai-plan .ai-res-btn.on { flex: 1.6; color: #14100a; font-weight: 700; border: none;
+  background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f); }

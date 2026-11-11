@@ -5,6 +5,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // v1.20.x：必吃清单的每个菜名可点 —— 点「北京烤鸭」直接筛出做这道菜的店（utils/food-map.js）
 const T = require("../../utils/travel.js");
 const Cloud = require("../../utils/cloud.js");   // 云端 AI（llmProxy 强模型网关，fail-closed）
+const AIAgent = require("../../utils/ai-agent.js");
 const FM = require("../utils/food-map.js");
 const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕，不再静默伪装成「没生成攻略」
 const app = getAppSafe();
@@ -217,7 +218,7 @@ Page(SafePage({
     try { ctx = Cloud.aiContextOf(plan, "美食页") + "\n" + lines.join("\n"); } catch (e) { ctx = lines.join("\n"); }
     self.setData({ aiLoading: true, aiErr: "" });
     if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { self._aiFoodOffline(plan); return; }
-    Cloud.aiChat({ prompt: q, context: ctx })
+    AIAgent.ask("food", q, ctx)
       .then((r) => {
         if (r && r.ok && r.text) self.setData({ aiText: r.text, aiSource: r.source || "ai", aiLoading: false, aiErr: "" });
         else self._aiFoodOffline(plan);

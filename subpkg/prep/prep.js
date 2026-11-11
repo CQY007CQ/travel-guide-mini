@@ -4,6 +4,8 @@ const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕
 // 每个景点的「已订 / 预约日期 / 备注」按 城市·景点名 记本机，回来再看不丢
 const T = require("../../utils/travel.js");
 const app = getAppSafe();
+const AIAgent = require("../../utils/ai-agent.js");
+const Cloud = require("../../utils/cloud.js");
 
 const HOTEL_TIPS = [
   "携程 / 美团 / 飞猪 / 去哪儿四平台比价，同一酒店价差可达 10-30%",
@@ -26,6 +28,7 @@ Page(SafePage({
 
   data: {
     fz: 1,
+    aiQ: "", aiAnswer: "", aiLoading: false, aiSource: "", aiErr: "",
     td: false,
     hasPlan: false, cityName: "", isMulti: false,
     tickets: [], tkDone: 0, bookN: 0,
@@ -196,5 +199,33 @@ Page(SafePage({
     const tel = String(e.currentTarget.dataset.tel || "");
     if (!tel) return;
     wx.makePhoneCall({ phoneNumber: tel, fail: () => {} });
-  }
+  },
+
+  // ── AI 多轮问答（Agent 记忆 + 云端强模型优先 · 离线兜底） ──
+  onAIInput(e) { this.setData({ aiQ: e.detail.value }); },
+  _aiCtx() {
+    let s = "";
+    try { s = Cloud.aiContextOf(app.globalData && app.globalData.plan, "出行准备页"); } catch (e) {}
+    return s + "\n【场景护栏】只给行前准备/打包/证件/交通的通用建议，不编造具体航班车次、票价、营业时间或政策条款；涉及签证/证件一律提示以官方最新规定为准。";
+  },
+  aiAsk() {
+    const q = String(this.data.aiQ || "").trim();
+    if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
+    const self = this;
+    if (!Cloud.cloudEnabled()) { self._aiOffline(q); return; }
+    self.setData({ aiLoading: true, aiErr: "" });
+    AIAgent.ask("prep", q, self._aiCtx()).then((r) => {
+      if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiSource: r.source || "ai", aiLoading: false });
+      else self._aiOffline(q);
+    }).catch(() => { self._aiOffline(q); });
+  },
+  _aiOffline(q) {
+    let r;
+    try { r = T.askAssistant(q, app.globalData && app.globalData.plan); } catch (e) { r = { text: "" }; }
+    this.setData({ aiAnswer: (r && r.text) || "离线模式：按上方行李清单与应急电话逐项核对；证件与政策以官方最新规定为准。", aiSource: "", aiLoading: false, aiErr: "" });
+  },
+  aiClear() {
+    try { AIAgent.clearHistory("prep"); } catch (e) {}
+    this.setData({ aiQ: "", aiAnswer: "", aiSource: "", aiErr: "" });
+  },
 }));

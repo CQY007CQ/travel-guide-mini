@@ -114,4 +114,21 @@
     <view class="cp-tip dim">全部为随包下发的离线结构化数据，无需联网即可规划</view>
   </view>
 
+  <!-- AI 多轮问答 -->
+  <view class="card ai-card">
+    <view class="ai-h">
+      <image class="ic" src="/images/icons/sparkle.png"/>
+      <text class="ai-t">AI 应急问答</text>
+      <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+      <view class="ai-clear" bindtap="aiClear">清空</view>
+    </view>
+    <view class="ai-tip dim">带上当前行程上下文的多轮问答；不给诊疗结论，急症请拨 120。无网络时自动回落本地资料。</view>
+    <view class="ai-row">
+      <input class="ai-inp" placeholder="如：爬山崴脚了该先怎么处理？" value="{{aiQ}}"
+             bindinput="onAIInput" bindconfirm="aiAsk" confirm-type="send"/>
+      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiAsk">{{aiLoading ? '思考中…' : '问'}}</view>
+    </view>
+    <view class="ai-ans" wx:if="{{aiAnswer}}">{{aiAnswer}}</view>
+    <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
+  </view>
 </view>

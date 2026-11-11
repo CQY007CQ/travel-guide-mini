@@ -5,6 +5,7 @@ const S = require("../../utils/store.js");
 const EL = require("../../utils/errlog.js");   // v1.19.205：候选/收藏读取失败留痕，不再静默清空
 const AI = require("../../utils/ai-intent.js"); // 对齐网页版 AI 的增强意图（出片/周边/城市名片/单景点详情/跳页/云同步）
 const Cloud = require("../../utils/cloud.js");        // 云互通基座（含跨端同步码）
+const AIAgent = require("../../utils/ai-agent.js");
 const CloudSync = require("../../utils/cloud-sync.js"); // 行程上云 / 拉回
 const app = getAppSafe();
 
@@ -167,7 +168,7 @@ Page(SafePage({
     const self = this;
     try { wx.showLoading({ title: "AI 思考中", mask: false }); } catch (e) {}
     const ctx = Cloud.aiContextOf(plan, "本地速查助手");
-    Cloud.aiChat({ prompt: q, context: ctx })
+    AIAgent.ask("assistant", q, ctx)
       .then(function (r) {
         try { wx.hideLoading(); } catch (e) {}
         if (r.ok && r.text) {

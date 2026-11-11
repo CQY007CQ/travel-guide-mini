@@ -6,6 +6,8 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");   // v1.11：统一存储封装（失败有提示，不再静默丢数据）
 const R = require("../../utils/recommend.js");   // 智能推荐引擎（端侧计算，纯本地，不联网）
+const AIAgent = require("../../utils/ai-agent.js");   // 统一 AI Agent（意图解析 / 多轮记忆）
+const Cloud = require("../../utils/cloud.js");
 
 // v1.19.100 修复：模块顶层 `getApp()` 在 lazyCodeLoading 下可能返回 undefined（App 尚未注册完），
 // 会导致 onLoad 整段初始化被抛错跳过、且本页 10 处 handler（goPlan / generate / 回填 等）访问
@@ -109,7 +111,9 @@ Page(SafePage({
     // ---- 2026-09 v1.8.4 ----
     blindOpen: false, blind3: [],   // A8 目的地盲盒
     remind: null,                  // B18 预约横幅
-    guideSeen: false              // v1.18：首访引导看过即不再常驻（一次性轻提示）
+    guideSeen: false,              // v1.18：首访引导看过即不再常驻（一次性轻提示）
+    // AI 行程助手：一句话 → 解析参数 → 本地 T.buildPlan 生成真实行程（零伪造）
+    aiText: "", aiLoading: false, aiParsed: null, aiSummary: "", aiErr: ""
   },
 
   onLoad(options) {
@@ -857,6 +861,92 @@ Page(SafePage({
   resumeOld() {
     if (!app.globalData.plan) return;
     wx.switchTab({ url: "/pages/today/today" });
+  },
+
+  // ── AI 行程助手（LLM 只解析参数，行程一律由本地引擎生成，零伪造） ──
+  onAIPlanInput(e) { this.setData({ aiText: e.detail.value }); },
+
+  _aiSummary(p) {
+    const L = { low: "经济", mid: "舒适", high: "高端" };
+    const P = { leisure: "轻松", balance: "平衡", speed: "特种兵" };
+    const M = { "": "不指定", family: "亲子游", couple: "情侣游", solo: "独行", elder: "带老人" };
+    const B = { "": "不偏好", history: "偏历史古迹", nature: "偏自然风光" };
+    const a = [];
+    if (p.city) a.push(p.city);
+    if (p.days) a.push(p.days + " 天");
+    if (p.budget) a.push(L[p.budget] || p.budget);
+    if (p.pace) a.push(P[p.pace] || p.pace);
+    if (p.people) a.push(p.people + " 人");
+    if (p.travelMode) a.push(M[p.travelMode] || p.travelMode);
+    if (p.bias) a.push(B[p.bias] || p.bias);
+    return a.join(" · ");
+  },
+
+  aiParse() {
+    const q = String(this.data.aiText || "").trim();
+    if (!q) { wx.showToast({ title: "先说一句话，如：3天成都，预算2000，爱吃", icon: "none" }); return; }
+    if (!Cloud.cloudEnabled()) {
+      this.setData({ aiErr: "云端 AI 未开启：需先在云开发部署 llmProxy 并配置云环境 ID。当前可手动选城市生成。" });
+      return;
+    }
+    const self = this;
+    self.setData({ aiLoading: true, aiErr: "", aiParsed: null, aiSummary: "" });
+    AIAgent.parsePlanIntent(q).then((p) => {
+      if (!p) { self.setData({ aiLoading: false, aiErr: "没解析出有效参数。换个说法试试，如「3天成都，预算2000，带老人」" }); return; }
+      self.setData({ aiLoading: false, aiParsed: p, aiSummary: self._aiSummary(p) });
+    }).catch(() => { self.setData({ aiLoading: false, aiErr: "解析失败，可手动选择后生成" }); });
+  },
+
+  aiCancel() { this.setData({ aiParsed: null, aiSummary: "", aiErr: "" }); },
+
+  aiGenerate() {
+    const p = this.data.aiParsed || {};
+    const self = this;
+    if (!this.data.depart || this.data.depart < this.data.departMin) {
+      wx.showToast({ title: "出发日期不能早于今天", icon: "none" }); return;
+    }
+    let c = null;
+    try { c = p.city ? T.findCity(p.city) : null; } catch (e) {}
+    if (!c) c = this.data.cities[this.data.cityIdx];
+    if (!c || !c.name) { wx.showToast({ title: "城市无效，请手动选择目的地", icon: "none" }); return; }
+    const days = p.days || this.data.days || 4;
+    const budget = p.budget || this.data.budgetKeys[this.data.budgetIdx] || "mid";
+    const pace = p.pace || this.data.paceVals[this.data.paceIdx] || "balance";
+    const tm = (p.travelMode !== undefined && p.travelMode !== null) ? p.travelMode : (this.data.travelModeVals[this.data.travelModeIdx] || "");
+    const people = p.people || this.data.people || 2;
+    const bias = (p.bias !== undefined && p.bias !== null) ? p.bias : (this.data.biasVals[this.data.biasIdx] || "");
+    try { const old = app.globalData.plan; if (old && old.days && old.days.length) T.savePlanSlot(old); } catch (e) {}
+    try { wx.showLoading({ title: "正在生成攻略…", mask: true }); } catch (e) {}
+    // 让 loading 先渲染：buildPlan 是同步计算，大城/多天会明显停顿
+    setTimeout(function () {
+      try {
+        const picks = T.getWish().filter(x => !x.city || x.city === c.name).map(x => x.name);
+        const pickOnly = self.data.pickOnly && picks.length > 0;
+        const daysArr = T.buildPlan({
+          city: c, days: days, depart: self.data.depart, budget: budget, pace: pace,
+          travelMode: tm, people: people, stayMountain: self.data.stayMtn,
+          picks: picks, pickOnly: pickOnly, bias: bias
+        });
+        const fo = self.data.fromCityObj || null;
+        const from = fo ? { province: fo.province, city: fo.name } : { province: "山西省", city: "太原" };
+        app.globalData.from = { province: c.province || self.data.provName, city: c.name };
+        app.setPlan({
+          cityName: c.name, province: c.province || self.data.provName,
+          totalDays: daysArr.length, depart: self.data.depart, days: daysArr,
+          budget: budget, customAmt: 0, people: people, pace: pace, travelMode: tm,
+          pickOnly: pickOnly, isMulti: false, from: from, savedAt: Date.now(), bias: bias
+        });
+        T.resetTripPrep();
+        try { T.pushRecent({ province: c.province || self.data.provName, city: c.name, days: daysArr.length, depart: self.data.depart }); } catch (e) {}
+        try { AN.track("plan_generate", { ok: 1, mode: "ai", days: daysArr.length }); } catch (e) {}
+        try { wx.hideLoading(); } catch (e) {}
+        wx.switchTab({ url: "/pages/plan/plan" });
+      } catch (err) {
+        try { wx.hideLoading(); } catch (e) {}
+        try { console.error("[aiGenerate] 生成失败：", err); } catch (e) {}
+        wx.showToast({ title: "生成失败，请手动生成", icon: "none" });
+      }
+    }, 30);
   },
 
   generate() {

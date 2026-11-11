@@ -4,6 +4,7 @@ const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 // 未配置时明确告知并引导「文字问」，绝不伪造识别结果。
 const T = require("../../utils/travel.js");
 const Cloud = require("../../utils/cloud.js");
+const AIAgent = require("../../utils/ai-agent.js");
 const EL = require("../../utils/errlog.js");
 const app = getAppSafe();
 
@@ -142,7 +143,7 @@ Page(SafePage({
     try { wx.showLoading({ title: "AI 思考中", mask: true }); } catch (e) {}
     let ctx = "";
     try { ctx = Cloud.aiContextOf(app.globalData && app.globalData.plan, "AI 识物页"); } catch (e) {}
-    Cloud.aiChat({ prompt: q, context: ctx })
+    AIAgent.ask("lens", q, ctx)
       .then((r) => {
         try { wx.hideLoading(); } catch (e) {}
         if (r && r.ok && r.text) self.setData({ result: r.text, loading: false, source: r.source || "ai" });

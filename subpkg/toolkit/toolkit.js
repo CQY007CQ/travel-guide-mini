@@ -4,6 +4,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
 const Cloud = require("../../utils/cloud.js");   // 云端 AI（llmProxy 强模型网关，fail-closed）
+const AIAgent = require("../../utils/ai-agent.js");
 const app = getAppSafe();
 
 // 工具分组抽到 utils/toolkit-groups.js，与指南页共用（避免页面模块互相 require）
@@ -325,7 +326,7 @@ Page(SafePage({
   if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { local(); return; }
   let ctx = "";
   try { ctx = Cloud.aiContextOf(plan, "旅行百宝箱") + "\n当前城市：" + (this.data.cityName || "未知") + "。"; } catch (e) { ctx = ""; }
-  Cloud.aiChat({ prompt: q, context: ctx })
+  AIAgent.ask("toolkit", q, ctx)
    .then((r) => {
     if (r && r.ok && r.text) self.setData({ out: { k: "ai", txt: r.text }, outAddable: false, aiLoading: false });
     else local();

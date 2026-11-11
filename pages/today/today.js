@@ -3,6 +3,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // today：「今天」行程态卡片（行前待办 / 途中速览+快捷记账 / 结束回顾）
 const T = require("../../utils/travel.js");
 const Cloud = require("../../utils/cloud.js");   // 云端 AI（llmProxy 强模型网关，fail-closed）
+const AIAgent = require("../../utils/ai-agent.js");
 const app = getAppSafe();
 
 Page(SafePage({
@@ -199,7 +200,7 @@ Page(SafePage({
     try { ctx = Cloud.aiContextOf(plan, "今天页") + "\n" + detail.join("\n"); } catch (e) { ctx = detail.join("\n"); }
     self.setData({ aiLoading: true, aiErr: "" });
     if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { self._aiTodayOffline(plan); return; }
-    Cloud.aiChat({ prompt: q, context: ctx })
+    AIAgent.ask("today", q, ctx)
       .then((r) => {
         if (r && r.ok && r.text) self.setData({ aiText: r.text, aiSource: r.source || "ai", aiLoading: false, aiErr: "" });
         else self._aiTodayOffline(plan);

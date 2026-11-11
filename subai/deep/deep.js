@@ -3,6 +3,8 @@
 // 票价、班次、开放时间以官方渠道当日公告为准。
 const A = require("../../utils/aicontent.js");
 const AD = require("../utils/ad.js");
+const AIAgent = require("../../utils/ai-agent.js");
+const Cloud = require("../../utils/cloud.js");
 
 // 打包提示：内容文件与本页同属 subai 分包，用静态字面量 require 一次，
 // 确保 ignoreUploadUnusedFiles 开启时也不会被当成未使用文件剔除。
@@ -52,6 +54,7 @@ Page({
 
   data: {
     ready: false,
+    aiQ: "", aiAnswer: "", aiLoading: false, aiSource: "", aiErr: "",
     cities: [],
     curName: "",
     cur: null,
@@ -140,5 +143,29 @@ Page({
     try {
       wx.setClipboardData({ data: lines.join("\n") });
     } catch (e) {}
-  }
+  },
+
+  // ── AI 多轮问答（Agent 记忆 + 云端强模型优先 · 离线兜底） ──
+  onAIInput(e) { this.setData({ aiQ: e.detail.value }); },
+  _aiCtx() {
+    return "当前页面：城市深度玩法（离线策展内容）。\n【场景护栏】只做旅行玩法科普；票价/班次/开放时间一律写「以官方当日公告为准」，不编造具体数字；中国台湾城市只写风物美食，不写行政区划表述。";
+  },
+  aiAsk() {
+    const q = String(this.data.aiQ || "").trim();
+    if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
+    const self = this;
+    if (!Cloud.cloudEnabled()) { self._aiOffline(q); return; }
+    self.setData({ aiLoading: true, aiErr: "" });
+    AIAgent.ask("deep", q, self._aiCtx()).then((r) => {
+      if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiSource: r.source || "ai", aiLoading: false });
+      else self._aiOffline(q);
+    }).catch(() => { self._aiOffline(q); });
+  },
+  _aiOffline(q) {
+    this.setData({ aiAnswer: "离线模式：本页深度玩法由团队人工整理，请从上方城市列表选择查看；票价与班次以官方当日公告为准。", aiSource: "", aiLoading: false, aiErr: "" });
+  },
+  aiClear() {
+    try { AIAgent.clearHistory("deep"); } catch (e) {}
+    this.setData({ aiQ: "", aiAnswer: "", aiSource: "", aiErr: "" });
+  },
 });
