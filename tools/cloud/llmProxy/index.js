@@ -155,9 +155,12 @@ exports.main = async (event) => {
   if (!messages && !prompt && !hasImage) return { ok: false, err: "empty-input" };
 
   // 视觉能力自检：明确已知不支持图片的模型，直接给可操作的原因，避免页面只拿到「识别失败」。
+  // VISION_OK 放行含 vl/vision/4o 等视觉型号，避免误拦 deepseek-vl2 / qwen-vl-max 这类视觉模型；
+  // LLM_ALLOW_VISION=1 为自定义兼容网关的逃生阀。
   const modelForCheck = (typeof event.model === "string" && event.model.trim()) ? event.model.trim() : cfg.model;
+  const VISION_OK = /(vl|vision|4o|4\.1|gpt-4|claude-3|gemini)/i;
   const NO_VISION = /deepseek|qwen-(max|plus|turbo|long)|moonshot-v1|gpt-3\.5|o1-mini|text-davinci/i;
-  if (hasImage && NO_VISION.test(modelForCheck)) {
+  if (hasImage && !VISION_OK.test(modelForCheck) && NO_VISION.test(modelForCheck) && process.env.LLM_ALLOW_VISION !== "1") {
     return {
       ok: false,
       err: "model-no-vision",

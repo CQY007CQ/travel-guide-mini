@@ -26,11 +26,15 @@ function readWeatherCache() {
     if (typeof wx === "undefined" || !wx.getStorageSync) return null;
     const idx = wx.getStorageSync("wxcacheIdxV1") || [];
     if (!idx.length) return null;
-    const k = idx[idx.length - 1] && idx[idx.length - 1].k;
+    const last = idx[idx.length - 1];
+    const k = last && last.k;
     if (!k) return null;
     const o = wx.getStorageSync("wxcacheV1." + k);
-    return (o && o.v && typeof o.v === "object") ? o.v : null;
-  } catch (e) { return null; }
+    if (!o || !o.v || typeof o.v !== "object") return null;
+    // 磁盘缓存 TTL 只有 30 分钟，但索引项可能残留 → 过期预报不能当「明天」用
+    if (o.t && Date.now() - o.t > 6 * 3600 * 1000) return null;
+    return { v: o.v, key: k };   // key 含城市，供快照校验，避免跨城市误对比
+  } catch (e) { try { EL.push("travelsvc.wxCache", e); } catch (_) {} return null; }
 }
 
 Page(SafePage({
@@ -80,7 +84,9 @@ Page(SafePage({
 
   _refresh() {
     // ① 天气变化：直接用天气模块已落盘的缓存，零网络
-    const cache = readWeatherCache();
+    const snap0 = readWeatherCache();
+    const cache = snap0 && snap0.v;
+    const cacheKey = snap0 && snap0.key;
     const keys = cache ? Object.keys(cache).sort() : [];
     let deltas = [], note = "";
     if (keys.length >= 2) {
@@ -88,8 +94,8 @@ Page(SafePage({
       if (!deltas.length) note = this.data.lang === "zh" ? "近两日天气变化不大，按原计划走即可。" : "Little change in the next two days.";
     } else {
       note = this.data.lang === "zh"
-        ? "暂无两天的预报缓存；去「行程」页加载一次天气后回来即可看到变化提醒。"
-        : "No cached two-day forecast yet. Load weather on the Plan page first.";
+        ? "预报缓存为空或已过期；去「行程」页加载一次天气后回来即可看到变化提醒。"
+        : "No valid cached forecast. Load weather on the Plan page first.";
     }
     // ①b 预报更新：与上次落盘的同一天预报对比；首次只记录，不虚报
     let fcUpdates = [], fcNote = "";
@@ -97,9 +103,10 @@ Page(SafePage({
       if (keys.length) {
         const today = cache[keys[0]];
         const snap = S.get(SNAP_KEY, null);
-        if (snap && snap.date === keys[0]) fcUpdates = SVC.forecastDelta(snap.day, today);
+        // 必须同日期 + 同城市缓存 key，否则换了城市却日期相同会误报「预报更新」
+        if (snap && snap.date === keys[0] && snap.key === cacheKey) fcUpdates = SVC.forecastDelta(snap.day, today);
         else fcNote = this.data.lang === "zh" ? "已记录本次预报，下次打开可对比预报更新。" : "Forecast saved; revisit to see updates.";
-        S.set(SNAP_KEY, { date: keys[0], day: today });
+        S.set(SNAP_KEY, { date: keys[0], key: cacheKey, day: today });
       }
     } catch (e) { try { EL.push("travelsvc.forecast", e); } catch (_) {} }
     // ② 本地数据统计（真实读取，不编造）
