@@ -12,6 +12,13 @@
     <view class="h2"><image class="ic" src="/images/icons/search.png"/>本地速查</view>
     <view class="ctx dim">{{ctx}}</view>
 
+    <!-- AI 识物入口：拍照认植物 / 地标，旅途科普 -->
+    <view class="lens-entry" bindtap="goLens">
+      <image class="le-ic" src="/images/icons/camera.png"/>
+      <text class="le-t">AI 识物：拍一张认植物 / 地标</text>
+      <text class="le-a">→</text>
+    </view>
+
     <view class="h3">一键查</view>
     <view class="tiles">
       <view class="tile" wx:for="{{tiles}}" wx:key="k" data-k="{{item.k}}" bindtap="onTile">

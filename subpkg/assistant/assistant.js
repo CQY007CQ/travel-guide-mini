@@ -297,5 +297,7 @@ Page(SafePage({
     });
   },
 
-  goIndex() { wx.switchTab({ url: "/pages/index/index" }); }
+  goIndex() { wx.switchTab({ url: "/pages/index/index" }); },
+
+  goLens() { try { wx.navigateTo({ url: "/subpkg/lens/lens" }); } catch (e) {} }
 }));

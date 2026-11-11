@@ -4,6 +4,14 @@
 .h2 .ic { width: 36rpx; height: 36rpx; vertical-align: -4rpx; margin-right: 10rpx; }
 .ctx { font-size: calc(23rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin: 10rpx 0 18rpx; line-height: 1.6; }
 
+/* AI 识物入口 */
+.lens-entry { display: flex; align-items: center; gap: 12rpx; margin: 0 0 18rpx; padding: 18rpx 20rpx; border-radius: 16rpx;
+  background: rgba(212,169,78,.10); border: 1rpx solid rgba(212,169,78,.32); }
+.lens-entry:active { background: rgba(212,169,78,.20); }
+.le-ic { width: 36rpx; height: 36rpx; }
+.le-t { flex: 1; font-size: calc(25rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); font-weight: 600; }
+.le-a { flex: none; font-size: calc(26rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); }
+
 /* 一键查：卡片网格（2 列） */
 .tiles { display: flex; flex-wrap: wrap; margin: 0 -10rpx 18rpx; }
 .tile { width: calc(25% - 20rpx); margin: 0 10rpx 18rpx; padding: 18rpx 6rpx; border-radius: 16rpx;

@@ -61,7 +61,8 @@
         "assistant/assistant",
         "guide/guide",
         "toolkit/toolkit",
-        "spotsearch/spotsearch"
+        "spotsearch/spotsearch",
+        "lens/lens"
       ]
     },
     {

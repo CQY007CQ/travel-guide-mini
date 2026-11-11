@@ -211,6 +211,50 @@ function aiChat(opts) {
   });
 }
 
+// 上传本地图片到云存储，返回 fileID（拍照识物用；小程序端）。
+function uploadImage(filePath) {
+  return new Promise(function (resolve, reject) {
+    try {
+      if (isWeb()) { reject(new Error("web-upload-unsupported")); return; }
+      if (typeof wx === "undefined" || !wx.cloud || typeof wx.cloud.uploadFile !== "function") {
+        reject(new Error("cloud-not-ready")); return;
+      }
+      if (!filePath) { reject(new Error("empty-file-path")); return; }
+      const m = String(filePath).match(/\.(\w+)$/);
+      const ext = m ? m[1] : "jpg";
+      const cloudPath = "lens/" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "." + ext;
+      wx.cloud.uploadFile({
+        cloudPath: cloudPath,
+        filePath: filePath,
+        success: function (res) { resolve((res && res.fileID) || ""); },
+        fail: function (err) { reject(err); }
+      });
+    } catch (e) { reject(e); }
+  });
+}
+
+// 视觉识别：把图片 fileID / base64 交给 llmProxy（多模态强模型），返回同 aiChat 的结构。
+function aiVision(opts) {
+  opts = opts || {};
+  return new Promise(function (resolve) {
+    if (!cloudEnabled()) { resolve({ ok: false, err: "cloud-disabled" }); return; }
+    const payload = {
+      prompt: (typeof opts.prompt === "string" && opts.prompt.trim()) ? opts.prompt.trim() : null,
+      system: (typeof opts.system === "string" && opts.system.trim()) ? opts.system.trim() : null,
+      context: (typeof opts.context === "string" && opts.context.trim()) ? opts.context.trim() : null,
+      imageFileID: opts.imageFileID || null,
+      imageBase64: opts.imageBase64 || null,
+      model: (typeof opts.model === "string" && opts.model.trim()) ? opts.model.trim() : null,
+      max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : 700
+    };
+    if (!payload.imageFileID && !payload.imageBase64) { resolve({ ok: false, err: "no-image" }); return; }
+    callFunction("llmProxy", payload).then(function (r) {
+      if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
+      else resolve({ ok: false, err: (r && r.err) || "vision-failed", raw: r });
+    }).catch(function (e) { resolve({ ok: false, err: String((e && e.message) || e) }); });
+  });
+}
+
 module.exports = {
   isWeb: isWeb,
   cloudEnv: cloudEnv,
@@ -224,5 +268,7 @@ module.exports = {
   setPairedUid: setPairedUid,
   clearPairedUid: clearPairedUid,
   aiContextOf: aiContextOf,
-  aiChat: aiChat
+  aiChat: aiChat,
+  uploadImage: uploadImage,
+  aiVision: aiVision
 };

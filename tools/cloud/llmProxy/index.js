@@ -136,6 +136,14 @@ function buildSystem(event, hasContext) {
   return s;
 }
 
+// 从云存储 fileID 下载图片并转 base64（拍照识物用；避免前端传大 payload 触发调用体积限制）
+async function downloadFileBase64(fileID) {
+  const res = await cloud.downloadFile({ fileID: fileID });
+  const buf = res && (res.fileContent || res.buffer);
+  if (!buf) throw new Error("empty-file");
+  return Buffer.from(buf).toString("base64");
+}
+
 exports.main = async (event) => {
   const cfg = resolveConfig();
   if (!cfg.base || !cfg.key) return { ok: false, err: "llm-not-configured" };
@@ -143,13 +151,32 @@ exports.main = async (event) => {
   event = event || {};
   const messages = Array.isArray(event.messages) ? event.messages : null;
   const prompt = (typeof event.prompt === "string") ? event.prompt : "";
-  if (!messages && !prompt) return { ok: false, err: "empty-input" };
+  const hasImage = !!(event.imageFileID || event.imageBase64);
+  if (!messages && !prompt && !hasImage) return { ok: false, err: "empty-input" };
+
+  // 图片（可选）：优先 fileID → 云存储下载转 base64；其次直接传 base64
+  let imageDataUrl = "";
+  if (event.imageFileID) {
+    try { imageDataUrl = "data:image/jpeg;base64," + (await downloadFileBase64(event.imageFileID)); }
+    catch (e) { return { ok: false, err: "image-download-failed" }; }
+  } else if (event.imageBase64) {
+    const s = String(event.imageBase64);
+    imageDataUrl = /^data:/.test(s) ? s : ("data:image/jpeg;base64," + s);
+  }
 
   const hasContext = !!(event.context && String(event.context).trim());
 
-  // 组装 messages：system（含护栏+上下文） + 对话历史（+ 单轮 prompt）
+  // 组装 messages：system（含护栏+上下文） + 对话历史（+ 单轮 prompt / 多模态图片）
   const finalMessages = [{ role: "system", content: buildSystem(event, hasContext) }];
-  if (messages) {
+  if (imageDataUrl) {
+    finalMessages.push({
+      role: "user",
+      content: [
+        { type: "text", text: prompt || "请识别这张图片，并给出旅途实用的小知识。" },
+        { type: "image_url", image_url: { url: imageDataUrl } }
+      ]
+    });
+  } else if (messages) {
     messages.forEach((m) => {
       if (m && m.role && m.content != null)
         finalMessages.push({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content) });
