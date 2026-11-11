@@ -68,9 +68,9 @@ let missing = [];
 for (const p of pages) if (!AI.PAGE_ROUTE[p]) missing.push(p);
 log(missing.length === 0, "全部场景目标页均有路由" + (missing.length ? "（缺：" + missing.join(",") + "）" : ""));
 
-// 4) 强模型场景提示词守卫：ai-prompts 必须导出 10 套场景提示词，且覆盖 ask() 真实场景名
+// 4) 强模型场景提示词守卫：ai-prompts（置于 assistant 分包）必须导出 10 套场景提示词，且覆盖 ask() 真实场景名
 let PROMPTS = null;
-try { PROMPTS = require(resolve(ROOT, "utils/ai-prompts.js")); } catch (e) {}
+try { PROMPTS = require(resolve(ROOT, "subpkg/assistant/ai-prompts.js")); } catch (e) {}
 log(!!PROMPTS && PROMPTS.count === 10, "ai-prompts 场景提示词数 = " + (PROMPTS && PROMPTS.count) + "（期望 10）");
 const ASK_SCENES = ["assistant", "today", "today-proactive", "plan", "food", "prep", "deep", "help", "toolkit", "lens"];
 let badSys = [];
@@ -80,6 +80,19 @@ for (const s of ASK_SCENES) {
   if (!sys || sys.length < 50) badSys.push(s);
 }
 log(badSys.length === 0, "全部 ask(scene) 场景均有有效 system 提示词" + (badSys.length ? "（缺：" + badSys.join(",") + "）" : ""));
+
+// 5) 场景漂移守卫：源码里所有 AIAgent.ask("scene") 字面量，必须都能在 ai-prompts 找到对应提示词
+const ASK_SRC = [];
+for (const f of ["pages/today/today.js", "pages/plan/plan.js", "pages/help/help.js", "pages/index/index.js",
+  "subpkg/assistant/assistant.js", "subpkg/prep/prep.js", "subpkg/food/food.js", "subpkg/lens/lens.js",
+  "subai/deep/deep.js", "subpkg/toolkit/toolkit.js"]) {
+  let src = "";
+  try { src = readFileSync(resolve(ROOT, f), "utf8"); } catch (e) { continue; }
+  const m = src.match(/AIAgent\.ask\(\s*"([^"]+)"/g) || [];
+  m.forEach(function (s) { const k = s.match(/"([^"]+)"/)[1]; if (ASK_SRC.indexOf(k) < 0) ASK_SRC.push(k); });
+}
+const drift = ASK_SRC.filter(function (s) { return !(PROMPTS && PROMPTS.SYSTEMS && PROMPTS.SYSTEMS[s]); });
+log(drift.length === 0, "源码 ask(scene) 均已有提示词（" + ASK_SRC.length + " 处场景字面量）" + (drift.length ? "（缺失：" + drift.join(",") + "）" : ""));
 
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);

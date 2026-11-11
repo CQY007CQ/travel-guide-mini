@@ -13,7 +13,15 @@
 const Cloud = require("./cloud.js");
 const DATA = require("./data.js");
 const S = require("./store.js");
-const PROMPTS = require("./ai-prompts.js");   // 强模型场景提示词注册表（10 套 + 通用作战协议）
+
+// 主包内置「压缩版」强模型纪律协议：仅通用作战协议（零伪造 / 思维链 / 多链投票 / 不越界 / 安全），约 0.7KB，守主包红线。
+// 完整 10 套场景提示词置于 subpkg/assistant/ai-prompts.js（不占主包）；assistant 自由聊天经 ask() 第 4 参注入完整版。
+const AI_MASTER =
+`你是「晨的旅行助手」强模型（离线优先 App）。铁律：①思维链先厘清意图再答。②多链投票：多方案想≥2条比优劣再给结论。③检索增强：事实优先基于随附「本机上下文」（行程/预算/花费/天气缓存/想去/自检分）并标来源。④零伪造：不编景点/票价/坐标/医院/实时天气，缺数据说「以App内对应页为准」。⑤不越界：生成行程/订票/支付引导去App内功能。⑥安全：急症第一句拨120/呼救。简体中文分点。`;
+// 选 system：优先用调用方传入的完整版（assistant 分包），否则回退主包压缩版，保证强模型永远有纪律。
+function aiSystemOf(scene, override) {
+  return override || AI_MASTER;
+}
 
 const MAX_TURNS = 6;                 // 每场景保留最近 6 轮（12 条消息）
 const MEM_KEY = "aiAgentMemV1";
@@ -72,14 +80,17 @@ function clearHistory(scene) {
 }
 
 // 多轮问答：自动带上该场景最近对话 + 本地上下文；成功后才写入记忆（失败不污染上下文）。
-function ask(scene, question, context) {
+// systemOverride：调用方（assistant 分包）可传入完整场景提示词；缺省用主包压缩版纪律协议。
+function ask(scene, question, context, systemOverride) {
   const q = String(question || "").trim();
   if (!q) return Promise.resolve({ ok: false, err: "empty-question" });
+  // 云未开：直接回落（调用方已做离线兜底），不白费算力拼 system / 不触发云通道
+  if (!Cloud.cloudEnabled()) return Promise.resolve({ ok: false, err: "cloud-disabled" });
   const k = scene || "default";
   if (_inflight[k]) return Promise.resolve({ ok: false, err: "inflight" });
   _inflight[k] = true;
   const msgs = historyOf(scene).concat([{ role: "user", content: q }]);
-  const sys = (PROMPTS && PROMPTS.buildSystem) ? PROMPTS.buildSystem(k, context) : null;
+  const sys = aiSystemOf(k, systemOverride);
   return Cloud.aiChat({ messages: msgs, context: context || null, system: sys }).then(function (r) {
     if (r && r.ok && r.text) {
       remember(scene, "user", q);

@@ -6,6 +6,7 @@ const EL = require("../../utils/errlog.js");   // v1.19.205：候选/收藏读�
 const AI = require("./ai-brain.js"); // 全场景 AI 大脑（ai-intent 严格超集：委派 6 类 + 新增 14 场景，离线零网络）
 const Cloud = require("../../utils/cloud.js");        // 云互通基座（含跨端同步码）
 const AIAgent = require("../../utils/ai-agent.js");
+const PROMPTS = require("./ai-prompts.js");   // 强模型场景提示词注册表（完整 10 套 + 作战协议，置于本分包不占主包）
 const CloudSync = require("../../utils/cloud-sync.js"); // 行程上云 / 拉回
 const app = getAppSafe();
 
@@ -233,7 +234,7 @@ Page(SafePage({
     const self = this;
     try { wx.showLoading({ title: "AI 思考中", mask: false }); } catch (e) {}
     const ctx = Cloud.aiContextOf(plan, "本地速查助手");
-    AIAgent.ask("assistant", q, ctx)
+    AIAgent.ask("assistant", q, ctx, PROMPTS.buildSystem("assistant", ctx))
       .then(function (r) {
         try { wx.hideLoading(); } catch (e) {}
         if (r.ok && r.text) {
