@@ -15,6 +15,7 @@
 
 const KEYS = require("./keys.js");
 const S = require("./store.js");
+const T = require("./travel.js");   // grounding 助手（预算/阶段/花费/想去/天气快照/体检），零伪造只读本机数据
 
 let _inited = false;
 let _initPromise = null;
@@ -156,6 +157,9 @@ function ensureUid() {
 // ── AI 接入（共用云端 llmProxy 强模型网关，fail-closed） ──
 // 组装本地真实上下文（行程 / 景点 / 城市 / 预算），作为 grounding 注入 LLM。
 // 零伪造：这里只读取用户本机已有行程数据，不编造任何坐标 / 票价 / 医院。
+// 组装本地真实上下文（行程 / 景点 / 城市 / 预算 / 天气 / 花费 / 想去清单），作为 grounding 注入 LLM。
+// 零伪造：这里只读取用户本机已有行程数据，不编造任何坐标 / 票价 / 医院 / 天气。
+// 每个派生维度都用 try/catch 隔离，任一助手缺失都不会让整段上下文失效（强模型调用永不因此崩）。
 function aiContextOf(plan, page) {
   const lines = [];
   if (page) lines.push("当前页面：" + String(page) + "（旅行攻略生成器 App）。");
@@ -167,6 +171,31 @@ function aiContextOf(plan, page) {
   const paceMap = { leisure: "轻松", balance: "平衡", speed: "特种兵" };
   if (plan.pace) lines.push("节奏：" + (paceMap[plan.pace] || plan.pace) + "。");
   if (plan.people) lines.push("同行人数：" + plan.people + " 人。");
+  // 交通方式（真实字段，绝不编造）
+  if (plan.travelMode) {
+    const mm = { walking: "步行", transit: "公共交通", driving: "自驾", cycling: "骑行", metro: "地铁" };
+    lines.push("交通偏好：" + (mm[plan.travelMode] || plan.travelMode) + "。");
+  }
+  // 预算进度（budgetGauge 已统一 customAmt 与档位；仅在用户实际设过预算时披露，避免把默认 900 当真）
+  if (plan.budget || plan.customAmt) {
+    try {
+      const bg = T.budgetGauge(plan);
+      if (bg && bg.txt) lines.push("预算：" + bg.txt + (bg.over ? "（已超预算，提醒控制）" : "") + "。");
+    } catch (e) {}
+  }
+  // 行程阶段 / 倒计时（before / during / after）
+  try {
+    const ts = T.todayState(plan);
+    if (ts && ts.phase === "before" && ts.daysLeft != null) lines.push("距出发还有 " + ts.daysLeft + " 天（尚未出行）。");
+    else if (ts && ts.phase === "during") lines.push("行程正在进行中。");
+    else if (ts && ts.phase === "after") lines.push("行程已结束（可作复盘）。");
+  } catch (e) {}
+  // 本机已记花费（真实记账，无则省略，不虚报）
+  try {
+    const today = T.todaySpent(), total = T.totalSpent();
+    if (total > 0) lines.push("本机已记录花费：今日 ¥" + Math.round(today) + " / 累计 ¥" + Math.round(total) + "。");
+  } catch (e) {}
+  // 去重景点（≤30）
   const seen = new Set(), spots = [];
   for (const d of plan.days) {
     if (!d || !Array.isArray(d.items)) continue;
@@ -181,11 +210,42 @@ function aiContextOf(plan, page) {
     if (spots.length >= 30) break;
   }
   if (spots.length) lines.push("这趟要去的点（去重，" + spots.length + " 个）：" + spots.join("、") + "。");
-  if (plan.customAmt) lines.push("用户自定义预算 ¥" + plan.customAmt + "。");
-  else if (plan.budget) {
-    const bm = { low: "经济", mid: "标准", high: "舒适" };
-    lines.push("预算档位：" + (bm[plan.budget] || plan.budget) + "。");
-  }
+  // 想去清单（本机收藏，无则省略）
+  try {
+    const city = (T.activeCityOf && T.activeCityOf(plan)) || plan.cityName || "";
+    if (city) {
+      const wish = T.wishPicksFor(city) || [];
+      if (wish.length) lines.push("用户在本机还收藏了想去（" + city + "，" + wish.length + " 个）：" + wish.slice(0, 15).join("、") + (wish.length > 15 ? " 等" : "") + "。");
+    }
+  } catch (e) {}
+  // 天气缓存快照（本地缓存、非实时，明确标注，绝不冒充实时天气）
+  try {
+    const snap = S.get("svcWxSnapV1", null);
+    if (snap && snap.day && typeof snap.day === "object") {
+      const d = snap.day;
+      let w = "最高 " + (d.tmax != null ? d.tmax : "?") + "℃/最低 " + (d.tmin != null ? d.tmin : "?") + "℃";
+      if (d.isSnow) w += "，有雪"; else if (d.isThunder) w += "，雷雨"; else if (d.isRain) w += "，有雨";
+      if (typeof d.wind === "number" && d.wind >= 40) w += "，大风";
+      lines.push("天气（本地缓存、" + (snap.date || "未知日期") + "、非实时）：" + w + "。");
+    }
+  } catch (e) {}
+  // 客流经验提示（非实时离线规则，不伪装实时拥挤度）
+  try {
+    const fd = plan.depart ? String(plan.depart).slice(0, 10) : "";
+    if (fd) {
+      const ct = T.crowdTipOf(fd);
+      if (ct && ct.txt) lines.push("出发日客流经验提示（非实时）：" + ct.txt + "。");
+    }
+  } catch (e) {}
+  // 行程体检（真实自检分 + 建议）
+  try {
+    const ck = T.planCheckup(plan);
+    if (ck && typeof ck.score === "number") {
+      let s = "行程自检 " + ck.score + " 分";
+      if (Array.isArray(ck.tips) && ck.tips.length) s += "；建议：" + ck.tips.slice(0, 2).join("；") + "。";
+      lines.push(s);
+    }
+  } catch (e) {}
   return lines.join("\n");
 }
 
