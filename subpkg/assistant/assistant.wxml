@@ -1,4 +1,21 @@
 <view class="page {{td ? 'td' : ''}} fz{{fz}}">
+  <!-- 全场景 AI 速达：把小程序全部能力以 AI 语境一站式带到眼前（空态/有行程都展示） -->
+  <view class="card scenes" wx:if="{{scenarios.length}}">
+    <view class="h3"><image class="ic" src="/images/icons/search.png"/>全场景 AI 速达</view>
+    <view class="scene-sub dim">点一下，立刻获得该场景的 AI 建议与直达入口</view>
+    <view class="scene-grid">
+      <view class="scene" wx:for="{{scenarios}}" wx:key="key" data-key="{{item.key}}" bindtap="onScenario">
+        <image class="scene-ic" src="/images/icons/{{item.icon}}"/>
+        <text class="scene-t">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 深链进入提示 -->
+  <view class="card deep-tip" wx:if="{{deepTip}}">
+    <view class="dt-t">{{deepTip}}</view>
+  </view>
+
   <!-- 空态 -->
   <view class="empty" wx:if="{{!hasPlan}}">
     <view class="em-ic"><image class="em-img" src="/images/icons/search.png"/></view>
