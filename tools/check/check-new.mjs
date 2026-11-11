@@ -1113,5 +1113,14 @@ assert("识物：多图传入云函数(imageFileIDs)", CLOUD_JS.indexOf("imageFi
 assert("识物：自适应二次核验（多链投票）已落地", /_visionWithVote/.test(LENS_JS) && /_promptVerify/.test(LENS_JS));
 assert("识物：离线文字问回落本地 AI 大脑", /AI\.handle/.test(LENS_JS) && /离线/.test(LENS_JS));
 
+// ── S1：拍照识物 → 行程 / 查景点联动（v1.20.7，分包内零主包体积）──
+const SP_JS = req("fs").readFileSync("./subpkg/spotsearch/spotsearch.js", "utf8");
+assert("识物联动：lens 解析实体名(_extractName) + 两个 action(onLookupSpot/onAddToTrip)", /_extractName\s*\(/.test(LENS_JS) && /onLookupSpot/.test(LENS_JS) && /onAddToTrip/.test(LENS_JS));
+assert("识物联动：WXML 已渲染联动按钮(查这个景点/加入行程)", /onLookupSpot/.test(LENS_WXML) && /onAddToTrip/.test(LENS_WXML) && /spotName/.test(LENS_WXML));
+assert("识物联动：加入行程走本地生成(_generateForCity 复用 buildPlan+setPlan，可 picks 纳入景点)", /_generateForCity/.test(LENS_JS) && /T\.buildPlan/.test(LENS_JS) && /app\.setPlan/.test(LENS_JS) && /picks/.test(LENS_JS));
+assert("识物联动：查不到时深链到查景点页(q 名称预填)", /subpkg\/spotsearch\/spotsearch\?q=/.test(LENS_JS));
+assert("识物联动：spotsearch 接收 q 深链预填(onLoad 读 options.q 触发 _runSearch)", /options\.q/.test(SP_JS) && /_deepQ/.test(SP_JS) && /_runSearch/.test(SP_JS));
+assert("识物联动：零伪造——只查本地 spotLookup，绝不编造(_extractName 仅文本解析)", /T\.spotLookup/.test(LENS_JS) && /防回潮|零伪造/.test(LENS_JS + SP_JS));
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

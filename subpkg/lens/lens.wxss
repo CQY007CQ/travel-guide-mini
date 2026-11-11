@@ -44,6 +44,20 @@
 .ai-badge { font-size: calc(20rpx * var(--fs, 1)); font-weight: 700; color: #14100a; background: linear-gradient(135deg, #e2b65c, #d4a94e); border-radius: 999rpx; padding: 2rpx 16rpx; }
 .r-txt { display: block; font-size: calc(27rpx * var(--fs, 1)); color: var(--t1, #dce5f0); line-height: 1.78; white-space: pre-wrap; word-break: break-word; }
 
+/* 识别联动：查景点 / 加入行程 */
+.spot-ops { display: flex; align-items: center; flex-wrap: wrap; gap: 14rpx; margin-top: 18rpx; padding-top: 16rpx; border-top: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .14); }
+.sp-btn { font-size: calc(25rpx * var(--fs, 1)); border-radius: 999rpx; padding: 12rpx 28rpx; background: var(--panel, #18233a); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .22); color: var(--t1, #dce5f0); }
+.sp-btn:active { opacity: .82; }
+.sp-primary { background: linear-gradient(135deg, #e2b65c, #d4a94e 45%, #b8892f); color: #14100a; font-weight: 800; border: none; }
+.sp-hint { font-size: calc(21rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-left: auto; }
+.spot-info { margin-top: 16rpx; padding: 18rpx; border-radius: 16rpx; background: rgba(var(--chip-rgb, 212, 169, 78), .08); border: 1rpx solid rgba(var(--chip-rgb, 212, 169, 78), .28); }
+.si-h { display: flex; align-items: center; gap: 12rpx; margin-bottom: 10rpx; }
+.si-name { font-size: calc(28rpx * var(--fs, 1)); font-weight: 800; color: var(--chip-tx, #d4a94e); }
+.si-city { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); }
+.si-txt { display: block; font-size: calc(25rpx * var(--fs, 1)); color: var(--t1, #dce5f0); line-height: 1.7; margin-top: 6rpx; }
+.si-close { margin-top: 12rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); text-align: right; }
+.spot-err { margin-top: 14rpx; font-size: calc(23rpx * var(--fs, 1)); color: var(--red, #e56a6a); line-height: 1.6; }
+
 /* 加载 / 错误 */
 .loading { font-size: calc(25rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); }
 .err { font-size: calc(25rpx * var(--fs, 1)); color: var(--red, #e56a6a); line-height: 1.65; }

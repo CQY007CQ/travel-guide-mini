@@ -40,9 +40,12 @@ Page(SafePage({
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
 
-  onLoad() {
+  onLoad(options) {
     this.__boot = T.ready().catch(() => null);
     this._buildDimGroups();
+    // v1.20.7：识物页「查这个景点」深链预填（按名称搜索，零伪造）
+    this._deepQ = (options && options.q) ? String(options.q) : "";
+    this._deepCity = (options && options.city) ? String(options.city) : "";
   },
 
   onShow() {
@@ -61,6 +64,16 @@ Page(SafePage({
           else if (plan.isProv && plan.province) opts.push({ k: plan.province, t: "仅看 " + plan.province + "省", type: "prov" });
         }
         this.setData({ scopeOptions: opts });
+        // 识物页深链：带 q 进入则按名称预填并搜索（若带 city 且该城在筛选项里则限定范围）
+        if (this._deepQ) {
+          let scope = "all", scopeType = "all";
+          if (this._deepCity && opts.some(function (o) { return o.k === this._deepCity; }, this)) {
+            scope = this._deepCity; scopeType = "city";
+          }
+          this.setData({ qText: this._deepQ, scope: scope, scopeType: scopeType });
+          this._runSearch();
+          this._deepQ = ""; this._deepCity = "";
+        }
       } catch (e) {}
     });
   },

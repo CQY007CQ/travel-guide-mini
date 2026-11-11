@@ -22,7 +22,11 @@ Page(SafePage({
     cloudOn: false,     // 云端是否开启
     textMode: false,    // 文字问模式
     textInput: "",
-    cityName: ""
+    cityName: "",
+    // v1.20.7：识物联动 —— 识别结果解析出的实体名 / 本地查到的景点资料 / 查不到时的提示
+    spotName: "",       // 从识别结果解析出的主体名称（供「查景点 / 加入行程」联动）
+    spotInfo: null,     // 本地命中资料 {name,intro,how,route,city}
+    spotErr: ""         // 查不到时的提示（空表示已命中）
   },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
@@ -80,16 +84,16 @@ Page(SafePage({
 
   _addImgs(paths) {
     const next = this.data.imgs.concat(paths).slice(0, 3);
-    this.setData({ imgs: next, result: "", source: "", err: "", voted: false });
+    this.setData({ imgs: next, result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "" });
   },
   removeImg(e) {
     const i = Number(e.currentTarget.dataset.i);
     if (isNaN(i)) return;
     const next = this.data.imgs.slice();
     next.splice(i, 1);
-    this.setData({ imgs: next, result: "", source: "", err: "", voted: false });
+    this.setData({ imgs: next, result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "" });
   },
-  clearImgs() { this.setData({ imgs: [], result: "", source: "", err: "", voted: false }); },
+  clearImgs() { this.setData({ imgs: [], result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "" }); },
 
   _prompt() {
     const city = this.data.cityName ? ("当前所在城市：" + this.data.cityName + "。") : "";
@@ -135,7 +139,7 @@ Page(SafePage({
       self.setData({ err: "AI 识物需先开启云端：在云函数 llmProxy 配置 LLM_PROVIDER / LLM_MODEL（需多模态模型，如 gpt-4o、qwen-vl-max）。当前可用下方「文字问」（离线也能答）。" });
       return;
     }
-    self.setData({ loading: true, result: "", source: "", err: "", voted: false });
+    self.setData({ loading: true, result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "" });
     try { wx.showLoading({ title: "AI 识别中", mask: true }); } catch (e) {}
     Promise.all(this.data.imgs.map(function (p) { return self._compress(p); }))
       .then(function (paths) { return Promise.all(paths.map(function (p) { return Cloud.uploadImage(p); })); })
@@ -146,8 +150,10 @@ Page(SafePage({
       })
       .then(function (r) {
         try { wx.hideLoading(); } catch (e) {}
-        if (r && r.ok && r.text) self.setData({ result: r.text, loading: false, source: r.source || "ai", err: "", voted: !!r.voted });
-        else self.setData({ loading: false, err: "识别失败：" + ((r && r.err) || "未知错误") + "。可改用「文字问」。" });
+        if (r && r.ok && r.text) {
+          const nm = self._extractName(r.text);
+          self.setData({ result: r.text, loading: false, source: r.source || "ai", err: "", voted: !!r.voted, spotName: nm, spotInfo: null, spotErr: "" });
+        } else self.setData({ loading: false, err: "识别失败：" + ((r && r.err) || "未知错误") + "。可改用「文字问」。" });
       })
       .catch(function (e) {
         try { wx.hideLoading(); } catch (_) {}
@@ -223,6 +229,103 @@ Page(SafePage({
         self.setData({ loading: false, err: "回答失败：" + String((e && e.message) || e) });
       });
   },
+
+  // 从结构化识别结果里抽取主体名称（供「查景点 / 加入行程」联动）。
+  // 零伪造：只做文本解析，绝不据此编造景点；解析不出则回退空串，由 UI 隐藏联动按钮。
+  _extractName(text) {
+    const t = String(text || "");
+    let name = "";
+    const m = t.match(/名称[：:]\s*([^\n，。；（(]+)/);
+    if (m) name = (m[1] || "").trim();
+    if (!name) {
+      const lines = t.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 1; });
+      if (lines.length) {
+        let first = lines[0].replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, "");
+        first = first.replace(/^[①-⑩\s]+/, "");
+        name = first.split(/[，。；：、（）()【】\s]/)[0] || "";
+      }
+    }
+    if (name) {
+      name = name.replace(/\s*[（(][^）)]*[）)]\s*$/, "");
+      name = name.replace(/[（(]?\s*置信度?\s*[:：]?\s*(高|中|低)\s*[）)]?/g, "");
+      name = name.replace(/^(这是|可能是|疑似|大概率是|应为|应该是|我认为是|估计是|或为)\s*/, "");
+      name = name.trim();
+    }
+    return (name.length > 1 && name.length <= 30) ? name : "";
+  },
+
+  // 查这个景点：命中本地资料则就地展示；未命中则落到查景点页（按名称搜索，零伪造）。
+  onLookupSpot() {
+    const name = this.data.spotName;
+    const city = this.data.cityName;
+    if (!name) { wx.showToast({ title: "没识别到明确名称，换个角度拍", icon: "none" }); return; }
+    let hit = null;
+    try { hit = T.spotLookup(name, city); } catch (e) {}
+    if (hit && hit.found) {
+      this.setData({
+        spotInfo: { name: hit.name || name, intro: hit.intro || "", how: hit.how || "", route: hit.route || "", city: hit.city || city || "" },
+        spotErr: ""
+      });
+    } else {
+      this.setData({ spotErr: "本地库暂未收录「" + name + "」，已打开查景点页" });
+      try { wx.navigateTo({ url: "/subpkg/spotsearch/spotsearch?q=" + encodeURIComponent(name) + "&city=" + encodeURIComponent(city || "") }); } catch (e) {}
+    }
+  },
+
+  // 加入行程：解析出的实体若命中本地景点，优先用其真实城市；否则用当前行程城市。
+  // 经 T.buildPlan 本地生成（可把该景点经 picks 强制纳入行程），零云依赖、零伪造。
+  onAddToTrip() {
+    const self = this;
+    let name = this.data.spotName;
+    let city = this.data.cityName;
+    if (!city && !name) { wx.showToast({ title: "先选目的地，或在首页生成行程", icon: "none" }); return; }
+    if (name) {
+      try {
+        const hit = T.spotLookup(name, city);
+        if (hit && hit.found && hit.city) { city = hit.city; name = hit.name || name; }
+      } catch (e) {}
+    }
+    if (!city) { wx.showToast({ title: "无法确定城市，去首页选目的地", icon: "none" }); return; }
+    self._generateForCity(city, name ? [name] : []);
+  },
+
+  // 复用 assistant「一句话生成」同源逻辑：本地生成并跳行程页（picks 可把具体景点纳入行程）
+  _generateForCity(cityName, picks) {
+    const self = this;
+    let c = null;
+    try { if (T.findCity) c = T.findCity(cityName); } catch (e) {}
+    if (!c) {
+      const provs = T.provinces();
+      for (let pi = 0; pi < (provs || []).length && !c; pi++) {
+        const cs = T.citiesOf(provs[pi]) || [];
+        c = cs.find(function (x) { return x.name === cityName; }) || null;
+      }
+    }
+    if (!c) { wx.showToast({ title: "未收录「" + cityName + "」", icon: "none" }); return; }
+    try {
+      const d = new Date(); d.setDate(d.getDate() + 3);
+      const pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+      const depart = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      const oldPlan = app.globalData && app.globalData.plan;
+      if (oldPlan && oldPlan.days && oldPlan.days.length) T.savePlanSlot(oldPlan);
+      const daysArr = T.buildPlan({ city: c, days: 4, depart: depart, budget: "mid", pace: "balance", travelMode: "", people: 2, stayMountain: true, picks: picks || [], pickOnly: false, bias: "" });
+      const from = { province: c.province || "", city: c.name };
+      try { T.resetTripPrep(); } catch (e) {}
+      if (app.setPlan) app.setPlan({
+        cityName: c.name, province: c.province || "", totalDays: daysArr.length, depart: depart, days: daysArr,
+        budget: "mid", customAmt: 0, people: 2, pace: "balance", travelMode: "", pickOnly: false, isMulti: false,
+        from: from, savedAt: Date.now(), bias: ""
+      });
+      try { T.pushRecent({ province: c.province || "", city: c.name, days: daysArr.length, depart: depart }); } catch (e) {}
+      wx.showToast({ title: "已将「" + c.name + "」加入行程", icon: "none" });
+      setTimeout(function () { try { wx.switchTab({ url: "/pages/plan/plan" }); } catch (e) {} }, 700);
+    } catch (e) {
+      wx.showToast({ title: "生成失败：" + ((e && e.message) || "请稍后重试"), icon: "none" });
+    }
+  },
+
+  // 收起本地资料面板
+  onCloseSpot() { this.setData({ spotInfo: null, spotErr: "" }); },
 
   goAssistant() {
     try { wx.navigateTo({ url: "/subpkg/assistant/assistant" }); } catch (e) {}

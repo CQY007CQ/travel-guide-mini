@@ -36,6 +36,20 @@
       <view class="ai-copy" bindtap="copyResult">复制</view>
       <view class="ai-copy" bindtap="clearImgs">重选图片</view>
     </view>
+    <!-- 识别联动：查这个景点 / 加入行程（仅在解析出明确名称时显示） -->
+    <view class="spot-ops" wx:if="{{spotName}}">
+      <view class="sp-btn" bindtap="onLookupSpot">查这个景点</view>
+      <view class="sp-btn sp-primary" bindtap="onAddToTrip">加入行程</view>
+      <text class="sp-hint">识别为「{{spotName}}」</text>
+    </view>
+    <view class="spot-info" wx:if="{{spotInfo}}">
+      <view class="si-h"><text class="si-name">{{spotInfo.name}}</text><text class="si-city" wx:if="{{spotInfo.city}}">{{spotInfo.city}}</text></view>
+      <text class="si-txt" wx:if="{{spotInfo.intro}}">{{spotInfo.intro}}</text>
+      <text class="si-txt" wx:if="{{spotInfo.how}}">怎么去：{{spotInfo.how}}</text>
+      <text class="si-txt" wx:if="{{spotInfo.route}}">{{spotInfo.route}}</text>
+      <view class="si-close" bindtap="onCloseSpot">收起</view>
+    </view>
+    <view class="spot-err" wx:if="{{spotErr}}">{{spotErr}}</view>
   </view>
   <view class="card loading" wx:if="{{loading}}">AI 思考中…</view>
   <view class="card err" wx:if="{{err}}">{{err}}</view>
