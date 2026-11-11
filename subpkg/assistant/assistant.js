@@ -309,4 +309,10 @@ Page(SafePage({
       wx.setClipboardData({ data: t, success: () => wx.showToast({ title: "已复制", icon: "none" }) });
     } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
   },
+  aiClearChat() {
+    try { AIAgent.clearHistory("assistant"); } catch (e) {}
+    this.setData({ aiText: "", aiAnswer: "", lastResult: "", result: "", out: null,
+      aiSource: "", source: "", aiQ: "", aiInput: "", aiErr: "" });
+    wx.showToast({ title: "会话已清空", icon: "none" });
+  },
 }));

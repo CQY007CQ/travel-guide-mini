@@ -40,6 +40,7 @@
       <view class="tq-row">
         <input class="tq-inp" placeholder="如：金银花能泡茶吗？这是什么树的叶子？" value="{{textInput}}" bindinput="onTextInput" bindconfirm="askText" confirm-type="send"/>
         <view class="tq-btn" bindtap="askText">问</view>
+        <view class="ai-copy" bindtap="aiClearChat">清空会话</view>
       </view>
     </block>
   </view>

@@ -917,6 +917,10 @@ Page(SafePage({
     if (!this.data.depart || this.data.depart < this.data.departMin) {
       wx.showToast({ title: "出发日期不能早于今天", icon: "none" }); return;
     }
+    // AI 生成只走单城分支；多站/全省模式下先明确提示，避免静默把用户切回单城
+    if (this.data.multiMode || this.data.provMode) {
+      wx.showToast({ title: "AI 生成暂只支持单城，请先切回「城市」", icon: "none" }); return;
+    }
     let c = null;
     try { c = p.city ? T.findCity(p.city) : null; } catch (e) {}
     if (!c) c = this.data.cities[this.data.cityIdx];

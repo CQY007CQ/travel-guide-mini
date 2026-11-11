@@ -343,5 +343,12 @@ Page(SafePage({
   if (i >= 0 && i < list.length) list.splice(i, 1);
   try { S.set("miniToolFavV1", list); } catch (e2) {}
   this.setData({ favs: list, favIdx: -1 });
- }
+ },
+
+  aiClearChat() {
+    try { AIAgent.clearHistory("toolkit"); } catch (e) {}
+    this.setData({ aiText: "", aiAnswer: "", lastResult: "", result: "", out: null,
+      aiSource: "", source: "", aiQ: "", aiInput: "", aiErr: "" });
+    wx.showToast({ title: "会话已清空", icon: "none" });
+  },
 }));

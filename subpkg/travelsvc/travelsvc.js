@@ -5,6 +5,7 @@ const T = require("../../utils/travel.js");
 const S = require("../../utils/store.js");
 const EL = require("../../utils/errlog.js");
 const SVC = require("../utils/travel-service.js");
+const AG = require("../../utils/ai-agent.js");
 const app = getAppSafe();
 
 const CURRENCIES = Object.keys(SVC.DEFAULT_RATES).filter(k => k !== "CNY");
@@ -48,6 +49,7 @@ Page(SafePage({
     phrases: SVC.PHRASES,
     wxDeltas: [], wxNote: "", fcUpdates: [], fcNote: "",
     statPlan: 0, statWish: 0, statSpent: 0,
+    memScenes: 0, memTurns: 0, memChars: 0,
     cny: "", curIdx: 0, curNames: [], curKey: "", curRate: "", convResult: "",
     rates: SVC.DEFAULT_RATES, rateEdit: "", rateOpen: false
   },
@@ -114,12 +116,21 @@ Page(SafePage({
     try { const p = app.globalData && app.globalData.plan; plan = (p && p.days && p.days.length) || 0; } catch (e) { try { EL.push("travelsvc.statPlan", e); } catch (_) {} }
     try { wish = (T.getWish() || []).length; } catch (e) { try { EL.push("travelsvc.statWish", e); } catch (_) {} }
     try { spent = Math.round(T.totalSpent()); } catch (e) { try { EL.push("travelsvc.statSpent", e); } catch (_) {} }
-    this.setData({ wxDeltas: deltas, wxNote: note, fcUpdates, fcNote, statPlan: plan, statWish: wish, statSpent: spent });
+    let mem = { scenes: 0, turns: 0, chars: 0 };
+    try { mem = AG.memoryStats() || mem; } catch (e) { try { EL.push("travelsvc.memStats", e); } catch (_) {} }
+    this.setData({ wxDeltas: deltas, wxNote: note, fcUpdates, fcNote, statPlan: plan, statWish: wish, statSpent: spent,
+      memScenes: mem.scenes, memTurns: mem.turns, memChars: mem.chars });
     this._convert();
   },
 
   goIndex() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) {} },
   goMore() { try { wx.switchTab({ url: "/pages/more/more" }); } catch (e) {} },
+
+  clearAllChats() {
+    try { AG.clearHistory(); } catch (e) { try { EL.push("travelsvc.clearChats", e); } catch (_) {} }
+    this._refresh();
+    wx.showToast({ title: "已清空", icon: "none" });
+  },
 
   doBackup() {
     let s = "";
@@ -154,6 +165,12 @@ Page(SafePage({
     try { S.set(RATE_KEY, rates); } catch (e) { try { EL.push("travelsvc.saveRate", e); } catch (_) {} }
     this.setData({ rates, rateOpen: false }, () => this._convert());
     wx.showToast({ title: "已更新（仅本机参考）", icon: "none" });
+  },
+
+  resetRates() {
+    try { S.set(RATE_KEY, SVC.DEFAULT_RATES); } catch (e) { try { EL.push("travelsvc.resetRates", e); } catch (_) {} }
+    this.setData({ rates: SVC.DEFAULT_RATES, rateOpen: false }, () => this._convert());
+    wx.showToast({ title: "已恢复默认参考汇率", icon: "none" });
   },
 
   onShareAppMessage() {

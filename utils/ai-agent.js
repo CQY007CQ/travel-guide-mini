@@ -18,6 +18,7 @@ const MAX_TURNS = 6;                 // 每场景保留最近 6 轮（12 条消�
 const MEM_KEY = "aiAgentMemV1";
 const MAX_SCENES = 4;                // 落盘最多 4 个场景，防止 storage 膨胀
 const SAVE_CHARS = 600;              // 落盘单条上限（内存里仍 1200）
+const _inflight = Object.create(null); // scene -> true，防止同场景重复点击并发请求
 let _mem = null;                     // scene -> [{role, content}]，首次访问时懒加载
 
 function _load() {
@@ -73,6 +74,9 @@ function clearHistory(scene) {
 function ask(scene, question, context) {
   const q = String(question || "").trim();
   if (!q) return Promise.resolve({ ok: false, err: "empty-question" });
+  const k = scene || "default";
+  if (_inflight[k]) return Promise.resolve({ ok: false, err: "inflight" });
+  _inflight[k] = true;
   const msgs = historyOf(scene).concat([{ role: "user", content: q }]);
   return Cloud.aiChat({ messages: msgs, context: context || null }).then(function (r) {
     if (r && r.ok && r.text) {
@@ -80,7 +84,23 @@ function ask(scene, question, context) {
       remember(scene, "assistant", r.text);
     }
     return r;
+  }).catch(function (e) {
+    return { ok: false, err: String((e && e.message) || e) };
+  }).then(function (r) {
+    delete _inflight[k];
+    return r;
   });
+}
+
+// 记忆占用（供设置页展示 / 全局清空），返回 { scenes, turns, chars }
+function memoryStats() {
+  const m = _load();
+  let turns = 0, chars = 0;
+  Object.keys(m).forEach(function (k) {
+    turns += Math.ceil((m[k].length || 0) / 2);
+    (m[k] || []).forEach(function (x) { chars += String(x.content || "").length; });
+  });
+  return { scenes: Object.keys(m).length, turns, chars };
 }
 
 const PLAN_SYS =
@@ -162,6 +182,7 @@ module.exports = {
   historyOf: historyOf,
   remember: remember,
   clearHistory: clearHistory,
+  memoryStats: memoryStats,
   parsePlanIntent: parsePlanIntent,
   resolveCity: resolveCity
 };

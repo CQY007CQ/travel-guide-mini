@@ -157,5 +157,12 @@ Page(SafePage({
 
   goAssistant() {
     try { wx.navigateTo({ url: "/subpkg/assistant/assistant" }); } catch (e) {}
-  }
+  },
+
+  aiClearChat() {
+    try { AIAgent.clearHistory("lens"); } catch (e) {}
+    this.setData({ aiText: "", aiAnswer: "", lastResult: "", result: "", out: null,
+      aiSource: "", source: "", aiQ: "", aiInput: "", aiErr: "" });
+    wx.showToast({ title: "会话已清空", icon: "none" });
+  },
 }));

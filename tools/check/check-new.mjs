@@ -1073,6 +1073,24 @@ AG.remember("__t__", "user", "问一句"); AG.remember("__t__", "assistant", "�
 assert("Agent 记忆：写入后可取回且落盘", AG.historyOf("__t__").length === 2);
 AG.clearHistory("__t__");
 assert("Agent 记忆：清空后为空", AG.historyOf("__t__").length === 0);
+// ── 防回潮：本轮修复的 3 个逻辑 bug + Agent 新增能力 ──
+const LLM_SRC = req("fs").readFileSync("./tools/cloud/llmProxy/index.js", "utf8");
+const VISION_OK_RE = eval(LLM_SRC.match(/const VISION_OK\s*=\s*(\/[^\n]+\/)/)[1]);
+const NO_VISION_RE = eval(LLM_SRC.match(/const NO_VISION\s*=\s*(\/[^\n]+\/)/)[1]);
+const blocked = m => !VISION_OK_RE.test(m) && NO_VISION_RE.test(m);
+assert("视觉护栏：纯文本模型仍拦截", ["deepseek-chat", "qwen-max", "moonshot-v1-8k", "gpt-3.5-turbo"].every(blocked));
+assert("视觉护栏：视觉模型不误拦", ["gpt-4o", "qwen-vl-max", "deepseek-vl2", "gpt-4.1"].every(m => !blocked(m)));
+const SVCJS = req("fs").readFileSync("./subpkg/travelsvc/travelsvc.js", "utf8");
+assert("天气缓存：有 6 小时硬过期", SVCJS.indexOf("6 * 3600 * 1000") >= 0);
+assert("预报快照：校验城市 cacheKey", SVCJS.indexOf("snap.key === cacheKey") >= 0);
+assert("首页 AI：多站/全省模式收口", req("fs").readFileSync("./pages/index/index.js", "utf8").indexOf("AI 生成暂只支持单城") >= 0);
+AG.clearHistory("__m__");
+AG.remember("__m__", "user", "q1"); AG.remember("__m__", "assistant", "a1");
+const ms = AG.memoryStats();
+assert("Agent 记忆占用可统计", ms.scenes >= 1 && ms.turns >= 1 && ms.chars >= 4, JSON.stringify(ms));
+AG.clearHistory();
+assert("Agent 全局清空生效", AG.memoryStats().scenes === 0);
+assert("Agent 并发保护存在", req("fs").readFileSync("./utils/ai-agent.js", "utf8").indexOf("_inflight[k]") >= 0);
 
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

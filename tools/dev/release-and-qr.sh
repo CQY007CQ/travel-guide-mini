@@ -28,11 +28,34 @@ DESC="${2:-最新开发版}"
 OUT="${3:-$(pwd)/预览二维码-latest.png}"
 
 echo "════════ 发布 v${VER} ════════"
+# 可选全量门禁：FULL_CHECK=1 时先跑 allcheck（默认只由 upload.sh 做 verify-release 发布门禁）
+if [ "${FULL_CHECK:-0}" = "1" ]; then
+  echo "⓪ 全量回归"
+  (cd "$(pwd)" && bash allcheck.sh > /tmp/release-allcheck.log 2>&1) || {
+    echo "❌ allcheck 未通过，终止上传。日志：/tmp/release-allcheck.log" >&2
+    tail -6 /tmp/release-allcheck.log >&2
+    exit 1
+  }
+  echo "  全绿"
+fi
 echo "① 上传体验版"
 bash tools/dev/upload.sh "$VER" "$DESC"
 
 echo "② 生成当前代码预览二维码"
 bash tools/dev/preview-qr.sh "$OUT"
+
+# ③ 落发版记录（便于追溯「哪个 commit / 什么时候 / 用的什么说明」）
+COMMIT="$(/Library/Developer/CommandLineTools/usr/bin/git -C "$(pwd)" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+STATE="$(pwd)/tools/dev/release-state.json"
+cat > "$STATE" <<EOF
+{
+  "version": "${VER}",
+  "desc": "${DESC}",
+  "time": "$(date '+%Y-%m-%d %H:%M:%S')",
+  "commit": "${COMMIT}",
+  "previewQr": "${OUT}"
+}
+EOF
 
 echo ""
 echo "════════ 完成 ════════"

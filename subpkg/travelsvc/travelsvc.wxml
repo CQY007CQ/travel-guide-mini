@@ -59,6 +59,9 @@
       </view>
       <view class="svc-cta" bindtap="doBackup">{{tx.backup}}</view>
       <view class="svc-note dim">{{tx.backupTip}}</view>
+      <view class="svc-h3 svc-gap">{{tx.memTitle}}</view>
+      <view class="svc-note dim">{{tx.memStat}}：{{memScenes}} / {{memTurns}} / {{memChars}}</view>
+      <view class="ai-copy" bindtap="clearAllChats">{{tx.clearChats}}</view>
     </view>
   </view>
 
@@ -75,6 +78,7 @@
       </view>
       <view class="conv-res" wx:if="{{convResult}}">{{tx.result}}：{{convResult}} {{curKey}}</view>
       <view class="rate-line" bindtap="toggleRate">汇率：1 ¥ = {{curRate}} {{curKey}} · 修改 ▾</view>
+      <view class="ai-copy" bindtap="resetRates">恢复默认汇率</view>
       <view class="conv-row" wx:if="{{rateOpen}}">
         <input class="conv-inp" type="digit" value="{{rateEdit}}" bindinput="onRateInput"/>
         <view class="conv-btn" bindtap="saveRate">保存</view>

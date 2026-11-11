@@ -119,7 +119,8 @@ const I18N = {
     lang: "语言", currency: "参考换算", rateTip: "离线参考汇率，非实时；汇率可自行修改。仅供参考，不参与记账。",
     privacy: "隐私协议", clear: "清空本地数据", clearTip: "在「更多 → 数据与隐私」执行，不可恢复",
     amount: "金额（¥）", target: "换算为", result: "参考金额",
-    phrase: "常用短语（中 / 英）", offlineBadge: "离线可用", onlineBadge: "需联网", naBadge: "不适用"
+    phrase: "常用短语（中 / 英）", offlineBadge: "离线可用", onlineBadge: "需联网", naBadge: "不适用",
+    memTitle: "AI 会话记忆", memStat: "场景 / 轮数 / 字符", clearChats: "清空全部 AI 会话"
   },
   en: {
     title: "Traveller Services", sub: "Offline-first · No payments · Data stays on your device",
@@ -131,7 +132,8 @@ const I18N = {
     lang: "Language", currency: "Reference conversion", rateTip: "Offline reference rates, not live. Editable. For reference only; never used in the ledger.",
     privacy: "Privacy policy", clear: "Clear local data", clearTip: "Run from More → Data & Privacy. Cannot be undone.",
     amount: "Amount (CNY)", target: "Convert to", result: "Reference amount",
-    phrase: "Useful phrases (ZH / EN)", offlineBadge: "Offline", onlineBadge: "Online", naBadge: "N/A"
+    phrase: "Useful phrases (ZH / EN)", offlineBadge: "Offline", onlineBadge: "Online", naBadge: "N/A",
+    memTitle: "AI chat memory", memStat: "scenes / turns / chars", clearChats: "Clear all AI chats"
   }
 };
 const PHRASES = [
