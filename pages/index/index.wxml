@@ -143,8 +143,8 @@
           <text class="prov-s">{{provSub}}</text>
         </view>
       </block>
-      <!-- 城市：单个目的地入口（34 省级行政区 · 351 城全量可选，选完自动定省） -->
       <block wx:else>
+        <!-- 城市：单个目的地入口（34 省级行政区 · 351 城全量可选，选完自动定省） -->
         <view class="field-row" data-mode="from" bindtap="openPicker">
           <text class="field-label">出发地</text>
           <text class="field-value {{fromCityObj ? 'pick-value' : ''}}">{{fromTxt}}<text class="arrow">›</text></text>

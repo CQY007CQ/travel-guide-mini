@@ -70,10 +70,12 @@
         <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
         <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askFoodAI">{{aiLoading ? '思考中…' : (aiText ? '再问一次' : '生成')}}</view>
       </view>
-      <view class="ai-body" wx:if="{{aiText}}">{{aiText}}</view>
-      <view class="ai-copy" wx:if="{{aiText}}" bindtap="aiCopy">复制回答</view>
-      <view class="ai-copy" bindtap="aiClearChat">清空会话</view>
+      <block wx:if="{{aiText}}">
+        <view class="ai-body">{{aiText}}</view>
+        <view class="ai-copy" bindtap="aiCopy">复制回答</view>
+      </block>
       <view class="ai-tip" wx:else>基于本地收录的真实必吃清单与名店给 3 条点餐建议；不编造店名和价格，无网络时自动回落离线规则库。</view>
+      <view class="ai-copy" bindtap="aiClearChat">清空会话</view>
       <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
     </view>
   </block>
