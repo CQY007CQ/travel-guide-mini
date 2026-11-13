@@ -4,10 +4,23 @@
 .group { margin-top: 30rpx; }
 
 .group-title { font-size: calc(23rpx * var(--fs, 1)); font-weight: 800; color: var(--t3, #8fa3bc); margin: 0 8rpx 14rpx;
-  letter-spacing: 2rpx; padding-left: 22rpx; position: relative; }
+  letter-spacing: 2rpx; padding-left: 22rpx; position: relative; display: flex; align-items: center; justify-content: space-between; }
 
 .group-title::before { content: ""; position: absolute; left: 6rpx; top: 50%; transform: translateY(-50%);
   width: 8rpx; height: 22rpx; border-radius: 4rpx; background: linear-gradient(180deg, #e8c877, #b8892f); }
+
+/* v1.20.7：分组折叠（手风琴）——标题右侧 chevron，点标题收起/展开该组 */
+.group-title::after { content: ""; width: 14rpx; height: 14rpx; margin-left: 12rpx; flex: none;
+  border-right: 3rpx solid var(--t3, #8fa3bc); border-bottom: 3rpx solid var(--t3, #8fa3bc);
+  transform: rotate(45deg); transition: transform .2s ease; opacity: .85; }
+.group.collapsed > .group-title::after { transform: rotate(-45deg); }
+.group.collapsed > .card { display: none; }
+
+/* 顶部「收起全部 / 展开全部」总开关 */
+.collapse-all { display: flex; align-items: center; justify-content: flex-end; gap: 10rpx;
+  margin: 16rpx 10rpx 0; padding: 14rpx 22rpx; background: rgba(148,163,184,.10); border-radius: 16rpx; }
+.collapse-all .ca-t { font-size: calc(24rpx * var(--fs, 1)); font-weight: 700; color: var(--t2, #c8d4e2); }
+.collapse-all .ca-ch { font-size: calc(20rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); }
 
 .group-card { padding: 8rpx 0; overflow: hidden; }
 

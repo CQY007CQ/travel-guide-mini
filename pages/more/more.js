@@ -29,13 +29,34 @@ const app = getAppSafe();
 Page(SafePage({
   data: {
     fz: 1, td: false, hasPlan: false, deepOn: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0,
-    achModal: { show: false, list: [], more: 0 } },
+    achModal: { show: false, list: [], more: 0 },
+    // v1.20.7：分组折叠（手风琴）——gid 与 WXML 一一对应；密集派生类默认收起，直接给「更多」页减负
+    collapsed: { saved: false, guides: false, foot: false, notes: false, review: false, insights: true, pz: true, insp: false, merge: false, year: true, heat: true, ui: false, ach: true, wish: false, privacy: true, keys: true, travel: false, prep: false, general: false },
+    allCollapsed: false
+  },
 
-    _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
+  _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
   onLoad() { this.__boot = T.ready().catch(() => null); _preloadMoreMods(this); },
   onShow() { onShowRender(this, "more"); },
   _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
+
+  /* ---------- v1.20.7：分组折叠（手风琴） ---------- */
+  // 点分组标题：收起 / 展开该组（gid 与 WXML 一一对应）
+  toggleGroup(e) {
+    const gid = e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.gid;
+    if (!gid) return;
+    const cur = !!(this.data.collapsed && this.data.collapsed[gid]);
+    this.setData({ ["collapsed." + gid]: !cur });
+  },
+  // 顶部总开关：一键收起 / 展开全部分组
+  toggleAll() {
+    const next = !this.data.allCollapsed;
+    const src = this.data.collapsed || {};
+    const collapsed = {};
+    for (const k in src) collapsed[k] = next;
+    this.setData({ collapsed: collapsed, allCollapsed: next });
+  },
 
   /* ---------- v1.7 ---------- */
   // 夜间自动深色（独立于手动主题，夜间小时段强制深色）
@@ -257,6 +278,10 @@ Page(SafePage({
         }
       ]
     });
+    // v1.20.7：为动态分组注入 gid，使其能被折叠态索引（「通用 / 旅途中 / 行前与账本」）
+    const _gmap = { "旅途中": "travel", "行前与账本": "prep", "通用": "general" };
+    (this.data.groups || []).forEach(g => { if (g && !g.gid) g.gid = _gmap[g.title] || g.title; });
+    this.setData({ groups: this.data.groups });
     // v1.20.6：成就解锁持久化 + 自动授予弹窗（app.onShow 已把跨页新解锁暂存到 globalData.pendingAch）
     try {
       const r = T.syncAchievements();

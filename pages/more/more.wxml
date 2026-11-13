@@ -3,9 +3,15 @@
   <!-- v1.20.7：AI 旅行助手入口（内嵌胶囊卡片，不压 tabBar；让 AI 充满「更多」枢纽页） -->
   <view class="card"><ai-entry inline topic="settings" label="问问 AI 旅行助手"/></view>
 
+  <!-- v1.20.7：分组折叠总开关 -->
+  <view class="collapse-all" bindtap="toggleAll">
+    <text class="ca-t">{{allCollapsed ? '展开全部' : '收起全部'}}</text>
+    <text class="ca-ch">{{allCollapsed ? '▶' : '▼'}}</text>
+  </view>
+
   <!-- 分组菜单（减法：顶部行程卡与底部「今天」tab 重复，已移除；行程身份看下方「旅行小结」） -->
-  <view class="group" wx:for="{{groups}}" wx:key="title" wx:for-item="g">
-    <view class="group-title">{{g.title}}</view>
+  <view class="group {{collapsed[g.gid] ? 'collapsed' : ''}}" wx:for="{{groups}}" wx:key="title" wx:for-item="g">
+    <view class="group-title" bindtap="toggleGroup" data-gid="{{g.gid}}">{{g.title}}</view>
     <view class="card group-card">
       <!-- 通用组首项：深色模式开关 + 二态外观（浅色/深色） -->
       <view wx:if="{{g.title === '通用'}}" class="menu theme-menu">
@@ -34,8 +40,8 @@
   </view>
 
   <!-- 我的行程存档 -->
-  <view class="group" wx:if="{{savedPlans.length}}">
-    <view class="group-title">我的行程</view>
+  <view class="group {{collapsed.saved ? 'collapsed' : ''}}" wx:if="{{savedPlans.length}}" data-gid="saved">
+    <view class="group-title" bindtap="toggleGroup" data-gid="saved">我的行程</view>
     <view class="card group-card">
       <view class="menu" wx:for="{{savedPlans}}" wx:key="id">
         <image class="m-ic" src="/images/icons/luggage.png"/>
@@ -51,8 +57,8 @@
   </view>
 
   <!-- v1.19.179：我的攻略库（专注浏览 / 打开 / 删除，区别于上面的快速恢复） -->
-  <view class="group" wx:if="{{planLibN > 0}}">
-    <view class="group-title">我的攻略</view>
+  <view class="group {{collapsed.guides ? 'collapsed' : ''}}" wx:if="{{planLibN > 0}}" data-gid="guides">
+    <view class="group-title" bindtap="toggleGroup" data-gid="guides">我的攻略</view>
     <view class="card group-card">
       <view class="menu" bindtap="goMyGuides">
         <image class="m-ic" src="/images/icons/luggage.png"/>
@@ -66,8 +72,8 @@
   </view>
 
   <!-- 旅行足迹 -->
-  <view class="group" wx:if="{{foot.spots > 0 || foot.cities > 0}}">
-    <view class="group-title">旅行足迹</view>
+  <view class="group {{collapsed.foot ? 'collapsed' : ''}}" wx:if="{{foot.spots > 0 || foot.cities > 0}}" data-gid="foot">
+    <view class="group-title" bindtap="toggleGroup" data-gid="foot">旅行足迹</view>
     <view class="card group-card">
       <view class="foot-line">
         <text class="foot-big">{{foot.cities}}</text><text class="foot-lb"> 座城市</text>
@@ -93,8 +99,8 @@
   </view>
 
   <!-- 旅行手记 -->
-  <view class="group" wx:if="{{notes.length}}">
-    <view class="group-title">旅行手记</view>
+  <view class="group {{collapsed.notes ? 'collapsed' : ''}}" wx:if="{{notes.length}}" data-gid="notes">
+    <view class="group-title" bindtap="toggleGroup" data-gid="notes">旅行手记</view>
     <view class="card group-card">
       <view class="menu" wx:for="{{notes}}" wx:key="date">
         <image class="m-ic" src="/images/icons/bulb.png"/>
@@ -109,8 +115,8 @@
   </view>
 
   <!-- 旅行小结（天数 / 景点 / 打卡 / 花费 / 最贵分类） -->
-  <view class="group" wx:if="{{review}}">
-    <view class="group-title">旅行小结</view>
+  <view class="group {{collapsed.review ? 'collapsed' : ''}}" wx:if="{{review}}" data-gid="review">
+    <view class="group-title" bindtap="toggleGroup" data-gid="review">旅行小结</view>
     <view class="card group-card">
       <view class="rv-title">{{review.title}}</view>
       <view class="rv-grid">
@@ -128,8 +134,8 @@
   <!-- v1.19.186 · 离线知识库·大数据卡片已迁至 pages/help（帮助页底部「离线数据来源·规模」板块） -->
 
   <!-- v1.19.137 · 本机数据洞察（真实记录聚合，离线 / 隐私优先） -->
-  <view class="group" wx:if="{{insights}}">
-    <view class="group-title">本机数据洞察</view>
+  <view class="group {{collapsed.insights ? 'collapsed' : ''}}" wx:if="{{insights}}" data-gid="insights">
+    <view class="group-title" bindtap="toggleGroup" data-gid="insights">本机数据洞察</view>
     <view class="card group-card">
       <block wx:if="{{insights.noData}}">
         <view class="dim ins-empty">还没有足够数据。多用几次记账、打卡和存档，这里会给出你的旅行画像。</view>
@@ -196,8 +202,8 @@
   </view>
 
   <!-- v1.19.138 · 个性化目的地推荐（真实画像驱动，每条带理由） -->
-  <view class="group" wx:if="{{personalized && personalized.list.length}}">
-    <view class="group-title">为你推荐 · 你的旅行画像</view>
+  <view class="group {{collapsed.pz ? 'collapsed' : ''}}" wx:if="{{personalized && personalized.list.length}}" data-gid="pz">
+    <view class="group-title" bindtap="toggleGroup" data-gid="pz">为你推荐 · 你的旅行画像</view>
     <view class="card group-card">
       <view class="dim ins-sub">{{personalized.intro}}</view>
       <view class="pz-item" wx:for="{{personalized.list}}" wx:key="name">
@@ -212,8 +218,8 @@
   </view>
 
   <!-- v1.7 · 旅行灵感（随机目的地） -->
-  <view class="group" wx:if="{{insp}}">
-    <view class="group-title">去哪儿好呢</view>
+  <view class="group {{collapsed.insp ? 'collapsed' : ''}}" wx:if="{{insp}}" data-gid="insp">
+    <view class="group-title" bindtap="toggleGroup" data-gid="insp">去哪儿好呢</view>
     <view class="card insp-card" bindtap="useInspire">
       <view class="insp-l">
         <image class="ic" src="/images/icons/sparkle.png"/>
@@ -235,8 +241,8 @@
   </view>
 
   <!-- v1.8.4 B16：跟同行人交换「想玩清单 + 整份行程」（协作包） -->
-  <view class="group" wx:if="{{hasPlan || wish.length}}">
-    <view class="group-title">行程协作</view>
+  <view class="group {{collapsed.merge ? 'collapsed' : ''}}" wx:if="{{hasPlan || wish.length}}" data-gid="merge">
+    <view class="group-title" bindtap="toggleGroup" data-gid="merge">行程协作</view>
     <view class="card group-card">
       <view class="menu" bindtap="onMergeOut">
         <image class="m-ic" src="/images/icons/export.png"/>
@@ -258,8 +264,8 @@
   </view>
 
   <!-- v1.8.4 B13 · 旅行年鉴 -->
-  <view class="group" wx:if="{{yearRpt && (yearRpt.citiesN > 0 || yearRpt.spent > 0 || yearRpt.notesN > 0)}}">
-    <view class="group-title">旅行年鉴</view>
+  <view class="group {{collapsed.year ? 'collapsed' : ''}}" wx:if="{{yearRpt && (yearRpt.citiesN > 0 || yearRpt.spent > 0 || yearRpt.notesN > 0)}}" data-gid="year">
+    <view class="group-title" bindtap="toggleGroup" data-gid="year">旅行年鉴</view>
     <view class="card group-card">
       <view class="rv-nums">
         <view class="rv-n"><text class="rv-v">{{yearRpt.citiesN}}</text><text class="rv-l">座城市</text></view>
@@ -275,8 +281,8 @@
   </view>
 
   <!-- v1.7 · 足迹热力图 -->
-  <view class="group" wx:if="{{heat.visited}}">
-    <view class="group-title">足迹热力图</view>
+  <view class="group {{collapsed.heat ? 'collapsed' : ''}}" wx:if="{{heat.visited}}" data-gid="heat">
+    <view class="group-title" bindtap="toggleGroup" data-gid="heat">足迹热力图</view>
     <view class="card group-card">
       <view class="foot-line">
         <text class="foot-big">{{heat.visited}}<text class="foot-lb">/34</text></text><text class="foot-lb"> 个省份已点亮 · {{heat.cities}} 座城市</text>
@@ -298,8 +304,8 @@
   </view>
 
   <!-- v1.7 · 首页快捷入口 + 夜间自动深色 -->
-  <view class="group">
-    <view class="group-title">界面设置</view>
+  <view class="group {{collapsed.ui ? 'collapsed' : ''}}" data-gid="ui">
+    <view class="group-title" bindtap="toggleGroup" data-gid="ui">界面设置</view>
     <view class="card group-card">
       <view class="set-row">
         <view class="set-l">
@@ -330,8 +336,8 @@
   </view>
 
   <!-- 旅行成就（足迹 / 手记 / 账本 / 存档 驱动的徽章） -->
-  <view class="group" wx:if="{{ach}}">
-    <view class="group-title">旅行成就</view>
+  <view class="group {{collapsed.ach ? 'collapsed' : ''}}" wx:if="{{ach}}" data-gid="ach">
+    <view class="group-title" bindtap="toggleGroup" data-gid="ach">旅行成就</view>
     <view class="card group-card">
       <view class="foot-line">
         <text class="foot-big">{{ach.got}}</text><text class="foot-lb"> / {{ach.total}} 枚徽章已解锁</text>
@@ -379,8 +385,8 @@
   </view>
 
   <!-- 想玩清单：内嵌可管理 -->
-  <view class="group">
-    <view class="group-title">想玩清单</view>
+  <view class="group {{collapsed.wish ? 'collapsed' : ''}}" data-gid="wish">
+    <view class="group-title" bindtap="toggleGroup" data-gid="wish">想玩清单</view>
     <view class="card">
       <block wx:if="{{wish.length}}">
         <view wx:for="{{wishGroups}}" wx:for-item="g" wx:for-index="gi" wx:key="city">
@@ -418,8 +424,8 @@
   </view>
 
   <!-- v1.19.2：本地数据一键重置（重度用户反复测试 / 换机场景的显式出口） -->
-  <view class="group">
-    <view class="group-title">数据与隐私</view>
+  <view class="group {{collapsed.privacy ? 'collapsed' : ''}}" data-gid="privacy">
+    <view class="group-title" bindtap="toggleGroup" data-gid="privacy">数据与隐私</view>
     <view class="card group-card">
       <view class="menu" bindtap="goTravelsvc">
         <image class="m-ic" src="/images/icons/shield.png"/>
@@ -442,8 +448,8 @@
 
   <!-- 合规与密钥（v1.19.188 / v1.20.4）：主体一致铁律——第三方 Key 须本人账号申请。
        仓库不内置任何明文 Key（已做凭据清理），需在此填入本人账号的和风 Key，即时生效、无需重发版 -->
-  <view class="group">
-    <view class="group-title">合规与密钥</view>
+  <view class="group {{collapsed.keys ? 'collapsed' : ''}}" data-gid="keys">
+    <view class="group-title" bindtap="toggleGroup" data-gid="keys">合规与密钥</view>
     <view class="card group-card">
       <view class="menu" catchtap="onSetKeys">
         <image class="m-ic" src="/images/icons/shield.png"/>
