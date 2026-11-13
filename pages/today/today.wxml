@@ -148,13 +148,14 @@
 
 </block>
 
-    <!-- AI 主动建议：打开即基于真实行程状态推一条（强模型优先 · 离线回落规则提示） -->
+    <!-- AI 主动建议：打开即基于真实行程状态推一条（强模型优先 · 离线回落规则提示）；新增「换一条」可手动刷新 -->
     <view class="card ai-today" wx:if="{{proactiveTip}}">
       <view class="ai-h">
         <image class="ic" src="/images/icons/sparkle.png"/>
         <text class="ai-t">AI 主动建议</text>
         <text class="ai-badge" wx:if="{{proactiveOffline}}">离线</text>
         <text class="ai-badge" wx:else>智能</text>
+        <view class="ai-btn {{proactiveLoading ? 'ai-busy' : ''}}" bindtap="proactiveRefresh">{{proactiveLoading ? '刷新中…' : '换一条'}}</view>
       </view>
       <view class="ai-body">{{proactiveTip}}</view>
     </view>

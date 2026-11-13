@@ -220,14 +220,14 @@ Page(SafePage({
   },
 
   // ── 主动 AI 建议：打开「今天」页即基于真实行程状态推 1 条（强模型优先 · 离线回落规则提示）──
-  _loadProactive() {
+  _loadProactive(force) {
     const self = this;
     const plan = app.globalData && app.globalData.plan;
     if (!plan || !plan.days || !plan.days.length) return;
     const key = (plan.cityName || "") + "|" + (plan.depart || "");
     const now = Date.now();
-    // 15 分钟内同行程直接复用缓存，避免 onShow 频繁打云端
-    if (_proactiveCache.key === key && now - _proactiveCache.ts < 15 * 60 * 1000 && _proactiveCache.tip) {
+    // 15 分钟内同行程直接复用缓存，避免 onShow 频繁打云端（手动「换一条」可强制忽略缓存）
+    if (!force && _proactiveCache.key === key && now - _proactiveCache.ts < 15 * 60 * 1000 && _proactiveCache.tip) {
       self.setData({ proactiveTip: _proactiveCache.tip, proactiveOffline: _proactiveCache.offline || false, proactiveLoading: false });
       return;
     }
@@ -266,6 +266,15 @@ Page(SafePage({
         _proactiveCache = { key: key, ts: now, tip: t, offline: true };
         self.setData({ proactiveTip: t, proactiveOffline: true, proactiveLoading: false });
       });
+  },
+
+  // v1.20.7：手动「换一条」——清空 15 分钟缓存并强制重新拉取主动建议（忽略缓存）
+  proactiveRefresh() {
+    if (this.data.proactiveLoading) return;
+    const plan = app.globalData && app.globalData.plan;
+    if (!plan || !plan.days || !plan.days.length) { wx.showToast({ title: "先生成行程", icon: "none" }); return; }
+    _proactiveCache = { key: "", ts: 0, tip: "" };
+    this._loadProactive(true);
   },
 
   // v1.8.5 C10：行程结束后的回顾入口
