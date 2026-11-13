@@ -125,6 +125,7 @@ Page(SafePage({
     };
     let r = null;
     try {
+      if (d.topic === "spot") { this.explainSpot(d.spot || "", d.city || city); this.setData({ deepTip: "已为你打开「景点讲解」" }); return; }
       if (city && cityQ[d.topic]) r = AI.handle(cityQ[d.topic](city), { city: city, plan: plan, page: "assistant", from: d.from });
       else if (AI.topicReply) r = AI.topicReply(d.topic, { city: city, plan: plan, page: "assistant", from: d.from });
     } catch (e) {}
@@ -449,5 +450,56 @@ Page(SafePage({
     this.setData({ aiText: "", aiAnswer: "", lastResult: "", result: "", out: null,
       aiSource: "", source: "", aiQ: "", aiInput: "", aiErr: "" });
     wx.showToast({ title: "会话已清空", icon: "none" });
+  },
+
+  // 景点结果卡上的「AI 讲解这个景点」：云端启用时把本机真实资料作 grounding 交给强模型延伸讲解；
+  // 未开/出错回落本地离线收录（零编造、零白屏）。
+  onSpotAI() {
+    const sr = this.data.spotResult;
+    if (!sr || !sr.name) { wx.showToast({ title: "先查一个景点", icon: "none" }); return; }
+    const city = sr.city || (function () { try { const p = app.globalData && app.globalData.plan; return p ? (T.activeCityOf(p) || p.cityName) : ""; } catch (e) { return ""; } })();
+    this.explainSpot(sr.name, city);
+  },
+
+  // 统一景点讲解（按钮 / 深链共用）：name 为景点名；云端优先，离线兜底。
+  explainSpot(name, city) {
+    const self = this;
+    const plan = app.globalData && app.globalData.plan;
+    const nm = String(name || "").trim();
+    if (!nm) { wx.showToast({ title: "先查一个景点", icon: "none" }); return; }
+    let offline = null;
+    try { offline = AI.spotExplain(nm, { city: city, plan: plan, page: "assistant", spot: nm }); } catch (e) {}
+    if (!offline) offline = { text: "这个景点暂无更详细的本地资料。", actions: [] };
+    if (!Cloud.cloudEnabled()) {
+      this.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [] });
+      return;
+    }
+    // 组装本地真实景点资料作 grounding（强模型只能基于它延伸，不编造）
+    const ground = (function () {
+      try {
+        const r = T.spotLookup(nm, city);
+        const p = [];
+        if (r && r.intro) p.push("介绍：" + r.intro);
+        if (r && r.how) p.push("怎么玩：" + r.how);
+        if (r && r.route) p.push("怎么去：" + r.route);
+        if (r && r.ticket && r.ticket.known) p.push("门票：" + (r.ticket.price || "") + (r.ticket.book ? "（需预约）" : "") + (r.ticket.where ? " · " + r.ticket.where : ""));
+        if (r && r.booking) p.push("预约提示：" + r.booking);
+        return p.join("\n");
+      } catch (e) { return ""; }
+    })();
+    const ctx = (Cloud.aiContextOf ? Cloud.aiContextOf(plan, "景点讲解") : "") +
+      "\n\n本机真实景点资料（请以这些为准，不要编造任何资料外的事实）：\n" + (ground || "（本机暂无该景点详细收录）");
+    const q = "请讲讲「" + nm + "」（" + (city || "当地") + "）";
+    try { wx.showLoading({ title: "AI 讲解中", mask: false }); } catch (e) {}
+    AIAgent.ask("spot", q, ctx, PROMPTS.buildSystem("spot"))
+      .then(function (res) {
+        try { wx.hideLoading(); } catch (e) {}
+        if (res && res.ok && res.text) {
+          self.setData({ lastQuery: "AI 讲解这个景点", lastResult: res.text, lastTileK: "", input: "", aiSource: res.source || "ai", actions: offline.actions || [] });
+        } else {
+          self.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [] });
+        }
+      })
+      .catch(function () { try { wx.hideLoading(); } catch (e) {} self.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [] }); });
   },
 }));

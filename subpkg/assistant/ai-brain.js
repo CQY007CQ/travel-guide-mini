@@ -336,8 +336,55 @@ const NEW_INTENTS = [
   { key: "travelsvc",      kw: /出行服务|订票|打车|机场|车站|值机|航班/, run: runTravelSvc },
   { key: "toolkit",        kw: /工具箱|百宝箱|换算|时差|计算器|工具/, run: runToolkit },
   { key: "guide",          kw: /我的攻略|收藏的攻略|保存的攻略|历史攻略|我的行程列表|攻略列表/, run: runGuide },
-  { key: "settings",       kw: /设置|偏好|主题|夜间模式|深色模式|浅色|字号|字体大小|账号管理/, run: runSettings }
+  { key: "settings",       kw: /设置|偏好|主题|夜间模式|深色模式|浅色|字号|字体大小|账号管理/, run: runSettings },
+  /* 景点讲解：放最后（最低优先级），仅当句子是「动词+景点名」或「X的故事」且本机资料能命中该景点时才触发，不抢食/今天等高频意图 */
+  { key: "spot",           kw: /^(讲讲|讲一下|介绍一下|介绍|讲解|科普|聊聊|说说|了解)\s*[一-龥A-Za-z0-9]{1,14}$|[一-龥A-Za-z0-9]{1,14}的故事$|讲讲这个|介绍这个/, run: runSpotExplain }
 ];
+
+/* ───────── 景点讲解：把单个景点用 AI 讲活（离线真实库 + 云端延伸，零伪造） ─────────
+ * 离线：直接复用 T.spotLookup 的真实收录（介绍/怎么玩/怎么去/门票），零网络、零编造。
+ * 云端（由调用方 assistant.onSpotAI 负责）：把本地资料作 grounding 交给强模型延伸讲解，
+ * 本函数只产出离线基线，绝不编造坐标/票价/年代。 */
+function extractSpot(text, city) {
+  text = (text || "").trim();
+  if (!text || text.length > 30) return "";
+  let keys = [];
+  try {
+    const D = DATA || {};
+    if (D.SPOT_DETAILS) keys = keys.concat(Object.keys(D.SPOT_DETAILS));
+    if (city && D.SPOT_DETAILS_BY_CITY && D.SPOT_DETAILS_BY_CITY[city]) keys = keys.concat(Object.keys(D.SPOT_DETAILS_BY_CITY[city]));
+  } catch (e) {}
+  keys.sort(function (a, b) { return b.length - a.length; });   // 长匹配优先，避免「园」类短键误命中
+  for (let i = 0; i < keys.length; i++) {
+    if (keys[i] && text.indexOf(keys[i]) >= 0) return keys[i];
+  }
+  return "";
+}
+function runSpotExplain(text, city, ctx) {
+  ctx = ctx || {};
+  let name = (ctx.spot || "").trim();
+  if (!name) {
+    name = String(text || "").replace(/^(讲讲|讲一下|介绍一下|介绍|讲解|科普|聊聊|说说|了解下?|讲)\s*/i, "")
+      .replace(/[？?。.！!，,~～].*$/, "").trim();
+  }
+  if (!name) name = extractSpot(text, city);
+  if (!name) return { text: "告诉我具体哪个景点，比如「讲讲故宫」，我用 App 本地真实资料给你讲讲。", actions: [], intent: "spot" };
+  let r = null;
+  try { if (T.spotLookup) r = T.spotLookup(name, city); } catch (e) {}
+  if (!r || !r.found) {
+    return { text: "本机还没收录「" + name + "」的详细资料，换个景点名试试，或到当地随走随问。", actions: ctx.plan ? [act("pages/plan/plan", "看行程 →", {}, "tab")] : [], intent: "spot" };
+  }
+  const lines = ["📖 " + r.name + (r.city ? "（" + r.city + "）" : "")];
+  if (r.intro) lines.push(r.intro);
+  if (r.how) lines.push("怎么玩：" + r.how);
+  if (r.route) lines.push("怎么去：" + r.route);
+  if (r.ticket && r.ticket.known) lines.push("门票：" + (r.ticket.price || "") + (r.ticket.book ? "（需预约）" : "") + (r.ticket.where ? " · " + r.ticket.where : ""));
+  if (r.booking) lines.push("预约提示：" + r.booking);
+  lines.push("（离线模式：以上为 App 本地真实收录；联网后点「AI 讲解这个景点」可获取延伸讲解）");
+  const acts = [act("subpkg/map/map", "地图找它 →")];
+  if (ctx.plan) acts.push(act("pages/plan/plan", "看行程 →", {}, "tab"));
+  return { text: lines.join("\n"), actions: acts, intent: "spot" };
+}
 
 /* ───────── 主入口：与 ai-intent 完全一致的契约 ───────── */
 function handle(text, ctx) {
@@ -405,6 +452,7 @@ function scenarioCard(topic, ctx) {
 
 module.exports = {
   handle: handle,
+  spotExplain: runSpotExplain,
   generatePlan: generatePlan,
   topicReply: topicReply,
   scenarioCard: scenarioCard,

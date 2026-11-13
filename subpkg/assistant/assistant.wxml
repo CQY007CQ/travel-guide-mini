@@ -89,6 +89,11 @@
       <view class="spot-lab">预约提示</view><view class="spot-txt">{{spotResult.booking}}</view>
     </view>
     <view class="spot-empty" wx:if="{{!spotResult.intro && !spotResult.note && !(spotResult.ticket && spotResult.ticket.known) && !spotResult.booking}}">这个景点暂时没有更详细的本地资料，到当地后随走随问也很方便 ~</view>
+    <view class="spot-ai" bindtap="onSpotAI" wx:if="{{spotResult.found}}">
+      <image lazy-load class="ic ic-sm" src="/images/icons/sparkle.png"/>
+      <text class="spot-ai-t">AI 讲解这个景点</text>
+      <text class="spot-ai-a">→</text>
+    </view>
   </view>
 
   <!-- 最近结果 -->
