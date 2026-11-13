@@ -188,11 +188,17 @@ function handleSpot(text, cityHint) {
 function isTab(p) {
   return ["pages/index/index", "pages/today/today", "pages/plan/plan", "pages/more/more"].indexOf(p) >= 0;
 }
+// 中文数字解析（覆盖 十 / 十一~十九 / 二十~九十九）。旧实现只认单字，导致「第十二天」
+// 被 map 成 0（多位数中文落到回退分支找不到数字）→ 地图「第X天」跳转锚点丢失。
 function numOf(s) {
-  const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+  s = String(s == null ? "" : s).trim();
   if (/^\d+$/.test(s)) return parseInt(s, 10);
-  if (map[s] != null) return map[s];
-  const m = String(s).match(/[0-9]+/); return m ? parseInt(m[0], 10) : 0;
+  const M = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+  if (M[s] != null) return M[s]; // 单字：三 / 十 / 两
+  // 两位数中文：十 / 十X（十一~十九）/ X十（二十~九十）/ X十Y（二十一~九十九）
+  const m = /^([一二三四五六七八九两])?十([一二三四五六七八九])?$/.exec(s);
+  if (m) return (m[1] ? M[m[1]] : 1) * 10 + (m[2] ? M[m[2]] : 0);
+  const d = s.match(/[0-9]+/); return d ? parseInt(d[0], 10) : 0;
 }
 
 /* 主入口：返回结果对象或 null（不处理时回落 T.askAssistant） */
@@ -204,7 +210,7 @@ function handle(text, ctx) {
   const nav = detectNav(text);
   if (nav) {
     const q = {};
-    const dm = text.match(/第\s*(\d+|[一二三四五六七八九十])\s*天/);
+    const dm = text.match(/第\s*(\d+|[一两二三四五六七八九十]{1,3})\s*天/);
     if (nav.p === "subpkg/map/map" && dm) q.di = Math.max(0, numOf(dm[1]) - 1);
     return {
       text: "好，已切到「" + nav.t + "」。这一页的数据都来自本机离线知识库。",
@@ -238,4 +244,4 @@ function handle(text, ctx) {
   return null;
 }
 
-module.exports = { handle, detectIntent, detectNav, cityOf, pageActions };
+module.exports = { handle, detectIntent, detectNav, cityOf, pageActions, numOf };

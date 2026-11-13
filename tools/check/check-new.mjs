@@ -13,6 +13,7 @@ const T = req("./utils/travel.js");
 const INS = req("./subpkg/utils/insights.js");
 const PZ = req("./subpkg/utils/personalize.js");
 const R = req("./utils/recommend.js");
+const AI = req("./utils/ai-intent.js");
 const D = T.D;
 
 let pass = 0, fail = 0;
@@ -1121,6 +1122,27 @@ assert("识物联动：加入行程走本地生成(_generateForCity 复用 build
 assert("识物联动：查不到时深链到查景点页(q 名称预填)", /subpkg\/spotsearch\/spotsearch\?q=/.test(LENS_JS));
 assert("识物联动：spotsearch 接收 q 深链预填(onLoad 读 options.q 触发 _runSearch)", /options\.q/.test(SP_JS) && /_deepQ/.test(SP_JS) && /_runSearch/.test(SP_JS));
 assert("识物联动：零伪造——只查本地 spotLookup，绝不编造(_extractName 仅文本解析)", /T\.spotLookup/.test(LENS_JS) && /防回潮|零伪造/.test(LENS_JS + SP_JS));
+
+// ── AI 导航中文多位数天数解析（v1.20.7 迭代 #8）：旧 numOf 只认单字中文，导致「第十二天」→0，
+// 地图「第X天」跳转锚点丢失；导航捕获正则也只捕单字。现 numOf 覆盖 十/十一~九十九，正则捕 1~3 字。 ──
+console.log("== 51. AI 导航中文多位数天数解析 ==");
+assert("numOf 单字 三 → 3", AI.numOf("三") === 3);
+assert("numOf 单字 十 → 10", AI.numOf("十") === 10);
+assert("numOf 两 → 2", AI.numOf("两") === 2);
+assert("numOf 两位数 十二 → 12", AI.numOf("十二") === 12);
+assert("numOf 两位数 二十 → 20", AI.numOf("二十") === 20);
+assert("numOf 两位数 二十五 → 25", AI.numOf("二十五") === 25);
+assert("numOf 两位数 三十 → 30", AI.numOf("三十") === 30);
+assert("numOf 数字串 15 → 15", AI.numOf("15") === 15);
+// 集成：地图「第X天」导航跳转锚点 di = 天数-1，中文多位数必须正确
+const nav12 = AI.handle("打开地图导引 第十二天", { city: "北京" });
+assert("地图 第十二天 → di=11", nav12 && nav12.jump && nav12.jump.query && nav12.jump.query.di === 11, JSON.stringify(nav12 && nav12.jump && nav12.jump.query));
+const nav3 = AI.handle("打开地图导引 第三天", { city: "北京" });
+assert("地图 第三天 → di=2", nav3 && nav3.jump && nav3.jump.query && nav3.jump.query.di === 2, JSON.stringify(nav3 && nav3.jump && nav3.jump.query));
+const nav20 = AI.handle("跳到地图导引 第二十天", { city: "北京" });
+assert("地图 第二十天 → di=19", nav20 && nav20.jump && nav20.jump.query && nav20.jump.query.di === 19, JSON.stringify(nav20 && nav20.jump && nav20.jump.query));
+const nav10 = AI.handle("打开地图导引 第十天", { city: "北京" });
+assert("地图 第十天 → di=9（单字十仍正确）", nav10 && nav10.jump && nav10.jump.query && nav10.jump.query.di === 9, JSON.stringify(nav10 && nav10.jump && nav10.jump.query));
 
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
