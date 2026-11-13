@@ -50,7 +50,9 @@ Page(SafePage({
     return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
   },
 
-  // 打开：把存档回写 planV1 并注入 globalData，再进行程页（与「出发→生成」后的打开路径完全一致）
+  // 打开：把存档回写 planV1 并注入 globalData，再进行程页（与「出发→生成」后的打开路径完全一致）。
+  // 注意：plan 是 tabBar 页，必须用 switchTab（navigateTo 到 tab 页会被微信静默拒绝 → 点击无反应）。
+  // 行程页靠 onShow 读 globalData.plan 渲染、「已存」状态由 T.findSavedPlanHit 比对存档库得出，无需 query 传参。
   openPlan(e) {
     const id = e.currentTarget.dataset.id;
     const item = this._plans && this._plans[id];
@@ -58,7 +60,7 @@ Page(SafePage({
     try {
       T.restorePlanSlot(id);
       app.setPlan(item.plan);
-      wx.navigateTo({ url: "/pages/plan/plan?from=saved&id=" + encodeURIComponent(id) });
+      wx.switchTab({ url: "/pages/plan/plan" });
     } catch (err) { wx.showToast({ title: "打开失败", icon: "none" }); }
   },
   delPlan(e) {

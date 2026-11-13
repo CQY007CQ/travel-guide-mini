@@ -101,6 +101,11 @@
     <view class="h3">最近一次查询<text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text></view>
     <view class="r-q">问：{{lastQuery}}</view>
     <view class="r-a">{{lastResult}}</view>
+    <view class="spot-ai" bindtap="onReviewAI" wx:if="{{lastIntent === 'review'}}">
+      <image lazy-load class="ic ic-sm" src="/images/icons/sparkle.png"/>
+      <text class="spot-ai-t">AI 帮我写游记</text>
+      <text class="spot-ai-a">→</text>
+    </view>
     <view class="ai-copy" wx:if="{{lastResult}}" bindtap="aiCopy">复制回答</view>
     <view class="ai-copy" bindtap="aiClearChat">清空会话</view>
     <!-- 增强意图附带的「直达对应页」按钮（对齐网页版 AI 全站导航） -->

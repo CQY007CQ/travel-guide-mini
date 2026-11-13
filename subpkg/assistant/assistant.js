@@ -39,6 +39,7 @@ Page(SafePage({
     tiles: TILES,
     mode: "",           // "" 普通查询 / "spot" 查景点
     lastQuery: "", lastResult: "", lastTileK: "",
+    lastIntent: "",     // 最近一次结果的意图（如 "review"），驱动结果卡上的专属操作按钮
     spotResult: null,   // 查景点结果
     actions: [],        // 增强意图附带的「直达对应页」按钮
     planSpots: [],      // 查景点模式：当前行程里的景点（一键查）
@@ -134,7 +135,7 @@ Page(SafePage({
       this._lastResult = r.text;
       this.setData({
         lastQuery: label, lastResult: r.text, lastTileK: "", input: "",
-        actions: r.actions || [], aiSource: "", deepTip: "已为你打开「" + label + "」"
+        actions: r.actions || [], aiSource: "", deepTip: "已为你打开「" + label + "」", lastIntent: r.intent || ""
       });
     } else {
       this.setData({ deepTip: "该场景暂不可用" });
@@ -156,7 +157,7 @@ Page(SafePage({
       r = { text: sc.desc + "。", actions: [{ label: sc.label + " →", path: rt.p, query: city ? { city: city } : {}, mode: rt.tab ? "tab" : "push" }], intent: sc.key };
     }
     this._lastResult = r.text;
-    this.setData({ lastQuery: sc.label, lastResult: r.text, lastTileK: "", input: "", actions: r.actions || [], aiSource: "" });
+    this.setData({ lastQuery: sc.label, lastResult: r.text, lastTileK: "", input: "", actions: r.actions || [], aiSource: "", lastIntent: sc.key });
     try { wx.showToast({ title: sc.label, icon: "none" }); } catch (_) {}
   },
 
@@ -281,7 +282,7 @@ Page(SafePage({
     if (ai) {
       if (ai.jump) this._nav(ai.jump);   // 显式导航：直接切页
       this._lastResult = ai.text;
-      this.setData({ lastQuery: q, lastResult: ai.text, lastTileK: tileK, input: "", actions: ai.actions || [] });
+      this.setData({ lastQuery: q, lastResult: ai.text, lastTileK: tileK, input: "", actions: ai.actions || [], lastIntent: ai.intent || "" });
       return;
     }
     // 离线意图未命中：自由查（非一键查卡片）优先走云端强模型（带本行程 grounding）；
@@ -296,7 +297,7 @@ Page(SafePage({
     this._lastResult = r.text;
     this.setData({
       lastQuery: q, lastResult: r.text, lastTileK: tileK,
-      input: "", actions: [], aiSource: ""
+      input: "", actions: [], aiSource: "", lastIntent: ""
     });
   },
 
@@ -309,7 +310,7 @@ Page(SafePage({
         try { wx.hideLoading(); } catch (e) {}
         if (r.ok && r.text) {
           self._lastResult = r.text;
-          self.setData({ lastQuery: q, lastResult: r.text, lastTileK: "", input: "", actions: [], aiSource: r.source || "ai" });
+          self.setData({ lastQuery: q, lastResult: r.text, lastTileK: "", input: "", actions: [], aiSource: r.source || "ai", lastIntent: "" });
           return;
         }
         self._aiFallback(q, plan);
@@ -323,7 +324,7 @@ Page(SafePage({
     try { r = T.askAssistant(q, plan); }
     catch (e) { r = { text: "查询出错了，换个关键词试试", tag: "info" }; }
     self._lastResult = r.text;
-    self.setData({ lastQuery: q, lastResult: r.text, lastTileK: "", input: "", actions: [], aiSource: "" });
+    self.setData({ lastQuery: q, lastResult: r.text, lastTileK: "", input: "", actions: [], aiSource: "", lastIntent: "" });
   },
 
   // 跳转到目标页（action / jump 共用）。tab 用 switchTab，其余 navigateTo；query 拼成 URL 参数。
@@ -471,7 +472,7 @@ Page(SafePage({
     try { offline = AI.spotExplain(nm, { city: city, plan: plan, page: "assistant", spot: nm }); } catch (e) {}
     if (!offline) offline = { text: "这个景点暂无更详细的本地资料。", actions: [] };
     if (!Cloud.cloudEnabled()) {
-      this.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [] });
+      this.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [], lastIntent: "" });
       return;
     }
     // 组装本地真实景点资料作 grounding（强模型只能基于它延伸，不编造）
@@ -495,11 +496,48 @@ Page(SafePage({
       .then(function (res) {
         try { wx.hideLoading(); } catch (e) {}
         if (res && res.ok && res.text) {
-          self.setData({ lastQuery: "AI 讲解这个景点", lastResult: res.text, lastTileK: "", input: "", aiSource: res.source || "ai", actions: offline.actions || [] });
+          self.setData({ lastQuery: "AI 讲解这个景点", lastResult: res.text, lastTileK: "", input: "", aiSource: res.source || "ai", actions: offline.actions || [], lastIntent: "" });
         } else {
-          self.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [] });
+          self.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [], lastIntent: "" });
         }
       })
-      .catch(function () { try { wx.hideLoading(); } catch (e) {} self.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [] }); });
+      .catch(function () { try { wx.hideLoading(); } catch (e) {} self.setData({ lastQuery: "AI 讲解这个景点", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [], lastIntent: "" }); });
+  },
+
+  // 结果卡上的「AI 帮我写游记」：基于本机真实素材（手记/记账/去过的地方）作 grounding 交给强模型升华成游记；
+  // 未开/出错回落本地离线复盘（零编造、零白屏）。
+  onReviewAI() {
+    const city = (function () { try { const p = app.globalData && app.globalData.plan; return p ? (T.activeCityOf(p) || p.cityName) : ""; } catch (e) { return ""; } })();
+    this.explainReview(city);
+  },
+
+  // 统一行程复盘/游记（按钮 / 深链共用）：云端优先，离线兜底。
+  explainReview(city) {
+    const self = this;
+    const plan = app.globalData && app.globalData.plan;
+    if (!plan || !plan.days || !plan.days.length) { wx.showToast({ title: "先生成行程", icon: "none" }); return; }
+    let offline = null;
+    try { offline = AI.review("帮我复盘这趟行程", { city: city, plan: plan, page: "assistant" }); } catch (e) {}
+    if (!offline) offline = { text: "暂无可复盘的素材。旅途中记点笔记、花点钱，回来我帮你写复盘/游记。", actions: [] };
+    if (!Cloud.cloudEnabled()) {
+      this.setData({ lastQuery: "AI 帮我写游记", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [], lastIntent: "review" });
+      return;
+    }
+    // 组装本地真实素材作 grounding（强模型只升华、不编造）
+    const ground = (offline.ground || "");
+    const ctx = (Cloud.aiContextOf ? Cloud.aiContextOf(plan, "行程复盘") : "") +
+      "\n\n本机真实素材（请以这些为准，只升华不编造任何没发生的事实）：\n" + (ground || "（本机暂无详细素材）");
+    const q = "请帮我写一份这趟「" + (plan.cityName || "") + "」的行程复盘/游记";
+    try { wx.showLoading({ title: "AI 写游记中", mask: false }); } catch (e) {}
+    AIAgent.ask("review", q, ctx, PROMPTS.buildSystem("review"))
+      .then(function (res) {
+        try { wx.hideLoading(); } catch (e) {}
+        if (res && res.ok && res.text) {
+          self.setData({ lastQuery: "AI 帮我写游记", lastResult: res.text, lastTileK: "", input: "", aiSource: res.source || "ai", actions: offline.actions || [], lastIntent: "review" });
+        } else {
+          self.setData({ lastQuery: "AI 帮我写游记", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [], lastIntent: "review" });
+        }
+      })
+      .catch(function () { try { wx.hideLoading(); } catch (e) {} self.setData({ lastQuery: "AI 帮我写游记", lastResult: offline.text, lastTileK: "", input: "", aiSource: "", actions: offline.actions || [], lastIntent: "review" }); });
   },
 }));

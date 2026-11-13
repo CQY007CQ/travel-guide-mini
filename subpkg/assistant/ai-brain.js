@@ -77,7 +77,8 @@ const SCENARIOS = [
   { key: "travelsvc",      page: "travelsvc",  label: "出行服务", icon: "bus.png",    sample: "出行服务",            desc: "订票/打车/机场车站入口" },
   { key: "toolkit",        page: "toolkit",    label: "旅行百宝箱", icon: "coin.png", sample: "工具箱",              desc: "汇率/时差/换算等小工具" },
   { key: "guide",          page: "myguides",   label: "我的攻略", icon: "star.png",   sample: "我的攻略",            desc: "保存与复用生成过的行程" },
-  { key: "settings",       page: "more",       label: "设置偏好", icon: "home.png",   sample: "设置",                desc: "主题/字体/偏好/数据管理" }
+  { key: "settings",       page: "more",       label: "设置偏好", icon: "home.png",   sample: "设置",                desc: "主题/字体/偏好/数据管理" },
+  { key: "review",         page: "assistant",  label: "行程复盘", icon: "star.png",   sample: "帮我复盘这趟行程",    desc: "基于真实手记/记账/去过的地方升华成游记" }
 ];
 
 /* ───────── 各扩展场景处理器（返回 {text, actions, intent, jump?} 或 null） ───────── */
@@ -337,6 +338,8 @@ const NEW_INTENTS = [
   { key: "toolkit",        kw: /工具箱|百宝箱|换算|时差|计算器|工具/, run: runToolkit },
   { key: "guide",          kw: /我的攻略|收藏的攻略|保存的攻略|历史攻略|我的行程列表|攻略列表/, run: runGuide },
   { key: "settings",       kw: /设置|偏好|主题|夜间模式|深色模式|浅色|字号|字体大小|账号管理/, run: runSettings },
+  /* 行程复盘/游记：基于本机真实素材（手记/记账/去过的地方）升华，零编造；关键词独立、不抢其它高频意图 */
+  { key: "review",         kw: /复盘|游记|回忆一下|写篇游记|帮我写.*(游记|复盘)|旅行总结|这趟.*(总结|复盘)|回来.*(总结|复盘)|旅途.*(总结|回忆)/, run: runReview },
   /* 景点讲解：放最后（最低优先级），仅当句子是「动词+景点名」或「X的故事」且本机资料能命中该景点时才触发，不抢食/今天等高频意图 */
   { key: "spot",           kw: /^(讲讲|讲一下|介绍一下|介绍|讲解|科普|聊聊|说说|了解)\s*[一-龥A-Za-z0-9]{1,14}$|[一-龥A-Za-z0-9]{1,14}的故事$|讲讲这个|介绍这个/, run: runSpotExplain }
 ];
@@ -384,6 +387,49 @@ function runSpotExplain(text, city, ctx) {
   const acts = [act("subpkg/map/map", "地图找它 →")];
   if (ctx.plan) acts.push(act("pages/plan/plan", "看行程 →", {}, "tab"));
   return { text: lines.join("\n"), actions: acts, intent: "spot" };
+}
+
+/* ───────── 行程复盘 / 游记：基于本机真实素材（手记/记账/去过的地方）升华，零编造 ─────────
+ * 离线：直接汇总真实素材给结构化复盘卡；云端（调用方 assistant.explainReview 负责）把真实素材作 grounding 让强模型写游记。
+ * 本函数只产出离线基线 + ground（真实素材原文），绝不编造没去过的点/没发生的花费。 */
+function runReview(text, city, ctx) {
+  ctx = ctx || {};
+  const plan = ctx.plan;
+  if (!plan || !plan.days || !plan.days.length) {
+    return { text: "还没有行程，先生成一份，旅途中记点笔记、花点钱，回来我帮你写复盘/游记。", actions: [act("pages/index/index", "去生成攻略 →", {}, "tab")], intent: "review" };
+  }
+  let notes = [], ledger = [], total = 0;
+  try { if (T.getNotes) notes = T.getNotes() || []; } catch (e) {}
+  try { if (T.getLedger) ledger = T.getLedger() || []; } catch (e) {}
+  try { if (T.totalSpent) total = Math.round(Number(T.totalSpent()) || 0); } catch (e) {}
+  const seen = new Set(), spots = [];
+  try {
+    for (const d of plan.days) {
+      if (!d || !Array.isArray(d.items)) continue;
+      for (const it of d.items) {
+        const n = (it && (it.name || it.disp)) || "";
+        if (!n || (T.isFrameName && T.isFrameName(n))) continue;
+        const k = (T.cleanSpotName && T.cleanSpotName(n)) || n;
+        if (seen.has(k)) continue;
+        seen.add(k); spots.push(n);
+        if (spots.length >= 20) break;
+      }
+      if (spots.length >= 20) break;
+    }
+  } catch (e) {}
+  const ground = [];
+  ground.push("行程：" + (plan.cityName || "") + "，" + plan.days.length + " 天。");
+  if (spots.length) ground.push("去过的点（" + spots.length + "）：" + spots.join("、") + "。");
+  if (notes.length) ground.push("旅行手记（" + notes.length + " 条）：\n" + notes.slice(0, 12).map(function (n) { return "· " + (n.date || "") + " " + (n.txt || ""); }).join("\n"));
+  if (ledger.length) ground.push("记账条目 " + ledger.length + " 笔，累计 ¥" + total + "。");
+  else if (total > 0) ground.push("累计花费 ¥" + total + "。");
+  const lines = ["📓 行程复盘 · " + (plan.cityName || "") + " " + plan.days.length + " 天"];
+if (spots.length) lines.push("去过的点：" + spots.slice(0, 12).join("、") + (spots.length > 12 ? " 等" : ""));
+  if (notes.length) lines.push("记了 " + notes.length + " 条手记，最近一句：「" + ((notes[notes.length - 1] && notes[notes.length - 1].txt) || "") + "」");
+  if (total > 0) lines.push("这趟累计花了 ¥" + total + "（记账 " + ledger.length + " 笔）。");
+  lines.push("（离线模式：以上为本机真实素材摘要；联网点「AI 帮我写游记」可生成完整复盘）");
+  const acts = [act("subpkg/ledger/ledger", "看记账本 →"), act("pages/today/today", "写手记 →", {}, "tab")];
+  return { text: lines.join("\n"), actions: acts, intent: "review", ground: ground.join("\n") };
 }
 
 /* ───────── 主入口：与 ai-intent 完全一致的契约 ───────── */
@@ -453,6 +499,7 @@ function scenarioCard(topic, ctx) {
 module.exports = {
   handle: handle,
   spotExplain: runSpotExplain,
+  review: runReview,
   generatePlan: generatePlan,
   topicReply: topicReply,
   scenarioCard: scenarioCard,
