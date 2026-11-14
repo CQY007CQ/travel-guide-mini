@@ -2,8 +2,8 @@
   <!-- 头部说明 -->
   <view class="card head">
     <view class="h2"><image lazy-load class="ic" src="/images/icons/camera.png"/>AI 识物 · 旅途科普</view>
-    <view class="sub">拍一张或多张（不同角度）旅途中的花草、地标或美食，AI 帮你认一认，并讲讲能碰不能碰、值不值得看的小知识。</view>
-    <view class="cloud-tag {{cloudOn ? 'on' : 'off'}}">{{cloudOn ? '云端 AI 已就绪' : '云端未开启 · 可先「文字问」'}}</view>
+    <view class="sub">拍一张或多张（不同角度）旅途中的花草、地标或美食，多条独立判断互相核验，并讲讲能碰不能碰、值不值得看的小知识。</view>
+    <view class="cloud-tag {{cloudOn ? 'on' : 'off'}}">{{cloudOn ? '云端 AI 已就绪 · 多链核验' : '云端未开启 · 可用本机离线对照'}}</view>
   </view>
 
   <!-- 拍照 / 相册（支持多张不同角度，提升识别准确率） -->
@@ -30,13 +30,45 @@
 
   <!-- 识别 / 回答结果 -->
   <view class="card result" wx:if="{{result}}">
-    <view class="h3">识别结果<text class="ai-badge" wx:if="{{source}}">AI 生成</text><text class="vote-badge" wx:if="{{voted}}">二次核验</text></view>
-    <text class="r-txt">{{result}}</text>
+    <view class="h3">识别结果
+      <text class="ai-badge" wx:if="{{source}}">AI 生成</text>
+      <text class="vote-badge ok" wx:if="{{voteInfo && voteInfo.consensus}}">{{chainN}} 链一致 · {{voteInfo.agree}}/{{voteInfo.total}}</text>
+      <text class="vote-badge warn" wx:elif="{{chainN}}">{{chainN}} 链判断 · 意见不一致</text>
+    </view>
+
+    <!-- 结构化摘要：名称 / 置信度 / 类别 / 可核对特征 / 科普与贴士 -->
+    <view class="sum" wx:if="{{parsed}}">
+      <view class="sum-top">
+        <text class="sum-name">{{parsed.rawName || '未能确定名称'}}</text>
+        <text class="sum-cf {{parsed.confidence == '高' ? 'cf-hi' : (parsed.confidence == '低' ? 'cf-lo' : 'cf-mid')}}" wx:if="{{parsed.confidence}}">{{parsed.confidence}}置信</text>
+      </view>
+      <text class="sum-cat" wx:if="{{parsed.category}}">{{parsed.category}}</text>
+      <view class="chips" wx:if="{{parsed && parsed.features.length}}">
+        <text class="chip" wx:for="{{parsed.features}}" wx:key="*this">{{item}}</text>
+      </view>
+      <text class="sum-line" wx:if="{{parsed.science}}">{{parsed.science}}</text>
+      <text class="sum-line" wx:if="{{parsed.tip}}">{{parsed.tip}}</text>
+    </view>
+
+    <!-- 多链分歧：把各链结论原样列出交人工确认，绝不擅自挑一个 -->
+    <view class="warn-box" wx:if="{{voteInfo && !voteInfo.consensus}}">
+      <text class="warn-t">多条独立判断未达成一致，以下是各自结论。请对照照片人工确认；此时不会自动加入行程。</text>
+      <view class="alt-row">
+        <text class="alt" wx:for="{{voteInfo.alternatives}}" wx:key="name" data-name="{{item.name}}" bindtap="onPickCandidate">{{item.name}}（{{item.count}} 票）</text>
+      </view>
+      <text class="warn-t" wx:if="{{!voteInfo.alternatives.length}}">各条判断都没能给出可靠名称，建议换个角度重拍，或用文字问。</text>
+    </view>
+
+    <view class="raw-fold">
+      <text class="raw-t" bindtap="toggleRaw">{{rawOpen ? '收起完整回答 ▴' : '查看完整回答 ▾'}}</text>
+      <text class="r-txt" wx:if="{{rawOpen}}">{{result}}</text>
+    </view>
     <view class="r-ops">
       <view class="ai-copy" bindtap="copyResult">复制</view>
       <view class="ai-copy" bindtap="clearImgs">重选图片</view>
+      <view class="ai-copy" bindtap="toggleText">继续追问</view>
     </view>
-    <!-- 识别联动：查这个景点 / 加入行程（仅在解析出明确名称时显示） -->
+    <!-- 识别联动：查这个景点 / 加入行程（仅在多链一致、解析出明确名称时显示） -->
     <view class="spot-ops" wx:if="{{spotName}}">
       <view class="sp-btn" bindtap="onLookupSpot">查这个景点</view>
       <view class="sp-btn sp-primary" bindtap="onAddToTrip">加入行程</view>
@@ -51,13 +83,34 @@
     </view>
     <view class="spot-err" wx:if="{{spotErr}}">{{spotErr}}</view>
   </view>
-  <view class="card loading" wx:if="{{loading}}">AI 思考中…</view>
+
+  <!-- 本机离线对照：明确声明不是图像识别，只列随包真实资料 -->
+  <view class="card local" wx:if="{{localMode}}">
+    <view class="h3">本机离线对照<text class="local-badge">非图像识别</text></view>
+    <text class="local-note">{{localNote}}</text>
+    <view class="cand-list">
+      <view class="cand" wx:for="{{candidates}}" wx:key="name" data-name="{{item.name}}" bindtap="onPickCandidate">
+        <view class="cand-h"><text class="cand-n">{{item.name}}</text><text class="cand-k">{{item.kind}}</text></view>
+        <text class="cand-note" wx:if="{{item.note}}">{{item.note}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card loading" wx:if="{{loading}}">{{busyTip || 'AI 思考中…'}}</view>
   <view class="card err" wx:if="{{err}}">{{err}}</view>
 
-  <!-- 文字问（视觉不可用时的科普兜底） -->
+  <!-- 识别历史 -->
+  <view class="card hist" wx:if="{{history.length}}">
+    <view class="h3">最近识别<view class="ai-copy" catchtap="onClearHistory">清空</view></view>
+    <view class="hist-row">
+      <text class="hist-item" wx:for="{{history}}" wx:key="name" data-name="{{item.name}}" bindtap="onHistoryTap">{{item.name}}</text>
+    </view>
+  </view>
+
+  <!-- 文字问 / 识别后继续追问（视觉不可用时的科普兜底） -->
   <view class="card textq">
     <view class="tq-head" bindtap="toggleText">
-      <text class="h3">不想拍照？用文字问 {{textMode ? '▴' : '▾'}}</text>
+      <text class="h3">{{result ? '就这张照片继续追问' : '不想拍照？用文字问'}} {{textMode ? '▴' : '▾'}}</text>
     </view>
     <block wx:if="{{textMode}}">
       <view class="tq-row">
@@ -69,7 +122,7 @@
   </view>
 
   <view class="foot">
-    <text class="foot-t">识别由云端多模态模型完成，可能存在误差；涉及食用、药用、有毒物种请以专业鉴定为准，切勿仅凭 AI 结论入口。</text>
+    <text class="foot-t">识别由云端多模态模型完成并经多条独立判断核验，仍可能存在误差；涉及食用、药用、有毒物种请以专业鉴定为准，切勿仅凭 AI 结论入口。离线状态下本机不做图像识别，只提供随包真实资料供对照。</text>
     <view class="foot-a" bindtap="goAssistant">去本地速查 →</view>
   </view>
 </view>

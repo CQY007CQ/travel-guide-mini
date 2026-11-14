@@ -125,8 +125,15 @@ function extractText(j) {
 function buildSystem(event, hasContext) {
   const custom = (event && event.system) || "";
   if (custom) {
-    // 调用方自带 system：仍强制追加护栏，确保零伪造
-    return custom.trim() + "\n\n" + GUARDRAIL;
+    // v1.20.6 修复：旧实现在「调用方自带 system」时直接 return，把 event.context 整个丢掉。
+    // 拍照识物（lens）与网页端分场景提示词都同时传 system + context，结果本地 grounding 一直没生效：
+    // 模型拿不到当前城市 / 真实景点清单，识别地标时容易给出与本地库对不上的名称，联动必然落空。
+    // 现在 custom 分支同样注入本地上下文，并明确其用途是「事实核对」而非创作素材（零伪造）。
+    let s = custom.trim();
+    if (hasContext) {
+      s += "\n\n【本地上下文 · 仅用于事实核对，勿据此编造】\n" + String(event.context);
+    }
+    return s + "\n\n" + GUARDRAIL;
   }
   let s = "你是「晨的旅行助手」内置 AI，基于用户提供的真实本地上下文（行程 / 景点 / 美食 / 天气 / 预算等）作答。";
   if (hasContext) {

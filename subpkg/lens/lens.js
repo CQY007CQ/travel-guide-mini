@@ -2,12 +2,21 @@ const { getAppSafe, SafePage, onShowRender } = require("../../utils/app.js");
 // lens：AI 识物 · 旅途科普（拍照 / 相册 → 云端多模态强模型识别 → 科普小贴士）
 // 设计原则：云端优先、离线诚实降级。识别依赖云端视觉模型（llmProxy + 多模态 LLM_MODEL），
 // 未配置时明确告知并引导「文字问」，绝不伪造识别结果。
+// v1.20.6 增强：① 本地真实上下文 grounding（当前城市 + 随包真实景点名，提升地标识别与联动命中）；
+//   ② 自适应级联多数投票（2 链一致即定，分歧才起第 3 链仲裁，绝不用「第二次结果覆盖第一次」）；
+//   ③ 结构化结果（名称/类别/置信度/特征/贴士）+ 云端名称对齐本地真实景点名；
+//   ④ 云不可用 / 识别失败时给「本机离线对照」出口（明确声明不是图像识别，只列随包真实资料）；
+//   ⑤ 部分上传失败仍可识别、失败自动重试一次、识别历史落盘、追问带识别上下文。
 const T = require("../../utils/travel.js");
 const Cloud = require("../../utils/cloud.js");
 const AIAgent = require("../../utils/ai-agent.js");
 const AI = require("../assistant/ai-brain.js");   // 离线 AI 大脑（无云时文字问兜底，零网络）
+const V = require("./lens-vision.js");             // 识物纯逻辑（分包内，主包零增长）
+const S = require("../../utils/store.js");
 const EL = require("../../utils/errlog.js");
 const app = getAppSafe();
+const HIST_KEY = "lensHistoryV1";
+const HIST_MAX = 8;
 
 Page(SafePage({
   data: {
@@ -26,10 +35,30 @@ Page(SafePage({
     // v1.20.7：识物联动 —— 识别结果解析出的实体名 / 本地查到的景点资料 / 查不到时的提示
     spotName: "",       // 从识别结果解析出的主体名称（供「查景点 / 加入行程」联动）
     spotInfo: null,     // 本地命中资料 {name,intro,how,route,city}
-    spotErr: ""         // 查不到时的提示（空表示已命中）
+    spotErr: "",        // 查不到时的提示（空表示已命中）
+    // v1.20.6：结构化识别结果 / 投票 / 离线对照 / 历史
+    parsed: null,       // {name,category,confidence,features,science,tip}
+    voteInfo: null,     // {consensus,agree,total,alternatives,tied}
+    chainN: 0,          // 本次实际跑了几条识别链
+    localMode: false,   // 是否处于「本机离线对照」模式
+    localNote: "",      // 离线模式的诚实说明
+    candidates: [],     // 随包真实景点候选（零伪造）
+    history: [],        // 最近识别记录
+    busyTip: "",        // 识别过程提示（上传到第几张 / 投票阶段）
+    rawOpen: false      // 是否展开模型完整回答
   },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
+
+  // 清空「与本次识别相关的状态」的统一口径，避免新增字段后某个入口漏清导致旧结论串到新照片上。
+  _blank() {
+    return {
+      result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "",
+      parsed: null, voteInfo: null, chainN: 0, localMode: false, localNote: "", candidates: [], busyTip: "", rawOpen: false
+    };
+  },
+
+  toggleRaw() { this.setData({ rawOpen: !this.data.rawOpen }); },
 
   onLoad() { this.__boot = T.ready().catch(() => null); },
 
@@ -38,7 +67,9 @@ Page(SafePage({
       try {
         const plan = app.globalData && app.globalData.plan;
         const city = plan ? (T.activeCityOf(plan) || plan.cityName || "") : "";
-        this.setData({ cloudOn: Cloud.cloudEnabled(), cityName: city || "" });
+        let hist = [];
+        try { hist = S.get(HIST_KEY, []) || []; } catch (e) { hist = []; }
+        this.setData({ cloudOn: Cloud.cloudEnabled(), cityName: city || "", history: Array.isArray(hist) ? hist.slice(0, HIST_MAX) : [] });
       } catch (e) { try { EL.push("lens.onShow", e); } catch (_) {} }
     });
   },
@@ -84,39 +115,77 @@ Page(SafePage({
 
   _addImgs(paths) {
     const next = this.data.imgs.concat(paths).slice(0, 3);
-    this.setData({ imgs: next, result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "" });
+    this.setData(Object.assign({ imgs: next }, this._blank()));
   },
   removeImg(e) {
     const i = Number(e.currentTarget.dataset.i);
     if (isNaN(i)) return;
     const next = this.data.imgs.slice();
     next.splice(i, 1);
-    this.setData({ imgs: next, result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "" });
+    this.setData(Object.assign({ imgs: next }, this._blank()));
   },
-  clearImgs() { this.setData({ imgs: [], result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "" }); },
+  clearImgs() { this.setData(Object.assign({ imgs: [] }, this._blank())); },
+
+  // 结构化输出约定（三条识别链共用，便于 parseResult 解析与投票）。
+  // 明确告知「本地景点名清单只做名称对齐」，防止模型为了对齐而把不相干的东西硬套成某个景点。
+  _format() {
+    return "用简体中文严格按下面 5 行作答，每行一项、不要额外编号外的段落：\n" +
+      "①名称：最可能是什么（俗名或学名）（置信度：高/中/低）\n" +
+      "②类别：植物 / 动物 / 地标建筑 / 美食 / 器物 / 自然地貌 / 其他（选一类）\n" +
+      "③关键可辨识特征：2-3 个现场可核对的视觉特征，用「、」分隔\n" +
+      "④一句话科普：最突出的特点或趣闻\n" +
+      "⑤旅途小贴士：能否触碰 / 能否食用 / 观赏或拍摄建议 / 文化典故\n" +
+      "若无法可靠识别，①直接写「无法确定」，②给出最可能的大类，绝不编造物种名、毒性、价格或坐标。";
+  },
 
   _prompt() {
     const city = this.data.cityName ? ("当前所在城市：" + this.data.cityName + "。") : "";
-    return city +
-      "请识别这张（这些）照片里的主体（植物 / 动物 / 地标 / 建筑 / 美食 / 器物等）。用简体中文严格按以下结构作答：\n" +
-      "①名称：最可能是什么（俗名或学名），并给出你的置信度（高 / 中 / 低）；\n" +
-      "②关键可辨识特征：列出 2-3 个最有助于现场确认该物体的视觉特征；\n" +
-      "③一句话科普：最突出的特点或趣闻；\n" +
-      "④旅途小贴士：能否触碰、能否食用、观赏或拍摄建议、相关文化典故。\n" +
-      "若无法可靠识别，直接说「无法确定」并给出可能的类别，绝不编造物种名、毒性、价格或坐标。";
+    return city + "请识别这张（这些）照片里的主体。\n" + this._format() +
+      "\n注意：若上下文附有本地景点名清单，它只用于「照片确实是那个地标时」统一标准名称；不是就照实作答，严禁套用清单里的名字。";
   },
 
-  // 二次核验（多链投票）：换角度重新判断，要求给出明确结论与决定性判别特征
+  // 复核链：换客观视角独立重判（输出同样结构化，供多数投票解析名称）
   _promptVerify() {
-    const city = this.data.cityName ? ("当前所在城市：" + this.data.cityName + "。") : "";
-    return city +
-      "请抛开既有思路，对同一张（同一组）照片做「二次核验」：从形态、生境、颜色、纹理、用途等更客观的角度重新判断主体最可能是什么，" +
-      "并给出置信度（高 / 中 / 低）与 1-2 个决定性判别特征。如果仍不确定，请明确说「无法确定」并列出 2-3 个最相关的可能类别，绝不编造。";
+    return "请抛开常识联想，完全依据照片里可见的形态、颜色、纹理、比例、生境 / 环境、构造用途做一次独立判断。\n" +
+      this._format() +
+      "\n重点：给出 1-2 个决定性判别特征；若与常见叫法不同，按你看到的客观特征命名，不要迎合任何清单。";
+  },
+
+  // 仲裁链：仅在前两链分歧时启用，从「排除易混淆对象」角度给出第三票
+  _promptArbitrate() {
+    return "这是第三次独立判断。请先列出 2-3 个最容易与照片主体混淆的候选，再逐一用可见特征排除，" +
+      "最后给出你认为最可能的那一个。\n" + this._format();
   },
 
   _system() {
     return "你是「晨的旅行助手」的识物科普助手，擅长辨认旅行中遇到的植物、动物、地标、建筑与地方美食。" +
       "回答必须基于图片真实可见的特征；不确定就明说，绝不编造物种名、毒性、价格或坐标。";
+  },
+
+  _systemVerify() {
+    return "你是独立的形态学复核员。只描述照片里看得见的证据并据此下结论，不受地点、常见印象或已有结论影响。" +
+      "不确定就写「无法确定」，绝不编造物种名、毒性、价格或坐标。";
+  },
+
+  _systemArbitrate() {
+    return "你是第三方仲裁员，专长为区分易混淆物种与建筑。以可排除的错误候选为推理依据，只给最可能的一个名称。" +
+      "证据不足就写「无法确定」，绝不编造物种名、毒性、价格或坐标。";
+  },
+
+  // 本地真实上下文 grounding：行程 + 当前城市 + 该城随包真实景点名（只做名称对齐）。
+  // 零伪造：清单全部来自 utils/data.js，不生成任何新名称；云函数会把这段注入 system。
+  _groundContext() {
+    let base = "";
+    try { base = Cloud.aiContextOf(app.globalData && app.globalData.plan, "AI 识物页"); } catch (e) { base = ""; }
+    const city = this.data.cityName || "";
+    const lines = [base];
+    if (city) lines.push("拍照时的城市：" + city + "。");
+    let names = [];
+    try { names = city ? V.citySpotNames(city, 20).map(function (x) { return x.name; }) : []; } catch (e) { names = []; }
+    if (names.length) {
+      lines.push("本机随包收录的该城真实景点名（仅供名称对齐；只有确认照片就是该地标时才使用其标准名，否则照实作答，严禁套用）：" + names.join("、") + "。");
+    }
+    return lines.filter(Boolean).join("\n");
   },
 
   _compress(p) {
@@ -132,52 +201,152 @@ Page(SafePage({
     });
   },
 
+  // 逐张上传：单张失败只丢这一张（原 Promise.all 是一张失败整批全挂）。
+  _uploadAny(paths) {
+    return Promise.all(paths.map(function (p) {
+      return Cloud.uploadImage(p).catch(function () { return ""; });
+    })).then(function (ids) { return ids.filter(Boolean); });
+  },
+  _uploadWithRetry(paths) {
+    const self = this;
+    return self._uploadAny(paths).then(function (ids) {
+      if (ids.length) return ids;
+      self.setData({ busyTip: "图片上传未成功，正在重试一次…" });
+      return self._uploadAny(paths);
+    });
+  },
+
+  // 云端不可用 / 识别失败时的诚实出口：本机不含离线图像识别，只列随包真实资料供人工对照。
+  // 绝不把「知识库候选」包装成「识别结果」——这是零伪造红线。
+  _openLocalCompare(note) {
+    const city = this.data.cityName || "";
+    let wish = [], plan = null, cands = [];
+    try { plan = app.globalData && app.globalData.plan; } catch (e) {}
+    try { wish = (city && T.wishPicksFor) ? (T.wishPicksFor(city) || []) : []; } catch (e) { wish = []; }
+    try { cands = V.localCandidates({ city: city, plan: plan, wish: wish, limit: 8 }); } catch (e) { cands = []; }
+    const head = "本机不含离线图像识别，无法判断照片里是什么。";
+    const tail = city
+      ? "下面是随包收录的「" + city + "」真实地点，请对照照片自行确认；点选后可看离线资料或加入行程。"
+      : "当前没有行程城市，可先在首页生成行程，或用下方「文字问」。";
+    this.setData(Object.assign({}, this._blank(), {
+      loading: false,
+      localMode: true,
+      localNote: (note ? note + " " : "") + head + tail,
+      candidates: cands,
+      err: cands.length ? "" : "本机暂无可用候选：请先在首页生成行程或选择城市。"
+    }));
+  },
+
   identify() {
     const self = this;
     if (!this.data.imgs.length) { wx.showToast({ title: "先拍一张或从相册选", icon: "none" }); return; }
     if (!Cloud.cloudEnabled()) {
-      self.setData({ err: "AI 识物需先开启云端：在云函数 llmProxy 配置 LLM_PROVIDER / LLM_MODEL（需多模态模型，如 gpt-4o、qwen-vl-max）。当前可用下方「文字问」（离线也能答）。" });
+      self._openLocalCompare("云端 AI 未开启（需在云函数 llmProxy 配置多模态 LLM_MODEL）。");
       return;
     }
-    self.setData({ loading: true, result: "", source: "", err: "", voted: false, spotName: "", spotInfo: null, spotErr: "" });
+    self.setData(Object.assign({}, self._blank(), { loading: true, busyTip: "正在压缩图片…" }));
     try { wx.showLoading({ title: "AI 识别中", mask: true }); } catch (e) {}
     Promise.all(this.data.imgs.map(function (p) { return self._compress(p); }))
-      .then(function (paths) { return Promise.all(paths.map(function (p) { return Cloud.uploadImage(p); })); })
+      .then(function (paths) {
+        self.setData({ busyTip: "正在上传 " + paths.length + " 张图片…" });
+        return self._uploadWithRetry(paths);
+      })
       .then(function (fileIDs) {
-        fileIDs = fileIDs.filter(Boolean);
-        if (!fileIDs.length) throw new Error("upload-empty");
+        if (!fileIDs || !fileIDs.length) throw new Error("upload-empty");
+        self.setData({ busyTip: "多链识别中（2 条独立判断）…" });
         return self._visionWithVote(fileIDs);
       })
-      .then(function (r) {
+      .then(function (out) {
         try { wx.hideLoading(); } catch (e) {}
-        if (r && r.ok && r.text) {
-          const nm = self._extractName(r.text);
-          self.setData({ result: r.text, loading: false, source: r.source || "ai", err: "", voted: !!r.voted, spotName: nm, spotInfo: null, spotErr: "" });
-        } else self.setData({ loading: false, err: "识别失败：" + ((r && r.err) || "未知错误") + "。可改用「文字问」。" });
+        const v = (out && out.v) || { consensus: false, uncertain: true, total: 0, agree: 0, alternatives: [], primaryText: "" };
+        const text = v.primaryText || (out && out.r && out.r.text) || "";
+        if (!text) {
+          self._openLocalCompare("云端识别未返回结果（" + ((out && out.r && out.r.err) || "未知") + "）。");
+          return;
+        }
+        const parsed = V.parseResult(text);
+        const city = self.data.cityName || "";
+        const name = v.consensus ? v.name : "";
+        let localName = "";
+        try { localName = name ? V.matchLocalName(name, city) : ""; } catch (e) {}
+        const spotName = name ? (localName || name) : "";
+        let spotInfo = null, spotErr = "";
+        if (spotName) {
+          try {
+            const hit = T.spotLookup(spotName, city);
+            if (hit && hit.found) spotInfo = {
+              name: hit.name || spotName, intro: hit.intro || "", how: hit.how || "",
+              route: hit.route || "", city: hit.city || city || ""
+            };
+          } catch (e) {}
+          if (localName && localName !== name) spotErr = "已对齐本地标准名「" + localName + "」";
+        }
+        self.setData(Object.assign({}, self._blank(), {
+          result: text, loading: false, source: (out && out.r && out.r.source) || "ai",
+          voted: (out && out.n) >= 3, parsed: parsed,
+          voteInfo: { consensus: !!v.consensus, agree: v.agree, total: v.total, tied: !!v.tied, alternatives: v.alternatives || [] },
+          chainN: (out && out.n) || 2, busyTip: "",
+          spotName: spotName, spotInfo: spotInfo, spotErr: spotErr
+        }));
+        // 只有多链一致才自动联动 / 记历史，避免把分歧结果误加进行程
+        if (spotName) self._pushHistory({ name: spotName, category: parsed.category || "", city: city, ts: Date.now(), source: "ai" });
       })
       .catch(function (e) {
         try { wx.hideLoading(); } catch (_) {}
         try { EL.push("lens.identify", e); } catch (_) {}
-        self.setData({ loading: false, err: "识别失败（" + String((e && e.message) || e) + "）。可改用「文字问」。" });
+        self._openLocalCompare("识别失败（" + String((e && e.message) || e) + "）。");
       });
   },
 
-  // 自适应多链投票：先主识别，若结果不确定（低置信度）再换角度核验一次，提升准确率
+  // 自适应级联多数投票：主链 + 客观复核链并发 → 名称一致（含同义归组）即定；
+  // 分歧或任一链不确定才起第三链仲裁 → 三链多数投票；仍不一致则标「意见不一致」，交用户确认。
+  // 修复旧实现「不确定就再问一次、然后直接用第二次结果覆盖第一次」——那反而可能把对的换成错的。
   _visionWithVote(fileIDs) {
     const self = this;
-    return Cloud.aiVision({ imageFileIDs: fileIDs, prompt: self._prompt(), system: self._system(), max_tokens: 700 })
-      .then(function (r1) {
-        if (!r1 || !r1.ok || !r1.text) return r1;
-        const uncertain = /不确定|可能|疑似|无法确定|不清楚|不太确定|也许|大概|存疑|难以确定|我无法|无法确认|不能确认/.test(r1.text);
-        if (!uncertain) return r1;
-        // 二次核验
-        return Cloud.aiVision({ imageFileIDs: fileIDs, prompt: self._promptVerify(), system: self._system(), max_tokens: 500 })
-          .then(function (r2) {
-            if (r2 && r2.ok && r2.text) return { ok: true, text: r2.text, source: r2.source || "ai", voted: true };
-            return r1; // 二次失败则回退首次结果
-          })
-          .catch(function () { return r1; });
+    const ctx = self._groundContext();
+    const call = function (prompt, system, mt) {
+      return Cloud.aiVision({
+        imageFileIDs: fileIDs, prompt: prompt, system: system, context: ctx, max_tokens: mt || 700
+      }).then(function (r) {
+        return { ok: !!(r && r.ok && r.text), text: (r && r.text) || "", source: (r && r.source) || "ai", err: (r && r.err) || "" };
+      }).catch(function (e) { return { ok: false, text: "", err: String((e && e.message) || e) }; });
+    };
+    const two = [call(self._prompt(), self._system(), 700), call(self._promptVerify(), self._systemVerify(), 600)];
+    return Promise.all(two).then(function (rs) {
+      const v2 = V.vote(rs);
+      if (v2.consensus) return { r: rs[0].ok ? rs[0] : rs[1], v: v2, n: 2 };
+      self.setData({ busyTip: "前两次判断不一致，正在做第三次仲裁…" });
+      return call(self._promptArbitrate(), self._systemArbitrate(), 600).then(function (third) {
+        const v3 = V.vote([rs[0], rs[1], third]);
+        const primary = third.ok ? third : (rs[0].ok ? rs[0] : rs[1]);
+        return { r: primary, v: v3, n: 3 };
       });
+    });
+  },
+
+  _pushHistory(item) {
+    let h = [];
+    try { h = S.get(HIST_KEY, []) || []; } catch (e) { h = []; }
+    if (!Array.isArray(h)) h = [];
+    h = [item].concat(h.filter(function (x) { return !(x && x.name === item.name); })).slice(0, HIST_MAX);
+    try { S.set(HIST_KEY, h); } catch (e) {}
+    this.setData({ history: h });
+  },
+  onClearHistory() {
+    try { S.del(HIST_KEY); } catch (e) {}
+    this.setData({ history: [] });
+  },
+  onPickCandidate(e) {
+    const name = (e.currentTarget.dataset && e.currentTarget.dataset.name) || "";
+    if (!name) return;
+    this.setData({ localMode: false, localNote: "", candidates: [], spotName: name, spotInfo: null, spotErr: "" });
+    this.onLookupSpot();
+  },
+  onHistoryTap(e) {
+    const name = (e.currentTarget.dataset && e.currentTarget.dataset.name) || "";
+    if (!name) return;
+    this.setData({ spotName: name, spotInfo: null, spotErr: "" });
+    this.onLookupSpot();
   },
 
   copyResult() {
@@ -211,6 +380,15 @@ Page(SafePage({
     try { wx.showLoading({ title: "AI 思考中", mask: true }); } catch (e) {}
     let ctx = "";
     try { ctx = Cloud.aiContextOf(app.globalData && app.globalData.plan, "AI 识物页"); } catch (e) {}
+    // 追问带上刚才的识别结论，避免「这是什么季节开花」「附近还有类似的吗」这类追问丢上下文。
+    // 明确标注仅供参考，防止强模型把未经人工确认的识别结果当事实继续发挥。
+    try {
+      const pr = this.data.parsed;
+      if (pr && pr.rawName) {
+        ctx += "\n刚才这张照片的识别结论（仅供参考，可能有误，勿据此编造事实）：" +
+          pr.rawName + (pr.category ? "（类别：" + pr.category + "）" : "") + "。";
+      }
+    } catch (e) {}
     AIAgent.ask("lens", q, ctx)
       .then(function (r) {
         try { wx.hideLoading(); } catch (e) {}
@@ -333,8 +511,9 @@ Page(SafePage({
 
   aiClearChat() {
     try { AIAgent.clearHistory("lens"); } catch (e) {}
-    this.setData({ aiText: "", aiAnswer: "", lastResult: "", result: "", out: null,
-      aiSource: "", source: "", aiQ: "", aiInput: "", aiErr: "" });
+    // 结构化识别结论 / 投票态一并清掉，否则「追问」会把上一次照片的结论当上下文串到新对话。
+    // 识别历史是独立功能，不在 _blank() 内，清空会话不会误删。
+    this.setData(Object.assign({ textInput: "" }, this._blank()));
     wx.showToast({ title: "会话已清空", icon: "none" });
   },
 }));
