@@ -375,6 +375,49 @@
   var lastPlan = null;        // { city, days } 最近一次由 AI 生成的行程
   var lastSpots = [];         // 最近列出的真实景点名（供「把第一个加入想玩」）
   var lastShops = [];         // 最近列出的真实店铺名
+
+  /* 多轮上下文落盘：小程序端 ai-agent 有 storage 记忆，网页端此前只在内存、刷新即丢。
+     只存能重建的轻量快照（城市 / 意图 / 最近行程 / 最近景点），不存聊天正文；全程 fail-closed。 */
+  var MEM_KEY = "webAIStateV1";
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(MEM_KEY);
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      if (!s || typeof s !== "object") return;
+      lastCity = (typeof s.city === "string" && s.city.length >= 2) ? s.city.slice(0, 20) : null;
+      lastIntent = typeof s.intent === "string" ? s.intent.slice(0, 30) : null;
+      lastPlan = (s.plan && typeof s.plan.city === "string")
+        ? { city: s.plan.city.slice(0, 20), days: Math.max(1, Math.min(14, parseInt(s.plan.days, 10) || 3)) }
+        : null;
+      lastSpots = Array.isArray(s.spots) ? s.spots.filter(function (x) { return typeof x === "string"; }).slice(0, 3) : [];
+      lastShops = Array.isArray(s.shops) ? s.shops.filter(function (x) { return typeof x === "string"; }).slice(0, 3) : [];
+    } catch (e) { /* 解析失败当作「没有记忆」，绝不影响主流程 */ }
+  }
+  function saveState() {
+    try {
+      localStorage.setItem(MEM_KEY, JSON.stringify({
+        city: lastCity, intent: lastIntent, plan: lastPlan,
+        spots: lastSpots.slice(0, 3), shops: lastShops.slice(0, 3)
+      }));
+    } catch (e) {}
+  }
+  loadState();
+
+  /* 离线命中可观测：对齐小程序 ai-brain.offlineStats()，纯计数、零网络 */
+  var _hits = 0, _hitBy = Object.create(null);
+  function bump(intent) {
+    _hits++;
+    var k = String(intent || "general");
+    _hitBy[k] = (_hitBy[k] || 0) + 1;
+  }
+  /** 所有问答入口都经此包装：算完回复即持久化多轮上下文（UI 发送 / 外部 API 同一条路径） */
+  function replyAndRemember(text, ctx) {
+    var r = buildReply(text, ctx);
+    saveState();
+    return r;
+  }
+
   function escapeHtml(s) {
     return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -551,10 +594,155 @@
     };
   }
 
+  /* ───────── 6b. 扩展场景（与小程序 ai-brain 对齐 · 离线 · 零伪造） ─────────
+   * 小程序 ai-brain 已具备「应急分诊 / 离线推荐城市 / 行程复盘游记」等场景，
+   * 网页版此前只有通用问答；这里补齐，两端问同一句话应得到同源真实数据回答。 */
+  function getR() {
+    try { return APP.__require("__entry__", "./utils/recommend.js") || {}; }
+    catch (e) { return {}; }
+  }
+  function getE() {
+    try { return APP.__require("__entry__", "./utils/emergency.js") || {}; }
+    catch (e) { return {}; }
+  }
+  function fmtMonths(arr) {
+    if (!arr || !arr.length) return "";
+    if (typeof arr[0] !== "number") return arr.map(escapeHtml).join("、");
+    var nums = arr.slice().sort(function (a, b) { return a - b; });
+    var parts = [], s = nums[0], p = nums[0];
+    for (var i = 1; i < nums.length; i++) {
+      if (nums[i] === p + 1) p = nums[i];
+      else { parts.push(s === p ? s + "月" : s + "-" + p + "月"); s = p = nums[i]; }
+    }
+    parts.push(s === p ? s + "月" : s + "-" + p + "月");
+    return parts.join("、");
+  }
+
+  /* ① 旅途应急：急症第一句必须拨 120；具名医院只从离线库取，绝不编造 */
+  function sceneEmergency(text, ctx, place) {
+    var E = getE();
+    var lines = ["🚑 <b>旅途应急</b>",
+      "如遇急症、意识不清、呼吸困难或大出血，请<b>立即拨打 120</b> 并就地呼救。以下仅为分诊指引，不替代医生诊断。"];
+    var tr = [];
+    try { if (E && typeof E.triage === "function") tr = E.triage(text) || []; } catch (e) {}
+    if (tr.length) {
+      tr.slice(0, 3).forEach(function (t) {
+        lines.push("<div class='ai-row'>· 建议挂「" + escapeHtml((t && t.dept) || "急诊") + "」：" + escapeHtml((t && t.tip) || "") + "</div>");
+      });
+    } else {
+      lines.push("<div class='ai-row'>· 中暑 / 过敏 / 腹泻 / 扭伤等常见情况的就地处理要点，可在「旅途应急」页逐条查。</div>");
+    }
+    var c = (place && place.type === "city") ? place.name : (lastCity || (ctx.plan && ctx.plan.cityName) || "");
+    if (c) {
+      var hs = [];
+      try { if (E && typeof E.hospitalsOf === "function") hs = E.hospitalsOf(c) || []; } catch (e) {}
+      if (hs.length) {
+        lines.push("<div class='ai-row'>· " + escapeHtml(c) + " 就近具名医院（按距城心排序，非推荐）：" +
+          hs.slice(0, 3).map(function (h) { return escapeHtml((h && (h.name || h)) || ""); }).filter(Boolean).join("、") + "</div>");
+      } else {
+        var approx = false;
+        try { approx = !!(E && E.isApprox && E.isApprox(c)); } catch (e) {}
+        lines.push("<div class='ai-row'>· " + escapeHtml(c) + (approx ? " 暂未收录具名医院" : " 的医院列表") +
+          "，请用「旅途应急」页或地图搜「医院」就近就医（不编造院名与距离）。</div>");
+      }
+    }
+    return {
+      html: lines.join("\n"),
+      actions: [act("pages/help/help", "打开旅途应急 →"), act("subpkg/map/map", "地图找医院 →")],
+      intent: "emergency"
+    };
+  }
+
+  /* ② 离线推荐城市：复用本地 recommend 引擎（按偏好标签打分，零网络） */
+  function sceneRecommend(text, ctx) {
+    var R = getR(), res = null;
+    try {
+      if (R && typeof R.recommend === "function")
+        res = R.recommend(text, { month: new Date().getMonth() + 1, topN: 5 });
+    } catch (e) {}
+    if (!res || res.pending || !res.list || !res.list.length) {
+      return {
+        html: "离线知识库暂时没能给出这份推荐。换个说法试试，比如「推荐几个适合亲子的海边城市」「想去小众古城」；「按标签找景点」里也能自己筛。",
+        actions: [act("subpkg/spotsearch/spotsearch", "按标签找景点 →"), act("pages/index/index", "去生成攻略 →", {}, "tab")],
+        intent: "recommend"
+      };
+    }
+    var tagged = res.prefs && res.prefs.tags && res.prefs.tags.length;
+    var lines = ["🌟 <b>离线推荐</b>" + (tagged ? "（已按你说的偏好加权）" : "") + "："];
+    res.list.slice(0, 5).forEach(function (x, i) {
+      lines.push("<div class='ai-row'>" + (i + 1) + ". " + escapeHtml((x && x.name) || "") +
+        ((x && x.province) ? "（" + escapeHtml(x.province) + "）" : "") + " · " +
+        escapeHtml((x && (x.seasonNote || x.reasonTag)) || "综合推荐") + "</div>");
+    });
+    lines.push("点城市名可直接生成行程；想更准就说「海边 + 亲子 + 5 天」这类组合。以上均为离线库内真实收录城市。");
+    return {
+      html: lines.join("\n"),
+      actions: [act("pages/index/index", "去生成攻略 →", {}, "tab"), act("subpkg/spotsearch/spotsearch", "按标签找景点 →")],
+      intent: "recommend"
+    };
+  }
+
+  /* ③ 行程复盘 / 游记：只重组本机真实素材（行程点位 / 手记 / 账本），绝不编造 */
+  function sceneReview(text, ctx) {
+    var T = getT(), plan = ctx && ctx.plan;
+    if (!plan || !plan.days || !plan.days.length) {
+      return {
+        html: "还没有行程可复盘。先说「帮我生成成都 3 天行程」，旅途中记点手记、记两笔账，回来我就能帮你写成复盘/游记。",
+        actions: [act("pages/index/index", "去生成攻略 →", {}, "tab")],
+        intent: "review"
+      };
+    }
+    var notes = [], ledger = [], total = 0;
+    try { if (T.getNotes) notes = T.getNotes() || []; } catch (e) {}
+    try { if (T.getLedger) ledger = T.getLedger() || []; } catch (e) {}
+    try { if (T.totalSpent) total = Math.round(Number(T.totalSpent()) || 0); } catch (e) {}
+    var seen = Object.create(null), spots = [];
+    try {
+      for (var di = 0; di < plan.days.length && spots.length < 20; di++) {
+        var items = (plan.days[di] && plan.days[di].items) || [];
+        for (var ii = 0; ii < items.length && spots.length < 20; ii++) {
+          var n = (items[ii] && (items[ii].name || items[ii].disp)) || "";
+          if (!n) continue;
+          var k = (T.cleanSpotName && T.cleanSpotName(n)) || n;
+          if (seen[k]) continue;
+          seen[k] = 1; spots.push(n);
+        }
+      }
+    } catch (e) {}
+    var lines = ["📓 <b>行程复盘 · " + escapeHtml(plan.cityName || "") + " " + plan.days.length + " 天</b>"];
+    if (spots.length) lines.push("<div class='ai-row'>去过的点：" + escapeHtml(spots.slice(0, 12).join("、")) + (spots.length > 12 ? " 等" : "") + "</div>");
+    if (notes.length) {
+      var last = notes[notes.length - 1] || {};
+      lines.push("<div class='ai-row'>记了 " + notes.length + " 条手记，最近一句：「" + escapeHtml(last.txt || "") + "」</div>");
+    }
+    if (total > 0) lines.push("<div class='ai-row'>这趟累计花了 ¥" + total + "（记账 " + ledger.length + " 笔）。</div>");
+    lines.push("以上全部来自本机真实素材。若已接入云端大模型，说「AI 帮我写游记」可据此生成完整游记；我不会编造没去过的点或没发生的花费。");
+    return {
+      html: lines.join("\n"),
+      actions: [act("subpkg/ledger/ledger", "看记账本 →"), act("pages/today/today", "写手记 →", {}, "tab"),
+        act("pages/myguides/myguides", "翻我的攻略 →")],
+      intent: "review"
+    };
+  }
+
+  /* 扩展场景分流：不抢显式导航 / 生成行程 / 站点状态 / 单景点详情（调用点在这些之后） */
+  function extraScenes(text, ctx, place) {
+    if (/医院|急救|受伤|骨折|出血|中暑|高原反应|晕倒|胸痛|急诊|食物.*(中毒|过敏)|不舒服|拉肚子|发烧|过敏|扭伤/.test(text))
+      return sceneEmergency(text, ctx, place);
+    if (/复盘|游记|回忆一下|写篇游记|旅行总结|这趟.*(总结|复盘)|回来.*(总结|复盘)|旅途.*(总结|回忆)/.test(text))
+      return sceneReview(text, ctx);
+    // 推荐城市只在没锁定具体城市时介入，避免抢「成都哪里好玩」这类城市问答
+    if (!(place && place.type === "city") &&
+        /推荐|想去|小众.*(目的地|城市|玩法)|适合.*(去|玩|城市|地方|目的地)|去哪.*(好|合适|舒服)/.test(text))
+      return sceneRecommend(text, ctx);
+    return null;
+  }
+
   function buildReply(text, ctx) {
     text = (text || "").trim();
     ctx = ctx || context();
     var intent = detectIntent(text);
+    bump(intent);
     var place = detectPlace(text);
     if (place && place.type === "city") lastCity = place.name;
     else if (place && place.type === "province") lastCity = null;
@@ -643,6 +831,7 @@
           "• <b>真干活</b>：直接生成并写入行程、带参数跳到任意一页（含地图指定某一天）\n" +
           "• <b>接着聊</b>：问完「成都吃什么」，直接说「那有什么好玩的」「改成 5 天」\n" +
           "• <b>写本机数据</b>：「记一笔 打车 32」「把西湖加入想玩」（只写离线库里真实存在的景点）\n" +
+          "• <b>场景服务</b>：「帮我复盘这趟行程」写复盘卡、「我发烧了怎么办」给分诊指引、「推荐几个适合亲子的城市」离线挑目的地（与小程序端同一套真实数据）\n" +
           "• <b>全站导航</b>：说「打开美食页」「看第 2 天地图」即可\n\n" +
           (cloudAIEnabled() || llmEnabled() ? "已接入大模型（云端强模型优先，无需在此填 Key），可自由对话。" : "默认纯离线，无需联网、无需 Key。") + "\n" + siteSummary(ctx),
         actions: pageActions(ctx, "general"),
@@ -651,6 +840,10 @@
     // ④b 单景点详情问答（离线真实资料，零伪造）：先于此处理，让「西湖怎么样」即使没提城市也能答
     var spot = trySpotDetail(text, ctx, place);
     if (spot) { lastIntent = "spot"; return spot; }
+
+    // ④c 扩展场景：应急分诊 / 行程复盘游记 / 离线推荐城市（对齐小程序 ai-brain，同源真实数据）
+    var extra = extraScenes(text, ctx, place);
+    if (extra) { lastIntent = extra.intent; return extra; }
 
     // ⑤ 省份
     if (place && place.type === "province") {
@@ -689,15 +882,17 @@
         };
       }
       if (intent === "season") {
-        var T = getT();
+        // 精准最佳季节：优先用离线城市名片 + bestMonths 的真实月份区间，不再只给泛化的「春秋最宜」
+        var cbS = T.cityBrief ? T.cityBrief(city) : null;
         var bm = T.bestTravelMonth ? T.bestTravelMonth(city) : "";
-        return {
-          html: "去 <b>" + escapeHtml(city) + "</b> 的最佳出行月份：<b>" + escapeHtml(bm || "春秋最宜（4–5 / 9–10 月）") + "</b>。\n" +
-            "• 春秋（4–5 / 9–10 月）最舒服，少雨温度宜人；\n" +
-            "• 夏季防暑防晒、南方多雨带伞；\n• 冬季北方保暖、南方防潮。\n" +
-            "具体月份穿衣与当日天气，行程页会按出发日期提示～",
-          actions: pageActions(ctx, "season"),
-        };
+        var ms = [];
+        try { if (T.bestMonths && cbS && cbS.best) ms = T.bestMonths(cbS.best) || []; } catch (e) {}
+        var sLines = ["去 <b>" + escapeHtml(city) + "</b> 的最佳出行月份：<b>" +
+          escapeHtml(fmtMonths(ms) || bm || (cbS && cbS.best) || "春秋最宜（4–5 / 9–10 月）") + "</b>。"];
+        if (cbS && cbS.climateTxt) sLines.push("气候：" + escapeHtml(cbS.climateTxt) + "。");
+        if (cbS && cbS.costTxt) sLines.push("花费参考：" + escapeHtml(cbS.costTxt) + "。");
+        sLines.push("具体几天的天气以 App 内天气页为准（联网获取）；穿衣建议可在「出行准备」页按出发月份生成。");
+        return { html: sLines.join("\n"), actions: pageActions(ctx, "season") };
       }
       if (intent === "packing") {
         return {
@@ -803,6 +998,39 @@
 
   /* ───────── 8. 可选大模型接入（安全策略沿用 #109/#110/#113） ───────── */
   var LS_KEY = "ai_llm_cfg_v1";
+
+  /* 云端强模型分场景纪律（与小程序 ai-prompts 对齐）：
+     此前网页端只有一句固定 system，聊到应急 / 复盘 / 推荐时强模型没有对应的零伪造约束。 */
+  var WEB_MASTER =
+    "你是「晨的旅行助手」（离线优先 App，网页版）。铁律：①先厘清意图再答；" +
+    "②事实优先基于随附「本机上下文」并标来源；" +
+    "③零伪造：不编景点/店铺/票价/坐标/医院/实时天气，缺数据说「以 App 内对应页为准」；" +
+    "④不越界：生成行程/订票/支付引导去 App 内功能，不输出伪行程；" +
+    "⑤急症第一句提示拨 120，不替代医生。简体中文、分点、克制 emoji。";
+  var WEB_SYS = {
+    emergency: "应急分诊：第一句「急症拨 120，就地呼救」；再给就诊科室与就地处理要点，明确「仅分诊不替代医生」，绝不编造医院名称与距离。",
+    review: "行程复盘/游记：只重组随附本机真实素材（去过的点/手记/记账/天数城市），绝不编造没去过的景点或没发生的花费；给 2-3 句总结 + 1 个下次再来的小建议。",
+    recommend: "目的地推荐：只基于本机离线库已收录城市与随附偏好给建议，不编造城市；不确定就说「以 App 内按标签找景点为准」。",
+    planOptimize: "行程体检师：据随附真实行程给绕路/节奏/重复/预算/天气五维点评，≤3 条可改建议，提示「行程页可直接改天数/节奏」。",
+    food: "美食向导：只讲该城真实菜系与吃法；问具体店说「以 App 美食页离线清单为准」，不虚构餐厅。",
+    attraction: "景点向导：只讲 App 已收录景点，不编年代/票价/开放时间。",
+    general: "通用旅行管家：给信息 + 下一步选项，不替用户做重决定；提示「首页生成离线行程」「对应页查美食/深度玩法」。"
+  };
+  function lastQuestion(h) {
+    for (var i = (h || []).length - 1; i >= 0; i--) if (h[i] && h[i].user) return String(h[i].text || "");
+    return "";
+  }
+  function sceneSystemOf(text) {
+    var t = String(text || "");
+    if (/医院|急救|受伤|骨折|出血|中暑|胸痛|急诊|发烧|过敏|不舒服/.test(t)) return WEB_SYS.emergency;
+    if (/复盘|游记|旅行总结|回忆一下/.test(t)) return WEB_SYS.review;
+    if (/推荐|想去|适合.*(城市|目的地)/.test(t)) return WEB_SYS.recommend;
+    if (/体检|行程.*(合理|问题|优化|太赶)|挑毛病/.test(t)) return WEB_SYS.planOptimize;
+    if (/吃|美食|必吃|小吃/.test(t)) return WEB_SYS.food;
+    if (/景点|好玩|必去|打卡/.test(t)) return WEB_SYS.attraction;
+    return WEB_SYS.general;
+  }
+
   var _obfKey = "tg-ai-2026";
   function _xor(s) {
     if (!s) return s;
@@ -849,8 +1077,8 @@
     var base = safeBaseURL(c.baseURL);
     if (!base) { onErr("Base URL 不合法：仅支持 https，且不能是本机/内网地址"); return; }
     var p = ctx.plan;
-    var sys = "你是「旅行攻略生成器」的网页助手，基于应用内离线旅行知识库回答中国国内旅行问题，简洁实用、用中文。" +
-      "当前页面：" + ctx.title + "（" + ctx.path + "）。" +
+    var sys = WEB_MASTER + "\n\n" + sceneSystemOf(lastQuestion(history)) +
+      "\n\n【本机上下文】当前页面：" + ctx.title + "（" + ctx.path + "）。" +
       (p && p.days && p.days.length
         ? "当前行程：" + (p.cityName || "") + "，" + p.days.length + " 天，出发 " + String(p.depart || "").slice(0, 10) + "。"
         : "当前没有行程。") +
@@ -876,7 +1104,8 @@
         ? Cloud.aiContextOf(ctx.plan, (ctx.title || "") + "（" + (ctx.path || "") + "）")
         : "当前页面：" + ((ctx && ctx.title) || "未知") + "（旅行攻略生成器网页版）。";
       var msgs = (history || []).map(function (m) { return { role: m.user ? "user" : "assistant", content: m.text }; });
-      Cloud.aiChat({ messages: msgs, context: ctxStr }).then(function (r) {
+      Cloud.aiChat({ messages: msgs, context: ctxStr,
+        system: WEB_MASTER + "\n\n" + sceneSystemOf(lastQuestion(history)) }).then(function (r) {
         if (r && r.ok && r.text) onDone(r.text);
         else callLLMDirect(history, ctx, onDone, onErr);
       }).catch(function () { callLLMDirect(history, ctx, onDone, onErr); });
@@ -983,20 +1212,20 @@
 
   /** 快捷提问随当前页面变化 —— AI 跟着用户所在页面走，不是固定的一组问题 */
   var CHIPS = {
-    "*": ["成都吃什么", "杭州最佳季节", "帮我生成成都3天行程", "我今天花了多少", "行程体检"],
-    "pages/index/index": ["帮我生成成都3天行程", "杭州5日游怎么安排", "西安有哪些必去", "成都附近还有哪好玩"],
+    "*": ["成都吃什么", "杭州最佳季节", "帮我生成成都3天行程", "我今天花了多少", "行程体检", "帮我复盘这趟行程"],
+    "pages/index/index": ["帮我生成成都3天行程", "推荐几个适合亲子的城市", "杭州5日游怎么安排", "西安有哪些必去", "成都附近还有哪好玩"],
     "pages/today/today": ["今天还剩几项安排", "我今天花了多少", "还差几天出发", "打包清单进度"],
     "pages/plan/plan": ["行程体检", "哪天最累", "看第2天地图", "总花费和预算对比"],
     "pages/more/more": ["足迹点亮几座城", "帮我生成西安4天行程", "打开使用指南", "数据怎么备份"],
     "pages/myguides/myguides": ["帮我生成重庆3天行程", "行程体检", "打开我的攻略"],
-    "pages/help/help": ["打开旅途应急", "生成一份行程", "打开使用指南"],
+    "pages/help/help": ["我发烧了怎么办", "打开旅途应急", "生成一份行程", "打开使用指南"],
     "subpkg/food/food": ["成都吃什么", "西安必吃清单", "看美食地图", "生成成都3天行程"],
     "subpkg/map/map": ["看第2天地图", "哪天最累", "今天还剩几项安排", "打开美食页"],
     "subpkg/ledger/ledger": ["我今天花了多少", "总花费和预算对比", "怎么 AA 分账", "行程体检"],
     "subpkg/prep/prep": ["还差几项没准备", "打包清单进度", "打开出行准备", "还差几天出发"],
     "subpkg/spotsearch/spotsearch": ["重庆有哪些必去", "成都哪里出片", "按标签找景点", "生成重庆3天行程"],
     "subpkg/toolkit/toolkit": ["打开旅行百宝箱", "行程体检", "生成一份行程"],
-    "subpkg/assistant/assistant": ["成都吃什么", "介绍一下西湖", "杭州最佳季节", "打开本地速查"],
+    "subpkg/assistant/assistant": ["成都吃什么", "介绍一下西湖", "杭州最佳季节", "帮我复盘这趟行程", "打开本地速查"],
     "subai/deep/deep": ["这个城市怎么避坑", "生成一份行程", "看第2天地图"],
     "subpkg/guide/guide": ["怎么用这个应用", "打开使用指南", "帮我生成成都3天行程"],
   };
@@ -1039,6 +1268,7 @@
   function clearConversation() {
     history = [];
     lastCity = null; lastIntent = null; lastPlan = null; lastSpots = []; lastShops = [];
+    try { localStorage.removeItem(MEM_KEY); } catch (e) {}   // 落盘的记忆也要一起清，避免刷新后又"串城"
     dom.msgs.innerHTML = "";
     dom._welcomed = true;
     pushBot("已清空对话与上下文。可以重新问「成都吃什么」，或让我生成一份新行程。");
@@ -1137,7 +1367,7 @@
         clearTyping(); pushBot(escapeHtml(txt).replace(/\n/g, "<br/>"));
       }, function (err) {
         clearTyping(); pushBot("⚠️ " + escapeHtml(err) + "\n已回退到内置离线助手：");
-        var r = buildReply(v, ctx); pushBot(r.html, r.actions); applyAuto(r);
+        var r = replyAndRemember(v, ctx); pushBot(r.html, r.actions); applyAuto(r);
       });
       return;
     }
@@ -1146,7 +1376,7 @@
     whenReady(function () {
       setTimeout(function () {
         clearTyping();
-        var r = buildReply(v, ctx);
+        var r = replyAndRemember(v, ctx);
         pushBot(r.html, r.actions);
         applyAuto(r);
       }, 320);
@@ -1161,7 +1391,7 @@
   APP.__webAI = {
     ask: function (text) { openPanel(); dom.input.value = String(text || ""); send(); },
     // reply 只算不渲染：网页其它模块（以及 tools/web/smoke.mjs）可直接复用同一套离线问答
-    reply: function (text, ctx) { return buildReply(text, ctx || context()); },
+    reply: function (text, ctx) { return replyAndRemember(text, ctx || context()); },
     go: goTo,
     context: context,
     generatePlan: generatePlan,
@@ -1175,6 +1405,12 @@
         plan: lastPlan ? { city: lastPlan.city, days: lastPlan.days } : null,
         spots: lastSpots.slice(), shops: lastShops.slice(),
       };
+    },
+    // 离线命中可观测（与小程序 ai-brain.offlineStats 同契约）：{ hits, byIntent }
+    offlineStats: function () {
+      var by = {};
+      Object.keys(_hitBy).forEach(function (k) { by[k] = _hitBy[k]; });
+      return { hits: _hits, byIntent: by };
     },
   };
 

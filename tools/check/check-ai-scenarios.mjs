@@ -1,5 +1,6 @@
 // tools/check/check-ai-scenarios.mjs —— AI 全场景覆盖防回潮守卫（独立脚本，零包体影响）
-// 验证：ai-brain 的 14 个场景都能给出非空回答 + 直达按钮；深链 topic 与页面接线一致。
+// 验证：ai-brain 的全部场景都能给出非空回答 + 直达按钮；深链 topic 与页面接线一致；
+//       双端（小程序 ai-brain / 网页 ai-assistant）AI 能力对齐、写操作零伪造。
 // 不接入 allcheck.sh（避免改动回归步数触发材料口径门禁），由自我迭代循环/CI 按需调用。
 import { createRequire } from "module";
 import { readFileSync } from "fs";
@@ -19,7 +20,11 @@ try {
   process.exit(1);
 }
 const scs = AI.allScenarios();
-log(Array.isArray(scs) && scs.length === 14, "ai-brain 场景数 = " + (scs && scs.length) + "（期望 14）");
+// 数量只做下限：新增场景应自动纳入覆盖检查，而不是让硬编码期望值过期后把整份守卫变成假红
+// （历史故障：新增「行程复盘」后 14→15，守卫长期报失败，反而掩盖了真实路由缺口）。
+log(Array.isArray(scs) && scs.length >= 15, "ai-brain 场景数 = " + (scs && scs.length) + "（期望 ≥15）");
+const badFields = scs.filter(s => !s || !s.key || !s.label || !s.page || !s.sample);
+log(badFields.length === 0, "全部场景字段完整（key/label/page/sample）");
 
 // 与 assistant._applyDeepTopic 一致的「带城市场景」查询构造（用于贴近真实深链行为）
 const CITYQ = {
@@ -71,8 +76,9 @@ log(missing.length === 0, "全部场景目标页均有路由" + (missing.length 
 // 4) 强模型场景提示词守卫：ai-prompts（置于 assistant 分包）必须导出 10 套场景提示词，且覆盖 ask() 真实场景名
 let PROMPTS = null;
 try { PROMPTS = require(resolve(ROOT, "subpkg/assistant/ai-prompts.js")); } catch (e) {}
-log(!!PROMPTS && PROMPTS.count === 10, "ai-prompts 场景提示词数 = " + (PROMPTS && PROMPTS.count) + "（期望 10）");
-const ASK_SCENES = ["assistant", "today", "today-proactive", "plan", "food", "prep", "deep", "help", "toolkit", "lens"];
+// 同样是下限：spot / review 等新增场景提示词不应让守卫失效；真正的覆盖由下面两道防线保证
+log(!!PROMPTS && PROMPTS.count >= 12, "ai-prompts 场景提示词数 = " + (PROMPTS && PROMPTS.count) + "（期望 ≥12）");
+const ASK_SCENES = ["assistant", "today", "today-proactive", "plan", "food", "prep", "deep", "help", "toolkit", "lens", "spot", "review"];
 let badSys = [];
 for (const s of ASK_SCENES) {
   let sys = "";
@@ -112,6 +118,51 @@ log(badOff.length === 0, "离线扩面意图（推荐/最佳季节）可解析�
 let st = null;
 try { st = AI.offlineStats && AI.offlineStats(); } catch (e) {}
 log(!!st && typeof st.hits === "number" && st.byIntent && typeof st.byIntent === "object", "离线命中可观测 offlineStats 可用（hits/byIntent）");
+
+// 8) 小程序端写操作（对齐网页版）：真写账本 / 真写想玩，且未收录景点必须拒绝。
+//    Node 下 utils/store.js 走 wx.*，这里给一次性 shim，用完即恢复，不污染其它守卫。
+const _oldWx = globalThis.wx;
+const _mem = new Map();
+globalThis.wx = {
+  getStorageSync(k) { const r = _mem.get(k); return r === undefined ? "" : JSON.parse(r); },
+  setStorageSync(k, v) { _mem.set(k, JSON.stringify(v)); },
+  removeStorageSync(k) { _mem.delete(k); },
+  showToast() {}
+};
+try {
+  const T = require(resolve(ROOT, "utils/travel.js"));
+  const before = (T.getLedger() || []).length;
+  const rb = AI.handle("记一笔 打车 32", { city: "成都", plan: null });
+  log(!!rb && rb.intent === "quickBill" && (T.getLedger() || []).length === before + 1,
+    "小程序端「记一笔」真写入本机账本（不是只回一句话）");
+  const rw = AI.handle("把西湖加入想玩", { city: "成都", plan: null });
+  log(!!rw && rw.intent === "addWish" &&
+    (T.getWish() || []).some(x => x.name === "西湖" && x.city === "杭州"),
+    "小程序端「加入想玩」写真实景点且城市归属正确（不串城）");
+  const rf = AI.handle("把不存在的景点XYZ加入想玩", { city: "成都", plan: null });
+  log(!!rf && /没找到/.test(rf.text), "小程序端未收录景点拒绝写入（零伪造）");
+} catch (e) {
+  log(false, "小程序端写操作可解析：" + ((e && e.message) || e));
+} finally {
+  if (_oldWx === undefined) delete globalThis.wx; else globalThis.wx = _oldWx;
+}
+
+// 9) 双端能力对齐：网页端必须补齐小程序端已有的核心场景，并共享离线统计 / 记忆契约。
+//    只匹配「声明」，不对整文件取反（注释里出现同名描述不算实现）。
+let webSrc = "";
+try { webSrc = readFileSync(resolve(ROOT, "web/ai-assistant.js"), "utf8"); } catch (e) {}
+const WEB_REQUIRED = [
+  ["function sceneEmergency(", "应急分诊"],
+  ["function sceneReview(", "行程复盘/游记"],
+  ["function sceneRecommend(", "离线推荐城市"],
+  ["function fmtMonths(", "精准最佳季节"],
+  ['var MEM_KEY = "webAIStateV1"', "多轮上下文落盘"],
+  ["function sceneSystemOf(", "云端分场景提示词"],
+  ["offlineStats: function", "离线命中可观测"]
+];
+const missWeb = WEB_REQUIRED.filter(([decl]) => webSrc.indexOf(decl) < 0).map(([, label]) => label);
+log(missWeb.length === 0, "网页端已与小程序端对齐场景能力" +
+  (missWeb.length ? "（缺：" + missWeb.join("、") + "）" : ""));
 
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);

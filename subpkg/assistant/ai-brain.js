@@ -58,7 +58,9 @@ const PAGE_ROUTE = {
   lens: { p: "subpkg/lens/lens", tab: false },
   travelsvc: { p: "subpkg/travelsvc/travelsvc", tab: false },
   toolkit: { p: "subpkg/toolkit/toolkit", tab: false },
-  myguides: { p: "pages/myguides/myguides", tab: false }
+  myguides: { p: "pages/myguides/myguides", tab: false },
+  // 「行程复盘 / 游记」场景在助手页内完成（review），须登记路由，否则直达按钮会错误回落到首页
+  assistant: { p: "subpkg/assistant/assistant", tab: false }
 };
 function routeOf(page) { return PAGE_ROUTE[page] || { p: "pages/index/index", tab: true }; }
 
@@ -263,6 +265,73 @@ function runEmergency(text, city, ctx) {
   return { text: lines.join("\n"), actions: [act("pages/help/help", "打开旅途应急 →"), act("subpkg/map/map", "看地图找医院 →")], intent: "help-emergency" };
 }
 
+/* ── 写操作（对齐网页版内置 AI）：一句话记账 / 把真实景点加入想玩 ──
+ * 只写本机离线数据；景点名必须能在离线库里查到，绝不写没收录的名字（零伪造、不脏数据）。
+ * 这两条要放在 NEW_INTENTS 最前：「记账」否则会被 ledger 的「花了多少」查询意图抢走。 */
+function realSpotOf(name) {
+  const nm = String(name || "").trim();
+  if (nm.length < 2) return null;
+  const coords = (DATA && DATA.SPOT_COORDS) || {};
+  const cities = Object.keys(coords);
+  // 精确优先，并带回景点真实所属城市（否则「西湖」会被记到上一轮聊的成都名下）
+  for (let i = 0; i < cities.length; i++) {
+    const arr = coords[cities[i]] || [];
+    for (let j = 0; j < arr.length; j++) {
+      const s = Array.isArray(arr[j]) ? arr[j][0] : (arr[j] && arr[j].name ? arr[j].name : arr[j]);
+      if (typeof s === "string" && s === nm) return { name: s, city: cities[i] };
+    }
+  }
+  if (DATA && DATA.SPOT_DETAILS && DATA.SPOT_DETAILS[nm]) return { name: nm, city: "" };
+  return null;
+}
+function runQuickBill(text) {
+  const m = text.match(/^(?:帮我|请|给我)?\s*(?:记一笔|记一下|记个账|记下|加一笔|记账)\s*(.+)$/);
+  if (!m) return null;
+  let b = null;
+  try { b = T.parseQuickBill ? T.parseQuickBill(m[1]) : null; } catch (e) {}
+  if (!b) return {
+    text: "没从「" + m[1] + "」里识别出金额。写成「记一笔 打车 32」这种带数字的说法就行～",
+    actions: [act("subpkg/ledger/ledger", "打开账本 →")], intent: "quickBill"
+  };
+  try {
+    T.addLedger(b.amt, b.cat, b.name);
+    return {
+      text: "已记下 ¥" + b.amt + " · " + b.cat + " · " + b.name + "（写入本机账本；说「今天花了多少」可查，去账本页可删）。",
+      actions: [act("subpkg/ledger/ledger", "打开账本核对 →"), act("pages/today/today", "打开今天 →", {}, "tab")],
+      intent: "quickBill"
+    };
+  } catch (e) {
+    return { text: "写入账本失败：" + ((e && e.message) || e), actions: [act("subpkg/ledger/ledger", "打开账本 →")], intent: "quickBill" };
+  }
+}
+function runAddWish(text, city, ctx) {
+  const m = text.match(/(?:把|将)?\s*(.{2,24}?)\s*(?:加入|加到|放进|加进|添加进|添加到)\s*想玩/) ||
+    text.match(/想玩(?:清单|列表|池)?\s*(?:里)?\s*(?:加|添加|加入)\s*(.{2,24})/);
+  if (!m) return null;
+  let raw = String(m[1] || "").trim();
+  if (/第一个|刚才|上面|它|这个|那个/.test(raw)) return {
+    text: "小程序端直接点景点行的「想玩」就好；也可以说完整的景点名，比如「把西湖加入想玩」。",
+    actions: [act("subpkg/spotsearch/spotsearch", "按标签找景点 →")], intent: "addWish"
+  };
+  raw = raw.replace(/^(?:把|将|这个|那个)\s*/, "").replace(/[，。！？!?,.]$/, "").trim();
+  const real = realSpotOf(raw);
+  if (!real) return {
+    text: "离线景点库里没找到「" + raw + "」，我不把没收录的名字写进想玩清单。可以说得更准确些，或先问「成都有什么必去」再挑一个。",
+    actions: [act("subpkg/spotsearch/spotsearch", "按标签找景点 →")], intent: "addWish"
+  };
+  const wishCity = real.city || (ctx && ctx.plan && ctx.plan.cityName) || city || "";
+  let was = false;
+  try { was = !!(T.isWished && T.isWished(real.name)); } catch (e) {}
+  try { T.toggleWish(real.name, wishCity); }
+  catch (e) { return { text: "写入想玩清单失败：" + ((e && e.message) || e), actions: [], intent: "addWish" }; }
+  return {
+    text: (was ? "已从想玩清单移除" : "已加入想玩清单") + "：" + real.name +
+      (wishCity ? "（" + wishCity + "）" : "") + "。再说一次可" + (was ? "重新加入" : "取消") + "；生成行程时会优先排进去。",
+    actions: [act("pages/index/index", "去生成攻略 →", {}, "tab"), act("subpkg/spotsearch/spotsearch", "按标签找景点 →")],
+    intent: "addWish"
+  };
+}
+
 /* 其余场景：以「一句话介绍 + 直达按钮」把用户带到对应页（这些页本身已是专业工具，AI 负责入口与语境） */
 function runLens() { return { text: "用「拍照识景」对着建筑/招牌拍一张，我会识别并讲讲它的故事（离线识别，无需联网）。", actions: [act("subpkg/lens/lens", "打开拍照识景 →")], intent: "lens" }; }
 function runTravelSvc() { return { text: "「出行服务」页集合了订票、打车、机场/车站、值机等常用入口，按城市自动匹配。", actions: [act("subpkg/travelsvc/travelsvc", "打开出行服务 →")], intent: "travelsvc" }; }
@@ -322,6 +391,9 @@ function runBestTime(text, city, ctx) {
 
 /* ───────── 扩展意图表（顺序：更具体者优先） ───────── */
 const NEW_INTENTS = [
+  // 明确指令的写操作优先：「记账」若落到后面会被 ledger 查询意图抢走，变成答非所问
+  { key: "quickBill", kw: /^(?:帮我|请|给我)?\s*(?:记一笔|记一下|记个账|记下|加一笔|记账)\s*.+/, run: runQuickBill },
+  { key: "addWish",  kw: /(?:加入|加到|放进|加进|添加进|添加到)\s*想玩|想玩(?:清单|列表|池)?\s*(?:里)?\s*(?:加|添加|加入)/, run: runAddWish },
   { key: "help-emergency", kw: /医院|急救|受伤|骨折|出血|中暑|高原反应|晕倒|胸痛|急诊|食物.*(中毒|过敏)|不舒服|拉肚子|发烧|过敏/, run: runEmergency },
   { key: "recommend",      kw: /推荐|想去|去哪.*(好|玩|合适|舒服)|哪里.*(好玩|适合|舒服)|适合.*(去|玩|城市|地方|目的地)|小众.*(目的地|城市|玩法)/, run: runRecommend },
   { key: "besttime",       kw: /几月去|什么时候去|最佳.*(季节|月份|时间)|什么.*(季节|月份).*去|避开.*(人潮|旺季)|(季节|月份).*最好|适合玩几天|最佳出行/, run: runBestTime },

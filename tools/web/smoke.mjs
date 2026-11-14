@@ -365,6 +365,38 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
     const rMust = AI.reply("杭州有哪些必去", AI.context());
     ok("「必去」类问法仍返回景点列表（未被城市名片抢走）",
       /杭州/.test(rMust.html) && /<li>|ai-row|代表性/.test(rMust.html), rMust.html.slice(0, 100));
+
+    // ── 2026-11-14 双端 AI 场景对齐：应急分诊 / 行程复盘 / 离线推荐 / 命中统计 / 记忆落盘 ──
+    const rEmer = AI.reply("我发烧了怎么办", AI.context());
+    ok("应急分诊首句提示拨 120 且只做分诊（不编医院）",
+      /120/.test(rEmer.html) && /不替代医生|分诊/.test(rEmer.html) &&
+      (rEmer.actions || []).some((a) => a.path === "pages/help/help"),
+      rEmer.html.slice(0, 130));
+
+    AI.reply("帮我生成杭州3天行程", AI.context());   // 保证有真实行程素材可复盘
+    const rRev = AI.reply("帮我复盘这趟行程", AI.context());
+    ok("行程复盘只读本机真实素材（含真实城市与天数，不编造）",
+      /行程复盘/.test(rRev.html) && /杭州/.test(rRev.html) && /真实素材|本机/.test(rRev.html),
+      rRev.html.slice(0, 130));
+
+    const rRec = AI.reply("推荐几个适合亲子的海边城市", AI.context());
+    ok("离线推荐城市返回榜单且接地（零网络）",
+      /离线推荐|按标签找景点/.test(rRec.html) &&
+      (rRec.actions || []).some((a) => a.path === "pages/index/index"),
+      rRec.html.slice(0, 130));
+
+    const st0 = AI.offlineStats();
+    ok("离线命中可观测 offlineStats 可用（hits/byIntent）",
+      !!st0 && typeof st0.hits === "number" && st0.hits > 0 &&
+      !!st0.byIntent && typeof st0.byIntent === "object", JSON.stringify(st0));
+
+    AI.reply("成都吃什么", AI.context());
+    const saved = g.localStorage.getItem("webAIStateV1");
+    let savedObj = null;
+    try { savedObj = JSON.parse(saved); } catch (e) {}
+    ok("多轮上下文落盘（刷新后可恢复城市/意图，不存聊天正文）",
+      !!savedObj && savedObj.city === "成都" && !("history" in savedObj),
+      String(saved).slice(0, 160));
   }
   g.document = oldDoc;
   g.wx = oldWx;

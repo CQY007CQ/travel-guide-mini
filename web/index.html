@@ -12,9 +12,9 @@
      其 onload 后再 resolve 这个承诺；utils/data.js 的 initData 网页分支 await 它再解包，
      既不被同步解压阻塞，又保证解包时数据块工厂已注册（否则 require 抛错丢数据）。 -->
 <script>window.__dataReadyP=new Promise(function(r){window.__dataReadyResolve=r;});</script>
-<link rel="stylesheet" href="lib/app.css?v=cf54f2ff"/>
-<link rel="stylesheet" href="shell.css?v=cf54f2ff"/>
-<link rel="stylesheet" href="ai-assistant.css?v=cf54f2ff"/>
+<link rel="stylesheet" href="lib/app.css?v=232f4d78"/>
+<link rel="stylesheet" href="shell.css?v=232f4d78"/>
+<link rel="stylesheet" href="ai-assistant.css?v=232f4d78"/>
 </head>
 <body>
   <!-- 启动遮罩：数据包解压需要一点时间，避免白屏 -->
@@ -36,14 +36,14 @@
     <a class="tb" data-p="pages/more/more"><img alt="更多"/><span>更多</span></a>
   </nav>
 
-  <script defer src="lib/modules.js?v=cf54f2ff"></script>
-  <script async src="lib/data.js?v=cf54f2ff" onload="window.__dataReadyResolve&&window.__dataReadyResolve()" onerror="window.__dataReadyResolve&&window.__dataReadyResolve()"></script>
-  <script defer src="lib/tpl.js?v=cf54f2ff"></script>
-  <script defer src="lib/nav.js?v=cf54f2ff"></script>
-  <script defer src="lib/runtime.js?v=cf54f2ff"></script>
-  <script defer src="lib/cloud-web.js?v=cf54f2ff"></script>
-  <script defer src="app.js?v=cf54f2ff"></script>
-  <script defer src="ai-assistant.js?v=cf54f2ff"></script>
+  <script defer src="lib/modules.js?v=232f4d78"></script>
+  <script async src="lib/data.js?v=232f4d78" onload="window.__dataReadyResolve&&window.__dataReadyResolve()" onerror="window.__dataReadyResolve&&window.__dataReadyResolve()"></script>
+  <script defer src="lib/tpl.js?v=232f4d78"></script>
+  <script defer src="lib/nav.js?v=232f4d78"></script>
+  <script defer src="lib/runtime.js?v=232f4d78"></script>
+  <script defer src="lib/cloud-web.js?v=232f4d78"></script>
+  <script defer src="app.js?v=232f4d78"></script>
+  <script defer src="ai-assistant.js?v=232f4d78"></script>
 
   <!-- 网页版数据互通：导出 / 导入备份文件（与小程序同 schema，可跨端迁移数据） -->
   <div id="webDataBar">
