@@ -253,6 +253,8 @@ body.force-wide #app > .page > .card {
   body.sidebar-collapsed #app { margin-left: 0; width: 100%; }
   body.sidebar-collapsed #webSidebar { transform: translateX(-100%); box-shadow: none; }
   body.sidebar-collapsed #webTopBar { left: 0; }
+  /* 侧栏收起后内容已铺满全宽，页面抽屉若仍按 left:侧栏宽+12px 定位会平白右移 224px */
+  body.sidebar-collapsed #webNavPanel { left: 12px; }
   body.sidebar-collapsed #wsExpand { display: flex; }
 }
 
@@ -486,3 +488,20 @@ body.has-topbar { padding-top: 46px; }
 /* 地图示意图标点可点：点编号直接唤起高德导航（对齐小程序 bindmarkertap） */
 [data-page="subpkg/map/map"] .the-map .map-mk { cursor: pointer; }
 [data-page="subpkg/map/map"] .the-map .map-mk:hover { stroke: var(--gold); stroke-width: 3; }
+
+/* ── 矮屏 / 横屏手机（≤560px 高）：压缩外壳占位，浮层不再挤出屏幕 ──
+   典型场景：手机横屏 844×390、分屏小窗。此前完全没有高度断点，
+   顶部栏 46px + 底部 tabBar 62px + 弹层自身高度会把内容挤到看不见。 */
+@media (max-height: 560px) {
+  body.has-topbar { padding-top: 38px; }
+  #webTopBar { height: 38px; }
+  #tabbar .tb { padding: 5px 0 4px; font-size: 10px; gap: 2px; }
+  #tabbar .tb img { width: 18px; height: 18px; }
+  body.has-tabbar #app { padding-bottom: 48px; }
+  .w-modal-box { max-height: 86vh; overflow-y: auto; padding: 14px 16px 10px; }
+  .w-sh-box { max-height: 86vh; overflow-y: auto; }
+  .w-pv-box img { max-height: 76vh; }
+  #webNavPanel { max-height: 78vh; }
+  #webSidebar .ws-brand { padding: 10px 14px 8px; }
+  #webSidebar .ws-group { margin: 8px 8px 4px; }
+}

@@ -17,7 +17,10 @@
   position: absolute; top: -2px; right: -2px; width: 14px; height: 14px;
   border-radius: 50%; background: #4ade80; border: 2px solid var(--shell-bg, #f4f5f7);
 }
-@media (min-width: 700px) {
+/* 底部 tabBar 一直到 <1100px 都还在（≥1100px 才换成左侧常驻侧栏）。
+   旧版在 ≥700px 就把 FAB 降到 24px，导致 700–1099px（平板 / 小桌面窗口）
+   右下角悬浮按钮压在 tab 图标上。这里保持 84px 抬高，只在侧栏接管后才落地。 */
+@media (min-width: 1100px) {
   .ai-fab { bottom: calc(24px + env(safe-area-inset-bottom)); }
 }
 
@@ -213,19 +216,28 @@ body.has-tabbar .ai-panel { bottom: calc(64px + env(safe-area-inset-bottom)); }
   .ai-fab { right: 24px; }
 }
 
-/* 超宽屏（≥1700px）：AI 助手吸右为常驻栏，不再浮层遮挡，内容自动左移让位 */
+/* 超宽屏（≥1700px）：AI 助手吸右为常驻栏，形成「左侧栏 + 中内容 + 右助手」三栏 */
 @media (min-width: 1700px) {
+  body.ai-docked { --dock-w: min(420px, 36vw); }
   body.ai-docked .ai-panel {
     left: auto; right: 0; top: 0; bottom: 0; transform: none; opacity: 1; pointer-events: auto;
-    width: min(420px, 36vw); height: 100vh; height: 100dvh; border-radius: 0;
+    width: var(--dock-w); height: 100vh; height: 100dvh; border-radius: 0;
     box-shadow: -10px 0 40px rgba(0, 0, 0, .16);
   }
   body.ai-docked .ai-backdrop { display: none; }
   body.ai-docked .ai-fab { display: none; }
-  /* 内容区左移，给常驻栏让出宽度（左侧已是侧栏，形成「中内容 + 右助手」三栏） */
-  body.ai-docked #app { margin-right: min(420px, 36vw); }
-  body.ai-docked #webTopBar { right: min(420px, 36vw); }
-  body.ai-docked #webNavPanel { right: calc(min(420px, 36vw) + 10px); }
+  /* 关键：shell.css 在 ≥1100px 已把 #app 的 width 定成 calc(100% - 侧栏)。
+     只加 margin-right 时块级元素 over-constrained，浏览器会忽略右外边距，
+     #app 仍铺到视口最右 → 右侧 420px 内容被常驻 AI 栏盖住。必须显式扣减 width。 */
+  body.ai-docked #app {
+    margin-right: var(--dock-w);
+    width: calc(100% - var(--sidebar-w, 224px) - var(--dock-w));
+  }
+  /* 侧栏收起后左侧宽度归零，同样跟着改，否则内容右侧凭空少 224px */
+  body.sidebar-collapsed.ai-docked #app { width: calc(100% - var(--dock-w)); }
+  body.ai-docked #webTopBar { right: var(--dock-w); }
+  /* ≥1100px 的抽屉靠 left 定位，再写 right 属于无效声明 */
+  body.ai-docked #webNavPanel { right: auto; }
 }
 
 /* 清空对话按钮（与设置齿轮同排，清掉多轮上下文避免串城） */
@@ -235,3 +247,10 @@ body.has-tabbar .ai-panel { bottom: calc(64px + env(safe-area-inset-bottom)); }
   font-size: 11px; line-height: 1; padding: 7px 9px; border-radius: 8px;
 }
 .ai-head .ai-clear:hover { color: var(--gold, #d4a94e); border-color: rgba(212, 169, 78, .5); }
+
+/* ── 矮屏 / 横屏手机（≤560px 高）：面板不吃满整屏，输入框与 tabBar 都还够得着 ── */
+@media (max-height: 560px) {
+  .ai-panel { height: min(84vh, 520px); }
+  body.has-tabbar .ai-panel { bottom: calc(56px + env(safe-area-inset-bottom)); }
+  .ai-fab { width: 46px; height: 46px; }
+}
