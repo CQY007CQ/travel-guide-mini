@@ -69,4 +69,6 @@
   </view>
 
   <view class="tk-foot dim">共 {{toolTotal}} 个灵感 / 体检 / 文案 / 百科 / 实用工具</view>
+  <!-- 全站 AI 入口 -->
+  <ai-entry topic="toolkit" label="问问 AI 换算与清单"/>
 </view>

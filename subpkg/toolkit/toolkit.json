@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "旅行百宝箱" }
+{ "navigationBarTitleText": "旅行百宝箱", "usingComponents": { "ai-entry": "../ai-entry/ai-entry" } }

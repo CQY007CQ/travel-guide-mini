@@ -115,3 +115,12 @@
 .nl-sub { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin: 8rpx 0 16rpx; line-height: 1.5; }
 .nl-result { font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 14rpx; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
 .btn.nl-busy { opacity: .6; }
+
+/* v1.20.6：页面级上下文徽章 + 双视角推理切换 */
+.result .ctx-badge { font-size: calc(19rpx * var(--fs, 1)); color: #8fd6a8; border: 1rpx solid rgba(143,214,168,.45); border-radius: 999rpx; padding: 2rpx 14rpx; }
+.dual { margin: 14rpx 0 10rpx; }
+.dual-tabs { display: flex; gap: 10rpx; }
+.dual-tab { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .3); border-radius: 999rpx; padding: 8rpx 22rpx; }
+.dual-tab.on { color: #14100a; font-weight: 800; background: linear-gradient(135deg, #e2b65c, #d4a94e); border-color: transparent; }
+.dual-note { margin-top: 10rpx; font-size: calc(20rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); line-height: 1.5; }
+.result .r-a-alt { border-left: 3rpx solid rgba(143,214,168,.6); padding-left: 16rpx; }

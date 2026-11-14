@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "城市深度玩法", "enablePullDownRefresh": true }
+{ "navigationBarTitleText": "城市深度玩法", "enablePullDownRefresh": true, "usingComponents": { "ai-entry": "../../subpkg/ai-entry/ai-entry" } }

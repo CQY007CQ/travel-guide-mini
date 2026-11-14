@@ -7,6 +7,7 @@ const AI = require("./ai-brain.js"); // 全场景 AI 大脑（ai-intent 严格�
 const Cloud = require("../../utils/cloud.js");        // 云互通基座（含跨端同步码）
 const AIAgent = require("../../utils/ai-agent.js");
 const PROMPTS = require("./ai-prompts.js");   // 强模型场景提示词注册表（完整 10 套 + 作战协议，置于本分包不占主包）
+const AIReason = require("./ai-reason.js");  // v1.20.6：双视角推理 + 白名单可执行动作（分包内，主包零增长）
 const CloudSync = require("../../utils/cloud-sync.js"); // 行程上云 / 拉回
 const app = getAppSafe();
 
@@ -49,7 +50,12 @@ Page(SafePage({
     nlText: "", nlBusy: false, nlResult: "",
     aiSource: "",       // 非空表示最近一次结果来自云端强模型（显示「AI 生成」标识）
     scenarios: [],      // 全场景 AI 速达：由 ai-brain.allScenarios() 驱动
-    deepTip: ""         // 深链进入时的场景提示（?topic=）
+    deepTip: "",        // 深链进入时的场景提示（?topic=）
+    // v1.20.6：双视角推理与页面级上下文
+    altText: "",        // 独立审慎视角的回答（复杂问题才有）
+    showingAlt: false,  // 当前是否展示第二视角
+    dualOn: false,      // 本次回答是否有第二视角
+    pageCtxOn: false    // 本次是否带入了来源页的真实数据
   },
 
   // 取当前行程里去重后的真实景点名（查景点模式的一键入口）
@@ -85,6 +91,29 @@ Page(SafePage({
       from: (options && options.from) || "",
       done: false
     };
+    // v1.20.6：读取 ai-entry 在跳转前存入的「来源页真实数据快照」。
+    // 纯内存、5 分钟有效、场景必须匹配；不落盘、不跨会话，避免旧数据串到新对话。
+    this._pageCtx = "";
+    try {
+      const pc = app.globalData && app.globalData.__aiPageCtx;
+      if (pc && pc.text && (Date.now() - (pc.ts || 0) < 5 * 60 * 1000) &&
+          (!pc.topic || !this._deep.topic || pc.topic === this._deep.topic)) {
+        this._pageCtx = String(pc.text).slice(0, 1200);
+      }
+    } catch (e) {}
+    this.setData({ pageCtxOn: !!this._pageCtx });
+  },
+
+  // 统一 grounding 出口：本机通用上下文 + 来源页专属真实数据（三处 AIAgent.ask 共用）。
+  _contextOf(plan, label) {
+    let base = "";
+    try { base = Cloud.aiContextOf(plan, label); } catch (e) { base = ""; }
+    return this._pageCtx ? (base + "\n\n" + this._pageCtx) : base;
+  },
+
+  toggleAlt() {
+    if (!this.data.altText) return;
+    this.setData({ showingAlt: !this.data.showingAlt });
   },
   onShow() { onShowRender(this, "assistant", null, () => { if (this.data.mode === "spot") this._computePlanSpots(); }); },
   _renderShow() {
@@ -304,18 +333,30 @@ Page(SafePage({
   _aiQuery(q, plan) {
     const self = this;
     try { wx.showLoading({ title: "AI 思考中", mask: false }); } catch (e) {}
-    const ctx = Cloud.aiContextOf(plan, "本地速查助手");
-    AIAgent.ask("assistant", q, ctx, PROMPTS.buildSystem("assistant", ctx))
-      .then(function (r) {
-        try { wx.hideLoading(); } catch (e) {}
-        if (r.ok && r.text) {
-          self._lastResult = r.text;
-          self.setData({ lastQuery: q, lastResult: r.text, lastTileK: "", input: "", actions: [], aiSource: r.source || "ai", lastIntent: "" });
-          return;
-        }
-        self._aiFallback(q, plan);
-      })
-      .catch(function () { try { wx.hideLoading(); } catch (e) {} self._aiFallback(q, plan); });
+    const ctx = this._contextOf(plan, "本地速查助手");
+    // 主回答：完整场景纪律 + 可选动作契约；复杂问题再并发一条独立审慎视角。
+    // 两链是「并列供用户判断」，不假装投票出唯一真理（零伪造）。
+    const sys = PROMPTS.buildSystem("assistant") + AIReason.actionContract();
+    const main = AIAgent.ask("assistant", q, ctx, sys);
+    const alt = AIReason.needsSecondOpinion(q) ? AIReason.secondOpinion(q, ctx) : Promise.resolve(null);
+    Promise.all([main, alt]).then(function (rs) {
+      try { wx.hideLoading(); } catch (e) {}
+      const r = rs[0], a = rs[1];
+      if (r && r.ok && r.text) {
+        const raw = String(r.text);
+        const actions = AIReason.parseActions(raw);
+        const text = AIReason.stripActionBlock(raw) || raw;
+        self._lastResult = text;
+        self.setData({
+          lastQuery: q, lastResult: text, lastTileK: "", input: "", actions: actions,
+          aiSource: r.source || "ai", lastIntent: "",
+          altText: (a && a.ok && a.text) ? String(a.text) : "",
+          showingAlt: false, dualOn: !!(a && a.ok && a.text)
+        });
+        return;
+      }
+      self._aiFallback(q, plan);
+    }).catch(function () { try { wx.hideLoading(); } catch (e) {} self._aiFallback(q, plan); });
   },
 
   _aiFallback(q, plan) {
@@ -489,7 +530,7 @@ Page(SafePage({
         return p.join("\n");
       } catch (e) { return ""; }
     })();
-    const ctx = (Cloud.aiContextOf ? Cloud.aiContextOf(plan, "景点讲解") : "") +
+    const ctx = this._contextOf(plan, "景点讲解") +
       "\n\n本机真实景点资料（请以这些为准，不要编造任何资料外的事实）：\n" + (ground || "（本机暂无该景点详细收录）");
     const q = "请讲讲「" + nm + "」（" + (city || "当地") + "）";
     try { wx.showLoading({ title: "AI 讲解中", mask: false }); } catch (e) {}
@@ -526,7 +567,7 @@ Page(SafePage({
     }
     // 组装本地真实素材作 grounding（强模型只升华、不编造）
     const ground = (offline.ground || "");
-    const ctx = (Cloud.aiContextOf ? Cloud.aiContextOf(plan, "行程复盘") : "") +
+    const ctx = this._contextOf(plan, "行程复盘") +
       "\n\n本机真实素材（请以这些为准，只升华不编造任何没发生的事实）：\n" + (ground || "（本机暂无详细素材）");
     const q = "请帮我写一份这趟「" + (plan.cityName || "") + "」的行程复盘/游记";
     try { wx.showLoading({ title: "AI 写游记中", mask: false }); } catch (e) {}

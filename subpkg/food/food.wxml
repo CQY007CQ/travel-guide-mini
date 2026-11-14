@@ -79,4 +79,6 @@
       <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
     </view>
   </block>
+  <!-- 全站 AI 入口：自动带入该城随包真实美食店与代表吃法 -->
+  <ai-entry topic="food" label="问问 AI 吃什么"/>
 </view>

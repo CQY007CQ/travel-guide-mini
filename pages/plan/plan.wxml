@@ -517,4 +517,6 @@
     </view>
     <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
   </view>
+  <!-- 全站 AI 入口：主包 tab 页用 inline 形态，避免悬浮 FAB 压住 tabBar -->
+  <ai-entry inline topic="planOptimize" label="让 AI 体检行程"/>
 </view>

@@ -69,4 +69,6 @@
     <view class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
     <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
   </view>
+  <!-- 全站 AI 入口：深度玩法场景 -->
+  <ai-entry topic="deep" label="问问 AI 深度玩法"/>
 </view>

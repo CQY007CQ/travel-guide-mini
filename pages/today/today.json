@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "今天" }
+{ "navigationBarTitleText": "今天", "usingComponents": { "ai-entry": "../../subpkg/ai-entry/ai-entry" } }

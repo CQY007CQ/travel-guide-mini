@@ -113,4 +113,6 @@
     <view class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
     <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
   </view>
+  <!-- 全站 AI 入口：自动带入目的地气候 / 最佳季节与清单完成度 -->
+  <ai-entry topic="prep" label="问问 AI 要带什么"/>
 </view>
