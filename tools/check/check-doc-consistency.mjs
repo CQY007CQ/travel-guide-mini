@@ -79,18 +79,32 @@ function materialText(p) {
   return read(p);
 }
 
+// 第三列 external=true：交付材料放在仓库父目录（outputs/），不随仓库分发。
+// CI 的 actions/checkout 只检出仓库自身，父目录必然为空 —— 旧版把这几项当必填，
+// 导致 #15~#39 连续 25 次 CI 全红，而本机因文件齐全一直全绿（环境差异，非代码缺陷）。
 const MATERIALS = [
-  ["考核计划书", path.join(OUT, "旅行攻略生成器-考核计划书.docx")],
-  ["考核演示 PPT", path.join(OUT, "旅行攻略生成器-考核演示.pptx")],
-  ["考核整改与答辩方案", path.join(OUT, "考核整改与答辩方案.md")],
-  ["模拟考核评分报告", path.join(OUT, "模拟考核评分报告.md")],
-  ["仓库 README", path.join(ROOT, "README.md")],
-  ["功能清单", path.join(ROOT, "docs/assessment/功能清单.md")],
-  ["演示讲稿", path.join(ROOT, "docs/assessment/演示讲稿.md")],
+  ["考核计划书", path.join(OUT, "旅行攻略生成器-考核计划书.docx"), true],
+  ["考核演示 PPT", path.join(OUT, "旅行攻略生成器-考核演示.pptx"), true],
+  ["考核整改与答辩方案", path.join(OUT, "考核整改与答辩方案.md"), true],
+  ["模拟考核评分报告", path.join(OUT, "模拟考核评分报告.md"), true],
+  ["仓库 README", path.join(ROOT, "README.md"), false],
+  ["功能清单", path.join(ROOT, "docs/assessment/功能清单.md"), false],
+  ["演示讲稿", path.join(ROOT, "docs/assessment/演示讲稿.md"), false]
 ];
+// 环境判定：外部材料一份都没有 → CI / 干净 checkout，仅跳过这 4 项。
+// 本机开发环境只要检测到任意一份，就要求全部齐全（缺一份照样 fail），
+// 避免「本地材料被误删 / 拷漏」被这个跳过逻辑静默放过。
+const externalCount = MATERIALS.filter(m => m[2]).length;
+const externalPresent = MATERIALS.filter(m => m[2] && fs.existsSync(m[1])).length;
+const skipExternal = externalPresent === 0;
+const ACTIVE = MATERIALS.filter(m => !m[2] || !skipExternal);
+if (skipExternal) {
+  console.log("【环境判定】CI / 干净 checkout：仓库父目录无交付材料，跳过 " + externalCount + " 份外部材料口径校验");
+  console.log("    本机检测到任意一份即要求全部齐全；仓库内材料与全部代码侧动态真值仍逐项校验");
+}
 const texts = {};
 console.log("【材料可读性】");
-for (const [label, p] of MATERIALS) {
+for (const [label, p] of ACTIVE) {
   const t = materialText(p);
   texts[label] = t || "";
   ok(label + " 可读且非空", !!t && t.length > 100, t ? String(t.length) + " 字符" : "读取失败");
@@ -99,12 +113,12 @@ for (const [label, p] of MATERIALS) {
 /* ── ③ 版本号口径 ── */
 console.log("【版本号口径】");
 const STALE_VER = ["1.19.110", "1.19.111", "1.19.123", "1.19.192", "1.19.198", "1.19.200"];
-for (const [label] of MATERIALS) {
+for (const [label] of ACTIVE) {
   const t = texts[label];
   const stale = STALE_VER.filter(v => t.indexOf(v) >= 0);
   ok(label + "：无过期「当前版本」数字", stale.length === 0, stale.join(","));
 }
-for (const label of ["考核计划书", "考核演示 PPT", "考核整改与答辩方案", "模拟考核评分报告", "仓库 README", "功能清单", "演示讲稿"]) {
+for (const [label] of ACTIVE) {
   ok(label + "：含当前版本 " + VER, texts[label].indexOf(VER) >= 0);
 }
 
@@ -112,7 +126,7 @@ for (const label of ["考核计划书", "考核演示 PPT", "考核整改与答�
 console.log("【回归项数 / 单测项数口径】");
 const CN_NUM = { 二十五: 25, 二十六: 26, 二十七: 27, 二十九: 29, 三十五: 35, 五十一: 51, 五十五: 55, 五十六: 56, 五十七: 57, 五十八: 58, 五十九: 59, 六十: 60, 六十一: 61 };
 let numTotal = 0, numBad = [];
-for (const [label] of MATERIALS) {
+for (const [label] of ACTIVE) {
   const t = texts[label];
   // 「26 / 26 项」「55/55」等分数式
   for (const m of t.matchAll(/(\d+)\s*\/\s*(\d+)\s*(?:项|步|全量回归|全绿)/g)) {
@@ -153,14 +167,15 @@ const STALE_PHRASES = [
 ];
 console.log("【过期话术黑名单】");
 let staleHits = [];
-for (const [label] of MATERIALS) {
+for (const [label] of ACTIVE) {
   for (const s of STALE_PHRASES) if (texts[label].indexOf(s) >= 0) staleHits.push(label + "：" + s);
 }
-ok("7 份材料无已知过期话术", staleHits.length === 0, staleHits.slice(0, 8).join(" ; "));
+ok(ACTIVE.length + " 份材料无已知过期话术", staleHits.length === 0, staleHits.slice(0, 8).join(" ; "));
 
 /* ── ⑤ 榜单口径：必须标注月份 + 可复现命令，杜绝写死后再次漂移 ── */
 console.log("【榜单时令口径】");
-for (const label of ["考核计划书", "考核演示 PPT", "考核整改与答辩方案"]) {
+const BOARD_LABELS = ["考核计划书", "考核演示 PPT", "考核整改与答辩方案"];
+for (const label of BOARD_LABELS.filter(l => ACTIVE.some(m => m[0] === l))) {
   const t = texts[label];
   ok(label + "：标注榜单实测月份", /2026\s*年\s*11\s*月|11\s*月实测/.test(t));
   ok(label + "：给出可复现命令 demo.sh", t.indexOf("demo.sh") >= 0);
@@ -174,7 +189,7 @@ const OLD_BOARDS = [
   "平遥 · 黔东南（镇远） · 凤凰 · 贺州（黄姚） · 哈密",
 ];
 let oldBoardHits = [];
-for (const [label] of MATERIALS) for (const b of OLD_BOARDS) if (texts[label].indexOf(b) >= 0) oldBoardHits.push(label + "：" + b);
+for (const [label] of ACTIVE) for (const b of OLD_BOARDS) if (texts[label].indexOf(b) >= 0) oldBoardHits.push(label + "：" + b);
 ok("材料中无旧版四组实测榜单整串", oldBoardHits.length === 0, oldBoardHits.slice(0, 5).join(" ; "));
 
 /* ── ⑥ 代码侧「硬编码时间」防回潮 ── */
