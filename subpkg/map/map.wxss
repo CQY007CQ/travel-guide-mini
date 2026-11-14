@@ -63,3 +63,5 @@
 .tag-bar { display: flex; flex-wrap: wrap; gap: 12rpx; margin: 14rpx 0 4rpx; }
 .tag-chip { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); border: 1rpx solid rgba(var(--ln-rgb, 148,163,184),.28); border-radius: 99rpx; padding: 6rpx 20rpx; background: rgba(var(--ln-rgb, 148,163,184),.06); }
 .tag-chip.on { color: var(--chip-tx, #d4a94e); border-color: rgba(212,169,78,.55); background: rgba(212,169,78,.12); }
+/* v1.20.6：无坐标美食店显式标注 */
+.f-nocoord { font-size: calc(19rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); border: 1rpx dashed rgba(var(--ln-rgb, 148,163,184), .4); border-radius: 999rpx; padding: 2rpx 12rpx; }

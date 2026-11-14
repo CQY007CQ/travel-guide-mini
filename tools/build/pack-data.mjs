@@ -30,6 +30,29 @@ const D = req("./utils/data.js");
   }
   console.log("✓ 打包期坐标完整性门禁通过");
 }
+// v1.20.6 打包期观测（只读、不 fail-closed）：(0,0) 是采集端占位值，历史存量较多，
+// 先让它在每次构建里可见、可追踪，再由渲染层显式标「无坐标 · 仅列表」，杜绝几内亚湾假 pin。
+{
+  const fs = D.FOOD_SPOTS;
+  let zero = 0, none = 0, total = 0;
+  if (fs && typeof fs === "object" && !Array.isArray(fs)) {
+    for (const c in fs) {
+      const arr = fs[c];
+      if (!Array.isArray(arr)) continue;
+      for (const s of arr) {
+        if (!s || typeof s !== "object") continue;
+        total++;
+        const la = +s.lat, lo = +s.lon;
+        if (s.lat == null || s.lon == null || !isFinite(la) || !isFinite(lo)) { none++; continue; }
+        if (la === 0 || lo === 0) zero++;
+      }
+    }
+  }
+  // 口径说明：此处读的是「打包基数据」，未含加载期团队增量合并，家数会小于运行时 FOOD_SPOTS，
+  // 两者不是丢数关系（详见 utils/data.js 的 applyTeamFoodEnrich / applyFoodEnrich）。
+  console.log("  美食坐标观测（打包基数据口径）: 共 " + total + " 家 / (0,0) 占位 " + zero +
+    " 家 / 无坐标 " + none + " 家（后两类仅列表展示，不生成地图 pin）");
+}
 
 // v1.19.55 JSON 键别名压缩特性已于 2026-10-02 停用（白屏事故根因：_apply-safe 反复增量 merge 致别名方案冲突，
 // 加载器只能还原一套 → CITIES[i].name 永远 undefined → 首页白屏）。对应函数(_collectKeys/_buildKeyMap/_renameKeys/

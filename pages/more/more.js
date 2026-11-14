@@ -373,26 +373,59 @@ Page(SafePage({
     wx.navigateTo({ url: "/pages/help/help", fail: () => wx.showToast({ title: "打开失败，请重试", icon: "none" }) });
   },
 
-  /* ---- v1.19.106：本地错误日志查看（被 SafePage / app.onError 兜住的异常回溯） ---- */
+  /* ---- v1.19.106 异常日志 → v1.20.6 升级为「本机健康快照」 ----
+     原来无异常时只弹一句 toast 就返回，用户/演示看不到程序状态。
+     现在无论有无异常都能查看并复制一份真实快照（规模 / 坐标健康 / 结构自检 / 存储 / 云端通道 / 行程 / 异常日志）。
+     全部只读本机真实数据，零网络、零编造、零新增页面入口。 */
+  _healthLines() {
+    const L = ["【本机健康快照】"];
+    try {
+      const D = require("../../utils/data.js");
+      let cities = 0, spots = 0, foods = 0;
+      if (Array.isArray(D.CITIES)) cities = D.CITIES.length;
+      const sc = D.SPOT_COORDS || {};
+      for (const c in sc) if (Array.isArray(sc[c])) spots += sc[c].length;
+      const fs = D.FOOD_SPOTS || {};
+      for (const c in fs) if (Array.isArray(fs[c])) foods += fs[c].length;
+      L.push("数据：城市池 " + cities + " 条 / 景点 " + spots + " 点 / 美食 " + foods + " 家");
+      const cs = (typeof D.coordStats === "function") ? D.coordStats() : null;
+      if (cs) L.push("坐标：越界 " + cs.outOfRange + " · (0,0)占位 " + cs.zeroFood + " · 无坐标 " + cs.noCoordFood + "（后两类仅列表展示）");
+      const issues = (typeof D.assertDataShape === "function") ? D.assertDataShape() : [];
+      L.push("结构自检：" + (issues.length ? issues.join("；") : "通过") + " · 数据就绪 " + (D.__dataReady ? "是" : "否"));
+    } catch (e) { L.push("数据：读取失败（已降级，不影响使用）"); }
+    try {
+      const info = (typeof wx !== "undefined" && wx.getStorageInfoSync) ? wx.getStorageInfoSync() : null;
+      if (info) L.push("存储：" + (info.currentSize || 0) + "KB / " + (info.limitSize || 0) + "KB，键 " + ((info.keys || []).length) + " 个");
+    } catch (e) {}
+    try {
+      const C = require("../../utils/cloud.js");
+      const st = C.aiChannelStats ? C.aiChannelStats() : null;
+      if (st) L.push("云端 AI：" + (st.enabled ? "已开启" : "未开启（离线优先）") + " · 调用 " + st.calls + " / 成功 " + st.ok + " / 失败 " + st.fail);
+    } catch (e) {}
+    try {
+      L.push("行程：" + ((app.globalData && app.globalData.plan) ? "已生成" : "暂无") + " · 异常日志 " + EL.count() + " 条");
+    } catch (e) {}
+    return L;
+  },
   onErrLog() {
     const n = EL.count();
-    if (!n) { wx.showToast({ title: "暂无异常记录 ✓", icon: "none" }); return; }
-    const list = EL.recent().slice(-10).reverse();
+    const health = this._healthLines().join("\n");
     const pad = (x) => String(x).padStart(2, "0");
-    const tx = list.map((x, i) => {
+    const logs = n ? EL.recent().slice(-10).reverse().map((x, i) => {
       const d = new Date(x.t || Date.now());
       const ts = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
       return (i + 1) + ". " + ts + " [" + (x.label || "") + "] " + (x.msg || "");
-    }).join("\n");
+    }).join("\n") : "";
+    const tx = health + "\n\n── 最近异常 ──\n" + (logs || "暂无异常记录 ✓");
     wx.showModal({
-      title: "运行异常日志（最近 " + n + " 条）",
+      title: "本机健康快照",
       content: tx,
-      confirmText: "复制日志",
-      cancelText: "清空记录",
+      confirmText: "复制全文",
+      cancelText: n ? "清空记录" : "关闭",
       success: (r) => {
         if (r.confirm) {
-          wx.setClipboardData({ data: tx, success: () => wx.showToast({ title: "已复制日志", icon: "none" }) });
-        } else if (r.cancel) {
+          wx.setClipboardData({ data: tx, success: () => wx.showToast({ title: "已复制快照", icon: "none" }) });
+        } else if (r.cancel && n) {
           EL.clear();
           this.setData({ errN: 0 });
           wx.showToast({ title: "已清空日志", icon: "none" });

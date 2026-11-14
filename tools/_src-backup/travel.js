@@ -4939,11 +4939,25 @@ function cityFirstLine(city) {
  const nm = (city.name) || (typeof city === "string" ? city : "") || "目的地";
  return "去" + nm + "：" + (city.best ? city.best.split("；")[0] + "，" : "") + (city.foods && city.foods[0] ? "别错过" + city.foods[0] + "。" : "");
 }
+// v1.20.6（审计 #50）：按句末标点就近截断，优先保留完整句子，别把话硬切在半句。
+// 规则：超过 max 时，在 [max/2, max] 窗口里找最后一个句末标点收尾；找不到才按 max 硬切。
+// 纯文本处理，不补写任何内容；原串本来就短则原样返回（不加省略号）。
+function briefOf(text, max) {
+ const t = String(text == null ? "" : text).trim();
+ const n = max > 0 ? max : 26;
+ if (t.length <= n) return t;
+ const head = t.slice(0, n);
+ let cut = -1;
+ for (let i = head.length - 1; i >= Math.floor(n * 0.5); i--) {
+  if (/[。！？；;.!?，,]/.test(head[i])) { cut = i + 1; break; }
+ }
+ return (cut > 0 ? head.slice(0, cut) : head).trim() + "…";
+}
 // 22) 城市美食动线（早市/正餐/宵夜）
 function foodRouteOf(city) {
  if (!city || !city.foods || !city.foods.length) return [];
  const f = city.foods;
- return ["早餐/早市：先来份" + (f[0] || "本地小吃") + (city.foodNote ? "——" + city.foodNote.slice(0, 26) + "…" : ""),
+ return ["早餐/早市：先来份" + (f[0] || "本地小吃") + (city.foodNote ? "——" + briefOf(city.foodNote, 26) : ""),
   "正餐老店：" + (f[1] || f[0]) + "配" + (f[2] || "时令菜") + "，找本地人多的小馆子最稳",
   "宵夜扫街：" + (f[3] || f[2] || f[1] || f[0]) + "收尾，留点肚子给明天"];
 }
@@ -6707,5 +6721,5 @@ module.exports = {
   luggageCheck, photoSpotOf, wifiHint, powerHint, simHint, mapHint,
   transportCardHint, taxiHint, luggageStoreHint, atmHint, footMapOf,
   yearTravelSummary, cityRankOf, travelStyleTag, tripCompare, budgetTrendOf,
-  distanceStatOf, achievementProgress
+  distanceStatOf, achievementProgress, briefOf
 };

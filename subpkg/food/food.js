@@ -6,6 +6,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const Cloud = require("../../utils/cloud.js");   // 云端 AI（llmProxy 强模型网关，fail-closed）
 const AIAgent = require("../../utils/ai-agent.js");
+const { hasCoord } = require("../utils/coord.js"); // v1.20.6：坐标有效性单一真源（显式数值判定，挡 "0"/NaN/(0,0)）
 const FM = require("../utils/food-map.js");
 const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕，不再静默伪装成「没生成攻略」
 const app = getAppSafe();
@@ -110,6 +111,7 @@ Page(SafePage({
         id: i,
         food: s.food, shop: s.shop, addr: s.addr, price: s.price,
         lat: s.lat, lon: s.lon,
+        noCoord: !hasCoord(s),   // v1.20.6：列表直接标「暂无坐标」，不用点一下才知道
         band: s.bandName || "", hit: !!s.hit,
         bandKey: s.bandName === '平价' ? 'low' : s.bandName === '中档' ? 'mid' : s.bandName === '高档' ? 'high' : '',
         m: 0,
@@ -190,7 +192,7 @@ Page(SafePage({
 
   onShopNav(e) {
     const s = e.currentTarget.dataset;
-    if (s.lat && s.lon) {
+    if (hasCoord(s)) {
       wx.openLocation({ latitude: Number(s.lat), longitude: Number(s.lon), name: s.shop || "", address: s.addr || "", scale: 16 });
     } else {
       wx.showToast({ title: "该店暂无坐标，用地图搜店名吧", icon: "none" });

@@ -82,3 +82,5 @@
   border-radius: 16rpx; padding: 16rpx 20rpx; }
 .ai-food .ai-tip { margin-top: 12rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); line-height: 1.6; }
 .ai-food .ai-err { margin-top: 12rpx; font-size: calc(23rpx * var(--fs, 1)); color: var(--red, #e56a6a); }
+/* v1.20.6：无坐标美食店显式标注（占位坐标不生成地图 pin，也不误导用户点导航） */
+.shop-nocoord { margin-left: 12rpx; font-size: calc(19rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); border: 1rpx dashed rgba(var(--ln-rgb, 148,163,184), .4); border-radius: 999rpx; padding: 2rpx 12rpx; }

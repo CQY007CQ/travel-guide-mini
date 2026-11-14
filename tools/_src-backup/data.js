@@ -375,6 +375,45 @@ function _hav(la1, lo1, la2, lo2) {
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 let _coordWarn = 0;
+// v1.20.6：美食坐标专项观测（只读，不计入 bad，避免 299 条历史 (0,0) 占位让打包期 fail-closed）。
+// (0,0) 是采集端「没取到坐标」的占位值，绝不是真实坐标；渲染层一律按「无坐标 · 仅列表」处理。
+let _zeroFood = 0, _noCoordFood = 0, _foodTotal = 0;
+function coordStats() {
+  return { outOfRange: _coordWarn, zeroFood: _zeroFood, noCoordFood: _noCoordFood, foodTotal: _foodTotal };
+}
+function scanFoodCoords() {
+  _zeroFood = 0; _noCoordFood = 0; _foodTotal = 0;
+  const fs = DATA.FOOD_SPOTS;
+  if (!fs || typeof fs !== "object" || Array.isArray(fs)) return;
+  for (const c in fs) {
+    const arr = fs[c];
+    if (!Array.isArray(arr)) continue;
+    for (const s of arr) {
+      if (!s || typeof s !== "object") continue;
+      _foodTotal++;
+      const la = +s.lat, lo = +s.lon;
+      if (s.lat == null || s.lon == null || !isFinite(la) || !isFinite(lo)) { _noCoordFood++; continue; }
+      if (la === 0 || lo === 0) _zeroFood++;
+    }
+  }
+  if (_zeroFood && console && console.warn) {
+    _dw("[data] 美食坐标观测: " + _zeroFood + " 家为 (0,0) 占位、另有 " + _noCoordFood +
+      " 家无坐标；均按「仅列表展示、不生成地图 pin」处理");
+  }
+}
+// v1.20.6：加载期轻量 shape 断言（审计 #196）。只告警、不抛错、不改写数据，
+// corrupted / 残缺分包也能继续渲染（本地优先），但不再「静默白屏无痕」。
+function assertDataShape() {
+  const issues = [];
+  if (!Array.isArray(DATA.CITIES) || !DATA.CITIES.length) issues.push("CITIES 非数组或为空");
+  else if (!DATA.CITIES[0] || !DATA.CITIES[0].name) issues.push("CITIES[0] 缺 name");
+  if (!DATA.SPOT_COORDS || typeof DATA.SPOT_COORDS !== "object" || Array.isArray(DATA.SPOT_COORDS)) issues.push("SPOT_COORDS 非对象");
+  if (!DATA.FOOD_SPOTS || typeof DATA.FOOD_SPOTS !== "object" || Array.isArray(DATA.FOOD_SPOTS)) issues.push("FOOD_SPOTS 非对象");
+  if (issues.length && console && console.warn) {
+    _dw("[data] 数据结构自检异常: " + issues.join("；") + "（保留原始数据并降级，不抛错）");
+  }
+  return issues;
+}
 function checkCoordIntegrity() {
   const cc = DATA.CITY_COORDS || {};
   const c2p = DATA.CITY2PROV || {};
@@ -406,6 +445,7 @@ function checkCoordIntegrity() {
   }
   _coordWarn += bad;
   if (bad) _dw("[data] 坐标完整性自检: 发现 " + bad + " 个疑似越界坐标，请核查 SPOT_COORD_FIX / pack-data 规则");
+  scanFoodCoords(); // v1.20.6：同一自检入口顺带观测美食零坐标（只读，不改变 bad 判定）
   return bad;
 }
 
@@ -456,6 +496,7 @@ function applyPacked(packed) {
   applyHotelAreasExtra();
   applyHotelListExtra(); // v1.19.183 逐酒店 + 房型并入 CITIES[].hotels
   checkCoordIntegrity(); // v1.19.173 只读自检：加载期暴露坐标回归，零改写零重打包风险
+  assertDataShape();     // v1.20.6：轻量 shape 断言，残缺分包有痕可查但不阻断渲染
   DATA.__dataReady = true;
   return DATA;
 }
@@ -535,6 +576,8 @@ function initData() {
 }
 DATA.initData = initData;
 DATA.checkCoordIntegrity = checkCoordIntegrity; // v1.19.173 暴露给单测：返回越界坐标数
+DATA.coordStats = coordStats;                   // v1.20.6 暴露给健康快照 / 全盘体检门禁
+DATA.assertDataShape = assertDataShape;         // v1.20.6 暴露给单测：返回结构问题清单
 
 // Node / 测试环境（没有 require.async 且非浏览器）：模块加载即同步就绪，保证 allcheck/tools 照常同步 require。
 // 浏览器刻意不在此处同步 applyPacked —— data.js 是 async 懒加载，注册工厂与解包时机由 initData 的

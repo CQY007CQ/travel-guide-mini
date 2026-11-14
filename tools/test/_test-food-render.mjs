@@ -27,6 +27,10 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
 const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
 const T = require("../../utils/travel.js");
 const FM = require("../../subpkg/utils/food-map.js");
+// v1.20.6：food.js 的坐标判定已抽到 subpkg/utils/coord.js。本单测用 vm 只执行「方法体」，
+// 不会跑顶层 require，因此新模块依赖必须显式注入 ctx，否则方法里会抛 ReferenceError。
+// 今后若 _renderCity / _renderShow 再引入新的顶层依赖，记得同步在下方两个 ctx 里注入。
+const { hasCoord } = require("../../subpkg/utils/coord.js");
 
 let fail = 0, n = 0;
 const ok = (name, cond, extra = "") => {
@@ -60,7 +64,7 @@ async function main() {
 
   // ---------- A. 真实数据渲染 ----------
   {
-    const ctx = Object.assign({ T, FM }, VMCORE);
+    const ctx = Object.assign({ T, FM, hasCoord }, VMCORE);
     vm.createContext(ctx);
     const rep = vm.runInContext("(" + fnRep + ")", ctx);
     let applied = 0, threw = null;
@@ -92,6 +96,7 @@ async function main() {
     const plan = opt.plan === "none" ? null : (opt.plan || { cityName: "北京", days: [{}, {}, {}, {}], budget: "mid" });
     // VMCORE 先铺底，自定义 mock 后写，否则真实 console 会覆盖捕获用的 mock
     const ctx = Object.assign({}, VMCORE, {
+      hasCoord,
       app: { globalData: { plan } },
       T: {
         citiesOf: () => [{ name: "太原" }, { name: "大同" }],

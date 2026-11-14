@@ -3,6 +3,7 @@ const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕
 // map：原生地图 + 真实坐标标点 + 编号连线 + 图层（景点 / 美食 / 住宿）
 const T = require("../../utils/travel.js");
 const app = getAppSafe();
+const { hasCoord } = require("../utils/coord.js"); // v1.20.6：坐标有效性单一真源（与 food 页共用）
 
 // v1.19.100：MARKER_CAP = 带数字标注的地图标点数量上限（超过只显示小圆点不标号）。
 // 此前该常量被 134 行引用却从未声明（基线 v1.19.77 以来一直缺失），导致 onNext/onLayer 走到该分支时
@@ -179,7 +180,7 @@ Page(SafePage({
     let showFoodList = [];
     if (this.data.layer === "food") {
       foodList.forEach(fs => {
-        if (fs.lat && fs.lon) showMk.push({
+        if (hasCoord(fs)) showMk.push({
           id: showMk.length, latitude: fs.lat, longitude: fs.lon,
           width: 26, height: 26,
           callout: { content: "美食 · " + (fs.shop || ""), fontSize: 12, color: "#eaeff7",
@@ -187,7 +188,10 @@ Page(SafePage({
           markerType: "food", name: fs.shop || ""
         });
       });
-      showFoodList = foodList;
+      // v1.20.6：无坐标店显式标注（原来只有点击后才 toast 提示），并补稳定 wx:key 用的 id。
+      showFoodList = foodList.map(function (fs, i) {
+        return Object.assign({}, fs, { id: i, noCoord: !hasCoord(fs) });
+      });
     } else if (this.data.layer === "stay") {
       hotelAreas.forEach((h, i) => showMk.push({
         id: showMk.length, latitude: h.lat, longitude: h.lon,
@@ -284,8 +288,8 @@ Page(SafePage({
   goFood(e) {
     const i = Number(e.currentTarget.dataset.i);
     const fs = this.data.foodList[i];
-    if (!fs || !fs.lat || !fs.lon) {
-      wx.showToast({ title: "该店暂无坐标", icon: "none" }); return;
+    if (!hasCoord(fs)) {
+      wx.showToast({ title: "该店暂无坐标，用地图搜店名吧", icon: "none" }); return;
     }
     wx.openLocation({ latitude: fs.lat, longitude: fs.lon, name: fs.shop, address: fs.addr, scale: 16 });
   },

@@ -69,6 +69,7 @@
         <text class="f-em">{{item.food}}</text>
         <text class="f-shop">{{item.shop}}</text>
         <text class="f-addr dim">{{item.addr}}</text>
+        <text wx:if="{{item.noCoord}}" class="f-nocoord">暂无坐标 · 仅列表</text>
         <text wx:if="{{item.price}}" class="f-price">{{item.price}}</text>
       </view>
       <view class="tip-inner dim" wx:if="{{!foodList.length}}">本城暂无收录的美食名店（看看必吃清单吧）</view>
