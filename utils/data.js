@@ -512,6 +512,14 @@ function initData() {
         require.async("../subdata2/data/data-packed2.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; })
       ];
       await Promise.race([Promise.all(_jobs), _sleep(9000)]);
+    } else if (typeof window !== "undefined") {
+      // 网页端：data.js 经 <script async> 懒加载，先把「数据块工厂」注册进 g.__M，
+      // 注册完成（script onload）后才 resolve __dataReadyP；此处 await 之后再 applyPacked，
+      // 既避免首屏被 2.4MB 同步解压阻塞，又保证解包时工厂已就位（否则 require 抛错丢数据）。
+      if (window.__dataReadyP) { try { await window.__dataReadyP; } catch (e) {} }
+      for (const p of CHUNK_PATHS) {
+        try { applyPacked(require(p)); } catch (e) { lastErr = e; }
+      }
     } else {
       // Node / 测试端：无 require.async，直接同步 require（可用变量；微信那条约束不适用）
       for (const p of CHUNK_PATHS) {
@@ -528,8 +536,10 @@ function initData() {
 DATA.initData = initData;
 DATA.checkCoordIntegrity = checkCoordIntegrity; // v1.19.173 暴露给单测：返回越界坐标数
 
-// Node / 测试环境（没有 require.async）：模块加载即同步就绪，保证 allcheck/tools 照常同步 require
-if (typeof require.async !== "function") {
+// Node / 测试环境（没有 require.async 且非浏览器）：模块加载即同步就绪，保证 allcheck/tools 照常同步 require。
+// 浏览器刻意不在此处同步 applyPacked —— data.js 是 async 懒加载，注册工厂与解包时机由 initData 的
+// window.__dataReadyP 链路统一控制，避免「脚本还没到、require 就抛错」丢数据。
+if (typeof require.async !== "function" && typeof window === "undefined") {
   for (const p of CHUNK_PATHS) {
     try { applyPacked(require(p)); } catch (e) { /* 数据缺失时保留空兜底 */ }
   }
