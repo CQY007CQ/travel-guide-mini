@@ -2,7 +2,8 @@ name: allcheck
 
 # 全量回归护栏：每次 push / PR 到 main 时，在无浏览器、无 IDE、无网络的 headless 环境
 # 跑一遍 ./allcheck.sh（JS 语法 → JSON → 数据健康 → 单测 → WXML → 事件配对 → 网页同源冒烟
-# → 合并门禁 → 体积预算 → 发布安全门禁 → 材料口径）。任一红项即判失败，阻断合入。
+# → 合并门禁 → 体积预算 → 发布安全门禁 → 材料口径 → 审计与 AI 全场景守卫）。
+# 任一红项即判失败，阻断合入。
 #
 # 凭据门禁：公开仓库里的 utils/keys.js / tools/_src-backup/keys.js 提交态一律为空串（明文已移出），
 # check-secrets 因此常绿；若有人误把真实 Key 提交进仓，CI 会立刻变红（这正是护栏要拦的）。
@@ -11,6 +12,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 concurrency:
   group: allcheck-${{ github.ref }}
@@ -26,17 +30,32 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: 'npm'
 
-      # build-min.mjs（合并门禁调用）依赖 terser；其余步骤均零 npm 依赖、纯 Node 内置模块。
-      - name: 安装工具链依赖（terser）
-        run: npm install
+      # package-lock.json 已入库且与 package.json 同步 → npm ci 可复现、比 npm install 更快。
+      # build-min.mjs（合并门禁调用）依赖 terser；其余步骤零 npm 依赖、纯 Node 内置模块。
+      - name: 安装工具链依赖（terser / esbuild）
+        run: npm ci
 
       - name: 运行全量回归 allcheck.sh
-        run: bash allcheck.sh
+        # pipefail 不可省：tee 会把 allcheck 的退出码吞成 0，导致门禁假绿（项目内已踩过一次）。
+        run: |
+          set -o pipefail
+          bash allcheck.sh 2>&1 | tee /tmp/allcheck.log
+
+      # 失败时把完整回归日志挂到 run 上，免去「邮件只说失败却看不到哪一步」的排查成本
+      - name: 上传回归日志（失败时定位）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allcheck-log-${{ github.run_number }}
+          path: /tmp/allcheck.log
+          if-no-files-found: ignore
 
       - name: 失败定位提示
         if: failure()
         run: |
           echo "::error::allcheck 存在失败步骤，请在本机先跑 './allcheck.sh' 复现并修复后再推送。"
           echo "提示：凭据门禁变红通常意味着把明文 Key 提交进了公开仓库，请改用运行时注入（keys.js 留空）。"
+          echo "提示：材料口径门禁在干净 checkout 下会跳过仓库父目录的 4 份交付材料，本机仍全量校验。"

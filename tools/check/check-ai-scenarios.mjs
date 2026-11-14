@@ -164,5 +164,28 @@ const missWeb = WEB_REQUIRED.filter(([decl]) => webSrc.indexOf(decl) < 0).map(([
 log(missWeb.length === 0, "网页端已与小程序端对齐场景能力" +
   (missWeb.length ? "（缺：" + missWeb.join("、") + "）" : ""));
 
+// 10) AI 触点全覆盖：每个真实交互页必须至少有一种 AI 入口（悬浮 ai-entry 或页内 AIAgent.ask），
+//     防止「AI 铺满全程序」在后续新增页面时静默回潮。启动页与数据占位页不需要，按 app.json 动态排除。
+let appJson = null;
+try { appJson = JSON.parse(readFileSync(resolve(ROOT, "app.json"), "utf8")); } catch (e) {}
+const allPages = (appJson && Array.isArray(appJson.pages) ? appJson.pages.slice() : []);
+((appJson && appJson.subPackages) || []).forEach(function (sp) {
+  ((sp && sp.pages) || []).forEach(function (p) { allPages.push(sp.root + "/" + p); });
+});
+const PLACEHOLDER = /^pages\/splash\/|^subdata\d*\/(keep|boost)\//;
+const realPages = allPages.filter(function (p) { return !PLACEHOLDER.test(p); });
+let noAI = [];
+for (const p of realPages) {
+  let json = "", js = "";
+  try { json = readFileSync(resolve(ROOT, p + ".json"), "utf8"); } catch (e) {}
+  try { js = readFileSync(resolve(ROOT, p + ".js"), "utf8"); } catch (e) {}
+  const hasEntry = /"ai-entry"/.test(json);
+  const hasBrain = /AIAgent\.ask|ai-entry|aiCard|__webAI/.test(js);
+  if (!hasEntry && !hasBrain) noAI.push(p);
+}
+log(realPages.length > 0 && noAI.length === 0,
+  "全部 " + realPages.length + " 个交互页均有 AI 触点（入口或页内能力）" +
+  (noAI.length ? "（缺：" + noAI.join(",") + "）" : ""));
+
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);

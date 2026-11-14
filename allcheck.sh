@@ -288,8 +288,9 @@ step "合并门禁 (utils 与 _src-backup 一致)" bash -c '
 # 核心保障是「同源」：任何改动都先构建再用引擎冒烟验证，网页端不会悄悄漂移。
 # NODE 是父 shell 局部变量（未 export），bash -c 子 shell 里取不到 → 曾报 "bash: : command not found"；
 # 必须用位置参数传进去。管道必须开 pipefail，否则 smoke 失败会被 tail 的退出码吞掉，门禁假绿。
-# 审计加固的运行时单测串在同一 step 里跑，不新增 step —— 61 步口径与考核材料无需跟着改
-step "审计整改防回潮断言 (#1/#19/#56/#81 不回潮)" bash -c '"$1" tools/audit/_test-audit-guards.mjs && "$1" tools/audit/_test-hardening.mjs && "$1" tools/audit/_test-roster-integrity.mjs' _ "$NODE"
+# 审计加固单测 + AI 双守卫串在同一 step 里跑，不新增 step —— 61 步口径与考核材料无需跟着改。
+# AI 守卫此前只在 CI/自迭代里按需调用，等于没有自动护栏；今晚新增的双端能力对齐断言必须随每次回归跑。
+step "审计整改 + AI 全场景守卫 (不回潮)" bash -c '"$1" tools/audit/_test-audit-guards.mjs && "$1" tools/audit/_test-hardening.mjs && "$1" tools/audit/_test-roster-integrity.mjs && "$1" tools/check/check-ai-scenarios.mjs && "$1" tools/check/check-ai-fallback.mjs' _ "$NODE"
 
 step "网页版 构建与引擎冒烟 (与小程序同源)" bash -c 'set -o pipefail; "$1" tools/web/build.mjs >/dev/null && "$1" tools/web/smoke.mjs | tail -4' _ "$NODE"
 
