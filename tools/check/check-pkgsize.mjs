@@ -7,7 +7,20 @@ import path from "path";
 import zlib from "zlib";
 
 // web/ 是网页版产物（v1.20.0），已在 project.config.json 的 packOptions.ignore 排除，不进小程序包
+// v1.20.6 迭代 #9：门禁改为直接读取 project.config.json 的 packOptions.ignore（权威排除清单），
+// 避免「真包已排除、门禁却仍计入」的漂移（如 prompt-lab/、package-lock.json 这类纯开发/Node 产物）。
 const EXC = new Set(["tools", "shots", ".qr", "outputs", "node_modules", ".git", ".workbuddy", "web", "docs"]);
+const FILE_IGNORE = new Set();
+const SUFFIX_IGNORE = new Set();
+try {
+  const po = (JSON.parse(fs.readFileSync("project.config.json", "utf8")).packOptions || {}).ignore || [];
+  for (const it of po) {
+    if (!it || !it.value) continue;
+    if (it.type === "folder") EXC.add(it.value);
+    else if (it.type === "file") FILE_IGNORE.add(it.value);
+    else if (it.type === "suffix") SUFFIX_IGNORE.add(it.value);
+  }
+} catch (e) { /* project.config.json 缺失则回退硬编码 EXC */ }
 // 真正会进微信包的源码扩展名（文档/脚本/配置不计入包体）
 const SRC_EXT = /\.(js|wxml|wxss|json|wxs|png|jpe?g|gif|svg|ttf|woff2?)$/i;
 
@@ -31,6 +44,9 @@ function walk(d, rel) {
     const p = path.join(d, e.name);
     const r = rel ? rel + "/" + e.name : e.name;
     if (e.isDirectory()) { walk(p, r); continue; }
+    // packOptions.ignore 的 file / suffix 规则同样不进包（如 package-lock.json / .md 等）
+    if (FILE_IGNORE.has(e.name)) continue;
+    if (SUFFIX_IGNORE.size && SUFFIX_IGNORE.has(e.name.slice(e.name.lastIndexOf(".")))) continue;
     // 图片/音频先累加（音频不在 SRC_EXT 白名单里，但同样计入微信 200K 口径）
     if (IMG_EXT.test(e.name)) imgBytes += fs.statSync(p).size;
     if (!SRC_EXT.test(e.name)) continue; // 只统计真正进包的源码

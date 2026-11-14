@@ -1,6 +1,6 @@
 {
-  "count": 8,
-  "runs": 8,
+  "count": 9,
+  "runs": 9,
   "log": [
     {"n": 1, "date": "2026-10-30", "ver": "1.19.148", "summary": "segCityOfDay 越界兜底 + check-new 断言误用修复"},
     {"n": 2, "date": "2026-11-01", "ver": "1.19.175", "summary": "推荐解析出行月份（extractPrefs 读文本月份）"},
@@ -9,6 +9,7 @@
     {"n": 5, "date": "2026-11-06", "ver": "1.19.192", "summary": "个性化『可二刷』带排序权重（理由与排序一致）"},
     {"n": 6, "date": "2026-11-08", "ver": "1.20.4", "summary": "预算/节奏否定前缀识别 + weather151 门控修复 + 材料同步"},
     {"n": 7, "date": "2026-11-10", "ver": "1.20.6", "summary": "fix(recommend): 否定前缀匹配长度无关化，修复『千万别』3 字死条目；新增 check-new block 40；APP_VER 1.20.5→1.20.6 并同步 config + 7 份考核材料；单测 455/0，allcheck 除凭据步（本地内置 Key 按设计不提交）全绿"},
-    {"n": 8, "date": "2026-11-13", "ver": "1.20.6", "summary": "fix(ai-intent): numOf 中文多位数解析（『第十二天』→0 改为 12）+ 地图『第X天』导航捕获正则补 1~3 字；新增 check-new block 51（12 断言）；单测 502/0，allcheck 全绿（exit 0，未升版、未碰 keys/不 push）"}
+    {"n": 8, "date": "2026-11-13", "ver": "1.20.6", "summary": "fix(ai-intent): numOf 中文多位数解析（『第十二天』→0 改为 12）+ 地图『第X天』导航捕获正则补 1~3 字；新增 check-new block 51（12 断言）；单测 502/0，allcheck 全绿（exit 0，未升版、未碰 keys/不 push）"},
+    {"n": 9, "date": "2026-11-14", "ver": "1.20.6", "summary": "fix(recommend): 出行天数中文多位数解析（『十五天』误判 5→15、『二十天』误判 10→20，天数适配信号失真），新增 cnDaysToNum 完整映射 十/十一~九十九；新增 check-new block 52（11 断言）；单测 513/0。附：修『代码质量』1.5M 包体门禁——主包混入 prompt-lab/(36KB) 与 package-lock.json(45KB) 纯开发/Node 产物（同 v1.19.206 非源码打进包问题），将其加入 packOptions.ignore 并让 check-pkgsize 读取该清单对齐，主包 raw 1539→1459KB 全达标；未升版、未碰 keys、不 push"}
   ]
 }

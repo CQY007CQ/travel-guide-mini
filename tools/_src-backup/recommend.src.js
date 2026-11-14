@@ -136,6 +136,20 @@ const CN_NUM = { 一: 1, 两: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7,
 // 中文月份映射（含 11/12，避免"十一月"被拆成"十"→10）
 const CN_MONTH = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10, 十一: 11, 十二: 12 };
 
+/* 中文天数解析（"三天"→3 / "十天"→10 / "十五天"→15 / "二十天"→20 / "二十五天"→25）。
+ * 此前 `([一两…十])\s*[天日]` 只取单字 → "十五天"误判为 5 天、"二十天"误判为 10 天，
+ * 导致天数适配信号（景点偏少/可玩点多）失真。现按"十/十一~十九/二十~九十九"完整映射；
+ * "今天/明天/后天/每天/半天"等含"天"但前字非数词的表述不会误中（正则要求紧邻数词）。 */
+function cnDaysToNum(str) {
+  if (!str) return 0;
+  if (str === "十") return 10;
+  if (str.length === 1) return CN_NUM[str] || 0;
+  if (str[0] === "十") { const u = CN_NUM[str[1]]; return u ? 10 + u : 0; }                       // 十一~十九
+  if (str[str.length - 1] === "十") { const t = CN_NUM[str[0]]; return t ? t * 10 : 0; }           // 二十~九十
+  if (str[1] === "十") { const t = CN_NUM[str[0]]; const u = CN_NUM[str[2]]; return (t && u) ? t * 10 + u : 0; } // 二十一~九十九
+  return 0;
+}
+
 /* 从自然语言解析出行月份（"3月"/"3月份"/"三月"/"十一月"）。
  * 仅当文本显式提到月份才返回，否则 0（交由后续回退当前月）；
  * 带"个"的"一个月"等时长表述不会误中（正则要求数字/汉字紧邻"月"，"1个月"的"个"会打断匹配）。 */
@@ -307,11 +321,11 @@ function extractPrefs(text, opts) {
     if (tags.indexOf(stKeys[i]) < 0) tags.push(stKeys[i]);
   }
   let days = 0;
-  const dm = s.match(/(\d+)\s*[天日]/);
-  if (dm) days = Math.max(1, Math.min(30, parseInt(dm[1], 10)));
-  else {
-    const cm = s.match(/([一两二三四五六七八九十])\s*[天日]/);
-    if (cm) days = CN_NUM[cm[1]] || 0;
+  const dm = s.match(/(\d{1,2})\s*[天日]/);
+  if (dm) { const d = parseInt(dm[1], 10); if (d >= 1) days = Math.max(1, Math.min(30, d)); }
+  if (!days) {
+    const cm = s.match(/([一两二三四五六七八九十]+)\s*[天日]/);
+    if (cm) days = cnDaysToNum(cm[1]);
   }
   let budget = "";
   for (const k in BUDGET_WORDS) {

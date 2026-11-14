@@ -1144,5 +1144,20 @@ assert("地图 第二十天 → di=19", nav20 && nav20.jump && nav20.jump.query 
 const nav10 = AI.handle("打开地图导引 第十天", { city: "北京" });
 assert("地图 第十天 → di=9（单字十仍正确）", nav10 && nav10.jump && nav10.jump.query && nav10.jump.query.di === 9, JSON.stringify(nav10 && nav10.jump && nav10.jump.query));
 
+// ── 推荐：出行天数中文多位数解析（迭代 #9）：旧正则只取单字中文，导致「十五天」误判为 5 天、
+// 「二十天」误判为 10 天，天数适配信号（景点偏少/可玩点多）失真。现完整映射 十/十一~九十九。 ──
+console.log("== 52. 推荐出行天数中文解析 ==");
+assert("阿拉伯 5天 → 5", R.extractPrefs("玩5天").days === 5);
+assert("阿拉伯 15天 → 15", R.extractPrefs("15天深度游").days === 15);
+assert("中文 三天 → 3", R.extractPrefs("去三天").days === 3);
+assert("中文 两天 → 2", R.extractPrefs("休两天").days === 2);
+assert("中文 十天 → 10", R.extractPrefs("待十天").days === 10);
+assert("中文 十五天 → 15（旧 bug 误判 5）", R.extractPrefs("玩十五天").days === 15);
+assert("中文 二十天 → 20（旧 bug 误判 10）", R.extractPrefs("行程二十天").days === 20);
+assert("中文 二十五天 → 25", R.extractPrefs("深度游二十五天").days === 25);
+assert("中文 三天两夜 → 3（取首个「天」）", R.extractPrefs("三天两夜").days === 3);
+assert("今天去北京 → 0（不误中『今』）", R.extractPrefs("今天去北京").days === 0);
+assert("无天数表述 → 0", R.extractPrefs("想看海").days === 0);
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
