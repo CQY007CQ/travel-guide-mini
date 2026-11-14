@@ -147,6 +147,36 @@ ok("真源 / 产物 / project.config.json 版本一致",
   ver(read("tools/_src-backup/travel.js")) === cfgVer && ver(read("utils/travel.js")) === cfgVer,
   [ver(read("tools/_src-backup/travel.js")), ver(read("utils/travel.js")), cfgVer].join(" / "));
 
+/* ---------- 10. 团队合并管线防回潮（v1.20.6） ----------
+   远端分区采集回仓后曾出现两类静默故障：
+   ① 采集端用 0,0 表示"没取到坐标"，被当成真实越界 → 55 条错误把整批 992 店合并拦死；
+   ② 全量注入四块静态数据会把主包从 1459KB 顶到 1626KB，越过 1.5M 代码质量线；
+   ③ 旧 pruneApprox 正则匹配不到压缩产物的 APPROX 声明 → 新增具名医院城与降级城重叠。
+   这里守住三处修复都还在，且注入块里确实没有 (0,0) 假坐标。 */
+const mergeSrc = read("tools/data/_merge-team-enrich.mjs");
+ok("合并脚本把 0,0 占位坐标归一为缺失（绝不写假坐标）",
+  /const isNoCoord\s*=/.test(mergeSrc) && /function normCoord\(/.test(mergeSrc) &&
+  /delete o\.lat;\s*delete o\.lon/.test(mergeSrc));
+ok("美食 / 逐店酒店 / 医院三处校验都走 normCoord",
+  (mergeSrc.match(/normCoord\(/g) || []).length >= 4,
+  "调用点=" + (mergeSrc.match(/normCoord\(/g) || []).length);
+ok("合并脚本有主包 1.5M 预算感知，超限块显式暂缓而非撑爆",
+  /MAIN_LIMIT_KB\s*=\s*1536/.test(mergeSrc) && /主包剩余/.test(mergeSrc) &&
+  /受主包预算约束暂缓/.test(mergeSrc));
+ok("APPROX 剔除用平衡括号扫描且产物/源码双写",
+  /function objLiteral\(/.test(mergeSrc) &&
+  mergeSrc.includes('pruneApprox("utils/emergency-data.js"') &&
+  mergeSrc.includes('pruneApprox("tools/_src-backup/emergency-data.src.js"'));
+const dsrc = read("tools/_src-backup/data.js");
+const tm = dsrc.match(/>>>TEAM_FOOD_START>>>[\s\S]*?const TEAM_FOOD_ENRICH = ([\s\S]*?);\s*\/\/ <<<TEAM_FOOD_END<<</);
+let teamFood = null, zero = 0;
+try { teamFood = tm ? Function("return " + tm[1] + ";")() : null; } catch (e) { /* 解析失败即判红 */ }
+if (teamFood) for (const c in teamFood) for (const sh of teamFood[c] || [])
+  if (sh && (sh.lat === 0 || sh.lon === 0)) zero++;
+ok("注入的团队美食块无 (0,0) 占位坐标", !!teamFood && zero === 0, "zero=" + zero);
+ok("远端采集增量确已入包（团队美食块 ≥900 店）", !!teamFood &&
+  Object.values(teamFood).reduce((a, v) => a + (Array.isArray(v) ? v.length : 0), 0) >= 900);
+
 console.log("  离线数据规模口径回归: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);
 console.log("  ✔ 医院统计已指向真源（具名 / 降级分开算），帮助页不再显示 0");
