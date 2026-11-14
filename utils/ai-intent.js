@@ -244,4 +244,5 @@ function handle(text, ctx) {
   return null;
 }
 
-module.exports = { handle, detectIntent, detectNav, cityOf, pageActions, numOf };
+// spotInText 供 ai-brain 的多轮会话记录「最近提到的真实景点」（零逻辑变化，仅多导出一个纯函数）
+module.exports = { handle, detectIntent, detectNav, cityOf, pageActions, numOf, spotInText };

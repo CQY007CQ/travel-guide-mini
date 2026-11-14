@@ -17,6 +17,7 @@ const DATA = require("../../utils/data.js");
 const EMERGENCY = require("../../utils/emergency.js");
 const AI_INTENT = require("../../utils/ai-intent.js");
 const RECOMMEND = require("../../utils/recommend.js");   // 本地离线推荐引擎（零网络）：recommend(text,opts)->{list,prefs,month,...}
+const S = require("../../utils/store.js");               // 多轮会话快照落盘（本地优先，fail-closed）
 
 /* 与 ai-intent 同款 action 构造器（assistant.onAction 消费 path/query/mode） */
 function act(path, label, query, mode) { return { label: label, path: path, query: query || {}, mode: mode || "push" }; }
@@ -27,6 +28,55 @@ let _hits = 0;
 const _hitBy = Object.create(null);
 function _bump(k) { _hits++; if (k) _hitBy[k] = (_hitBy[k] || 0) + 1; }
 function offlineStats() { return { hits: _hits, byIntent: Object.assign({}, _hitBy) }; }
+
+/* ───────── 离线多轮会话状态（对齐网页端 __webAI.state，落盘 + fail-closed） ─────────
+ * 让「成都吃什么」→「那有什么好玩的」沿用上一轮城市，并支持「把第一个加入想玩」指代。
+ * 只存可重建的轻量快照（城市 / 意图 / 最近 3 个真实景点 / 轮数），绝不存聊天正文；
+ * store 不可用时自动退化为内存态，任何异常都不影响问答主流程。 */
+const SESS_KEY = "aiBrainSessionV1";
+const FOLLOWUP_RE = /那|这|它|呢|再|还|又|刚才|上面|同一|换成|改成|接着|第一个|第二个/;
+let _sess = null;
+function _sessLoad() {
+  if (_sess) return _sess;
+  _sess = { city: "", intent: "", spots: [], turns: 0 };
+  try {
+    const v = S.get(SESS_KEY, null);
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      _sess = {
+        city: typeof v.city === "string" ? v.city.slice(0, 20) : "",
+        intent: typeof v.intent === "string" ? v.intent.slice(0, 30) : "",
+        spots: Array.isArray(v.spots) ? v.spots.filter(x => typeof x === "string").slice(0, 3) : [],
+        turns: Number(v.turns) || 0
+      };
+    }
+  } catch (e) {}
+  return _sess;
+}
+function _sessSave() { try { S.set(SESS_KEY, _sessLoad()); } catch (e) {} }
+function sessionState() {
+  const s = _sessLoad();
+  return { city: s.city, intent: s.intent, spots: s.spots.slice(), turns: s.turns };
+}
+function resetSession() {
+  _sess = { city: "", intent: "", spots: [], turns: 0 };
+  try { if (S.del) S.del(SESS_KEY); else S.set(SESS_KEY, null); } catch (e) {}
+}
+// 只在实际给出回答后写入，失败 / 未命中不污染上下文（与 ai-agent 的云端记忆同一纪律）
+function _remember(text, r, ctx) {
+  try {
+    const s = _sessLoad();
+    let c = "";
+    try { c = (AI_INTENT.cityOf ? AI_INTENT.cityOf(text, "") : "") || ""; } catch (e) {}
+    if (!c) c = ctx.city || "";
+    if (typeof c === "string" && c.length >= 2 && c.length <= 20) s.city = c;
+    if (r.intent) s.intent = r.intent;
+    s.turns++;
+    let sp = (Array.isArray(r.spots) && r.spots.length) ? String(r.spots[0] || "") : "";
+    if (!sp) { try { sp = (AI_INTENT.spotInText && AI_INTENT.spotInText(String(r.text || ""))) || ""; } catch (e) {} }
+    if (sp) s.spots = [sp].concat(s.spots.filter(x => x !== sp)).slice(0, 3);
+    _sessSave();
+  } catch (e) {}
+}
 
 /* 本地日期 yyyy-mm-dd */
 function localDate(d) {
@@ -265,6 +315,120 @@ function runEmergency(text, city, ctx) {
   return { text: lines.join("\n"), actions: [act("pages/help/help", "打开旅途应急 →"), act("subpkg/map/map", "看地图找医院 →")], intent: "help-emergency" };
 }
 
+/* ── 追问路由：本轮没点名城市时，把上一轮城市补进问题重新分发（只重入一层，防自环） ── */
+const FOLLOWUP_ROUTES = [
+  { re: /好吃|吃|美食|餐厅|小吃|必吃|吃什么/, q: c => c + "吃什么" },
+  { re: /好玩|景点|必去|打卡|玩什么|逛|去哪/, q: c => c + "有哪些必去" },
+  { re: /出片|拍照|机位|摄影|拍什么/, q: c => c + "哪里出片" },
+  { re: /几月|什么时候|季节|最佳|月份/, q: c => c + "几月去最好" },
+  { re: /附近|周边|顺路/, q: c => c + "附近还有哪好玩" },
+  { re: /介绍|概况|名片|适合玩几天/, q: c => c + "介绍一下" },
+  { re: /穿|带伞|冷|热|衣服|外套/, q: c => c + "穿什么" }
+];
+function runFollowup(text, ctx) {
+  const c = ctx.city || "";
+  if (!c) return null;
+  for (let i = 0; i < FOLLOWUP_ROUTES.length; i++) {
+    const rt = FOLLOWUP_ROUTES[i];
+    if (!rt.re.test(text)) continue;
+    let inner = null;
+    try { inner = _dispatch(rt.q(c), Object.assign({}, ctx, { __followup: false })); } catch (e) {}
+    if (inner) return inner;
+  }
+  return null;
+}
+
+/* 城市代表景点：只用 SPOT_COORDS 里的真实点位名，零伪造 */
+function runLandmarks(text, city) {
+  if (!city) return null;
+  let arr = [];
+  try { arr = (DATA && DATA.SPOT_COORDS && DATA.SPOT_COORDS[city]) || []; } catch (e) { arr = []; }
+  const names = [], seen = Object.create(null);
+  for (let i = 0; i < arr.length && names.length < 8; i++) {
+    const it = arr[i];
+    let n = Array.isArray(it) ? it[0] : (it && (it.name || it.n)) || "";
+    if (typeof n !== "string" || !n) continue;
+    try { n = (T.cleanSpotName ? T.cleanSpotName(n) : n) || n; } catch (e) {}
+    if (seen[n]) continue;
+    seen[n] = 1; names.push(n);
+  }
+  if (!names.length) return {
+    text: "「" + city + "」暂时没有逐点资料（不编造景点名）。可以先生成行程，或去「按标签找景点」按主题筛。",
+    actions: [act("subpkg/spotsearch/spotsearch", "按标签找景点 →"), act("pages/index/index", "去生成攻略 →", {}, "tab")],
+    intent: "landmark"
+  };
+  const lines = ["🏞 " + city + " 代表景点（离线库真实点位）："];
+  names.forEach((n, i) => lines.push((i + 1) + ". " + n));
+  lines.push("想排进行程、看顺路度和导航，点下面直达。");
+  return {
+    text: lines.join("\n"),
+    actions: [act("subpkg/spotsearch/spotsearch", "按标签找景点 →", { city }),
+      act("subai/deep/deep", "城市深度玩法 →", { city }),
+      act("pages/plan/plan", "看每日行程 →", {}, "tab")],
+    intent: "landmark", spots: names
+  };
+}
+
+/* 穿衣 / 带伞：离线气候库 + 出发月份，绝不编实时天气 */
+function runDress(text, city, ctx) {
+  const c = city || (ctx && ctx.plan && ctx.plan.cityName) || "";
+  let d = null, brief = null;
+  try {
+    const obj = c && T.findCity ? T.findCity(c) : null;
+    if (obj && T.dressForMonth) d = T.dressForMonth(obj, (ctx && ctx.plan && ctx.plan.depart) || "");
+  } catch (e) {}
+  try { if (c && T.cityBrief) brief = T.cityBrief(c); } catch (e) {}
+  const lines = ["🧥 " + (c ? c + " " : "") + "穿衣与随身建议（离线气候库，非实时天气）"];
+  if (d) {
+    lines.push("· " + (d.season || "") + (d.weather ? "：" + d.weather : ""));
+    (d.lines || []).slice(0, 3).forEach(x => { if (x) lines.push("· " + x); });
+    if (d.acc) lines.push("· 配件：" + d.acc);
+    if (d.tip) lines.push("· " + d.tip);
+  } else if (brief && brief.climateTxt) {
+    lines.push("· 气候：" + brief.climateTxt + "。");
+    lines.push("· 逐月穿衣清单在「出行准备」页按出发日期生成。");
+  } else {
+    lines.push("· 说个具体城市（如「成都 11 月穿什么」），我按离线气候库给建议。");
+  }
+  lines.push("实时天气以 App 内天气页为准（联网获取），这里不编造温度与降雨。");
+  return {
+    text: lines.join("\n"),
+    actions: [act("subpkg/prep/prep", "打开出行准备 →"), act("pages/today/today", "打开今天 →", {}, "tab")],
+    intent: "dress"
+  };
+}
+
+/* 当天动线：按真实坐标估算，不编造点位与距离 */
+function runRoute(text, city, ctx) {
+  const plan = ctx && ctx.plan;
+  if (!plan || !plan.days || !plan.days.length) return {
+    text: "还没有行程动线。先说「帮我生成成都 3 天行程」，我再按真实坐标算当天走多少路。",
+    actions: [act("pages/index/index", "去生成攻略 →", {}, "tab")],
+    intent: "route"
+  };
+  let st = null;
+  try { st = T.todayState ? T.todayState(plan) : null; } catch (e) {}
+  const di = (st && st.phase === "during") ? (st.idx || 0) : 0;
+  const day = plan.days[di] || {};
+  let mv = null;
+  try { mv = T.dayMove ? T.dayMove(day, plan.cityName) : null; } catch (e) {}
+  const lines = ["🧭 第 " + (di + 1) + " 天动线（按离线库真实坐标估算）"];
+  if (mv) lines.push("· 全程约 " + mv.km + " km、步行约 " + mv.steps + " 步。");
+  const items = (day.items || []).slice(0, 4).map(it => {
+    const n = (it && (it.name || it.disp)) || "";
+    try { return (T.cleanSpotName && T.cleanSpotName(n)) || n; } catch (e) { return n; }
+  }).filter(Boolean);
+  if (items.length) lines.push("· 当天点位：" + items.join(" → "));
+  if (!mv && !items.length) lines.push("· 这一天还没排入可定位的点位，去行程页加几个景点再看动线。");
+  lines.push("· 逐点导航在地图页点任意一行即可唤起。");
+  return {
+    text: lines.join("\n"),
+    actions: [act("subpkg/map/map", "看当天地图 →", { di }),
+      act("pages/plan/plan", "打开每日行程 →", {}, "tab")],
+    intent: "route"
+  };
+}
+
 /* ── 写操作（对齐网页版内置 AI）：一句话记账 / 把真实景点加入想玩 ──
  * 只写本机离线数据；景点名必须能在离线库里查到，绝不写没收录的名字（零伪造、不脏数据）。
  * 这两条要放在 NEW_INTENTS 最前：「记账」否则会被 ledger 的「花了多少」查询意图抢走。 */
@@ -397,9 +561,12 @@ const NEW_INTENTS = [
   { key: "help-emergency", kw: /医院|急救|受伤|骨折|出血|中暑|高原反应|晕倒|胸痛|急诊|食物.*(中毒|过敏)|不舒服|拉肚子|发烧|过敏/, run: runEmergency },
   { key: "recommend",      kw: /推荐|想去|去哪.*(好|玩|合适|舒服)|哪里.*(好玩|适合|舒服)|适合.*(去|玩|城市|地方|目的地)|小众.*(目的地|城市|玩法)/, run: runRecommend },
   { key: "besttime",       kw: /几月去|什么时候去|最佳.*(季节|月份|时间)|什么.*(季节|月份).*去|避开.*(人潮|旺季)|(季节|月份).*最好|适合玩几天|最佳出行/, run: runBestTime },
+  { key: "dress",          kw: /穿什么|穿衣|穿啥|带伞|带.*(外套|衣服)|冷不冷|热不热|几月穿|天气.*(穿|带)/, run: runDress },
   { key: "planOptimize",   kw: /行程.*(合理|问题|体检|优化|挑毛病|太赶|调整|改一下|有没有|顺不顺)|挑毛病|体检.*行程|排得.*(太|不)/, run: runPlanOptimize },
+  { key: "route",          kw: /怎么走|动线|走多少|几公里|今天.*(路线|怎么走)|第.*天.*(路线|怎么走)|顺路吗/, run: runRoute },
   { key: "generate",       kw: /生成|做一份|排一份|安排一下|帮我排|来一份|规划|日游|几天|怎么安排|定制行程|排个行程|出个行程/, run: runGenerate },
   { key: "food",           kw: /吃什么|吃啥|美食|必吃|好吃的|当地菜|特色菜|餐厅|馆子|小吃|夜市/, run: runFood },
+  { key: "landmark",       kw: /有哪些必去|必去|有什么好玩|好玩的|景点推荐|地标|玩什么|值得一去|代表景点/, run: runLandmarks },
   { key: "today",          kw: /今天.*(安排|干嘛|干什么|玩什么|还剩|花了多少|去哪)|今天去哪|下一站|明天去哪|倒计时|还有几天出发|出发还有|今天行程/, run: runToday },
   { key: "prep",           kw: /带什么|行李|准备什么|打包|出行前|要准备|必备|收拾/, run: runPrep },
   { key: "ledger",         kw: /花了多少|记账|预算|超支|账本|花费|消费了多少|今天.*花/, run: runLedger },
@@ -509,6 +676,31 @@ function handle(text, ctx) {
   text = (text || "").trim();
   if (!text) return null;
   ctx = ctx || {};
+  const sess = _sessLoad();
+  // ① 追问沿用上一轮城市：本轮没点名城市、调用方也没有真实行程城市时，
+  //    把上一轮城市注入 ctx，让「那有什么好玩的」「换成美食」能接着聊而不是甩泛话。
+  //    调用方 ctx.city（来自真实行程）优先级始终最高，不覆盖。
+  let askedCity = "";
+  try { askedCity = (AI_INTENT.cityOf ? AI_INTENT.cityOf(text, "") : "") || ""; } catch (e) {}
+  if (!askedCity && !ctx.city && sess.city && FOLLOWUP_RE.test(text)) {
+    ctx = Object.assign({}, ctx, { city: sess.city, __followup: true });
+  }
+  // ② 指代消解：把「第一个 / 它 / 刚才那个」还原成最近列出的真实景点名（零伪造，只用库内名字）
+  if (sess.spots.length && /想玩|讲解|介绍|讲讲/.test(text) && /第一个|刚才那|它|这个|那个/.test(text)) {
+    text = text.replace(/第一个|刚才那(?:个)?|它|这个|那个/g, sess.spots[0]);
+  }
+  // ③ 追问路由：补上城市后重新分发一次，让「那有什么好玩的」真的给出该城景点而非泛话
+  if (ctx.__followup) {
+    const fr = runFollowup(text, ctx);
+    if (fr) { _bump("followup"); _remember(text, fr, ctx); return fr; }
+  }
+  const r = _dispatch(text, ctx);
+  if (r) _remember(text, r, ctx);   // 只在真给出回答后写入，未命中不污染上下文
+  return r;
+}
+
+/* 真正的一轮分发（原 handle 主体，保持委派顺序与零回归契约不变） */
+function _dispatch(text, ctx) {
   // ① 先委派 ai-intent（photo/near/cityinfo/spot/nav/sync），零回归
   try {
     const delegated = AI_INTENT.handle(text, ctx);
@@ -580,6 +772,8 @@ module.exports = {
   pageSuggestions: pageSuggestions,
   allScenarios: allScenarios,
   offlineStats: offlineStats,
+  sessionState: sessionState,
+  resetSession: resetSession,
   SCENARIOS: SCENARIOS,
   PAGE_ROUTE: PAGE_ROUTE,
   // 兼容 ai-intent 既有导出

@@ -187,5 +187,44 @@ log(realPages.length > 0 && noAI.length === 0,
   "全部 " + realPages.length + " 个交互页均有 AI 触点（入口或页内能力）" +
   (noAI.length ? "（缺：" + noAI.join(",") + "）" : ""));
 
+// 11) 小程序离线多轮会话：追问沿用城市 / 指代消解 / 会话快照 / 清空不串城
+try {
+  AI.resetSession();
+  const q1 = AI.handle("成都吃什么", { city: "", plan: null });
+  const s1 = AI.sessionState();
+  log(!!q1 && q1.intent === "food" && s1.city === "成都", "多轮会话记录上一轮城市（成都）");
+  const q2 = AI.handle("那有什么好玩的", { city: "", plan: null });
+  log(!!q2 && q2.intent === "landmark" && /成都/.test(q2.text) &&
+    Array.isArray(q2.actions) && q2.actions.length > 0,
+    "追问沿用上一轮城市并给出该城真实景点（非泛话）");
+  AI.resetSession();
+  const q3 = AI.handle("杭州有哪些必去", { city: "", plan: null });
+  const s3 = AI.sessionState();
+  log(!!q3 && s3.spots.length > 0, "会话记录最近列出的真实景点（供指代）");
+  const q4 = AI.handle("讲讲这个", { city: "", plan: null });
+  log(!!q4 && q4.intent === "spot" && s3.spots.some(n => q4.text.indexOf(n) >= 0),
+    "指代「这个」还原为真实景点并给出离线资料");
+  const s4 = AI.sessionState();
+  log(!!s4 && typeof s4.turns === "number" && s4.turns > 0, "sessionState 可读（turns/city/spots）");
+  AI.resetSession();
+  log(AI.sessionState().city === "" && AI.sessionState().spots.length === 0,
+    "resetSession 清空上下文（不串城）");
+} catch (e) {
+  log(false, "多轮会话守卫异常：" + ((e && e.message) || e));
+}
+
+// 12) 新增离线意图：穿衣 / 动线必须接地且带直达按钮
+const NEW_INTENT_CASES = [
+  { q: "成都 11 月穿什么", key: "dress", re: /穿衣|秋季|冬季|气候/ },
+  { q: "今天怎么走", key: "route", re: /动线|行程/ }
+];
+for (const c of NEW_INTENT_CASES) {
+  let r = null;
+  try { r = AI.handle(c.q, { city: "", plan: null }); } catch (e) {}
+  log(!!r && r.intent === c.key && c.re.test(r.text) &&
+    Array.isArray(r.actions) && r.actions.length > 0,
+    "新增意图「" + c.key + "」接地且带直达按钮");
+}
+
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);

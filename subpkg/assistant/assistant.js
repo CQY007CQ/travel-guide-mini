@@ -448,6 +448,7 @@ Page(SafePage({
   },
   aiClearChat() {
     try { AIAgent.clearHistory("assistant"); } catch (e) {}
+    try { AI.resetSession(); } catch (e) {}   // 离线多轮上下文（城市/意图/最近景点）一并清空，避免刷新后串城
     this.setData({ aiText: "", aiAnswer: "", lastResult: "", result: "", out: null,
       aiSource: "", source: "", aiQ: "", aiInput: "", aiErr: "" });
     wx.showToast({ title: "会话已清空", icon: "none" });
