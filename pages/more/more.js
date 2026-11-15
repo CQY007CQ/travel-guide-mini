@@ -246,7 +246,7 @@ Page(SafePage({
             { key: "map", icon: "map", t: "地图导引", d: "每天真实坐标标点 + 导航" },
             { key: "food", icon: "food", t: "美食名店", d: "必吃清单 + 可导航的老店" },
             { key: "deep", icon: "bulb", t: "城市深度玩法", d: "本地节奏 / 避坑 / 机位 / 顺手加一日" },
-            { key: "assistant", icon: "search", t: "本地速查", d: "离线速查：天气/美食/门票/预算…" },
+            { key: "assistant", icon: "search", t: "AI 助手 · 拍照识物", d: "问 AI / 拍照识植物地标 / 离线速查天气美食门票…" },
             { key: "toolkit", icon: "sparkle", t: "旅行百宝箱", d: "体检/文案/灵感/百科等 " + TOOL_TOTAL + " 个工具" }
           ]
         },
