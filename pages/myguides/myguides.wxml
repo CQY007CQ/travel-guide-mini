@@ -13,7 +13,7 @@
         <view class="mg-title">{{item.title}}</view>
         <view class="mg-del" catchtap="delPlan" data-id="{{item.id}}">删除</view>
       </view>
-      <view class="mg-meta dim">{{item.cityName}} · {{item.days}} 天 · 保存于 {{item.dateText}}</view>
+      <view class="mg-meta dim">{{item.sub}} · 保存于 {{item.dateText}}</view>
       <view class="mg-go">打开行程 ›</view>
     </view>
     <view class="tip">点卡片打开完整行程；删除仅移除收藏，不影响原生成记录</view>

@@ -5,6 +5,7 @@ const AN = require("../../utils/analytics.js");
 const T = require("../../utils/travel.js");
 const ST = require("../../utils/spot-tags.js");
 const SS = require("../utils/spotsearch.js");
+const { hasCoord } = require("../utils/coord.js"); // 坐标有效性单一真源：挡 "0"/NaN/(0,0)
 const app = getAppSafe();
 
 const DIM_ORDER = ["theme", "activity", "audience", "season", "mood", "duration", "price"];
@@ -175,7 +176,7 @@ Page(SafePage({
 
   onLocate(e) {
     const d = e.currentTarget.dataset;
-    if (d && d.lat && d.lon) {
+    if (hasCoord(d)) {
       wx.openLocation({
         latitude: Number(d.lat), longitude: Number(d.lon),
         name: d.name || "", address: (d.city || "") + " · " + (d.name || ""), scale: 15
