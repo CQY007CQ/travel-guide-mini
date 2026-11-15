@@ -120,5 +120,20 @@ ck("每个入口 topic 都在场景表内",
     return true;
   })());
 
+/* ---------- ⑤ 使用指南置顶 AI / 识物重点组 ---------- */
+// 用户明确要求指南重点强调 AI 与识图；防止后续改版把置顶组或直达按钮删掉。
+const guideJs = code(read("subpkg/guide/guide.js"));
+const guideWxml = code(read("subpkg/guide/guide.wxml"));
+ck("使用指南置顶「AI 助手 · 拍照识物」重点组，含助手/识物/一句话生成/页面上下文四条",
+  /g:\s*"AI 助手 · 拍照识物（重点）"/.test(guideJs) &&
+  /t:\s*"AI 助手：像旅行搭子一样问"/.test(guideJs) &&
+  /t:\s*"拍照识物（识图）"/.test(guideJs) &&
+  /t:\s*"一句话生成行程"/.test(guideJs) &&
+  /t:\s*"从当前页问，答案更贴场景"/.test(guideJs));
+ck("指南有 AI 助手/识物两个一键直达按钮（不展开可见）",
+  /data-url="\/subpkg\/assistant\/assistant"/.test(guideWxml) &&
+  /data-url="\/subpkg\/lens\/lens"/.test(guideWxml) &&
+  /class="g-ai-quick"/.test(guideWxml));
+
 console.log("  更强 AI / 全站适配防回潮守卫: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);
