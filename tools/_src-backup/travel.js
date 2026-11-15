@@ -3304,7 +3304,7 @@ const HOME_TILES = [
   { k: "ledger", t: "旅行账本", ic: "bill", url: "/subpkg/ledger/ledger" },
   { k: "prep", t: "出行准备", ic: "luggage", url: "/subpkg/prep/prep" },
   { k: "spotsearch", t: "按标签找景点", ic: "target", url: "/subpkg/spotsearch/spotsearch" },
-  { k: "assistant", t: "本地速查", ic: "compass", url: "/subpkg/assistant/assistant" },
+  { k: "assistant", t: "AI 助手 · 拍照识物", ic: "compass", url: "/subpkg/assistant/assistant" },
    { k: "today", t: "今天怎么走", ic: "sun", url: "/pages/today/today" }
  ];
  // v1.11：瓦片 key 索引 + 详情索引，替代反复 some()/find() 线性查找

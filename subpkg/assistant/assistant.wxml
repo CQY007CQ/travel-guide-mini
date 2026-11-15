@@ -47,7 +47,7 @@
 
   <!-- 头部：上下文 + 一键查 + 自由查 -->
   <view class="card head" wx:if="{{hasPlan}}">
-    <view class="h2"><image lazy-load class="ic" src="/images/icons/search.png"/>本地速查</view>
+    <view class="h2"><image lazy-load class="ic" src="/images/icons/search.png"/>AI 速查</view>
     <view class="ctx dim">{{ctx}}</view>
 
     <view class="h3">一键查</view>

@@ -180,7 +180,7 @@
     if (intent === "attraction") return [act("subpkg/spotsearch/spotsearch", "按标签找景点 →"), act("subai/deep/deep", "城市深度玩法 →", cityQ)].concat(common);
     if (intent === "packing") return [act("subpkg/prep/prep", "打开出行准备 →"), act("pages/today/today", "打开今天 →", {}, "tab")];
     if (intent === "transport") return [act("subpkg/map/map", "打开地图导引 →", mapQ), actPlan()];
-    return [act("pages/index/index", "打开生成攻略 →", {}, "tab"), act("subpkg/assistant/assistant", "本地速查 →")];
+    return [act("pages/index/index", "打开生成攻略 →", {}, "tab"), act("subpkg/assistant/assistant", "打开 AI 助手 →")];
   }
 
   /** 显式导航意图：只有用户说「打开/跳到/带我去 X 页」才直接切页 */
@@ -196,7 +196,7 @@
     { re: /记账|账本|分账/, p: "subpkg/ledger/ledger", t: "记账" },
     { re: /地图|动线|导航页/, p: "subpkg/map/map", t: "地图导引" },
     { re: /准备页|行李清单|打包/, p: "subpkg/prep/prep", t: "出行准备" },
-    { re: /速查|随身问答|百科/, p: "subpkg/assistant/assistant", t: "本地速查" },
+    { re: /速查|随身问答|百科/, p: "subpkg/assistant/assistant", t: "AI 助手 · 拍照识物" },
     { re: /工具箱|百宝箱/, p: "subpkg/toolkit/toolkit", t: "旅行百宝箱" },
     { re: /找景点|按标签|标签检索/, p: "subpkg/spotsearch/spotsearch", t: "按标签找景点" },
     { re: /深度玩法|机位|避坑/, p: "subai/deep/deep", t: "城市深度玩法" },
@@ -1235,7 +1235,7 @@
     "subpkg/prep/prep": ["还差几项没准备", "打包清单进度", "打开出行准备", "还差几天出发"],
     "subpkg/spotsearch/spotsearch": ["重庆有哪些必去", "成都哪里出片", "按标签找景点", "生成重庆3天行程"],
     "subpkg/toolkit/toolkit": ["打开旅行百宝箱", "行程体检", "生成一份行程"],
-    "subpkg/assistant/assistant": ["成都吃什么", "介绍一下西湖", "杭州最佳季节", "帮我复盘这趟行程", "打开本地速查"],
+    "subpkg/assistant/assistant": ["成都吃什么", "介绍一下西湖", "杭州最佳季节", "帮我复盘这趟行程", "打开 AI 助手"],
     "subai/deep/deep": ["这个城市怎么避坑", "生成一份行程", "看第2天地图"],
     "subpkg/guide/guide": ["怎么用这个应用", "打开使用指南", "帮我生成成都3天行程"],
   };

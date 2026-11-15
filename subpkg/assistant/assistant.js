@@ -333,7 +333,7 @@ Page(SafePage({
   _aiQuery(q, plan) {
     const self = this;
     try { wx.showLoading({ title: "AI 思考中", mask: false }); } catch (e) {}
-    const ctx = this._contextOf(plan, "本地速查助手");
+    const ctx = this._contextOf(plan, "AI 助手");
     // 主回答：完整场景纪律 + 可选动作契约；复杂问题再并发一条独立审慎视角。
     // 两链是「并列供用户判断」，不假装投票出唯一真理（零伪造）。
     const sys = PROMPTS.buildSystem("assistant") + AIReason.actionContract();

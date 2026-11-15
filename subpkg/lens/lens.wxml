@@ -123,6 +123,6 @@
 
   <view class="foot">
     <text class="foot-t">识别由云端多模态模型完成并经多条独立判断核验，仍可能存在误差；涉及食用、药用、有毒物种请以专业鉴定为准，切勿仅凭 AI 结论入口。离线状态下本机不做图像识别，只提供随包真实资料供对照。</text>
-    <view class="foot-a" bindtap="goAssistant">去本地速查 →</view>
+    <view class="foot-a" bindtap="goAssistant">去 AI 助手 →</view>
   </view>
 </view>

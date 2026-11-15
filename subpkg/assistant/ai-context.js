@@ -21,7 +21,7 @@ const MAX_CHARS = 1200;
 const LABELS = {
   generate: "生成行程", food: "必吃美食", today: "今天安排", planOptimize: "行程体检",
   prep: "出行准备", spotsearch: "按标签找景点", deep: "深度玩法", ledger: "花费记账",
-  "help-emergency": "旅途应急", lens: "拍照识景", travelsvc: "出行服务",
+  "help-emergency": "旅途应急", lens: "拍照识物", travelsvc: "出行服务",
   toolkit: "旅行百宝箱", guide: "我的攻略", settings: "设置偏好", review: "行程复盘",
   spot: "景点讲解", map: "地图导览", help: "帮助与应急", plan: "我的行程"
 };

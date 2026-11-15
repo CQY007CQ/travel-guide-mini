@@ -125,7 +125,7 @@ const SCENARIOS = [
   { key: "deep",           page: "deep",       label: "深度玩法", icon: "star.png",   sample: "成都深度玩法",        desc: "机位、避坑、当地人玩法" },
   { key: "ledger",         page: "ledger",     label: "花费记账", icon: "coin.png",   sample: "今天花了多少",        desc: "本机账本累计与预算进度" },
   { key: "help-emergency", page: "help",       label: "旅途应急", icon: "shield.png", sample: "附近医院",            desc: "分诊指引 + 就近医院" },
-  { key: "lens",           page: "lens",       label: "拍照识景", icon: "camera.png", sample: "拍照识别景点",        desc: "对着建筑拍一张讲讲它的故事" },
+  { key: "lens",           page: "lens",       label: "拍照识物", icon: "camera.png", sample: "拍照识物",            desc: "对着建筑/植物/招牌拍一张讲讲它的故事" },
   { key: "travelsvc",      page: "travelsvc",  label: "出行服务", icon: "bus.png",    sample: "出行服务",            desc: "订票/打车/机场车站入口" },
   { key: "toolkit",        page: "toolkit",    label: "旅行百宝箱", icon: "coin.png", sample: "工具箱",              desc: "汇率/时差/换算等小工具" },
   { key: "guide",          page: "myguides",   label: "我的攻略", icon: "star.png",   sample: "我的攻略",            desc: "保存与复用生成过的行程" },
@@ -497,7 +497,7 @@ function runAddWish(text, city, ctx) {
 }
 
 /* 其余场景：以「一句话介绍 + 直达按钮」把用户带到对应页（这些页本身已是专业工具，AI 负责入口与语境） */
-function runLens() { return { text: "用「拍照识景」对着建筑/招牌拍一张，我会识别并讲讲它的故事（离线识别，无需联网）。", actions: [act("subpkg/lens/lens", "打开拍照识景 →")], intent: "lens" }; }
+function runLens() { return { text: "用「拍照识物」对着建筑/植物/招牌拍一张，云端多模态模型会识别并讲讲它的故事（需联网；离线时本机不做图像识别，只给真实地点对照）。", actions: [act("subpkg/lens/lens", "打开拍照识物 →")], intent: "lens" }; }
 function runTravelSvc() { return { text: "「出行服务」页集合了订票、打车、机场/车站、值机等常用入口，按城市自动匹配。", actions: [act("subpkg/travelsvc/travelsvc", "打开出行服务 →")], intent: "travelsvc" }; }
 function runToolkit() { return { text: "「旅行百宝箱」有汇率换算、时差、单位换算、证件清单等小工具，离线可用。", actions: [act("subpkg/toolkit/toolkit", "打开百宝箱 →")], intent: "toolkit" }; }
 function runGuide() { return { text: "「我的攻略」里保存着你生成过的行程，可随时翻看、复用、再编辑。", actions: [act("pages/myguides/myguides", "打开我的攻略 →")], intent: "guide" }; }

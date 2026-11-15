@@ -30,7 +30,7 @@ const NAV_KW = [
   { re: /美食页|必吃清单/, p: "subpkg/food/food", t: "美食" },
   { re: /地图|动线|导航页/, p: "subpkg/map/map", t: "地图导引" },
   { re: /准备页|行李清单|打包/, p: "subpkg/prep/prep", t: "出行准备" },
-  { re: /速查|随身问答|百科/, p: "subpkg/assistant/assistant", t: "本地速查" },
+  { re: /速查|随身问答|百科/, p: "subpkg/assistant/assistant", t: "AI 助手 · 拍照识物" },
   { re: /工具箱|百宝箱/, p: "subpkg/toolkit/toolkit", t: "旅行百宝箱" },
   { re: /找景点|按标签|标签检索/, p: "subpkg/spotsearch/spotsearch", t: "按标签找景点" },
   // 「机位」不列入显式导航：它是 photo 意图（出片点列表）的关键词。nav 在 handle() 里优先执行，
