@@ -93,6 +93,8 @@
   margin-bottom: 16rpx;
 }
 
+/* 行程联动的提示条与景点 chip 复用 .er-disclaim / .er-chips / .er-chip，零新增样式 */
+
 /* ── 分诊输入 ── */
 .er-chips { display: flex; flex-wrap: wrap; gap: 12rpx; }
 .er-chip {

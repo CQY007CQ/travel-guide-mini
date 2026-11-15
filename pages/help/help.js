@@ -6,6 +6,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // v1.19.180：无具名医院的城市不再伪造机构名，改走「地图搜索」降级（宁缺勿错）
 const T = require("../../utils/travel.js");
 const E = require("../../utils/emergency.js");
+const GEO = require("../../utils/geo.js");   // haversineKm：按当天景点重排医院距离
 const app = getAppSafe();
 const AIAgent = require("../../utils/ai-agent.js");
 const Cloud = require("../../utils/cloud.js");
@@ -23,6 +24,9 @@ Page(SafePage({
     approx: false,      // 该城只有城中心坐标，无具名医院
     apLat: 0,
     apLon: 0,
+    tripHint: "",       // 行程自动定位说明：第 N 天 · 城市 · 附近景点
+    nearSpot: "",       // 当前用于排序的当天景点名（空=按城中心）
+    daySpots: [],       // 当天景点（有真实坐标的才列出，供「按景点就近」切换）
     pickOpen: false,    // 城市选择弹层
     kw: "",
     cityList: [],
@@ -40,33 +44,49 @@ Page(SafePage({
     if (!this.data.city) this._pickDefaultCity();
   },
 
-  /* 应用某城：同时给出具名医院 / 降级城中心两种形态 */
-  _applyCity(c) {
-    const ap = E.isApprox(c);
-    const coord = ap ? E.approxCoord(c) : null;
-    this.setData({
-      city: c,
-      hos: E.hospitalsOf(c),
-      approx: ap,
-      apLat: coord ? coord[0] : 0,
-      apLon: coord ? coord[1] : 0,
-    });
+  // 行程当天：during=当天 / before=首日 / after=末日；多城游由 segCityOfDay 按天取城市
+  _tripDay() {
+    try {
+      const p = app && app.globalData && app.globalData.plan;
+      if (!p || !p.days || !p.days.length) return null;
+      const st = T.todayState(p);
+      const di = st && st.phase === "during" && st.idx != null ? st.idx
+        : (st && st.phase === "after" ? p.days.length - 1 : 0);
+      return { city: T.segCityOfDay(p, di) || p.cityName || p.city || "", dayNo: di + 1,
+        spots: T.daySpots(p.days[di]) || [], phase: st ? st.phase : "before" };
+    } catch (e) { return null; }
   },
 
-  /* 默认城市：优先当前行程城市 → 首页最近选择 → 首个已收录具名医院的城市 */
+  // 应用城市；spotName 有真实坐标则按它重排医院，否则按城中心（不谎称景点距离）
+  _applyCity(c, spotName, dayNo, phase) {
+    const ap = E.isApprox(c), coord = ap ? E.approxCoord(c) : null;
+    let hos = E.hospitalsOf(c), near = spotName || "";
+    const hint = () => dayNo ? "第 " + dayNo + " 天 · " + c +
+      (near ? " · 附近：" + near : (phase === "after" ? " · 行程已结束" : "")) : "";
+    if (near) {
+      let sc = null; try { sc = T.P.getSpotCoord(c, near); } catch (e) {}
+      if (sc && sc.lat && sc.lon && sc.approx === false) {
+        hos = hos.map((h) => Object.assign({}, h, { kms: GEO.haversineKm(sc, h) })).sort((a, b) => a.kms - b.kms);
+      } else { near = ""; }
+    }
+    this.setData({ city: c, approx: ap, apLat: coord ? coord[0] : 0, apLon: coord ? coord[1] : 0,
+      nearSpot: near, tripHint: hint(), hos });
+  },
+
+  // 默认城市：行程当天城市 → 最近选择 → 首个有具名医院城。多城游自动按天切。
   _pickDefaultCity() {
-    let c = "";
-    try {
-      const p = getApp().globalData.plan;
-      if (p && p.city) c = p.city;
-    } catch (e) {}
+    const td = this._tripDay();
+    let c = td ? td.city : "";
     if (!c) { try { c = S.get("lastCityName", "") || ""; } catch (e) {} }
     const list = E.cities();
-    if (!c || list.indexOf(c) < 0) {
-      // 默认落到首个「有具名医院」的城市，避免一进来就是降级态
-      c = list.filter((x) => !E.isApprox(x))[0] || list[0] || "";
-    }
-    this._applyCity(c);
+    if (!c || list.indexOf(c) < 0) c = list.filter((x) => !E.isApprox(x))[0] || list[0] || "";
+    let spots = [];
+    if (td && td.city === c) spots = td.spots.map((it) => {
+      let sc = null; try { sc = T.P.getSpotCoord(c, it.name); } catch (e) {}
+      return (sc && sc.lat && sc.lon && sc.approx === false) ? { name: it.name } : null;
+    }).filter(Boolean);
+    this.setData({ daySpots: spots });
+    this._applyCity(c, "", td ? td.dayNo : 0, td ? td.phase : "");
   },
 
   onInput(e) { this.setData({ text: (e.detail && e.detail.value) || "" }); },
@@ -171,6 +191,13 @@ Page(SafePage({
   },
 
   onPickClose() { this.setData({ pickOpen: false, kw: "" }); },
+
+  // 「按城中心 / 按当天某个景点」切换医院排序口径
+  onNearSpot(e) {
+    const name = String(e.currentTarget.dataset.name || "");
+    const td = this._tripDay();
+    this._applyCity(this.data.city, name, td ? td.dayNo : 0, td ? td.phase : "");
+  },
 
   // 数据规模说明已迁到使用指南，这里给一处可见入口（急救页不再堆无关统计）
   goGuide() { try { wx.navigateTo({ url: "/subpkg/guide/guide" }); } catch (e) {} },

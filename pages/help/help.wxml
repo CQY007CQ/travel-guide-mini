@@ -41,13 +41,19 @@
     </view>
   </view>
 
-  <!-- 第三步：就近医院（仅展示已核验的具名医院） -->
+  <!-- 第三步：就近医院（仅展示已核验的具名医院）。多城游自动跟随行程当天城市 -->
   <view class="card er-hos" wx:if="{{city && hos.length}}">
     <view class="er-h">第三步 · 就近医院（{{city}}）</view>
+    <view class="er-disclaim" wx:if="{{tripHint}}">{{tripHint}}</view>
+    <!-- 当天真实坐标景点：点一下按该景点重排医院；再点一次回城中心。复用 er-chips 样式省主包体积 -->
+    <view class="er-chips" wx:if="{{daySpots.length}}">
+      <text class="er-chip" style="{{nearSpot === '' ? 'background:linear-gradient(135deg,#e6bb62,#c19337);color:#171107;font-weight:800' : ''}}" data-name="" catchtap="onNearSpot">城中心</text>
+      <text class="er-chip" style="{{nearSpot === item.name ? 'background:linear-gradient(135deg,#e6bb62,#c19337);color:#171107;font-weight:800' : ''}}" wx:for="{{daySpots}}" wx:key="name" data-name="{{item.name}}" catchtap="onNearSpot">{{item.name}}</text>
+    </view>
     <view class="er-hrow" wx:for="{{hos}}" wx:key="n" data-i="{{index}}" bindtap="onNav">
       <view class="er-hl">
         <text class="er-hn">{{item.n}}</text>
-        <text class="er-hm">{{item.lv}} · 距城中心约 {{item.kmc}} km</text>
+        <text class="er-hm">{{item.lv}} · {{nearSpot ? '距' + nearSpot : '距城中心'}}约 {{nearSpot ? item.kms : item.kmc}} km</text>
       </view>
       <text class="er-nav">导航 ›</text>
     </view>
@@ -56,6 +62,7 @@
 
   <!-- 降级态：本城无已核验医院名单。不编造机构名，改为地图搜索 -->
   <view class="card er-none" wx:if="{{city && !hos.length}}">
+    <text class="er-disclaim" wx:if="{{tripHint}}">{{tripHint}}</text>
     <text class="er-nt">{{city}} 暂无已核验的医院名单</text>
     <text class="er-ns">为避免给出并不存在的机构，这里不列具体医院名。请在地图中搜索「医院」或「急诊」，就近前往；急危重症直接拨打 120。</text>
     <view class="er-mapbtn" wx:if="{{apLat}}" bindtap="onMapSearch">在地图中搜索附近医院</view>

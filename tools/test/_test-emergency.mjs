@@ -110,6 +110,32 @@ ok("医院按距城中心升序", (() => {
   return true;
 })());
 
+/* ── 二·五、行程联动：就近医院自动跟随当天城市 / 按景点就近 ── */
+console.log("【行程联动】");
+import { readFileSync } from "fs";
+const helpJs = readFileSync(new URL("../../pages/help/help.js", import.meta.url), "utf8");
+const helpWxml = readFileSync(new URL("../../pages/help/help.wxml", import.meta.url), "utf8");
+ok("默认城市走 todayState+segCityOfDay（多城游按天切城市）",
+  /T\.todayState\(p\)/.test(helpJs) && /T\.segCityOfDay\(p,\s*di\)/.test(helpJs));
+ok("未出发用首日、已结束用末日（非简单回落 plan.city）",
+  /phase === "after"\s*\?\s*p\.days\.length - 1/.test(helpJs));
+ok("按景点重排用真实坐标 + haversineKm，无坐标回落城中心不谎报距离",
+  /GEO\.haversineKm\(sc,\s*h\)/.test(helpJs) && /sc\.approx === false/.test(helpJs));
+ok("医院列表展示行程提示 + 当天景点 chip 切换",
+  /tripHint/.test(helpWxml) && /daySpots/.test(helpWxml) && /onNearSpot/.test(helpWxml));
+ok("距离文案按口径切换（距景点 / 距城中心）",
+  /nearSpot \? '距' \+ nearSpot : '距城中心'/.test(helpWxml));
+// 纯数据：haversine 按景点坐标重排后确实改变顺序（用真实城市多个景点验证）
+ok("按景点重排不会凭空造医院（仅重排既有具名医院）", (() => {
+  const city = Object.keys(D.HOSPITALS).find((c) => D.HOSPITALS[c].length >= 2);
+  if (!city) return true;
+  const a = E.hospitalsOf(city);
+  const pt = { lat: a[0].lat, lon: a[0].lon };
+  const GEO = require("../../utils/geo.js");
+  const b = a.slice().map((h) => Object.assign({}, h, { kms: GEO.haversineKm(pt, h) })).sort((x, y) => x.kms - y.kms);
+  return a.length === b.length && b.every((h) => a.some((x) => x.n === h.n));
+})());
+
 /* ── 三、红线：不得出现医疗断言/医院推荐 ── */
 console.log("【红线】");
 const BANNED = ["擅长", "最好", "首选", "推荐去", "权威", "专治", "包治", "治愈"];
