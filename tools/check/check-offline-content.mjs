@@ -52,7 +52,21 @@ for (const f of pageWxml) {
 
 log(aHits === 0, "全量 wxml 无 <a> 外链标签（" + allWxml.length + " 个文件）");
 log(remoteHits === 0, "主包 pages/ 首屏无远程图片 src（" + pageWxml.length + " 个文件）");
+
+/* ── 能力宣称真实性：用户可见文案不得夸大联网/离线能力 ──
+   已连续两轮发现此类错误：识物「离线识别无需联网」（实走云端）、指南「天气已内置免配置」（需本人 Key）。
+   这些是用户直接可见的能力承诺，与实现相反会误导预期，故做成 fail-fast。仅扫用户可见数据，不扫注释。 */
+const code = (p) => readFileSync(resolve(ROOT, p), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "").replace(/<!--[\s\S]*?-->/g, "");
+const guideSrc = code("subpkg/guide/guide.js");
+const moreSrc = code("pages/more/more.js");
+const aiBrainSrc = code("subpkg/assistant/ai-brain.js");
+const lensSrc = code("subpkg/lens/lens.wxml");
+const mapSrc = code("subpkg/map/map.js");
+log(!/天气已内置|免配置/.test(guideSrc), "使用指南不宣称天气「已内置/免配置」（实需本人和风 Key + 联网）");
+log(!/离线速查天气/.test(moreSrc), "更多页不宣称「离线速查天气」（实为联网 + Key）");
+log(!/离线识别，无需联网|离线识别无需联网/.test(aiBrainSrc + lensSrc), "识物文案不宣称「离线识别无需联网」（实走云端多模态）");
+log(!/直接导航（离线可用）/.test(mapSrc), "地图分享卡不宣称导航「离线可用」（导航需联网底图）");
 console.log(fail === 0
-  ? "\n✓ 离线优先 / 零外链 内容守卫通过（无 <a> 外链、主包首屏无远程图）"
+  ? "\n✓ 离线优先 / 零外链 内容守卫通过（无 <a> 外链、主包首屏无远程图、能力宣称属实）"
   : "\n✗ 命中离线优先 / 零外链 红线，请移除外链标签或远程首屏图");
 process.exit(fail === 0 ? 0 : 1);

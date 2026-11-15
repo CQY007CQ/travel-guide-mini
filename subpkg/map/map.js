@@ -13,7 +13,7 @@ const MARKER_CAP = 20;
 Page(SafePage({
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
-    return { title: "行程景点全标地图，点一下直接导航（离线可用）", path: "/pages/index/index" };
+    return { title: "行程景点全标地图，点位连线可离线看；点一下联网导航", path: "/pages/index/index" };
   },
 
   data: {
