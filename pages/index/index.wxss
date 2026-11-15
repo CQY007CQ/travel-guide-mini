@@ -220,8 +220,8 @@
 .q-lab { font-size: calc(21rpx * var(--fs, 1)); color: var(--t4, #7d92ab); margin-bottom: 10rpx; letter-spacing: 1rpx; }
 
 /* v1.8：玩几天「－ 数字 ＋」步进（v1.8.1 移除快捷天数 chip，回归减法） */
-.day-ctl { flex: 1; display: flex; align-items: center; justify-content: flex-end; }
-
+/* 减法：去掉 .day-ctl 包装层，对齐样式直接并入 stepper */
+.day-stepper { flex: 1; justify-content: flex-end; }
 .day-stepper .step-num { min-width: 96rpx; font-size: calc(30rpx * var(--fs, 1)); color: var(--gold-tx, #b8860b); }
 
 .action-area { padding: 40rpx 40rpx 0; }

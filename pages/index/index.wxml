@@ -9,7 +9,7 @@
   </view>
 
   <!-- v1.20.7：AI 助手入口（内嵌胶囊卡片，不压 tabBar）—— 让 AI 充满程序门面，带当前选中城市进 assistant -->
-  <view class="card"><ai-entry inline topic="generate" city="{{cityName}}" label="问问 AI 助手（含拍照识物）"/></view>
+  <ai-entry inline topic="generate" city="{{cityName}}" label="问问 AI 助手（含拍照识物）"/>
 
   <!-- v1.19.60：城市数据分包加载失败兜底 —— 展示重试卡片，避免空白死页被误判白屏 -->
   <view class="card data-fail" wx:if="{{dataFailed}}">
@@ -193,12 +193,10 @@
       </block>
       <view class="field-row">
         <text class="field-label">玩几天</text>
-        <view class="day-ctl">
-          <view class="stepper day-stepper">
-            <text class="step-btn" catchtap="onDaysMinus">－</text>
-            <text class="step-num">{{days}} 天</text>
-            <text class="step-btn" catchtap="onDaysPlus">＋</text>
-          </view>
+        <view class="stepper day-stepper">
+          <text class="step-btn" catchtap="onDaysMinus">－</text>
+          <text class="step-num">{{days}} 天</text>
+          <text class="step-btn" catchtap="onDaysPlus">＋</text>
         </view>
       </view>
       <!-- v1.19.2：常用天数一键预设（步进要点 7 次才好；新手也不知道几天合适） -->

@@ -1232,8 +1232,7 @@ Page(SafePage({
       if (!c) { wx.showToast({ title: "示例城市暂未收录", icon: "none" }); return; }
       // 示例行程用 +2 出发：5 天正好落在和风 7 天预报窗口(today..+6)内，演示能直接看到天气
       const d = new Date(); d.setDate(d.getDate() + 2);
-      const pad = n => (n < 10 ? "0" + n : "" + n);
-      const depart = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+      const depart = iso(d);   // 复用本文件已有的 iso()，去掉重复的日期拼接
       const oldPlan = app.globalData && app.globalData.plan;
       if (oldPlan && oldPlan.days && oldPlan.days.length) { try { T.savePlanSlot(oldPlan); } catch (e) {} }
       const daysArr = T.buildPlan({
