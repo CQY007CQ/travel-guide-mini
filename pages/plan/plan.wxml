@@ -34,7 +34,7 @@
     </view>
 
     <!-- v1.8.4 A1：人流提示（公假 / 暑假 / 周末） -->
-    <view class="hint-strip {{hint.lv}}" wx:for="{{hints}}" wx:key="date">
+    <view class="hint-strip {{hint.lv}}" wx:for="{{hints}}" wx:for-item="hint" wx:key="date">
       <text class="hint-d">{{hint.dateTx}}</text>
       <text class="hint-t">{{hint.txt}}</text>
     </view>
