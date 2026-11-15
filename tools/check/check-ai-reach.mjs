@@ -34,6 +34,8 @@ const reason = code(read("subpkg/assistant/ai-reason.js"));
 const asst = code(read("subpkg/assistant/assistant.js"));
 const wxml = code(read("subpkg/assistant/assistant.wxml"));
 const wxss = read("subpkg/assistant/assistant.wxss");
+const moreJsA = code(read("pages/more/more.js"));
+const webAiJs = code(read("web/ai-assistant.js"));
 
 /* ---------- ① 页面级 grounding ---------- */
 ck("新增纯逻辑模块都在 assistant 分包（主包零增长）",
@@ -134,6 +136,13 @@ ck("指南有 AI 助手/识物两个一键直达按钮（不展开可见）",
   /data-url="\/subpkg\/assistant\/assistant"/.test(guideWxml) &&
   /data-url="\/subpkg\/lens\/lens"/.test(guideWxml) &&
   /class="g-ai-quick"/.test(guideWxml));
+
+/* ---------- ⑥ 折叠状态同步 + 网页 AI 场景对齐 ---------- */
+ck("更多页单组折叠后重算总开关（文案不与实际状态相反）",
+  /Object\.keys\(collapsed\)\.every\(/.test(moreJsA) && /allCollapsed/.test(moreJsA));
+ck("网页 AI 把「拍照识物」引导到识物页，不误答出片点",
+  /识物\|识别\|认出/.test(webAiJs) && /act\("subpkg\/lens\/lens",\s*"打开拍照识物/.test(webAiJs) &&
+  /intent:\s*"lens"/.test(webAiJs));
 
 console.log("  更强 AI / 全站适配防回潮守卫: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);

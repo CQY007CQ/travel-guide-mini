@@ -53,18 +53,12 @@
         <view class="ps-del" data-id="{{item.id}}" catchtap="onDelPlan">✕</view>
       </view>
       <view class="sp-tip dim">点行程名或「恢复」切换</view>
-    </view>
-  </view>
-
-  <!-- v1.19.179：我的攻略库（专注浏览 / 打开 / 删除，区别于上面的快速恢复） -->
-  <view class="group {{collapsed.guides ? 'collapsed' : ''}}" wx:if="{{planLibN > 0}}" data-gid="guides">
-    <view class="group-title" bindtap="toggleGroup" data-gid="guides">我的攻略</view>
-    <view class="card group-card">
-      <view class="menu" bindtap="goMyGuides">
-        <image class="m-ic" src="/images/icons/luggage.png"/>
+      <!-- 减法：攻略库与原「我的攻略」是同一批存档，不再单列一张卡，收进本组底部一行入口 -->
+      <view class="menu" bindtap="goMyGuides" wx:if="{{planLibN > 0}}">
+        <image class="m-ic" src="/images/icons/book.png"/>
         <view class="m-txt">
-          <view class="m-t">我的攻略库</view>
-          <view class="m-d dim">已保存 {{planLibN}} 份行程，随时再打开</view>
+          <view class="m-t">管理全部攻略</view>
+          <view class="m-d dim">共 {{planLibN}} 份 · 打开 / 删除</view>
         </view>
         <text class="arrow">›</text>
       </view>

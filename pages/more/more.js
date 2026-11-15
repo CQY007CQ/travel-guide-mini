@@ -32,7 +32,7 @@ Page(SafePage({
     fz: 1, td: false, hasPlan: false, deepOn: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0, cloudEnv: "",
     achModal: { show: false, list: [], more: 0 },
     // v1.20.7：分组折叠（手风琴）——gid 与 WXML 一一对应；密集派生类默认收起，直接给「更多」页减负
-    collapsed: { saved: false, guides: false, foot: false, notes: false, review: false, insights: true, pz: true, insp: false, merge: false, year: true, heat: true, ui: false, ach: true, wish: false, privacy: true, keys: true, travel: false, prep: false, general: false },
+    collapsed: { saved: false, foot: false, notes: false, review: false, insights: true, pz: true, insp: false, merge: false, year: true, heat: true, ui: false, ach: true, wish: false, privacy: true, keys: true, travel: false, prep: false, general: false },
     allCollapsed: false
   },
 
@@ -48,7 +48,10 @@ Page(SafePage({
     const gid = e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.gid;
     if (!gid) return;
     const cur = !!(this.data.collapsed && this.data.collapsed[gid]);
-    this.setData({ ["collapsed." + gid]: !cur });
+    const collapsed = Object.assign({}, this.data.collapsed, { [gid]: !cur });
+    // 总开关文案必须跟随实际折叠状态：否则「收起全部」后手动展开一组，文案仍相反
+    const allCollapsed = Object.keys(collapsed).every((k) => collapsed[k]);
+    this.setData({ collapsed, allCollapsed });
   },
   // 顶部总开关：一键收起 / 展开全部分组
   toggleAll() {
