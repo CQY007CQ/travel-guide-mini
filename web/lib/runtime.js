@@ -620,6 +620,43 @@
       img.onerror = function () { o.fail && o.fail({ errMsg: "getImageInfo:fail" }); };
       img.src = o.src;
     },
+    // 拍照识物（网页端）：用隐藏 <input type=file> 选图，objectURL 同时供 <image src> 预览与上传。
+    // sourceType 含 camera 时加 capture 触发后置摄像头；用户取消走 fail，不打扰。
+    chooseMedia: function (o) {
+      o = o || {};
+      try {
+        var inp = document.createElement("input");
+        inp.type = "file"; inp.accept = "image/*";
+        inp.multiple = (o.count || 1) > 1;
+        var st = o.sourceType || ["album", "camera"];
+        if (st.indexOf("camera") >= 0 && st.indexOf("album") < 0) inp.setAttribute("capture", "environment");
+        inp.style.position = "fixed"; inp.style.left = "-9999px";
+        document.body.appendChild(inp);
+        inp.addEventListener("change", function () {
+          var fs = Array.prototype.slice.call(inp.files || []).slice(0, o.count || 1);
+          inp.remove();
+          if (!fs.length) { o.fail && o.fail({ errMsg: "chooseMedia:fail cancel" }); return; }
+          var urls = fs.map(function (f) { return URL.createObjectURL(f); });
+          var r = ok("chooseMedia", {
+            tempFiles: urls.map(function (u, i) { return { tempFilePath: u, fileType: "image", size: fs[i].size }; }),
+            tempFilePaths: urls, type: "image"
+          });
+          o.success && o.success(r); o.complete && o.complete(r);
+        });
+        inp.click();
+      } catch (e) { o.fail && o.fail({ errMsg: "chooseMedia:fail " + (e && e.message) }); }
+    },
+    chooseImage: function (o) {
+      o = o || {};
+      wx.chooseMedia(Object.assign({}, o, {
+        sourceType: o.sourceType || ["album", "camera"],
+        success: function (r) {
+          var r2 = ok("chooseImage", { tempFilePaths: (r && r.tempFilePaths) || [], tempFiles: (r && r.tempFiles) || [] });
+          o.success && o.success(r2); o.complete && o.complete(r2);
+        },
+        fail: function (e) { o.fail && o.fail(e); o.complete && o.complete(e); }
+      }));
+    },
     saveImageToPhotosAlbum: function (o) {
       // 浏览器端直接触发下载；原来没有可见反馈，用户点了像「分享图生成失败」
       o = o || {};

@@ -306,7 +306,8 @@ function aiChat(opts) {
   });
 }
 
-// 上传本地图片到云存储，返回 fileID（拍照识物用；小程序端）。
+// 上传本地图片到云存储，返回 fileID（拍照识物用；小程序 + 网页双端）。
+// filePath 在小程序是本地临时路径，在网页是 <input type=file> 拿到的 File/Blob 对象（runtime wx.chooseMedia 垫片产出）。
 function uploadImage(filePath) {
   return new Promise(function (resolve, reject) {
     let done = false;
@@ -318,14 +319,26 @@ function uploadImage(filePath) {
     const ok = function (v) { if (done) return; done = true; try { clearTimeout(timer); } catch (e) {} resolve(v); };
     const bad = function (e) { if (done) return; done = true; try { clearTimeout(timer); } catch (e2) {} reject(e); };
     try {
-      if (isWeb()) { bad(new Error("web-upload-unsupported")); return; }
+      if (!filePath) { bad(new Error("empty-file-path")); return; }
+      const m = String(filePath.name || filePath).match(/\.(\w+)$/);
+      const ext = m ? m[1] : "jpg";
+      const cloudPath = "lens/" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "." + ext;
+      if (isWeb()) {
+        // 网页端走 CloudBase JS SDK 的 storage.uploadFile（FormData），与 callFunction 同一 app 实例。
+        // filePath 是 wx.chooseMedia 垫片产出的 objectURL（同时供 <image src> 预览），先 fetch 成 Blob 再传。
+        const cb = (typeof window !== "undefined") && window.__cloudbase;
+        if (!cb || !cb.uploadFile) { bad(new Error("cloud-web-not-ready")); return; }
+        const toBlob = (typeof filePath === "string" && /^blob:/.test(filePath))
+          ? fetch(filePath).then(function (r) { return r.blob(); })
+          : Promise.resolve(filePath);
+        toBlob.then(function (blob) { return cb.uploadFile({ cloudPath: cloudPath, file: blob }); })
+          .then(function (res) { ok((res && (res.fileID || res.fileId)) || ""); })
+          .catch(function (err) { bad(err); });
+        return;
+      }
       if (typeof wx === "undefined" || !wx.cloud || typeof wx.cloud.uploadFile !== "function") {
         bad(new Error("cloud-not-ready")); return;
       }
-      if (!filePath) { bad(new Error("empty-file-path")); return; }
-      const m = String(filePath).match(/\.(\w+)$/);
-      const ext = m ? m[1] : "jpg";
-      const cloudPath = "lens/" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "." + ext;
       wx.cloud.uploadFile({
         cloudPath: cloudPath,
         filePath: filePath,

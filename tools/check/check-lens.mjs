@@ -38,6 +38,8 @@ const wxml = code(read("subpkg/lens/lens.wxml"));
 const wxss = read("subpkg/lens/lens.wxss");
 const appJson = read("app.json");
 const asstWxml = code(read("subpkg/assistant/assistant.wxml"));
+const runtimeJs = code(read("web/lib/runtime.js"));
+const cloudJs = code(read("utils/cloud.js"));
 
 /* ---------- ① 云端 grounding ---------- */
 ck("云函数 buildSystem 的 custom 分支注入 hasContext 上下文",
@@ -95,6 +97,13 @@ ck("识物页仍注册在分包内（新增文件不占主包）",
 ck("助手页识物入口无条件展示（不依赖 hasPlan / 生成攻略）",
   /class="card lens-card" bindtap="goLens"/.test(asstWxml) &&
   !/class="card lens-card"[^>]*wx:if/.test(asstWxml));
+// 网页版曾整条链路不通：runtime 无 wx.chooseMedia、Cloud.uploadImage 直接 web-upload-unsupported。
+// 现在网页用 <input type=file> 垫片选图 + CloudBase SDK storage.uploadFile 上传，双端同源。
+ck("网页版识图链路可用：chooseMedia 垫片 + 云存储上传（不再 web-upload-unsupported）",
+  /chooseMedia: function/.test(runtimeJs) && /type\s*=\s*"file"/.test(runtimeJs) &&
+  /createObjectURL/.test(runtimeJs) &&
+  /cb\.uploadFile\(\{\s*cloudPath/.test(cloudJs) &&
+  !/web-upload-unsupported/.test(cloudJs));
 
 console.log("  拍照识物防回潮守卫: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);
