@@ -14,9 +14,11 @@
   border-right: 3rpx solid var(--t3, #8fa3bc); border-bottom: 3rpx solid var(--t3, #8fa3bc);
   transform: rotate(45deg); transition: transform .2s ease; opacity: .85; }
 .group.collapsed > .group-title::after { transform: rotate(-45deg); }
-/* 折叠时只保留标题：直接子节点（.card / 操作按钮 / 提示行等）一律隐藏，
-   避免「去哪儿好呢」的 .insp-ops、「想玩清单」的 .wish-tip 这类非 .card 子节点在收起后仍漏出 */
-.group.collapsed > *:not(.group-title) { display: none; }
+.group.collapsed > .card { display: none; }
+/* 折叠时一并隐藏非 .card 的直接子节点（「去哪儿好呢」.insp-ops、「想玩清单」.wish-tip），
+   否则卡片收起后这些子节点仍会漏出。WeChat WXSS 不支持通用选择器 *，此处逐类名列举 */
+.group.collapsed > .insp-ops,
+.group.collapsed > .wish-tip { display: none; }
 
 /* 顶部「收起全部 / 展开全部」总开关 */
 .collapse-all { display: flex; align-items: center; justify-content: flex-end; gap: 10rpx;
