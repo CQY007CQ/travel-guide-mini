@@ -212,25 +212,37 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
     /w-sx/.test(wxmlSrc) && /#app \.w-sx/.test(shell) && /overflow-x:\s*auto/.test(shell));
   ok("工具条默认折叠，不再压住内容",
     htmlSrc.includes("webToolsToggle") && /#webTools\.hidden/.test(htmlSrc));
-  ok("桌面侧栏与布局切换由 app.js 驱动",
-    ["buildSidebar", "toggleLayout", "force-wide", "webToolsToggle"].every((k) => appJs.includes(k)));
-  ok("顺序型页面（行程/今天/地图/使用指南）桌面保持单列，避免 2 列打断阅读顺序",
-    /data-page="pages\/today\/today"\]/.test(shell) && /max-width:\s*1080px/.test(shell) &&
-    /data-page="subpkg\/map\/map"\]/.test(shell) &&
-    /data-page="subpkg\/guide\/guide"\][^{]*\{[^}]*display:\s*block[^}]*max-width:\s*1080px/.test(shell));
+  ok("桌面侧栏与布局切换由 app.js 驱动，折叠后数据工具条同步归位",
+    ["buildSidebar", "toggleLayout", "force-wide", "webToolsToggle"].every((k) => appJs.includes(k)) &&
+    /body\.sidebar-collapsed #webDataBar\s*\{\s*left:\s*12px/.test(shell));
+  // 防假绿：旧断言只查 data-page 字符串是否存在，选择器写成 .page[data-page=...] 也照样通过，
+  // 而运行时 data-page 实际挂在 #app 上（runtime.js paint），那些规则一条都不会命中。
+  ok("页面专属布局选择器作用域正确：#app[data-page] > .page，禁止把属性选择器挂在 .page 上",
+    !/\.page\[data-page=/.test(shell.replace(/\/\*[\s\S]*?\*\//g, "")) &&
+    /#app\[data-page="pages\/index\/index"\] > \.page/.test(shell) &&
+    /#app\[data-page="pages\/more\/more"\] > \.page/.test(shell));
+  ok("顺序型页面（行程/今天/地图/指南/急救/深度）桌面保持单列，避免 2 列打断阅读顺序",
+    [["pages/plan/plan"], ["pages/today/today"], ["subpkg/map/map"],
+     ["subpkg/guide/guide"], ["pages/help/help"], ["subai/deep/deep"]]
+      .every(([p]) => new RegExp('#app\\[data-page="' + p.replace(/\//g, "\\/") + '"\\] > \\.page').test(shell)) &&
+    /#app\[data-page="subpkg\/guide\/guide"\] > \.page[^{]*\{[^}]*display:\s*block[^}]*max-width:\s*1080px/.test(shell));
   ok("桌面侧栏常驻时页面级 modal 压过侧栏（否则浮层跑到侧栏后）",
     /\[data-page\]\s*\.psheet\s*\{\s*z-index:\s*9451/.test(shell) &&
     /\[data-page\]\s*\.pmask[^\}]*z-index:\s*9450/.test(shell));
 
   // ── 2026-11-15 界面适配续：FAB / 三栏 dock / 侧栏折叠 / 矮屏 ──
   const aiCss = fs.readFileSync(path.join(ROOT, "web/ai-assistant.css"), "utf8");
+  const aiJs = fs.readFileSync(path.join(ROOT, "web/ai-assistant.js"), "utf8");
   ok("700–1099px 时 AI 悬浮按钮不压底部 tabBar（侧栏接管后才落地）",
     /@media \(min-width: 1100px\)\s*\{\s*\.ai-fab\s*\{\s*bottom:\s*calc\(24px/.test(aiCss) &&
     !/@media \(min-width: 700px\)\s*\{\s*\.ai-fab\s*\{\s*bottom:\s*calc\(24px/.test(aiCss));
-  ok("≥1700px AI 常驻栏显式扣减 #app 宽度（否则右栏盖住内容）",
+  ok("≥1700px AI 常驻栏显式扣减 #app 宽度，且跨断点自动回退形态",
     /body\.ai-docked\s*\{[^}]*--dock-w/.test(aiCss) &&
     /body\.ai-docked #app\s*\{[^}]*width:\s*calc\(100% - var\(--sidebar-w[^)]*\) - var\(--dock-w\)\)/.test(aiCss) &&
-    /body\.sidebar-collapsed\.ai-docked #app/.test(aiCss));
+    /body\.sidebar-collapsed\.ai-docked #app/.test(aiCss) &&
+    /window\.addEventListener\("resize"/.test(aiJs) &&
+    /classList\.toggle\("ai-docked",\s*dock\)/.test(aiJs) &&
+    /dom\.fab\.style\.display\s*=\s*open\s*\?\s*"none"\s*:\s*""/.test(aiJs));
   ok("侧栏折叠后页面抽屉回到左边缘（不再偏右 224px）",
     /body\.sidebar-collapsed #webNavPanel\s*\{\s*left:\s*12px/.test(shell));
   ok("矮屏 / 横屏手机有高度断点（顶栏、tabBar、弹层均收敛）",

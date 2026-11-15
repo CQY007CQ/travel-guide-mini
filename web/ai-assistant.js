@@ -1172,6 +1172,16 @@
 
     fab.addEventListener("click", openPanel);
     backdrop.addEventListener("click", closePanel);
+    // 宽屏 dock 与窄屏浮层是 CSS 媒体查询切的两套形态，但 ai-docked / 遮罩 / FAB 是 JS 一次性写入的。
+    // 面板开着时跨过 1700px 断点，CSS 会变而 JS 状态不会：FAB 永久 display:none、遮罩消失，用户关不掉。
+    // 这里随视口重算三者状态，关闭态则整体复位。
+    window.addEventListener("resize", function () {
+      var open = dom.panel.classList.contains("open");
+      var dock = open && window.innerWidth >= 1700;
+      document.body.classList.toggle("ai-docked", dock);
+      dom.backdrop.classList.toggle("show", open && !dock);
+      dom.fab.style.display = open ? "none" : "";
+    });
     panel.querySelector("#aiClose").addEventListener("click", closePanel);
     panel.querySelector("#aiSend").addEventListener("click", send);
     panel.querySelector("#aiGear").addEventListener("click", function () { dom.settings.classList.toggle("show"); });

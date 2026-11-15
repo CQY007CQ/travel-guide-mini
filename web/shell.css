@@ -115,9 +115,11 @@ button { font-family: inherit; }
 @media (min-width: 3200px) {
   #app > .page { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); align-content: start; }
 }
-/* 设置页：超宽屏收成舒适阅读栏，避免一行拉太长 */
+/* 设置页：超宽屏收成舒适阅读栏，避免一行拉太长。
+   注意：运行时 data-page 挂在 #app 上（runtime.js paint()），.page 根节点没有该属性；
+   把属性选择器挂在 .page 上的旧写法一条都不命中，必须挂在 #app 上再取子代 .page。 */
 @media (min-width: 1500px) {
-  #app > .page[data-page="pages/more/more"] {
+  #app[data-page="pages/more/more"] > .page {
     display: block; max-width: 960px; margin: 0 auto;
   }
 }
@@ -127,40 +129,44 @@ button { font-family: inherit; }
    用 auto-fit 网格两两成对，单卡自动撑满整行 —— 不出现「右栏大片留白 / 底截一刀」。
    仅 ≥820px 接管；<820px 回落手机单列（.home-aux 用 auto-fit 自然塌成单列）。 */
 @media (min-width: 820px) {
-  #app > .page[data-page="pages/index/index"] {
+  #app[data-page="pages/index/index"] > .page {
     display: block;
     max-width: 1560px;
     margin: 0 auto;
     padding: 0 12px;
   }
-  #app > .page[data-page="pages/index/index"] .home-aux {
+  #app[data-page="pages/index/index"] > .page .home-aux {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 18px;
     margin: 0 14px;
   }
-  #app > .page[data-page="pages/index/index"] .home-aux > .card {
+  #app[data-page="pages/index/index"] > .page .home-aux > .card {
     margin: 0;
     border-radius: 18px;
     box-shadow: 0 1px 3px rgba(16, 24, 40, .06), 0 6px 18px rgba(16, 24, 40, .05);
     transition: transform .22s ease, box-shadow .22s ease;
   }
-  #app > .page[data-page="pages/index/index"] .home-aux > .card:hover {
+  #app[data-page="pages/index/index"] > .page .home-aux > .card:hover {
     transform: translateY(-3px);
     box-shadow: 0 4px 10px rgba(16, 24, 40, .10), 0 16px 40px rgba(16, 24, 40, .12);
   }
 }
 
-/* ── 顺序型页面（行程时间线 / 今天安排 / 地图 / 使用指南）桌面保持单列 ──
+/* ── 顺序型页面（行程时间线 / 今天安排 / 地图 / 使用指南 / 急救分诊 / 城市深度）桌面保持单列 ──
    通用 2 列网格会把 day-card / 时间线 / 地图清单左右错开，打断「从上往下读」的顺序，
    单列居中（≤1080px）既避免错位，又比手机全宽更舒展；特异性高于通用网格规则，优先命中。
    使用指南（guide）是「分组标题 + 手风琴列表卡片」结构：2 列网格下 .g-group-t 独占整行、
-   .g-list.card 只占左列，右列大片空白（1080px 视口下卡片仅约 275px）→ 同归顺序页单列。 */
+   .g-list.card 只占左列，右列大片空白（1080px 视口下卡片仅约 275px）→ 同归顺序页单列。
+   急救分诊（help）的「第一步/第二步/第三步」与城市深度（deep）的分组资料卡同为线性流程，不能并排。
+   注意选择器作用域：data-page 在 #app 上，别把属性选择器写到 .page 上（旧写法全失效）。 */
 @media (min-width: 820px) {
-  #app > .page[data-page="pages/plan/plan"],
-  #app > .page[data-page="pages/today/today"],
-  #app > .page[data-page="subpkg/map/map"],
-  #app > .page[data-page="subpkg/guide/guide"] {
+  #app[data-page="pages/plan/plan"] > .page,
+  #app[data-page="pages/today/today"] > .page,
+  #app[data-page="subpkg/map/map"] > .page,
+  #app[data-page="subpkg/guide/guide"] > .page,
+  #app[data-page="pages/help/help"] > .page,
+  #app[data-page="subai/deep/deep"] > .page {
     display: block; max-width: 1080px; margin: 0 auto; padding: 0 12px;
   }
 }
@@ -257,6 +263,8 @@ body.force-wide #app > .page > .card {
   body.sidebar-collapsed #webTopBar { left: 0; }
   /* 侧栏收起后内容已铺满全宽，页面抽屉若仍按 left:侧栏宽+12px 定位会平白右移 224px */
   body.sidebar-collapsed #webNavPanel { left: 12px; }
+  /* 数据工具条同病：index.html 的内联 @media 把它推到 侧栏宽+12px，折叠后孤悬在空白区 */
+  body.sidebar-collapsed #webDataBar { left: 12px; }
   body.sidebar-collapsed #wsExpand { display: flex; }
 }
 
