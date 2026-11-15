@@ -50,6 +50,9 @@ function resolveConfig() {
   const key = (process.env.LLM_API_KEY || "").trim();
   let model = (process.env.LLM_MODEL || "").trim();
   const prov = (process.env.LLM_PROVIDER || "").trim().toLowerCase();
+  // 双模型：识图专用视觉模型（如 qwen-vl-plus）。配置后，有图的请求自动改走它，
+  // 文本请求仍用默认 LLM_MODEL（如 qwen-plus），兼顾「能识图 + 文本省钱」。
+  const visionModel = (process.env.LLM_VISION_MODEL || "").trim();
 
   let finalBase = base;
   let finalModel = model;
@@ -58,7 +61,7 @@ function resolveConfig() {
     if (!finalModel) finalModel = PROVIDERS[prov].model;
   }
   if (!finalModel) finalModel = "gpt-4o"; // 强模型兜底，不再是 gpt-4o-mini
-  return { base: finalBase, key: key, model: finalModel };
+  return { base: finalBase, key: key, model: finalModel, visionModel: visionModel };
 }
 
 function providerOf(baseUrl) {
@@ -161,18 +164,23 @@ exports.main = async (event) => {
   const hasImage = !!(event.imageFileID || event.imageBase64 || (Array.isArray(event.imageFileIDs) && event.imageFileIDs.length));
   if (!messages && !prompt && !hasImage) return { ok: false, err: "empty-input" };
 
+  // 双模型生效：有图且配了 LLM_VISION_MODEL 时，识图请求改走视觉模型（如 qwen-vl-plus），
+  // 文本仍走默认 LLM_MODEL（如 qwen-plus）。这样默认用便宜的文本模型，识图才切多模态，整体最省钱。
+  const effectiveModel = (hasImage && cfg.visionModel)
+    ? cfg.visionModel
+    : ((typeof event.model === "string" && event.model.trim()) ? event.model.trim() : cfg.model);
+
   // 视觉能力自检：明确已知不支持图片的模型，直接给可操作的原因，避免页面只拿到「识别失败」。
   // VISION_OK 放行含 vl/vision/4o 等视觉型号，避免误拦 deepseek-vl2 / qwen-vl-max 这类视觉模型；
   // LLM_ALLOW_VISION=1 为自定义兼容网关的逃生阀。
-  const modelForCheck = (typeof event.model === "string" && event.model.trim()) ? event.model.trim() : cfg.model;
   const VISION_OK = /(vl|vision|4o|4\.1|gpt-4|claude-3|gemini)/i;
   const NO_VISION = /deepseek|qwen-(max|plus|turbo|long)|moonshot-v1|gpt-3\.5|o1-mini|text-davinci/i;
-  if (hasImage && !VISION_OK.test(modelForCheck) && NO_VISION.test(modelForCheck) && process.env.LLM_ALLOW_VISION !== "1") {
+  if (hasImage && !VISION_OK.test(effectiveModel) && NO_VISION.test(effectiveModel) && process.env.LLM_ALLOW_VISION !== "1") {
     return {
       ok: false,
       err: "model-no-vision",
-      hint: "当前模型 " + modelForCheck + " 不支持图片输入；拍照识物需在云函数环境变量把 LLM_MODEL 改为多模态模型（如 gpt-4o / qwen-vl-max）。",
-      model: modelForCheck
+      hint: "当前视觉模型 " + effectiveModel + " 不支持图片输入；拍照识物需在云函数环境变量把 LLM_VISION_MODEL 改为多模态模型（如 qwen-vl-plus / qwen-vl-max / gpt-4o）。",
+      model: effectiveModel
     };
   }
 
@@ -214,7 +222,7 @@ exports.main = async (event) => {
     finalMessages.push({ role: "user", content: prompt });
   }
 
-  const model = (typeof event.model === "string" && event.model.trim()) ? event.model.trim() : cfg.model;
+  const model = effectiveModel;
   const temperature = (typeof event.temperature === "number") ? event.temperature : 0.7;
   const maxTokens = (typeof event.max_tokens === "number" && event.max_tokens > 0) ? event.max_tokens : 1200;
 
