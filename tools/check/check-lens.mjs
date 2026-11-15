@@ -76,7 +76,8 @@ ck("离线候选只来自随包真实资料", /V\.localCandidates\(/.test(lens) 
 ck("逐张上传失败只丢该张（不再整批全挂）",
   /Cloud\.uploadImage\(p\)\.catch\(function \(\) \{ return ""; \}\)/.test(lens));
 ck("上传全失败自动重试一次", /_uploadWithRetry/.test(lens) && /正在重试一次/.test(lens));
-ck("识别失败 / 无结果也回落离线对照", /云端识别未返回结果/.test(lens));
+// 文案已从「云端识别未返回结果（原始 err）」改为 _friendlyErr 人话；断言跟随新实现
+ck("识别失败 / 无结果也回落离线对照", /_friendlyErr\(out && out\.r && out\.r\.err\)/.test(lens) && /_friendlyErr\(e\)/.test(lens));
 
 /* ---------- ⑤ 纯逻辑零伪造与 UI 区块 ---------- */
 ck("纯逻辑层不生成任何名称（无随机 / 无模板造词）",
@@ -104,6 +105,13 @@ ck("网页版识图链路可用：chooseMedia 垫片 + 云存储上传（不再 
   /createObjectURL/.test(runtimeJs) &&
   /cb\.uploadFile\(\{\s*cloudPath/.test(cloudJs) &&
   !/web-upload-unsupported/.test(cloudJs));
+
+// 云函数原始错误含 errCode/Require stack/callId，曾原样拼进 localNote 刷屏并把地点列表挤出屏幕。
+ck("识物失败只给用户人话，不泄漏 errCode / Require stack 技术堆栈",
+  /_friendlyErr\(/.test(lens) &&
+  /Cannot find module\|504002/.test(lens) &&
+  /errCode\|Require stack/.test(lens) &&
+  !/_openLocalCompare\("识别失败（" \+ String/.test(lens));
 
 console.log("  拍照识物防回潮守卫: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);

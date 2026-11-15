@@ -216,6 +216,18 @@ Page(SafePage({
     });
   },
 
+  // 云函数原始错误含完整堆栈（errCode / Require stack / callId），直接展示会吓到用户且刷屏。
+  // 这里只映射成一句人话；技术细节仍由 EL.push 记进本机异常日志，排查不丢信息。
+  _friendlyErr(e) {
+    const s = String((e && e.message) || e || "");
+    if (/Cannot find module|504002|BASE_FUNCTIONS_EXECUTE_FAIL/.test(s)) return "云端识别服务暂时不可用";
+    if (/timeout|超时|ETIMEDOUT/.test(s)) return "云端识别超时，请重试";
+    if (/cloud-disabled|not-configured|未开启/.test(s)) return "云端识别未开启";
+    if (/limit|配额|quota|429/.test(s)) return "云端识别额度用尽，请稍后再试";
+    if (/upload|上传/.test(s)) return "照片上传失败，请检查网络";
+    return "云端识别暂时不可用";
+  },
+
   // 云端不可用 / 识别失败时的诚实出口：本机不含离线图像识别，只列随包真实资料供人工对照。
   // 绝不把「知识库候选」包装成「识别结果」——这是零伪造红线。
   _openLocalCompare(note) {
@@ -259,9 +271,11 @@ Page(SafePage({
       .then(function (out) {
         try { wx.hideLoading(); } catch (e) {}
         const v = (out && out.v) || { consensus: false, uncertain: true, total: 0, agree: 0, alternatives: [], primaryText: "" };
-        const text = v.primaryText || (out && out.r && out.r.text) || "";
+        let text = v.primaryText || (out && out.r && out.r.text) || "";
+        // 云函数失败时可能把错误堆栈当 text 回传：不把它当识别结果展示（也不重复两遍）
+        if (/errCode|Require stack|BASE_FUNCTIONS_EXECUTE_FAIL|functions execute fail/.test(text)) text = "";
         if (!text) {
-          self._openLocalCompare("云端识别未返回结果（" + ((out && out.r && out.r.err) || "未知") + "）。");
+          self._openLocalCompare(self._friendlyErr(out && out.r && out.r.err) + "。");
           return;
         }
         const parsed = V.parseResult(text);
@@ -294,7 +308,7 @@ Page(SafePage({
       .catch(function (e) {
         try { wx.hideLoading(); } catch (_) {}
         try { EL.push("lens.identify", e); } catch (_) {}
-        self._openLocalCompare("识别失败（" + String((e && e.message) || e) + "）。");
+        self._openLocalCompare(self._friendlyErr(e) + "。");
       });
   },
 
