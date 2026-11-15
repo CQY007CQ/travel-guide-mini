@@ -28,6 +28,15 @@
     <view class="dt-t">{{deepTip}}</view>
   </view>
 
+  <!-- AI 识物入口：不依赖行程，有/无攻略都必须可见（曾嵌在 hasPlan 卡片里导致新用户找不到） -->
+  <view class="card lens-card" bindtap="goLens">
+    <view class="h2"><image lazy-load class="ic" src="/images/icons/camera.png"/>AI 识物 · 拍照识图</view>
+    <view class="lens-entry">
+      <text class="le-t">拍一张认植物 / 地标 / 招牌，AI 讲讲它的故事</text>
+      <text class="le-a">→</text>
+    </view>
+  </view>
+
   <!-- 空态 -->
   <view class="empty" wx:if="{{!hasPlan}}">
     <view class="em-ic"><image lazy-load class="em-img" src="/images/icons/search.png"/></view>
@@ -40,13 +49,6 @@
   <view class="card head" wx:if="{{hasPlan}}">
     <view class="h2"><image lazy-load class="ic" src="/images/icons/search.png"/>本地速查</view>
     <view class="ctx dim">{{ctx}}</view>
-
-    <!-- AI 识物入口：拍照认植物 / 地标，旅途科普 -->
-    <view class="lens-entry" bindtap="goLens">
-      <image lazy-load class="le-ic" src="/images/icons/camera.png"/>
-      <text class="le-t">AI 识物：拍一张认植物 / 地标</text>
-      <text class="le-a">→</text>
-    </view>
 
     <view class="h3">一键查</view>
     <view class="tiles">

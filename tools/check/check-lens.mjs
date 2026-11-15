@@ -37,6 +37,7 @@ const vision = code(read("subpkg/lens/lens-vision.js"));
 const wxml = code(read("subpkg/lens/lens.wxml"));
 const wxss = read("subpkg/lens/lens.wxss");
 const appJson = read("app.json");
+const asstWxml = code(read("subpkg/assistant/assistant.wxml"));
 
 /* ---------- ① 云端 grounding ---------- */
 ck("云函数 buildSystem 的 custom 分支注入 hasContext 上下文",
@@ -90,6 +91,10 @@ ck("WXSS 有新增区块样式（结构化 / 候选 / 历史）",
   /\.sum \{/.test(wxss) && /\.cand \{/.test(wxss) && /\.hist-item/.test(wxss));
 ck("识物页仍注册在分包内（新增文件不占主包）",
   /"lens\/lens"/.test(appJson) && !/utils\/lens-vision/.test(lens));
+// 曾把识物入口嵌在 hasPlan 卡片内：未生成攻略时整块不渲染，用户按「识图 / AI 助手」根本找不到。
+ck("助手页识物入口无条件展示（不依赖 hasPlan / 生成攻略）",
+  /class="card lens-card" bindtap="goLens"/.test(asstWxml) &&
+  !/class="card lens-card"[^>]*wx:if/.test(asstWxml));
 
 console.log("  拍照识物防回潮守卫: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);
