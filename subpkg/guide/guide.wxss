@@ -150,6 +150,14 @@
   font-size: calc(20rpx * var(--fs, 1)); color: var(--t4, #7d92ab);
 }
 
+/* 离线数据规模（v1.20.6 从急救页迁入）：与上方速查条拉开呼吸感 */
+.g-corpus { padding: 26rpx 28rpx; }
+.g-corpus-h {
+  font-size: calc(27rpx * var(--fs, 1)); font-weight: 800;
+  color: var(--t1, #18233a); padding-bottom: 14rpx;
+  border-bottom: 1rpx solid rgba(var(--ln-rgb, 19, 29, 49), .1);
+}
+
 /* 分组标题（本版新增：三组功能地图） */
 .g-group-t {
   margin: 28rpx 32rpx 10rpx;

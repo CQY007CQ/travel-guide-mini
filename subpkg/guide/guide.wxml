@@ -45,6 +45,34 @@
     </view>
   </block>
 
+  <!-- 离线数据规模：v1.20.6 从「旅途应急」页迁入，作为「了解本 App」的透明说明 -->
+  <view class="g-group-t">关于数据</view>
+  <view class="card g-corpus" wx:if="{{corpus}}">
+    <view class="g-corpus-h">离线数据规模</view>
+    <view class="cp-head">{{corpus.headline}}</view>
+    <view class="cp-grid">
+      <view class="cp-n"><text class="cp-v">{{corpus.cities}}</text><text class="cp-l">真实城市</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.cityEntries}}</text><text class="cp-l">城市池条目</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.spots}}</text><text class="cp-l">景点</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.foods}}</text><text class="cp-l">有美食店城</text></view>
+      <view class="cp-n"><text class="cp-v gold">{{corpus.hospitals}}</text><text class="cp-l">具名医院</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.approxCities}}</text><text class="cp-l">搜索降级城</text></view>
+      <view class="cp-n"><text class="cp-v">{{corpus.provinces}}</text><text class="cp-l">省级区</text></view>
+    </view>
+    <view class="cp-tip dim">城市池 {{corpus.cityEntries}} 条 = {{corpus.cities}} 座不同城市 + {{corpus.aliasEntries}} 条全称别名（如「阿坝 / 阿坝藏族羌族自治州」指向同一地）。其中 {{corpus.foods}} 城有真实美食店、{{corpus.spotCities}} 城有景点坐标；未收录具体店铺或坐标的城市走城心降级，不编造店名与坐标。</view>
+    <view class="cp-sec" wx:if="{{corpus.climate.length}}">
+      <view class="cp-h">气候带分布</view>
+      <view class="cp-row" wx:for="{{corpus.climate}}" wx:key="k">
+        <view class="cp-lab">{{item.label}}<text class="cp-amt"> {{item.n}}</text></view>
+        <view class="cp-bar"><view class="cp-fill" style="width:{{item.pct}}%"></view></view>
+      </view>
+    </view>
+    <view class="cp-chips" wx:if="{{corpus.region.length}}">
+      <text class="cp-chip" wx:for="{{corpus.region}}" wx:key="k">{{item.label}} {{item.n}}</text>
+    </view>
+    <view class="cp-tip dim">全部为随包下发的离线结构化数据，无需联网即可规划</view>
+  </view>
+
   <view class="g-foot">v{{ver}} · {{total}} 条 · 点标题展开 · 随时可从「更多」页打开本页</view>
 
 </view>

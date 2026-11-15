@@ -5,6 +5,8 @@ const { SafePage } = require("../../utils/app.js");
 //       ③ 本版：默认全部收起（首屏只是标题行，条数由 total 动态统计，不硬编码），但条目补足到覆盖功能地图，
 //          说明给到 40-70 字 —— 用户只展开自己要看的那条，不多看一个字。
 const T = require("../../utils/travel.js");
+// 离线数据规模：v1.20.6 从「旅途应急」页迁入（数据透明说明属「了解本 App」，不属急救场景）
+const CP = require("../../utils/corpus.js");
 
 // k = 唯一键（展开态用它判断）；url = 可直达的页面
 const GROUPS = [
@@ -53,7 +55,7 @@ const GROUPS = [
       { k: "c9", t: "数据在哪", d: "行程数据可在「更多」页导出备份或清空。", url: "/pages/more/more" },
       { k: "c10", t: "换景点与收藏", d: "换景点时弹出选择面板：本城可换景点、我的想玩/收藏（只列当天城市，避免跨城乱换）、随机换一个。", url: "/pages/plan/plan" },
       { k: "c11", t: "示例行程", d: "首页「看看示例行程」可一键载入成都 5 天的精排示例（会先把你现有行程存入存档槽，不覆盖），适合先看效果再自己生成。", url: "/pages/index/index" },
-      { k: "c12", t: "离线数据规模", d: "「帮助」页底部可看随包知识库的真实体量：城市/景点/美食城/具名医院与气候、区域分布，全部离线、数字实时统计。", url: "/pages/help/help" },
+      { k: "c12", t: "离线数据规模", d: "本页底部「关于数据」可看随包知识库的真实体量：城市/景点/美食城/具名医院与气候、区域分布，全部离线、数字实时统计。" },
     ],
   },
 ];
@@ -71,6 +73,7 @@ Page(SafePage({
     open: "",          // 当前展开条目的 k；空串 = 全部收起
     groups: GROUPS,
     total: 0,
+    corpus: null,
     ver: T.APP_VER || "",   // 版本号动态跟随 APP_VER，杜绝静态文案漂移
   },
 
@@ -87,7 +90,13 @@ Page(SafePage({
   _theme() {
     try { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); } catch (e) {}
   },
-  onShow() { this.setData({ fz: T.fontScale() }); (this.__boot || Promise.resolve()).then(() => { try { this._theme(); } catch (e) {} }); },
+  onShow() {
+    this.setData({ fz: T.fontScale() });
+    (this.__boot || Promise.resolve()).then(() => {
+      try { this._theme(); } catch (e) {}
+      try { this.setData({ corpus: CP.corpusStats() }); } catch (e) {}
+    });
+  },
 
   // 点标题展开/收起（单开：不会因为多点几下又变回长文档）
   onTopic(e) {

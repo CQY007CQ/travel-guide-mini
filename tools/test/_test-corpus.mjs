@@ -118,19 +118,23 @@ ok("真源不再用 D.HOSPITALS 统计（回潮点）",
   !/D\.HOSPITALS/.test(srcCorpus.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n")));
 ok("产物不含 D.HOSPITALS", !/D\.HOSPITALS/.test(outCorpus));
 
-/* ---------- 7. 帮助页渲染三处 ---------- */
+/* ---------- 7. 数据规模渲染页：v1.20.6 从帮助页迁到使用指南 ----------
+   急救页只留一行入口，真正的数据透明说明在 guide 页「关于数据」。断言跟随迁移后的真实位置。 */
+const guideWxml = read("subpkg/guide/guide.wxml");
+const guideJs7 = read("subpkg/guide/guide.js");
 const helpWxml = read("pages/help/help.wxml");
-const helpJs = read("pages/help/help.js");
-ok("help.wxml 渲染 headline", /\{\{\s*corpus\.headline\s*\}\}/.test(helpWxml));
-ok("help.wxml 渲染 hospitals", /\{\{\s*corpus\.hospitals\s*\}\}/.test(helpWxml));
-ok("help.wxml 渲染 approxCities（降级城单独展示）",
-  /\{\{\s*corpus\.approxCities\s*\}\}/.test(helpWxml));
-ok("help.js 通过 corpusStats() 取数", /corpusStats\s*\(/.test(helpJs));
-ok("help.js 取数失败不拖垮页面（try/catch）",
-  /try\s*\{[^}]*corpusStats|corpusStats[^;]*\}\s*catch/.test(helpJs));
-ok("help.wxml 展示城市池条目数", /\{\{\s*corpus\.cityEntries\s*\}\}/.test(helpWxml));
-ok("help.wxml 解释全称别名口径", /全称别名/.test(helpWxml));
-ok("help.wxml 说明未收录城市走降级、不编造", /不编造店名与坐标/.test(helpWxml));
+ok("guide.wxml 渲染 headline", /\{\{\s*corpus\.headline\s*\}\}/.test(guideWxml));
+ok("guide.wxml 渲染 hospitals", /\{\{\s*corpus\.hospitals\s*\}\}/.test(guideWxml));
+ok("guide.wxml 渲染 approxCities（降级城单独展示）",
+  /\{\{\s*corpus\.approxCities\s*\}\}/.test(guideWxml));
+ok("guide.js 通过 corpusStats() 取数", /corpusStats\s*\(/.test(guideJs7));
+ok("guide.js 取数失败不拖垮页面（try/catch）",
+  /try\s*\{[^}]*corpusStats|corpusStats[^;]*\}\s*catch/.test(guideJs7));
+ok("guide.wxml 展示城市池条目数", /\{\{\s*corpus\.cityEntries\s*\}\}/.test(guideWxml));
+ok("guide.wxml 解释全称别名口径", /全称别名/.test(guideWxml));
+ok("guide.wxml 说明未收录城市走降级、不编造", /不编造店名与坐标/.test(guideWxml));
+ok("急救页不再堆数据规模，只留到指南的入口",
+  !/corpus\.headline/.test(helpWxml) && /使用指南/.test(helpWxml) && /goGuide/.test(helpWxml));
 
 /* ---------- 8. 使用指南不再写静态医院数字 ---------- */
 const guideJs = read("subpkg/guide/guide.js");
@@ -179,4 +183,4 @@ ok("远端采集增量确已入包（团队美食块 ≥900 店）", !!teamFood 
 
 console.log("  离线数据规模口径回归: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);
-console.log("  ✔ 医院统计已指向真源（具名 / 降级分开算），帮助页不再显示 0");
+console.log("  ✔ 医院统计已指向真源（具名 / 降级分开算），数据规模在使用指南展示、不再显示 0");

@@ -6,7 +6,6 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // v1.19.180：无具名医院的城市不再伪造机构名，改走「地图搜索」降级（宁缺勿错）
 const T = require("../../utils/travel.js");
 const E = require("../../utils/emergency.js");
-const CP = require("../../utils/corpus.js");
 const app = getAppSafe();
 const AIAgent = require("../../utils/ai-agent.js");
 const Cloud = require("../../utils/cloud.js");
@@ -28,7 +27,6 @@ Page(SafePage({
     kw: "",
     cityList: [],
     cityAll: [],
-    corpus: null,
   },
 
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); },
@@ -39,7 +37,6 @@ Page(SafePage({
     try { AN.pageView("help"); } catch (e) {}
     try { this.setData({ fz: T.fontScale() }); } catch (e) {}
     this._theme();
-    try { this.setData({ corpus: CP.corpusStats() }); } catch (e) {}
     if (!this.data.city) this._pickDefaultCity();
   },
 
@@ -174,6 +171,9 @@ Page(SafePage({
   },
 
   onPickClose() { this.setData({ pickOpen: false, kw: "" }); },
+
+  // 数据规模说明已迁到使用指南，这里给一处可见入口（急救页不再堆无关统计）
+  goGuide() { try { wx.navigateTo({ url: "/subpkg/guide/guide" }); } catch (e) {} },
 
   noop() {},
 
