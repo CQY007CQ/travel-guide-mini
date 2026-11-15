@@ -20,11 +20,10 @@ const DEFAULT = {
   qweatherKey: "", // v1.20.4 #1/#19：明文移出仓库，改运行时注入（setKeys）
   qweatherHost: "", // 同上，须与 qweatherKey 配对注入
   amapKey: "", // 高德 Key：当前未使用；未来若用高德须填本人账号申请的 Key
-  // 云环境 ID（CloudBase）：个人主体也能开云开发（约 ¥19.9/月）。
-  // 未填 → 云能力整体 fail-closed 降级（本地优先，绝不抛错，见 utils/cloud.js）。
-  // 接入：运行时 wx.setStorageSync("__app_keys__", { cloudEnv: "你的环境ID" })，
-  //   或直接在此填入（环境 ID 是标识符非密钥，风险低；但公开仓库仍建议用运行时注入避免泄露）。
-  cloudEnv: ""
+  // 云环境 ID（CloudBase）：环境 ID 是公开标识符（小程序前端本就要明文用它初始化 wx.cloud），非密钥。
+  // 已填本人环境 → 云端 AI（llmProxy 强模型）启用；留空 → 云能力 fail-closed 降级（本地优先，见 utils/cloud.js）。
+  // 运行时仍可用 wx.setStorageSync("__app_keys__", { cloudEnv: "..." }) 覆盖，用于换环境而无需重发版。
+  cloudEnv: "cloud1-d8ghdiimn9a2d8b8e"
 };
 
 // 占位符特征：未真正配置的 Key

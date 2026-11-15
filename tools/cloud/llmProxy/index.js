@@ -50,9 +50,13 @@ function resolveConfig() {
   const key = (process.env.LLM_API_KEY || "").trim();
   let model = (process.env.LLM_MODEL || "").trim();
   const prov = (process.env.LLM_PROVIDER || "").trim().toLowerCase();
-  // 双模型：识图专用视觉模型（如 qwen-vl-plus）。配置后，有图的请求自动改走它，
+  // 双模型：识图专用视觉模型（如 qwen3-vl-plus）。配置后，有图的请求自动改走它，
   // 文本请求仍用默认 LLM_MODEL（如 qwen-plus），兼顾「能识图 + 文本省钱」。
-  const visionModel = (process.env.LLM_VISION_MODEL || "").trim();
+  // 兼容两处历史配置问题（云函数环境变量在控制台手填，出错概率高，改动又要重新部署）：
+  //   1) 变量名笔误 LLM_VISIION_MODEL（双 I）也认；
+  //   2) 旧视觉名 qwen-vl-plus / qwen-vl-max 在百炼 2026 已下线，自动映射到当前有效的 qwen3-vl-plus。
+  let visionModel = (process.env.LLM_VISION_MODEL || process.env.LLM_VISIION_MODEL || "").trim();
+  if (/^qwen-vl-(plus|max|max-latest)$/i.test(visionModel)) visionModel = "qwen3-vl-plus";
 
   let finalBase = base;
   let finalModel = model;
