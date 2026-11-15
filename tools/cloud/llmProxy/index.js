@@ -92,7 +92,7 @@ function postJSON(targetUrl, payload, apiKey, timeoutMs) {
         "Authorization": "Bearer " + (apiKey || ""),
         "Content-Length": Buffer.byteLength(data)
       },
-      timeout: timeoutMs || 25000
+      timeout: timeoutMs || 18000
     };
     const req = https.request(opts, (res) => {
       let body = "";
@@ -226,7 +226,7 @@ exports.main = async (event) => {
   };
 
   try {
-    const j = await postJSON(endpointOf(cfg.base), payload, cfg.key, 25000);
+    const j = await postJSON(endpointOf(cfg.base), payload, cfg.key, 18000);
     const text = extractText(j);
     if (!text) return { ok: false, err: "empty-response" };
     return { ok: true, text: text, model: model, source: providerOf(cfg.base) };
