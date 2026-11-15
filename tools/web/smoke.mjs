@@ -214,9 +214,10 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
     htmlSrc.includes("webToolsToggle") && /#webTools\.hidden/.test(htmlSrc));
   ok("桌面侧栏与布局切换由 app.js 驱动",
     ["buildSidebar", "toggleLayout", "force-wide", "webToolsToggle"].every((k) => appJs.includes(k)));
-  ok("顺序型页面（行程/今天/地图）桌面保持单列，避免 2 列打断时间线",
+  ok("顺序型页面（行程/今天/地图/使用指南）桌面保持单列，避免 2 列打断阅读顺序",
     /data-page="pages\/today\/today"\]/.test(shell) && /max-width:\s*1080px/.test(shell) &&
-    /data-page="subpkg\/map\/map"\]/.test(shell));
+    /data-page="subpkg\/map\/map"\]/.test(shell) &&
+    /data-page="subpkg\/guide\/guide"\][^{]*\{[^}]*display:\s*block[^}]*max-width:\s*1080px/.test(shell));
   ok("桌面侧栏常驻时页面级 modal 压过侧栏（否则浮层跑到侧栏后）",
     /\[data-page\]\s*\.psheet\s*\{\s*z-index:\s*9451/.test(shell) &&
     /\[data-page\]\s*\.pmask[^\}]*z-index:\s*9450/.test(shell));

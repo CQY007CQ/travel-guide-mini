@@ -1159,5 +1159,20 @@ assert("中文 三天两夜 → 3（取首个「天」）", R.extractPrefs("三�
 assert("今天去北京 → 0（不误中『今』）", R.extractPrefs("今天去北京").days === 0);
 assert("无天数表述 → 0", R.extractPrefs("想看海").days === 0);
 
+// ── AI 意图：出片点关键词「机位」曾被 nav 抢走（迭代 #10）──
+// 旧实现 NAV_KW 的 /深度玩法|机位|避坑/ 与 photo 意图的 /…机位…/ 重叠，而 nav 在 handle() 里最先执行，
+// 导致「成都拍照机位」被直接切到深度玩法页，拿不到 photoSpotOf 出片清单。已从 nav 正则移除「机位」。
+console.log("== 53. 出片机位意图不被导航抢走 ==");
+assert("nav 正则不再含『机位』", !/深度玩法\|机位/.test(req("fs").readFileSync("./utils/ai-intent.js", "utf8")));
+const aiPhoto1 = AI.handle("成都拍照机位", { city: "成都" });
+assert("『成都拍照机位』→ photo（旧 bug 走 nav）", aiPhoto1 && aiPhoto1.intent === "photo" && !aiPhoto1.jump, JSON.stringify(aiPhoto1 && aiPhoto1.intent));
+assert("photo 回答含出片清单", !!(aiPhoto1 && /出片|拍照/.test(aiPhoto1.text || "")));
+const aiPhoto2 = AI.handle("成都摄影机位推荐", { city: "成都" });
+assert("『摄影机位推荐』→ photo", aiPhoto2 && aiPhoto2.intent === "photo");
+const aiNavDeep = AI.handle("打开深度玩法", { city: "成都" });
+assert("显式『打开深度玩法』仍导航（正向回归）", aiNavDeep && aiNavDeep.intent === "nav" && aiNavDeep.jump && aiNavDeep.jump.path === "subai/deep/deep", JSON.stringify(aiNavDeep && aiNavDeep.jump));
+const aiNavPit = AI.handle("成都避坑攻略", { city: "成都" });
+assert("『避坑』仍导航（正向回归）", aiNavPit && aiNavPit.intent === "nav");
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

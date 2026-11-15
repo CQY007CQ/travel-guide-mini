@@ -115,10 +115,9 @@ button { font-family: inherit; }
 @media (min-width: 3200px) {
   #app > .page { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); align-content: start; }
 }
-/* 文字型页面（设置 / 使用指南等）：超宽屏收成舒适阅读栏，避免一行拉太长 */
+/* 设置页：超宽屏收成舒适阅读栏，避免一行拉太长 */
 @media (min-width: 1500px) {
-  #app > .page[data-page="pages/more/more"],
-  #app > .page[data-page="subpkg/guide/guide"] {
+  #app > .page[data-page="pages/more/more"] {
     display: block; max-width: 960px; margin: 0 auto;
   }
 }
@@ -152,13 +151,16 @@ button { font-family: inherit; }
   }
 }
 
-/* ── 顺序型页面（行程时间线 / 今天安排 / 地图）桌面保持单列 ──
+/* ── 顺序型页面（行程时间线 / 今天安排 / 地图 / 使用指南）桌面保持单列 ──
    通用 2 列网格会把 day-card / 时间线 / 地图清单左右错开，打断「从上往下读」的顺序，
-   单列居中（≤1080px）既避免错位，又比手机全宽更舒展；特异性高于通用网格规则，优先命中。 */
+   单列居中（≤1080px）既避免错位，又比手机全宽更舒展；特异性高于通用网格规则，优先命中。
+   使用指南（guide）是「分组标题 + 手风琴列表卡片」结构：2 列网格下 .g-group-t 独占整行、
+   .g-list.card 只占左列，右列大片空白（1080px 视口下卡片仅约 275px）→ 同归顺序页单列。 */
 @media (min-width: 820px) {
   #app > .page[data-page="pages/plan/plan"],
   #app > .page[data-page="pages/today/today"],
-  #app > .page[data-page="subpkg/map/map"] {
+  #app > .page[data-page="subpkg/map/map"],
+  #app > .page[data-page="subpkg/guide/guide"] {
     display: block; max-width: 1080px; margin: 0 auto; padding: 0 12px;
   }
 }

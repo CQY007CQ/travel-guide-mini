@@ -33,7 +33,9 @@ const NAV_KW = [
   { re: /速查|随身问答|百科/, p: "subpkg/assistant/assistant", t: "本地速查" },
   { re: /工具箱|百宝箱/, p: "subpkg/toolkit/toolkit", t: "旅行百宝箱" },
   { re: /找景点|按标签|标签检索/, p: "subpkg/spotsearch/spotsearch", t: "按标签找景点" },
-  { re: /深度玩法|机位|避坑/, p: "subai/deep/deep", t: "城市深度玩法" },
+  // 「机位」不列入显式导航：它是 photo 意图（出片点列表）的关键词。nav 在 handle() 里优先执行，
+  // 若也收「机位」，「成都拍照机位」会被直接跳页而非给出片点清单。见 check-new block 53。
+  { re: /深度玩法|避坑/, p: "subai/deep/deep", t: "城市深度玩法" },
   { re: /今天页|今日速览/, p: "pages/today/today", t: "今天" },
   { re: /行程页|每日行程/, p: "pages/plan/plan", t: "每日行程" },
   { re: /更多页|设置页/, p: "pages/more/more", t: "更多" },
