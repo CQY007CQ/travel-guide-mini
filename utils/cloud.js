@@ -86,6 +86,14 @@ function init() {
   return _initPromise;
 }
 
+// 运行时重新初始化：用户在「更多」页补填 cloudEnv 后，无需重启小程序即可让云端能力生效。
+// init() 是幂等守护（_inited 一旦为 true 不再执行），这里先复位再走一次 init()。
+function reinit() {
+  _inited = false;
+  _initPromise = null;
+  return init();
+}
+
 // 通道是否真正可用
 function ready() {
   try {
@@ -358,6 +366,7 @@ module.exports = {
   cloudEnv: cloudEnv,
   cloudEnabled: cloudEnabled,
   init: init,
+  reinit: reinit,
   ready: ready,
   callFunction: callFunction,
   localUid: localUid,

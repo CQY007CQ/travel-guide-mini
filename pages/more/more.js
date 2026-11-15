@@ -4,6 +4,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 const T = require("../../utils/travel.js");
 const EL = require("../../utils/errlog.js"); // v1.19.106：本地错误日志（被 SafePage / app.onError 兜住的异常）
 const KEYS = require("../../utils/keys.js"); // v1.19.188：第三方密钥统一出口（含运行时注入 setKeys）
+const Cloud = require("../../utils/cloud.js"); // v1.20.8：云端能力接入层（cloudEnv 配置驱动，fail-closed）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
 const A = require("../../utils/aicontent.js"); // 深度玩法 holder（内容随 subai 分包异步下发，未加载/未收录都安全降级）
 // v1.20.3：insights 仅 more 页用到，已从主包迁到分包 subpkg/utils，按需异步加载（主包瘦身绕开微信 1.5M 软线）。
@@ -28,7 +29,7 @@ const app = getAppSafe();
 
 Page(SafePage({
   data: {
-    fz: 1, td: false, hasPlan: false, deepOn: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0,
+    fz: 1, td: false, hasPlan: false, deepOn: false, wish: [], groups: [], ver: T.APP_VER, stamp: null, persona: null, errN: 0, cloudEnv: "",
     achModal: { show: false, list: [], more: 0 },
     // v1.20.7：分组折叠（手风琴）——gid 与 WXML 一一对应；密集派生类默认收起，直接给「更多」页减负
     collapsed: { saved: false, guides: false, foot: false, notes: false, review: false, insights: true, pz: true, insp: false, merge: false, year: true, heat: true, ui: false, ach: true, wish: false, privacy: true, keys: true, travel: false, prep: false, general: false },
@@ -160,6 +161,9 @@ Page(SafePage({
   refresh() {
     const p = app.globalData.plan;
     const hasPlan = !!(p && p.days && p.days.length);
+    // v1.20.8：云环境 ID 现状（fail-closed：未填则空串 → 云端能力关闭）。仅在「更多」页展示状态，不触发任何联网。
+    let cloudEnv = "";
+    try { cloudEnv = (typeof Cloud.cloudEnv === "function") ? (Cloud.cloudEnv() || "") : ""; } catch (e) {}
     // 深度玩法入口：仅当「目标地（主城或任一串联站）」收录了深度内容时才显示；
     // 未收录（或没有行程）不占坑 —— 避免点进去发现不是自己的目的地。
     const _deepCands = [];
@@ -202,6 +206,7 @@ Page(SafePage({
       themePref: T.themePref(),
       review: hasPlan ? T.tripReview(p) : null,
       hasPlan,
+      cloudEnv: cloudEnv,
       wish,
       wishGroups,
       savedPlans,
@@ -487,6 +492,32 @@ Page(SafePage({
             wx.showToast({ title: "已保存，下次加载天气即生效", icon: "none" });
           }
         });
+      }
+    });
+  },
+
+  /* ---- 云环境 ID（启用云端 AI / 云同步，v1.20.8） ----
+     个人主体也能开微信云开发（约 ¥19.9/月）。填好环境 ID 后，llmProxy 强模型与跨端云同步
+     即可在「已部署 llmProxy + 配置好 LLM 环境变量」的前提下生效；未填 / 格式非法则 fail-closed 静默降级。 */
+  onSetCloudEnv() {
+    wx.showModal({
+      title: "配置云环境 ID",
+      content: "在微信开发者工具 → 云开发 → 环境设置 复制你的环境 ID（形如 travel-xxxx）。粘贴后云端 AI / 云同步即启用（存本机）。需先把 llmProxy 云函数部署到该环境并配置 LLM 密钥。留空则不启用。",
+      editable: true,
+      placeholderText: "粘贴云环境 ID",
+      success: (r) => {
+        if (!r.confirm) return;
+        const v = (r.content || "").trim();
+        if (!v) { KEYS.setKeys({ cloudEnv: "" }); wx.showToast({ title: "已关闭云端", icon: "none" }); this.refresh(); return; }
+        // 云环境 ID 形如 xxx-xxxx（含短横线），做最小格式校验，避免误填
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{3,}$/.test(v)) { wx.showToast({ title: "环境 ID 格式不正确", icon: "none" }); return; }
+        if (KEYS.setKeys({ cloudEnv: v })) {
+          try { Cloud.reinit(); } catch (e) {}
+          wx.showToast({ title: "已保存，云端能力启用中", icon: "none" });
+        } else {
+          wx.showToast({ title: "保存失败", icon: "none" });
+        }
+        this.refresh();
       }
     });
   },

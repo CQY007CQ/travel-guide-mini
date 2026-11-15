@@ -459,6 +459,14 @@
         </view>
         <text class="arrow">›</text>
       </view>
+      <view class="menu" catchtap="onSetCloudEnv">
+        <image class="m-ic" src="/images/icons/cloud.png"/>
+        <view class="m-txt">
+          <view class="m-t">配置云环境（启用云端 AI）</view>
+          <view class="m-d dim">{{cloudEnv ? '已启用 · ' + cloudEnv : '粘贴云环境 ID 后开启强模型 / 云同步'}}</view>
+        </view>
+        <text class="arrow">›</text>
+      </view>
       <view class="m-note dim">小程序合规要求：第三方服务 Key 须注册在本人 / 本小程序主体下，严禁借用他人 Key。仓库为安全起见不内置任何明文 Key：在 dev.qweather.com 用本人账号申请免费 Key，点上方填入即可即时生效（存在本机，无需重发版）。</view>
     </view>
   </view>
