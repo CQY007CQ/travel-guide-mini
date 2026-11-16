@@ -12,6 +12,7 @@ const EL = require("../../utils/errlog.js");  // v1.19.200：渲染异常留痕�
 const app = getAppSafe();
 
 Page(SafePage({
+  goIndex() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) { wx.showToast({ title: "请从底部首页进入", icon: "none" }); } },
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "到一个城市吃什么？必吃清单 + 地道名店一键导航", path: "/pages/index/index" };

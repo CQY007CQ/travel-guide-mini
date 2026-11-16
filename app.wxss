@@ -142,7 +142,9 @@ page {
 
 .h3 { font-size: calc(26rpx * var(--fs, 1)); font-weight: 700; color: var(--t3, #8fa3bc); letter-spacing: 1rpx; }
 
-.dim { color: var(--t4, #5b6b82); }
+/* v1.20.8+ 无障碍：改用专门的 --dim（浅 #5b6b82 / 深 #8fa3bc）。
+   此前用 --t4 时深色主题下只有约 3:1 对比度，低于 WCAG AA 4.5:1，说明文字读起来吃力。 */
+.dim { color: var(--dim, #5b6b82); }
 
 .gold { color: var(--gold-tx, #d4a94e); }
 

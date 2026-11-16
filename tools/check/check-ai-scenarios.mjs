@@ -261,5 +261,20 @@ log(/CROSS_SCENE_TTL = 10 \* 60 \* 1000/.test(AGENT_SRC) && /_crossTs = 0/.test(
 log(/role === "user"/.test(AGENT_SRC) && /slice\(-2\)/.test(AGENT_SRC),
   "只取其它场景最近 2 条用户问题（不取回答，避免串台与 token 浪费）");
 
+// 15) 体验与无障碍防回潮：空态必须有可点入口；地图字号随全局；深色 dim 用专用变量。
+let uxBad = [];
+const EMPTY_PAGES = ["subpkg/food/food", "subpkg/prep/prep", "subpkg/map/map", "pages/today/today"];
+for (const p of EMPTY_PAGES) {
+  let w = "", j = "";
+  try { w = readFileSync(resolve(ROOT, p + ".wxml"), "utf8"); j = readFileSync(resolve(ROOT, p + ".js"), "utf8"); } catch (e) {}
+  if (!/bindtap="goIndex"/.test(w) || !/goIndex\(\)/.test(j)) uxBad.push(p + ":空态无跳转");
+}
+log(uxBad.length === 0, "空态页均有可点「去生成攻略」入口" + (uxBad.length ? "（" + uxBad.join(",") + "）" : ""));
+const mapSrc = readFileSync(resolve(ROOT, "subpkg/map/map.js"), "utf8");
+log(/fontScale\(\)/.test(mapSrc) && !/fontSize: 16[,}]/.test(mapSrc) && !/fontSize: 12[,}]/.test(mapSrc),
+  "地图 callout 字号跟随全局档位（不再硬编码）");
+const appCss = readFileSync(resolve(ROOT, "app.wxss"), "utf8");
+log(/\.dim \{ color: var\(--dim/.test(appCss), "深色主题 .dim 用专用 --dim 变量（对比度 ≥4.5:1）");
+
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);

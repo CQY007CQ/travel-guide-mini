@@ -35,7 +35,16 @@ Page(SafePage({
 
   onLoad() {
     this._syncTheme();
-    // v1.19.66：开机页**既不等数据、也不触发数据加载**，固定 KEEP_MS 后进首页。
+    // v1.19.66：开机页**不等数据**，固定 KEEP_MS 后进首页（不被数据加载拖住）。
+    // v1.20.8+ 优化：但可以在动画期间「顺手预热」——T.ready() 自带 _ready 缓存且幂等，
+    // 首页随后调用只会拿到同一个 Promise。数据分包下载与 1.25s 动画并行，首屏更早可用。
+    // 注意：这里只点火、不 await、不 setData；任何异常都不影响开屏跳转。
+    try {
+      if (T && typeof T.ready === "function") {
+        const p = T.ready();
+        if (p && typeof p.catch === "function") p.catch(function (e) { try { console.warn("[splash] 数据预热失败，首页会重试", e && e.message); } catch (_) { return; } });
+      }
+    } catch (e) { console.warn("[splash] 数据预热跳过", e && e.message); }
     this._arm();
   },
   // 双保险：onLoad 若被异常打断，onReady / onShow 再兜一次，保证跳转一定会被排上

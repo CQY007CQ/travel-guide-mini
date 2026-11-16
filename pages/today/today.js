@@ -36,7 +36,10 @@ Page(SafePage({
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：主题或刷新任一环节抛错都不该白屏
   onLoad() { this.__boot = T.ready().catch(() => null); },
-  onShow() { onShowRender(this, "today"); this._loadProactive(); },
+  // 竞态修复：onShowRender 把 _renderShow()（内含 refresh()）放进 boot.then 微任务，
+  // 原先紧随其后同步调用 _loadProactive 会读到尚未刷新的 view/state（甚至是上一页残留），
+  // 导致主动建议串台或冷启动时直接 return 永不重试。改为 after 回调，确保 refresh 先完成。
+  onShow() { onShowRender(this, "today", null, function () { this._loadProactive(); }); },
   _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
 
   refresh() {

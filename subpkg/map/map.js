@@ -19,7 +19,7 @@ Page(SafePage({
   data: {
     fz: 1,
     td: false,
-    hasPlan: false, cityName: "",
+    hasPlan: false, cityName: "", loadErr: false,
     dayIdx: 0, dayText: "",
     layer: "spots",  // spots | food | stay
     markers: [],
@@ -85,7 +85,7 @@ Page(SafePage({
     try {
       this._theme();
       const plan = app.globalData && app.globalData.plan;
-      if (!plan || !plan.days || !plan.days.length) { this.setData({ hasPlan: false }); return; }
+      if (!plan || !plan.days || !plan.days.length) { this.setData({ hasPlan: false, loadErr: false }); return; }
       let dayIdx = 0;
       if (this._seedDi >= 0) {
         dayIdx = Math.min(this._seedDi, plan.days.length - 1);
@@ -100,11 +100,20 @@ Page(SafePage({
     } catch (e) {
       try { console.error("[map] 渲染失败", e); } catch (_) {}
       try { EL.push("map._renderShow", e); } catch (_) {}
-      try { this.setData({ hasPlan: false, markers: [], polyline: [], list: [], foodList: [] }); } catch (_) {}
+      // 渲染失败 ≠ 没有行程：给可见的 loadErr 与重试入口，不再静默伪装成空态
+      try { this.setData({ hasPlan: false, loadErr: true, markers: [], polyline: [], list: [], foodList: [] }); } catch (_) {}
     }
   },
 
+  // 读取/渲染失败后原地重试（不必杀进程重进页面）
+  reload() { this._renderShow(); },
+  goIndex() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) { wx.showToast({ title: "请从底部首页进入", icon: "none" }); } },
+
   _renderDay(plan, di) {
+    // 地图 callout 的字号原本硬编码，长辈设「特大」后地图标注仍是小字。
+    // 跟随全局字号档位；失败时回落 1，不影响标点渲染。
+    let fscale = 1;
+    try { fscale = (T && typeof T.fontScale === "function") ? (T.fontScale() || 1) : 1; } catch (e) {}
     const day = plan.days[di];
     // 多站行程：每天属于哪一段就用哪座城市的坐标/美食/住宿库；单城直接用 plan.cityName
     let cityName = plan.cityName;
@@ -142,7 +151,7 @@ Page(SafePage({
           id: mk.length,
           latitude: coord.lat, longitude: coord.lon,
           width: numbered ? 32 : 20, height: numbered ? 32 : 20,
-          callout: numbered ? { content: "" + seq, fontSize: 16, color: "#1a1a1a",
+          callout: numbered ? { content: "" + seq, fontSize: Math.round(16 * fscale), color: "#1a1a1a",
             bgColor: "#d4a94e", borderRadius: 16, padding: 4, display: "ALWAYS" } : undefined,
           markerType: "spots", seq: 0, name: n
         });
@@ -183,7 +192,7 @@ Page(SafePage({
         if (hasCoord(fs)) showMk.push({
           id: showMk.length, latitude: fs.lat, longitude: fs.lon,
           width: 26, height: 26,
-          callout: { content: "美食 · " + (fs.shop || ""), fontSize: 12, color: "#eaeff7",
+          callout: { content: "美食 · " + (fs.shop || ""), fontSize: Math.round(12 * fscale), color: "#eaeff7",
             bgColor: "rgba(125,167,212,.85)", borderRadius: 10, padding: 4, display: "BYCLICK" },
           markerType: "food", name: fs.shop || ""
         });
@@ -196,14 +205,14 @@ Page(SafePage({
       hotelAreas.forEach((h, i) => showMk.push({
         id: showMk.length, latitude: h.lat, longitude: h.lon,
         width: 28, height: 28,
-        callout: { content: "住 · " + h.name, fontSize: 12, color: "#eaeff7",
+        callout: { content: "住 · " + h.name, fontSize: Math.round(12 * fscale), color: "#eaeff7",
           bgColor: "rgba(212,169,78,.85)", borderRadius: 10, padding: 4, display: "BYCLICK" },
         markerType: "stay", name: h.name || "", areaIdx: i
       }));
     }
     const isMultiCity = !!(segs && segs.length > 1);
     this.setData({
-      hasPlan: true, cityName,
+      hasPlan: true, cityName, loadErr: false,
       dayIdx: di,
       dayText: "D" + (di + 1) + (isToday ? " · 今天" : "") + " " + String(day.date).slice(5) +
         (isMultiCity ? " · " + cityName : ""),

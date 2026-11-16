@@ -21,6 +21,7 @@ const DUTY_POOL = [
 ];
 
 Page(SafePage({
+  goIndex() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) { wx.showToast({ title: "请从底部首页进入", icon: "none" }); } },
   // v1.17.12：补上转发入口 —— 微信规则：只有定义了 onShareAppMessage 的页面，右上角菜单才显示「转发」
   onShareAppMessage() {
     return { title: "出发前该带什么？行李清单 + 证件票据提醒", path: "/pages/index/index" };

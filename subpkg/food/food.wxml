@@ -3,6 +3,7 @@
     <view class="em-ic"><image lazy-load class="em-img" src="/images/icons/food.png"/></view>
     <view class="em-t">先去生成攻略</view>
     <view class="em-s">这里会显示目的地的必吃清单与地道名店</view>
+    <button class="btn-primary em-btn" bindtap="goIndex">去生成攻略</button>
   </view>
 
   <block wx:if="{{hasPlan}}">

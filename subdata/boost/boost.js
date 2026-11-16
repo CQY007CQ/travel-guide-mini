@@ -4,6 +4,7 @@ const T = require("../../utils/travel.js");
 const app = getAppSafe();
 
 Page(SafePage({
+  goIndex() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) { wx.showToast({ title: "请从底部首页进入", icon: "none" }); } },
   data: {
     fz: 1,
     td: false,

@@ -3,6 +3,7 @@
     <view class="em-ic"><image lazy-load class="em-img" src="/images/icons/luggage.png"/></view>
     <view class="em-t">先去生成攻略</view>
     <view class="em-s">这里会整理票价预约、酒店比价与团队分工</view>
+    <button class="btn-primary em-btn" bindtap="goIndex">去生成攻略</button>
   </view>
 
   <block wx:if="{{hasPlan}}">

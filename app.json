@@ -74,11 +74,15 @@
     },
     {
       "root": "subdata2",
-      "pages": ["keep/keep"]
+      "pages": [
+        "keep/keep"
+      ]
     },
     {
       "root": "subdata3",
-      "pages": ["keep/keep"]
+      "pages": [
+        "keep/keep"
+      ]
     },
     {
       "root": "subai",
@@ -89,12 +93,18 @@
   ],
   "preloadRule": {
     "pages/index/index": {
-      "network": "all",
-      "packages": ["subpkg"]
+      "network": "wifi",
+      "packages": [
+        "subpkg",
+        "subdata2",
+        "subdata3"
+      ]
     },
     "pages/plan/plan": {
       "network": "wifi",
-      "packages": ["subdata"]
+      "packages": [
+        "subdata"
+      ]
     }
   }
 }
