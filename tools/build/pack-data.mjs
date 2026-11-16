@@ -12,13 +12,12 @@ import zlib from "zlib";
 import { createRequire } from "module";
 const req = createRequire(process.cwd() + "/");
 
-// v1.20.7：团队美食数据不要烘焙进打包基数据。
-// 理由（两条硬约束）：① 该数据已独立住在 subdata3/data/team-food3.js，运行期由 initData()
-// 作为第 3 个分块加载后合并，基数据再存一份就是「同一事实两个真相源」，改一处另一处会陈旧；
-// ② subdata 包 raw 已 1929KB / 红线 2048KB，美食扩量（目标 1 万家）靠团队注入，烘焙进来会把
-//   这 119KB 余量吃光；subdata3 还有 1.8MB 空间，放那里更安全。
-// 打包器逐字节复现「不含团队数据」的基数据；运行期仍由 subdata3 补齐，最终结果一致。
-process.env.PACK_SKIP_TEAM_FOOD = "1";
+// v1.20.7：打包期只取「基数据」，不烘焙任何来自主包 enrich 表的增量。
+// 涉及三处：团队美食（subdata3/data/team-food3.js）、酒店片区 + 逐店酒店（utils/hotel-areas.js）。
+// 理由两条硬约束：① 烘焙进去＝同一事实在「基数据」和「主包」各存一份，改一处另一处会陈旧；
+// ② subdata 包 raw 已逼近 2048KB 红线（实测烘焙后 data-packed 1956KB，顶破 1950KB 预算门禁）。
+// 运行期 applyPacked() 之后的合并会把这三样补齐，最终数据与烘焙版逐字节一致（已用 DATA 指纹校验）。
+process.env.PACK_BASE_ONLY = "1";
 const D = req("./utils/data.js");
 
 // ── v1.19.174 打包期坐标完整性硬门禁 ─────────────────────────────────

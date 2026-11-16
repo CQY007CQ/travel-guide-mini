@@ -176,10 +176,8 @@ function applyTeamFoodEnrich() {
   if (_teamFoodAdded) _dw("[data] 团队美食合并 " + _teamFoodAdded + " 家（增量合并）");
 }
 // subdata3 分块到达后调用（幂等：晚到、重复调用都安全）。
-// 打包期跳过：tools/build/pack-data.mjs 置 PACK_SKIP_TEAM_FOOD=1，团队数据不烘焙进基数据
-// （否则数据会「基数据 + subdata3」两份，改一处另一处陈旧；且 subdata 包余量只有 119KB）。
 function _applyTeamFood3(mod) {
-  if (typeof process !== "undefined" && process.env && process.env.PACK_SKIP_TEAM_FOOD) return;
+  if (_PACK_BASE_ONLY) return;
   const t = (mod && mod.default) || mod;
   if (t && typeof t === "object") _teamFood = t;
   applyTeamFoodEnrich();
@@ -269,6 +267,7 @@ function fillBestSeason() {
 // 幂等：按片区名去重，多数据分块重复调用 applyPacked 也不会重复追加。
 let _hotelAreasMerged = 0;
 function applyHotelAreasExtra() {
+  if (_PACK_BASE_ONLY) return;
   const EX = (HA && HA.HOTEL_AREAS_EXTRA) || {};
   const keys = Object.keys(EX);
   if (!keys.length) return;
@@ -299,6 +298,7 @@ function findCityByName(cn) {
   return c;
 }
 function applyHotelListExtra() {
+  if (_PACK_BASE_ONLY) return;
   const SRC = (HA && HA.HOTEL_LIST_EXTRA) || {};
   const TEAM = (HA && HA.TEAM_HOTEL_LIST_ENRICH) || {};
   const mergeFrom = (map) => {
@@ -464,6 +464,11 @@ function checkCoordIntegrity() {
 // v1.20.x：支持「多数据分包」——把城市数据切成多个 chunk 文件（subdata/subdata2…），
 // 各自独立 2MB 上限、懒加载。合并语义：对象键按城市名并集、数组去重拼接、其余覆盖。
 function isObj(x) { return x && typeof x === "object" && !Array.isArray(x); }
+// v1.20.7：打包期「只取基数据」。来自主包 enrich 表（团队美食 / 酒店片区 / 逐店酒店）的增量
+// 一律不烘焙进 data-packed*，理由两条：① 否则基数据与主包各存一份，改一处另一处陈旧
+// （典型多真相源）；② subdata 包会被这些重复内容顶过 1950KB 预算线（实测 1956KB 判红）。
+// 运行期这些增量仍由 applyPacked 后的合并补齐，最终数据完全一致。
+const _PACK_BASE_ONLY = typeof process !== "undefined" && !!(process.env && process.env.PACK_BASE_ONLY);
 function mergeInto(target, src) {
   for (const k of Object.keys(src)) {
     const sv = src[k], tv = target[k];
