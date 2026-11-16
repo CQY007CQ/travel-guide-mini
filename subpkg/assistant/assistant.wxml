@@ -2,7 +2,7 @@
   <!-- 全场景 AI 速达：把小程序全部能力以 AI 语境一站式带到眼前（空态/有行程都展示） -->
   <view class="card scenes" wx:if="{{scenarios.length}}">
     <view class="h3"><image lazy-load class="ic" src="/images/icons/search.png"/>全场景 AI 速达</view>
-    <view class="scene-sub dim">点一下，立刻获得该场景的 AI 建议与直达入口</view>
+    <view class="scene-sub dim">点一下直接进对应页，AI 会带着当前城市继续帮你</view>
     <view class="scene-grid">
       <view class="scene" wx:for="{{scenarios}}" wx:key="key" data-key="{{item.key}}" bindtap="onScenario">
         <image lazy-load class="scene-ic" src="/images/icons/{{item.icon}}"/>

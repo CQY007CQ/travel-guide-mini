@@ -164,14 +164,19 @@ Page(SafePage({
       this._lastResult = r.text;
       this.setData({
         lastQuery: label, lastResult: r.text, lastTileK: "", input: "",
-        actions: r.actions || [], aiSource: "", deepTip: "已为你打开「" + label + "」", lastIntent: r.intent || ""
+        actions: r.actions || [], aiSource: "",
+        // 没有显式 jump 时不谎称「已打开」——深链的目的是在本页给出建议，由用户点按钮进对应页
+        deepTip: r.jump ? "已为你打开「" + label + "」" : "已为你准备「" + label + "」，点下方按钮直达",
+        lastIntent: r.intent || ""
       });
     } else {
       this.setData({ deepTip: "该场景暂不可用" });
     }
   },
 
-  // 全场景 AI 速达：点面板任意场景，给一句 AI 语境介绍 + 直达按钮（不自动执行生成等重操作）
+  // 全场景 AI 速达：点面板任意场景 → 保留 AI 语境建议卡，并直接送进对应页。
+  // scenarioCard 是零副作用卡（不会自动生成行程/改数据），所以可以直接导航；
+  // 只有「行程复盘」本来就在助手页内完成，不重复 navigateTo 到自己。
   onScenario(e) {
     const key = e.currentTarget.dataset.key;
     let sc = null;
@@ -179,6 +184,8 @@ Page(SafePage({
     if (!sc) return;
     const plan = app.globalData.plan;
     const city = (plan && (T.activeCityOf(plan) || plan.cityName)) || this._deep.city || "";
+    // 「行程复盘」的目标页就是本页，不需要跳自己：直接开始复盘（无行程时提示先生成）
+    if (key === "review") { this.explainReview(city); return; }
     let r = null;
     try { if (AI.scenarioCard) r = AI.scenarioCard(key, { city: city, plan: plan, page: "assistant" }); } catch (err) {}
     if (!r) {
@@ -187,7 +194,13 @@ Page(SafePage({
     }
     this._lastResult = r.text;
     this.setData({ lastQuery: sc.label, lastResult: r.text, lastTileK: "", input: "", actions: r.actions || [], aiSource: "", lastIntent: sc.key });
-    try { wx.showToast({ title: sc.label, icon: "none" }); } catch (_) {}
+    // 一键直达：优先用建议卡自带的 jump / action（它们带正确的 tab/push 模式与 query）
+    const rt = (AI.PAGE_ROUTE && AI.PAGE_ROUTE[sc.page]) || { p: "pages/index/index", tab: true };
+    const jump = (r.jump || (r.actions && r.actions.find(a => a && a.path)) ||
+      { path: rt.p, query: city ? { city: city } : {}, mode: rt.tab ? "tab" : "push" });
+    // 不用正则字面量：/^\// 末尾的 // 会被事件配对门禁的简易扫描器误判成行注释
+    const jp = String(jump.path || "");
+    if (jp !== "subpkg/assistant/assistant" && jp !== "/subpkg/assistant/assistant") this._nav(jump);
   },
 
   _syncKeeps() {
@@ -371,14 +384,20 @@ Page(SafePage({
   // 跳转到目标页（action / jump 共用）。tab 用 switchTab，其余 navigateTo；query 拼成 URL 参数。
   _nav(t) {
     if (!t) return;
+    // 关键：助手页本身在 subpkg/assistant 分包里，AI 动作里的路径全是相对路径
+    // （如 "subpkg/food/food"）。直接传给 wx 会被解析成 /subpkg/assistant/subpkg/food/food
+    // → 页面不存在，且 catch 吞掉报错，表现为「点了没反应 / 无法直达」。统一补根斜杠。
+    const raw = String(t.path || "");
+    if (!raw || raw === "/") return;
+    const path = raw.charAt(0) === "/" ? raw : "/" + raw;
     const q = t.query || {};
     const qs = Object.keys(q).length
       ? "?" + Object.keys(q).map(k => encodeURIComponent(k) + "=" + encodeURIComponent(q[k])).join("&")
       : "";
     try {
-      if (t.mode === "tab") wx.switchTab({ url: t.path });
-      else wx.navigateTo({ url: t.path + qs });
-    } catch (e) {}
+      if (t.mode === "tab") wx.switchTab({ url: path });
+      else wx.navigateTo({ url: path + qs });
+    } catch (e) { try { EL.push("assistant.nav", e); } catch (_) {} }
   },
 
   // 点击「直达对应页」按钮。普通 action 走 _nav；云同步类的特殊 mode 走本地处理。

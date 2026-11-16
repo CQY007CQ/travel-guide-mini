@@ -752,7 +752,7 @@ function scenarioCard(topic, ctx) {
   const q = ctx.city ? { city: ctx.city } : {};
   const extra = ctx.city ? "（当前城市：" + ctx.city + "）" : "";
   return {
-    text: sc.desc + extra + "。点下面的按钮直接进对应页，AI 会在那页继续帮你。",
+    text: sc.desc + extra + "。正在带你进对应页，AI 会在那页继续帮你。",
     actions: [act(rt.p, sc.label + " →", q, rt.tab ? "tab" : "push")],
     intent: sc.key
   };

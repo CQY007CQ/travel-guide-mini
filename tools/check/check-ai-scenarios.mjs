@@ -228,5 +228,27 @@ for (const c of NEW_INTENT_CASES) {
     "新增意图「" + c.key + "」接地且带直达按钮");
 }
 
+// 13) 分包内「无法直达」防回潮：助手页在 subpkg/assistant 里，AI 动作路径全是相对路径，
+//     不经根斜杠归一化会被 wx 解析到 /subpkg/assistant/xxx，导航静默失败（catch 吞错）。
+//     速达 tile 也必须真的调用导航，而不是只出一张建议卡。
+let asstSrc = "";
+try { asstSrc = pageSrc("subpkg/assistant/assistant.js", ROOT); } catch (e) {}
+log(/charAt\(0\)\s*===\s*"\/"\s*\?\s*raw\s*:\s*"\/"\s*\+\s*raw/.test(asstSrc),
+  "_nav 将 AI 相对动作路径补成根路径（分包内直达不失效）");
+const osc = asstSrc.indexOf("onScenario(");
+const oscBody = osc >= 0 ? asstSrc.slice(osc, osc + 2400) : "";
+log(/onScenario\(e\)/.test(oscBody) && /this\._nav\(jump\)/.test(oscBody),
+  "全场景速达 tile 点击后直接导航到对应页（不只弹建议卡）");
+let badRoute = [];
+for (const s of scs) {
+  const p = AI.PAGE_ROUTE[s.page] && AI.PAGE_ROUTE[s.page].p;
+  if (!p) { badRoute.push(s.key + ":无路由"); continue; }
+  let exists = false;
+  try { readFileSync(resolve(ROOT, p + ".wxml"), "utf8"); exists = true; } catch (e) {}
+  if (!exists) badRoute.push(s.key + ":" + p);
+}
+log(badRoute.length === 0, "全部场景路由指向真实页面文件" +
+  (badRoute.length ? "（缺：" + badRoute.join(",") + "）" : ""));
+
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);
