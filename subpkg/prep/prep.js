@@ -209,6 +209,7 @@ Page(SafePage({
     return s + "\n【场景护栏】只给行前准备/打包/证件/交通的通用建议，不编造具体航班车次、票价、营业时间或政策条款；涉及签证/证件一律提示以官方最新规定为准。";
   },
   aiAsk() {
+    if (this.data.aiLoading) return;
     const q = String(this.data.aiQ || "").trim();
     if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
     const self = this;

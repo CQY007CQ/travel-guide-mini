@@ -178,19 +178,16 @@ function aiContextOf(plan, page) {
       if (bg && bg.txt) lines.push("预算：" + bg.txt + (bg.over ? "（已超预算，提醒控制）" : "") + "。");
     } catch (e) {}
   }
-  // 行程阶段 / 倒计时（before / during / after）
   try {
     const ts = T.todayState(plan);
     if (ts && ts.phase === "before" && ts.daysLeft != null) lines.push("距出发还有 " + ts.daysLeft + " 天（尚未出行）。");
     else if (ts && ts.phase === "during") lines.push("行程正在进行中。");
     else if (ts && ts.phase === "after") lines.push("行程已结束（可作复盘）。");
   } catch (e) {}
-  // 本机已记花费（真实记账，无则省略，不虚报）
   try {
     const today = T.todaySpent(), total = T.totalSpent();
     if (total > 0) lines.push("本机已记录花费：今日 ¥" + Math.round(today) + " / 累计 ¥" + Math.round(total) + "。");
   } catch (e) {}
-  // 去重景点（≤30）
   const seen = new Set(), spots = [];
   for (const d of plan.days) {
     if (!d || !Array.isArray(d.items)) continue;
@@ -205,7 +202,6 @@ function aiContextOf(plan, page) {
     if (spots.length >= 30) break;
   }
   if (spots.length) lines.push("这趟要去的点（去重，" + spots.length + " 个）：" + spots.join("、") + "。");
-  // 想去清单（本机收藏，无则省略）
   try {
     const city = (T.activeCityOf && T.activeCityOf(plan)) || plan.cityName || "";
     if (city) {

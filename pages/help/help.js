@@ -215,6 +215,7 @@ Page(SafePage({
     return s + "\n【场景护栏】本页只做旅途应急科普：不给诊疗结论、不评价医院优劣、不编造医院名称/药品剂量/电话号码；急症一律建议拨打 120 并就近就医。";
   },
   aiAsk() {
+    if (this.data.aiLoading) return;
     const q = String(this.data.aiQ || "").trim();
     if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
     const self = this;

@@ -151,5 +151,15 @@ ck("网页直连大模型有硬超时中止，且超时与跨域分开收口",
   /new AbortController\(\)/.test(webAiJs) && /signal: ac \? ac\.signal/.test(webAiJs) &&
   /aborted \?/.test(webAiJs) && /网关未回包/.test(webAiJs));
 
+// AI 按钮在「思考中」仍然可点 → 连点会命中 AIAgent 的 scene 锁返回 inflight，
+// 各页把 inflight 当失败处理 → 界面被离线答案闪替（用户以为 AI 坏了）。
+// 这是一类问题：同类守卫必须横向扫全部 AI 页面，只盯报障那一个必然漏。
+["pages/today/today.js", "pages/plan/plan.js", "pages/help/help.js",
+ "subpkg/prep/prep.js", "subpkg/food/food.js", "subpkg/toolkit/toolkit.js",
+ "subai/deep/deep.js"].forEach(function (p) {
+  ck("AI 提问按钮有加载守卫（连点不命中 inflight）· " + p,
+    /if \(this\.data\.aiLoading\) return;/.test(read(p)));
+});
+
 console.log("  更强 AI / 全站适配防回潮守卫: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);

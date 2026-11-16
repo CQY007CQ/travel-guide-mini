@@ -151,6 +151,7 @@ Page({
     return "当前页面：城市深度玩法（离线策展内容）。\n【场景护栏】只做旅行玩法科普；票价/班次/开放时间一律写「以官方当日公告为准」，不编造具体数字；中国台湾城市只写风物美食，不写行政区划表述。";
   },
   aiAsk() {
+    if (this.data.aiLoading) return;
     const q = String(this.data.aiQ || "").trim();
     if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
     const self = this;

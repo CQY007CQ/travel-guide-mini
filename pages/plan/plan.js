@@ -1255,7 +1255,8 @@ Page(SafePage({
   try { r = T.askAssistant(q, plan); } catch (e) { r = { text: "暂时答不上来，换个问法试试" }; }
   this.setData({ aiAnswer: (r && r.text) || "", aiLoading: false, aiSource: "", aiErr: "" });
  },
- sendAI() {
+  sendAI() {
+    if (this.data.aiLoading) return;
   const q = (this.data.aiInput || "").trim();
   if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
   const self = this;
