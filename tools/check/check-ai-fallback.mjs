@@ -109,6 +109,25 @@ log(/rate-limited/.test(PROXY_JS) && /稍后再试/.test(PROXY_JS),
 log(/return true; \/\/ 计数器异常时放行/.test(GUARD_JS),
   "防护层 fail-open：计数异常不阻断 AI 可用性");
 
+// ── 提示词八项纪律（元模板迭代产物，主包/分包/云函数三处口径必须一致）──
+const PROMPTS_JS = readFileSync(resolve(ROOT, "subpkg/assistant/ai-prompts.js"), "utf8");
+const allPrompt = PROMPTS_JS + "\n" + AGENT_JS + "\n" + PROXY_JS;
+const DISCIPLINES = [
+  ["复述确认", /复述确认|先用一句复述/],
+  ["思维链", /思维链|厘清意图/],
+  ["多链投票", /多链投票/],
+  ["检索增强", /检索增强|标明来源/],
+  ["零伪造", /零伪造|不编/],
+  ["时效约束", /2025/],
+  ["自我修正", /自我修正|输出前自检/],
+  ["格式强制", /格式[:：]|四段|共识度/]
+];
+const missD = DISCIPLINES.filter(([, re]) => !re.test(allPrompt)).map(([n]) => n);
+log(missD.length === 0,
+  "提示词八项纪律三处齐备（主包/分包/云函数）" + (missD.length ? "（缺：" + missD.join("、") + "）" : ""));
+log(/暂无数据/.test(allPrompt) && /≤400/.test(allPrompt),
+  "提示词统一「暂无数据」口径与篇幅上限");
+
 console.log(fail === 0
   ? "\n✓ 云端 AI fail-closed 覆盖守卫通过（每个调用点都有 .catch 且失败分支优雅降级）"
   : "\n✗ 存在缺兜底的云端 AI 调用点，请在 .then 失败分支补离线/云端感知回落，并确保 .catch 存在");
