@@ -250,5 +250,16 @@ for (const s of scs) {
 log(badRoute.length === 0, "全部场景路由指向真实页面文件" +
   (badRoute.length ? "（缺：" + badRoute.join(",") + "）" : ""));
 
+// 14) 跨页 AI 衔接：AIAgent.ask 统一注入其它场景最近问题，只进 context 不写回记忆。
+//     故障表现是「今天问下雨，切到美食页问『那推荐室内的』答非所问」，静态门禁查不出，
+//     故在这里锁住实现契约，运行时行为由 tools/test/_test-cross-scene-ai.mjs 守卫。
+const AGENT_SRC = readFileSync(resolve(ROOT, "utils/ai-agent.js"), "utf8");
+log(/crossSceneHints\(/.test(AGENT_SRC) && /fullCtx \|\| null/.test(AGENT_SRC),
+  "ask() 统一注入跨页上下文（11 个调用点无需各自改动）");
+log(/CROSS_SCENE_TTL = 10 \* 60 \* 1000/.test(AGENT_SRC) && /_crossTs = 0/.test(AGENT_SRC),
+  "跨页上下文有 10 分钟时效且清空会话立即失效");
+log(/role === "user"/.test(AGENT_SRC) && /slice\(-2\)/.test(AGENT_SRC),
+  "只取其它场景最近 2 条用户问题（不取回答，避免串台与 token 浪费）");
+
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);

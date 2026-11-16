@@ -28,6 +28,7 @@ const MEM_KEY = "aiAgentMemV1";
 const MAX_SCENES = 8;                // 全站实有 11 个 scene；8 个约 112KB，storage 10MB 非瓶颈
 const SAVE_CHARS = 600;              // 落盘单条上限（内存里仍 1200）
 const _inflight = Object.create(null); // scene -> true，防止同场景重复点击并发请求
+const _sceneTs = Object.create(null);  // scene -> 最近一次用户提问时间（纯内存，跨页衔接时效用）
 let _mem = null;                     // scene -> [{role, content}]，首次访问时懒加载
 
 function _load() {
@@ -66,6 +67,7 @@ function remember(scene, role, text) {
     const m = _load();
     if (!m[k]) m[k] = [];
     m[k].push({ role: role === "assistant" ? "assistant" : "user", content: String(text || "").slice(0, 1200) });
+    if (role !== "assistant") { _sceneTs[k] = Date.now(); _crossTs = 0; } // 新提问使跨页缓存失效
     if (m[k].length > MAX_TURNS * 2) m[k] = m[k].slice(-MAX_TURNS * 2);
     // 键顺序即淘汰顺序：把刚用过的场景挪到末尾（详见 check-ai-fallback 断言）。
     const cur = m[k]; delete m[k]; m[k] = cur;
@@ -75,10 +77,36 @@ function remember(scene, role, text) {
 function clearHistory(scene) {
   try {
     const m = _load();
-    if (scene) delete m[scene];
-    else Object.keys(m).forEach(k => delete m[k]);
+    if (scene) { delete m[scene]; delete _sceneTs[scene]; }
+    else { Object.keys(m).forEach(k => delete m[k]); Object.keys(_sceneTs).forEach(k => delete _sceneTs[k]); }
+    _crossTs = 0; // 清空会话后跨页缓存立即失效，不吐 30 秒内的旧问题
     _save();
   } catch (e) {}
+}
+
+// 跨页衔接：把「其它场景最近 2 条用户提问」附进本次 context，让「那换成室内的呢」
+// 在 food 页也能接上 today 页的上下文。只注入、不写回记忆、不进 messages。
+// 时效 10 分钟 + 只取 user 问题（不取回答，避免长文本串台与 token 浪费）。
+// 纯内存快照，无落盘、无新增存储键；失败时返回空串，绝不阻断主流程。
+const CROSS_SCENE_TTL = 10 * 60 * 1000;
+let _crossTs = 0, _crossCache = "";
+function crossSceneHints(current) {
+  try {
+    const now = Date.now();
+    if (now - _crossTs < 30000 && _crossCache) return _crossCache; // 30s 内复用，避免每次全表扫描
+    const m = _load();
+    const lines = [];
+    Object.keys(m).forEach(function (k) {
+      if (k === current || !Array.isArray(m[k])) return;
+      if (now - (_sceneTs[k] || 0) > CROSS_SCENE_TTL) return; // 超过 10 分钟不串台
+      const qs = m[k].filter(function (x) { return x && x.role === "user" && x.content; })
+        .slice(-2).map(function (x) { return "· " + String(x.content).slice(0, 60); });
+      if (qs.length) lines.push("【" + k + "页最近问过】\n" + qs.join("\n"));
+    });
+    const out = lines.slice(0, 3).join("\n");
+    _crossTs = now; _crossCache = out;
+    return out;
+  } catch (e) { return ""; }
 }
 
 // 多轮问答：自动带上该场景最近对话 + 本地上下文；成功后才写入记忆（失败不污染上下文）。
@@ -93,7 +121,9 @@ function ask(scene, question, context, systemOverride) {
   _inflight[k] = true;
   const msgs = historyOf(scene).concat([{ role: "user", content: q }]);
   const sys = aiSystemOf(k, systemOverride);
-  return Cloud.aiChat({ messages: msgs, context: context || null, system: sys }).then(function (r) {
+  const hint = crossSceneHints(k);
+  const fullCtx = hint ? (String(context || "") + "\n\n【跨页上下文 · 仅供理解指代，勿当成该页事实】\n" + hint) : context;
+  return Cloud.aiChat({ messages: msgs, context: fullCtx || null, system: sys }).then(function (r) {
     if (r && r.ok && r.text) {
       remember(scene, "user", q);
       remember(scene, "assistant", r.text);
