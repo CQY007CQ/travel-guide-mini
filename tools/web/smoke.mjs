@@ -252,6 +252,25 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
     /@media \(max-height: 560px\)/.test(aiCss) &&
     /\.w-modal-box\s*\{[^}]*max-height:\s*86vh/.test(shell) &&
     /#tabbar \.tb\s*\{[^}]*font-size:\s*10px/.test(shell));
+  // ── 浮层键盘/点击可达性（旧版只能靠鼠标找 × 关抽屉，键盘用户完全走不出去）──
+  ok("Esc 能收起页面抽屉，抽屉没开时才去收 AI 面板",
+    /e\.key === "Escape"/.test(appJs) &&
+    /navPanel\.classList\.add\("hidden"\)/.test(appJs) &&
+    /__webAI\.close/.test(appJs) &&
+    /querySelector\("\.ai-panel\.open"\)/.test(appJs));
+  ok("输入框内不劫持 Alt+← / Alt+H / Alt+N（按词移动光标不能被整页跳走顶掉）",
+    /t\.tagName === "INPUT"/.test(appJs) && /t\.isContentEditable/.test(appJs) &&
+    /!e\.altKey \|\| typing\) return/.test(appJs));
+  ok("点抽屉外部收起抽屉，两个开关按钮不重复关闭（否则点了等于没点）",
+    /navPanel\.contains\(e\.target\)/.test(appJs) &&
+    /#webNavBtn/.test(appJs) && /#webNavOpen/.test(appJs));
+  // 真 bug 防回潮：tpl.js 里一直有 "on:error":"onImgError"，但 runtime 的事件表没有 error，
+  // 于是「远端封面图挂了 → 回退示意图」这条兜底在网页端从未触发，只留一个碎图标。
+  ok("小程序 <image binderror> 在网页端有等价实现（编译有绑定 + 运行时派发，两条都得在）",
+    /on:error/.test(fs.readFileSync(path.join(ROOT, "web/lib/tpl.js"), "utf8")) &&
+    /error:\s*"error"/.test(rt) &&
+    // 资源 error 不冒泡，必须靠捕获阶段才收得到 —— 少了 true 这条修复等于没写
+    /root\.addEventListener\(domEvt, function \(ev\) \{[\s\S]*?\}, true\);/.test(rt));
 }
 
 /* ── 8. 内置 AI 全站智能体：真的跑一遍（不是只看源码形状） ──

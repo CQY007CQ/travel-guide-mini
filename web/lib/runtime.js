@@ -980,7 +980,12 @@
     var map = { click: "click", input: "input", change: "change", blur: "blur", focus: "focus",
       submit: "submit", reset: "reset", contextmenu: "contextmenu", touchstart: "touchstart",
       touchmove: "touchmove", touchend: "touchend", touchcancel: "touchcancel",
-      keydown: "keydown", scroll: "scroll" };
+      keydown: "keydown", scroll: "scroll",
+      /* error：小程序 <image binderror> 的网页等价物。
+         资源加载失败不冒泡，但「捕获阶段」会从 root 一路走到目标元素，所以下面这个
+         capture=true 的监听能收到 <img> 的 error；缺了这条，页面里 binderror="onImgError"
+         的封面兜底在网页端永远不触发，远端图挂了就只剩一个碎图标。 */
+      error: "error" };
     Object.keys(map).forEach(function (domEvt) {
       root.addEventListener(domEvt, function (ev) {
         // scroll 事件不冒泡到 handler 名，需要单独找带 __ev 的祖先

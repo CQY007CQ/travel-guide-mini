@@ -330,12 +330,38 @@
         el.addEventListener("click", function () { router(el.dataset.p, "tab"); });
       });
 
-      // 4) 键盘快捷跳转：Alt+← 返回 / Alt+H 出发页 / Alt+N 页面抽屉
+      // 4) 键盘快捷跳转：Alt+← 返回 / Alt+H 出发页 / Alt+N 页面抽屉 / Esc 收起浮层
       document.addEventListener("keydown", function (e) {
-        if (!e.altKey) return;
+        // 焦点在输入框里时绝不抢键：Alt+← 在输入框内是「按词移动光标」，劫持掉会让人
+        // 在搜索/记一笔/和 AI 打字时整页跳走（桌面端最容易踩的失效路径）。
+        var t = e.target;
+        var typing = !!(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable));
+        if (e.key === "Escape") {
+          // 抽屉原先只能点 × 关，键盘用户和小屏上都够不着 → Esc 最先收抽屉，
+          // 抽屉本来就没开时才去收 AI 面板（AI 面板由 ai-assistant.js 自管理状态）。
+          if (navPanel && !navPanel.classList.contains("hidden")) {
+            navPanel.classList.add("hidden");
+            e.preventDefault();
+          } else if (document.querySelector(".ai-panel.open") &&
+                     window.__webAI && typeof window.__webAI.close === "function") {
+            window.__webAI.close();
+            e.preventDefault();
+          }
+          return;
+        }
+        if (!e.altKey || typing) return;
         if (e.key === "ArrowLeft") { e.preventDefault(); window.__webBack(); }
         else if (e.key === "h" || e.key === "H") { e.preventDefault(); router(HOME, "tab"); }
         else if (e.key === "n" || e.key === "N") { e.preventDefault(); if (navPanel) navPanel.classList.toggle("hidden"); }
+      });
+
+      // 4b) 点抽屉外面收起抽屉：这是「浮层」的默认预期，缺了它就只能去右上角找 ×
+      document.addEventListener("click", function (e) {
+        if (!navPanel || navPanel.classList.contains("hidden")) return;
+        if (navPanel.contains(e.target)) return;
+        // 两个开关按钮自己有 toggle，不要在这里再关一次（否则点了等于没点）
+        if (e.target.closest && (e.target.closest("#webNavBtn") || e.target.closest("#webNavOpen"))) return;
+        navPanel.classList.add("hidden");
       });
 
       // 5) 路由监听
