@@ -1283,7 +1283,7 @@ function budgetFoodFirst(shops, budgetKey, withTag) {
 }
 
 /* ---------- 穿衣建议（CLOTH + SEASON_WX，按目的地气候与出发月） ---------- */
-const SEASON_KEYS = { 1: "冬", 2: "冬", 3: "春", 4: "春", 5: "春", 6: "夏", 7: "夏", 8: "夏", 9: "秋", 10: "秋", 11: "秋", 12: "冬" };
+// 季节判定唯一入口是 _seasonKeyOf/_clothSeason（见文件下方 A2 段），此处不再另存一张季节表。
 // month：可选，1-12。必须由调用方按**行程出发月**传入——不传才回落当前月。
 // 曾固定用当前月：11 月规划一月哈尔滨会给出「秋·薄外套」，与同屏「行李清单」（按出发月算）自相矛盾。
 function clothAdvice(city, month) {
@@ -3605,7 +3605,7 @@ function _seasonKeyOf(month) { return ({ 12: "冬", 1: "冬", 2: "冬", 3: "春"
 // v1.20.6：区域/气候感知的季节判定 —— 修「北方 11 月被当成秋季给薄外套」。
 // 11 月：东北/华北/西北 或 cold/plateau 气候，实际已入冬（0℃上下），按「冬」给羽绒服；
 //        华东/华中/华南/西南（温和）仍按「秋」。3 月同理（北方仍冷，按「冬」）。
-// 只用于穿衣/行李这类保暖相关判定，不改动 SEASON_KEYS 全表（其它功能口径不变）。
+// 全站季节判定的唯一真相源：穿衣/行李等都走这里，勿在别处再定义季节映射表。
 function _clothSeason(month, city) {
   const base = _seasonKeyOf(month);
   const c = city || {};

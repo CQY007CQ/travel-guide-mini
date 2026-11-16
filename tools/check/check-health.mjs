@@ -43,10 +43,12 @@ ck("主包未越 1.5M 代码质量线", mainKB != null && mainKB <= HEADROOM_LIM
   mainKB == null ? "" : "余量 " + (HEADROOM_LIMIT - mainKB) + "KB");
 ck("主包仍有可迭代余量（> 0KB）", mainKB != null && mainKB < HEADROOM_LIMIT);
 ck("体积体检逐包 2MB 红线通过", /全部包体在 2MB 红线内/.test(pkgOut));
-// 软预警（不 fail）：主包逼近 1.5M 线时提示后续能力优先落分包 / 打通 subdata3 数据槽位。
+// 软预警（不 fail）：主包逼近 1.5M 线时提示后续能力优先落分包。
+// v1.20.7：团队静态美食块（227KB）已实际挪进 subdata3（余量 1KB→226KB），
+// 故此处提示改为通用建议，不再指向已完成的动作。
 if (mainKB != null && HEADROOM_LIMIT - mainKB < 16) {
   console.log("  [warn] 主包余量仅 " + (HEADROOM_LIMIT - mainKB) +
-    "KB：新增能力请优先放分包，或先把团队静态块挪进 subdata3 预留槽位");
+    "KB：新增静态数据请落 subdata3 槽位，新增能力请优先放分包");
 }
 
 /* ───────── ② 数据规模（只报真实值，不写死期望） ───────── */

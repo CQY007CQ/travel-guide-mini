@@ -172,7 +172,11 @@ ok("APPROX 剔除用平衡括号扫描且产物/源码双写",
   mergeSrc.includes('pruneApprox("utils/emergency-data.js"') &&
   mergeSrc.includes('pruneApprox("tools/_src-backup/emergency-data.src.js"'));
 const dsrc = read("tools/_src-backup/data.js");
-const tm = dsrc.match(/>>>TEAM_FOOD_START>>>[\s\S]*?const TEAM_FOOD_ENRICH = ([\s\S]*?);\s*\/\/ <<<TEAM_FOOD_END<<</);
+// v1.20.7：团队美食块（约 227KB）已移到 subdata3 分包给主包瘦身，断言改读新真源。
+// 同时加「不回潮」断言：一旦有人把它塞回主包 data.js，主包会再次顶爆 1536KB 死线。
+const tfSrc = read("subdata3/data/team-food3.js");
+const tm = tfSrc.match(/>>>TEAM_FOOD_START>>>[\s\S]*?const TEAM_FOOD_ENRICH = ([\s\S]*?);\s*\/\/ <<<TEAM_FOOD_END<<</);
+ok("团队美食块不回流主包（data.js 内不再内联）", !/const TEAM_FOOD_ENRICH\s*=/.test(dsrc));
 let teamFood = null, zero = 0;
 try { teamFood = tm ? Function("return " + tm[1] + ";")() : null; } catch (e) { /* 解析失败即判红 */ }
 if (teamFood) for (const c in teamFood) for (const sh of teamFood[c] || [])

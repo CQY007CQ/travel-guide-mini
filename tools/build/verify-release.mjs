@@ -50,8 +50,19 @@ const stripped = dataSrc.replace(/require\.async\(\s*["'][^"']+["']\s*\)/g, "");
 const hasVarCall = /require\.async\(\s*[^"'\s)]/.test(stripped);
 ok("utils/data.js 的 require.async 均为静态字面量（无变量）", literals.length >= 1 && !hasVarCall,
    `字面量=${literals.length}`);
-ok("data.js 字面量数 == 数据块数", literals.length === chunks.length,
-   `字面量=${literals.length} 块=${chunks.length}`);
+// v1.20.7：data.js 的 require.async 不再只有 packed 分块 —— 团队美食块（227KB，为解锁主包
+// 1536KB 死线从主包搬出）是 subdata3 里的普通模块，不进 manifest。故「数量==块数」只对
+// packed 分块成立；额外分块单独校验存在且非空，路径写错时会在这里被判红而不是线上静默丢数据。
+const packedLits = literals.filter((p) => /data-packed\d*\.js$/.test(p));
+const extraLits = literals.filter((p) => !/data-packed\d*\.js$/.test(p));
+ok("data.js 字面量数 == 数据块数", packedLits.length === chunks.length,
+   `packed字面量=${packedLits.length} 块=${chunks.length}`);
+for (const p of extraLits) {
+  const fp = resolve(ROOT, "utils", p);
+  const ex = existsSync(fp);
+  const sz = ex ? statSync(fp).size : 0;
+  ok(`额外数据分块存在且 >10KB: ${p}`, ex && sz > 10 * 1024, ex ? `${Math.round(sz / 1024)}KB` : "缺失");
+}
 
 // 4. 每个数据分块文件存在且非平凡大小（>10KB，远小于此即残包/空）
 let totalBytes = 0;

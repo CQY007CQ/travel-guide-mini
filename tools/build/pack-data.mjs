@@ -12,6 +12,13 @@ import zlib from "zlib";
 import { createRequire } from "module";
 const req = createRequire(process.cwd() + "/");
 
+// v1.20.7：团队美食数据不要烘焙进打包基数据。
+// 理由（两条硬约束）：① 该数据已独立住在 subdata3/data/team-food3.js，运行期由 initData()
+// 作为第 3 个分块加载后合并，基数据再存一份就是「同一事实两个真相源」，改一处另一处会陈旧；
+// ② subdata 包 raw 已 1929KB / 红线 2048KB，美食扩量（目标 1 万家）靠团队注入，烘焙进来会把
+//   这 119KB 余量吃光；subdata3 还有 1.8MB 空间，放那里更安全。
+// 打包器逐字节复现「不含团队数据」的基数据；运行期仍由 subdata3 补齐，最终结果一致。
+process.env.PACK_SKIP_TEAM_FOOD = "1";
 const D = req("./utils/data.js");
 
 // ── v1.19.174 打包期坐标完整性硬门禁 ─────────────────────────────────

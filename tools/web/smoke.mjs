@@ -470,5 +470,20 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
   ok("无遮罩加载层不拦触摸", /\.w-loading-nomask \{[^}]*pointer-events: none/.test(css2));
 }
 
+// v1.20.7 主包瘦身：团队美食数据（227KB）搬到 subdata3 普通模块，不再内联进 utils/data.js。
+// 网页端必须同样注册进模块表，否则浏览器 require 抛错 → 355 家店静默消失（列表少店、无法察觉）。
+{
+  ok("团队美食块已注册进网页模块表", !!g.__M["subdata3/data/team-food3.js"]);
+  let tf = null;
+  try { tf = g.__require("__entry__", "./subdata3/data/team-food3.js"); } catch (e) {}
+  const cities = tf && typeof tf === "object" ? Object.keys(tf).length : 0;
+  let shops = 0;
+  if (tf) for (const c in tf) shops += Array.isArray(tf[c]) ? tf[c].length : 0;
+  ok("团队美食块可加载且规模正确（≥200 城 / ≥300 店）", cities >= 200 && shops >= 300,
+    `城=${cities} 店=${shops}`);
+  const dsrc = fs.readFileSync(path.join(ROOT, "utils/data.js"), "utf8");
+  ok("data.js 不再内联团队美食块（主包瘦身防回潮）", !/const TEAM_FOOD_ENRICH\s*=/.test(dsrc));
+}
+
 console.log("\n结果：" + pass + " 通过 / " + fail + " 失败");
 if (fail) process.exit(1);

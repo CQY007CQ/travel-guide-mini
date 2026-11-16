@@ -163,7 +163,8 @@ console.log("\n主包预算：raw=" + (baseRaw == null ? "未测" : baseRaw + "K
   "KB，可用 " + (budget === Infinity ? "未测" : (budget / 1024).toFixed(0) + "KB"));
 // 美食注入 tools/_src-backup/data.js 后由末尾 cp 到 utils/data.js，主包只增长一份，故按一份计。
 const JOBS = [
-  ["美食", "tools/_src-backup/data.js", "TEAM_FOOD_START", "TEAM_FOOD_END", "TEAM_FOOD_ENRICH", agg.food],
+  // v1.20.7：美食块已移出主包，注入目标改为 subdata3 分包（主包瘦身 226KB，预算闸门不再拦它）。
+  ["美食", "subdata3/data/team-food3.js", "TEAM_FOOD_START", "TEAM_FOOD_END", "TEAM_FOOD_ENRICH", agg.food],
   ["具名医院", "utils/emergency-data.js", "TEAM_HOSP_START", "TEAM_HOSP_END", "TEAM_HOSP_ENRICH", agg.hospitals],
   ["逐店酒店", "utils/hotel-areas.js", "TEAM_HOTEL_LIST_START", "TEAM_HOTEL_LIST_END", "TEAM_HOTEL_LIST_ENRICH", agg.hotelList],
   ["住宿片区", "utils/hotel-areas.js", "TEAM_HOTEL_START", "TEAM_HOTEL_END", "TEAM_HOTEL_ENRICH", agg.hotels]
