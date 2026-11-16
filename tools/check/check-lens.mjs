@@ -113,5 +113,9 @@ ck("识物失败只给用户人话，不泄漏 errCode / Require stack 技术堆
   /errCode\|Require stack/.test(lens) &&
   !/_openLocalCompare\("识别失败（" \+ String/.test(lens));
 
+// 识别中重复点击 = 云调用翻倍（每次 2-3 条多模态链 + 一轮上传）、结果互相覆盖、storage 留孤儿图。
+ck("识物识别中挡住重复点击（loading 守卫在最前，先于图片为空判断）",
+  /identify\(\)\s*\{[\s\S]{0,220}?if \(this\.data\.loading\) return;[\s\S]{0,300}?if \(!this\.data\.imgs\.length\)/.test(lens));
+
 console.log("  拍照识物防回潮守卫: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);

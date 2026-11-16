@@ -251,6 +251,10 @@ Page(SafePage({
 
   identify() {
     const self = this;
+    // 识别中必须挡住重复点击：每点一次就是「2-3 条多模态链 + 一轮上传」，
+    // 连点会云调用翻倍、token 翻倍、storage 里留孤儿图，且两条链路结果互相覆盖（后完成者赢）。
+    // 各层都有超时兜底（上传 12s / 识图 25s），失败必走 catch 复位 loading，不会把按钮永久锁住。
+    if (this.data.loading) return;
     if (!this.data.imgs.length) { wx.showToast({ title: "先拍一张或从相册选", icon: "none" }); return; }
     if (!Cloud.cloudEnabled()) {
       self._openLocalCompare("云端 AI 未开启（需在云函数 llmProxy 配置多模态 LLM_MODEL）。");

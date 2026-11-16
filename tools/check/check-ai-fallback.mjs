@@ -88,6 +88,9 @@ log(intentTmo > 0 && intentTmo < cloudTextWait,
 // 否则被淘汰的是「最早创建」的场景——常用页反而先失忆。
 log(/delete m\[k\];\s*m\[k\] = cur;/.test(AGENT_JS),
   "场景记忆淘汰最久未用（把刚用过的场景挪到末尾），不是最早创建");
+// 全站实有 11 个 scene；落盘只留 MAX_SCENES 个，太少会让「跨页面问过几次」就丢早期记忆。
+const maxScenes = Number((AGENT_JS.match(/const MAX_SCENES = (\d+);/) || [])[1] || 0);
+log(maxScenes >= 8, "落盘场景数(" + maxScenes + ") 覆盖全站 11 个 scene 的多数（storage 远非瓶颈）");
 
 console.log(fail === 0
   ? "\n✓ 云端 AI fail-closed 覆盖守卫通过（每个调用点都有 .catch 且失败分支优雅降级）"

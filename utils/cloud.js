@@ -1,10 +1,9 @@
 // utils/cloud.js —— 微信云开发 / 网页版 CloudBase 统一接入层
 //
-// 小程序与网页版共用同一云环境与集合（users/plans/wishes/footprints/notes/feedback/ai_cache），
-// 实现「小程序生成的行程网页版能接着看、网页版收藏的足迹小程序能看到」的互通。
+// 两端共用同一云环境与集合（users/plans/wishes/footprints/notes/feedback/ai_cache），
+// 实现「小程序生成的行程网页版能接着看、网页版收藏的足迹小程序能看到」。
 //   小程序端：原生 wx.cloud；网页端：@cloudbase/js-sdk（cloud-web.js 预先 init 并挂 window.__cloudbase）。
-// 铁律：云环境 ID 走 keys.cloudEnv，缺失即 fail-closed 整体降级（不阻断主流程）；
-//       LLM 密钥只存在于云函数环境变量，前端代码一个字都不出现。
+// 铁律：cloudEnv 缺失即 fail-closed 整体降级（不阻断主流程）；LLM 密钥只在云函数环境变量，前端零 Key。
 // 设计原则：本地优先，云同步是增强项，任何联网失败都回落本地。
 
 const KEYS = require("./keys.js");

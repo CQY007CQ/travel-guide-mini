@@ -25,7 +25,7 @@ function aiSystemOf(scene, override) {
 
 const MAX_TURNS = 6;                 // 每场景保留最近 6 轮（12 条消息）
 const MEM_KEY = "aiAgentMemV1";
-const MAX_SCENES = 4;                // 落盘最多 4 个场景，防止 storage 膨胀
+const MAX_SCENES = 8;                // 全站实有 11 个 scene；8 个约 112KB，storage 10MB 非瓶颈
 const SAVE_CHARS = 600;              // 落盘单条上限（内存里仍 1200）
 const _inflight = Object.create(null); // scene -> true，防止同场景重复点击并发请求
 let _mem = null;                     // scene -> [{role, content}]，首次访问时懒加载
