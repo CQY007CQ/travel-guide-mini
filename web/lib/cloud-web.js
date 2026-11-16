@@ -28,11 +28,20 @@
     var sdkUrl = "lib/cloudbase-sdk.js" + (v ? "?v=" + v : "");
 
     function boot() {
-      var tcb = window.tcb;
-      if (!tcb || typeof tcb.init !== "function") return;   // SDK 没加载成功 → fail-closed
+      // SDK 用 esbuild 打成 CJS 互操作包装：window.tcb 上只有一个 { default, __esModule }，
+      // 真正的工厂在 tcb.default.init；SDK 另外还会挂 window.cloudbase。
+      // 曾只认 window.tcb.init → 该值为 undefined → 本函数第 32 行静默 return，
+      // 于是 window.__cloudbase 永不挂载：网页版云同步、AI 强模型、识图上传全链路降级为离线，
+      // 而且全程无报错（fail-closed 掩盖成"本地优先"），极难发现。三种形态任取其一。
+      var cands = [window.tcb, window.tcb && window.tcb.default, window.cloudbase];
+      var fac = null;
+      for (var i = 0; i < cands.length; i++) {
+        if (cands[i] && typeof cands[i].init === "function") { fac = cands[i]; break; }
+      }
+      if (!fac) return;   // SDK 确实没加载成功 → fail-closed
       try { globalThis.IS_MP_BUILD = false; } catch (e) {}  // 强制走 Web 适配器，避免被 wx 垫片误导
       var app;
-      try { app = tcb.init({ env: env, timeout: 8000 }); }
+      try { app = fac.init({ env: env, timeout: 8000 }); }
       catch (e) { return; }
       if (!app) return;
       var auth = (typeof app.auth === "function") ? app.auth() : null;

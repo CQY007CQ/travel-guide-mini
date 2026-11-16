@@ -1284,11 +1284,14 @@ function budgetFoodFirst(shops, budgetKey, withTag) {
 
 /* ---------- 穿衣建议（CLOTH + SEASON_WX，按目的地气候与出发月） ---------- */
 const SEASON_KEYS = { 1: "冬", 2: "冬", 3: "春", 4: "春", 5: "春", 6: "夏", 7: "夏", 8: "夏", 9: "秋", 10: "秋", 11: "秋", 12: "冬" };
-function clothAdvice(city) {
+// month：可选，1-12。必须由调用方按**行程出发月**传入——不传才回落当前月。
+// 曾固定用当前月：11 月规划一月哈尔滨会给出「秋·薄外套」，与同屏「行李清单」（按出发月算）自相矛盾。
+function clothAdvice(city, month) {
  try {
   const c = city || {};
   const climate = c.climate || "temperate";
-  const sk = _clothSeason(new Date().getMonth() + 1, c);
+  const mm = Math.floor(Number(month));
+  const sk = _clothSeason((mm >= 1 && mm <= 12) ? mm : (new Date().getMonth() + 1), c);
   const wx = (D.SEASON_WX && D.SEASON_WX[climate] && D.SEASON_WX[climate][sk]) || "";
   const cl = (D.CLOTH && D.CLOTH[climate] && D.CLOTH[climate][sk]) || null;
   const lines = [];
@@ -1518,7 +1521,7 @@ function askAssistant(rawQ, plan) {
  }
  // ---- 天气 / 穿衣 ----
  if (/天气|气温|穿衣|穿什么|衣服|外套|冷不冷|热不热|下雨|下雪|衣物|防晒|季节/.test(q)) {
-  const adv = clothAdvice(cityObj);
+  const adv = clothAdvice(cityObj, plan && plan.depart ? +String(plan.depart).slice(5, 7) : 0);
   L(city + "穿衣建议：");
   L(adv || "数据暂缺，按目的地当月气候常识准备即可。");
   // v1.20.6：只有问「季节/几月/什么时候去」才单独给「适宜时节」，单纯问穿衣不再混入最佳季节
@@ -6496,16 +6499,17 @@ function highlightOf(plan) {
 }
 
 // 错峰提示：法定节假日 + 周末对热门景点给提示（静态规则）
-const _HOLIDAYS = { "01-01": "元旦", "02-10": "春节", "04-05": "清明", "05-01": "五一", "06-10": "端午", "09-15": "中秋", "10-01": "国庆" };
+// 复用上方 HOLIDAYS 这张唯一权威表（带年份 + 起止区间）。不要再维护第二张 MM-DD 表：
+// 旧的 _HOLIDAYS 既丢年份又只写单日，春节/端午/中秋的日期与实际相差 9-10 天，
+// 于是真实假期漏报（判成"工作日出行，人流友好"）、普通工作日误报（2-10 报"春节假期"）。
 function crowdTipOf(dateStr) {
-  const d = String(dateStr || "");
-  const md = d.slice(5, 10);
-  const hol = _HOLIDAYS[md] || "";
+  const d = String(dateStr || "").slice(0, 10);
   try {
+    const hol = HOLIDAYS.find(x => d >= x.s && d <= x.e);
     const dt = new Date(d + "T00:00:00");
     const wd = dt.getDay();
     const isWeekend = wd === 0 || wd === 6;
-    if (hol) return { level: "高", txt: hol + "假期人流量大，热门景点建议提前预约、错开上午 10 点前入场" };
+    if (hol) return { level: "高", txt: hol.name + "假期人流量大，热门景点建议提前预约、错开上午 10 点前入场" };
     if (isWeekend) return { level: "中", txt: "周末市区景点人流较多，热门点建议赶早" };
     return { level: "低", txt: "工作日出行，人流友好" };
   } catch (e) { return { level: "-", txt: "" }; }

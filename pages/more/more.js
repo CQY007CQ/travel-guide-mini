@@ -115,8 +115,10 @@ Page(SafePage({
       success(r) { if (r.confirm) self._genMulti(route); }
     });
   },
-  _departIn(days) {
-    const d = new Date(Date.now() + (days || 7) * 86400000);
+  _departIn() {
+    // 弹窗承诺「下周末出发」→ 必须落到周六。原来纯 +7 天会得到「下周一」，与文案不符。
+    const d = new Date();
+    d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
     const pad = n => String(n).padStart(2, "0");
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   },

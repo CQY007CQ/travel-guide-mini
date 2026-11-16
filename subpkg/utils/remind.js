@@ -169,7 +169,11 @@ function addToCalendar(item) {
     try {
       const d = String(t.date || "");
       if (!d) { resolve(false); return; }
-      const start = new Date(d + " 08:00:00");
+      // 不能用 new Date("2026-11-16 08:00:00")：空格分隔格式不在 ECMAScript 日期字符串规范内，
+      // iOS 的 JavaScriptCore 直接返回 Invalid Date → 这里静默 resolve(false)，
+      // 而「加日历」是纯离线环境下唯一能真正叫醒用户的通道。改用数值构造，双端一致。
+      const p = d.slice(0, 10).split("-");
+      const start = new Date(+p[0], (+p[1]) - 1, +p[2], 8, 0, 0);
       if (isNaN(start.getTime())) { resolve(false); return; }
       const startTime = Math.floor(start.getTime() / 1000);
       wx.addPhoneCalendar({

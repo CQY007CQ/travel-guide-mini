@@ -213,7 +213,7 @@ Page(SafePage({
   // 这里只保留「怎么穿」，气候与最佳季节交给城市速览。
   const _bf = (T.cityBrief ? T.cityBrief(plan.cityName) : null) || {};
   const _dupLines = [String(_bf.climateTxt || "").trim(), String(_bf.best || "").trim()].filter(Boolean);
-  clothText = String(T.clothAdvice(city) || "")
+  clothText = String(T.clothAdvice(city, plan.depart ? +String(plan.depart).slice(5, 7) : 0) || "")
     .split("\n")
     .filter(line => {
       const t = line.trim();

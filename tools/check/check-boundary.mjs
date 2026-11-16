@@ -175,5 +175,22 @@ runOnLaunch();
 assert("无行程 → 不归档不报错", !("planV1" in mem) && (mem["miniPlansV1"] || []).length === 0);
 if (savedApp) global.App = savedApp;
 
+// ── D3 时间基准：假日表必须带年份区间，穿衣必须按行程月份 ──
+// crowdTipOf 曾用一张无年份、只写单日的 MM-DD 表：春节写 02-10（实际 02-15~02-21）、
+// 端午写 06-10（实际 06-19~06-21）、中秋写 09-15（实际 09-25~09-27）。
+// 结果是真实假期漏报成"工作日出行，人流友好"，普通工作日又误报"春节假期人流量大"。
+assert("假日区间命中：2026-06-19 端午首日 → 高", T.crowdTipOf("2026-06-19").level === "高");
+assert("假日区间命中：2026-09-25 中秋首日 → 高", T.crowdTipOf("2026-09-25").level === "高");
+assert("假日区间命中：2026-10-05 国庆第 5 天 → 高", T.crowdTipOf("2026-10-05").level === "高");
+assert("非假日不误报：2026-02-10（周二）→ 低", T.crowdTipOf("2026-02-10").level === "低");
+// clothAdvice 曾固定用 new Date() 的当前月：11 月规划一月行程会给出当季建议，
+// 与同屏「行李清单」（按出发月算）自相矛盾。必须按传入月份。
+{
+  const bj = T.findCity("北京");
+  const w = bj ? T.clothAdvice(bj, 1) : "";
+  const s = bj ? T.clothAdvice(bj, 7) : "";
+  assert("穿衣建议按传入月份变化（北京 1 月 ≠ 7 月）", !!w && !!s && w !== s);
+}
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

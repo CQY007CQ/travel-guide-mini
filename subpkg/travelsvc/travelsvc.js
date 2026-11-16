@@ -92,9 +92,15 @@ Page(SafePage({
     const cache = snap0 && snap0.v;
     const cacheKey = snap0 && snap0.key;
     const keys = cache ? Object.keys(cache).sort() : [];
+    // 缓存 key 是「抓取那一刻」的第一天，不一定是今天：缓存 6 小时有效，跨零点后仍可能命中，
+    // 直接用 keys[0] 会把「今天降温」当成「明天降温」播给用户。按真实今天定位。
+    const _nw = new Date(), _p2 = (n) => String(n).padStart(2, "0");
+    const todayStr = _nw.getFullYear() + "-" + _p2(_nw.getMonth() + 1) + "-" + _p2(_nw.getDate());
+    let di = keys.indexOf(todayStr);
+    if (di < 0) di = 0;
     let deltas = [], note = "";
-    if (keys.length >= 2) {
-      deltas = SVC.weatherDelta(cache[keys[0]], cache[keys[1]]);
+    if (keys.length >= 2 && di + 1 < keys.length) {
+      deltas = SVC.weatherDelta(cache[keys[di]], cache[keys[di + 1]]);
       if (!deltas.length) note = this.data.lang === "zh" ? "近两日天气变化不大，按原计划走即可。" : "Little change in the next two days.";
     } else {
       note = this.data.lang === "zh"
@@ -105,12 +111,12 @@ Page(SafePage({
     let fcUpdates = [], fcNote = "";
     try {
       if (keys.length) {
-        const today = cache[keys[0]];
+        const today = cache[keys[di]];
         const snap = S.get(SNAP_KEY, null);
         // 必须同日期 + 同城市缓存 key，否则换了城市却日期相同会误报「预报更新」
-        if (snap && snap.date === keys[0] && snap.key === cacheKey) fcUpdates = SVC.forecastDelta(snap.day, today);
+        if (snap && snap.date === keys[di] && snap.key === cacheKey) fcUpdates = SVC.forecastDelta(snap.day, today);
         else fcNote = this.data.lang === "zh" ? "已记录本次预报，下次打开可对比预报更新。" : "Forecast saved; revisit to see updates.";
-        S.set(SNAP_KEY, { date: keys[0], key: cacheKey, day: today });
+        S.set(SNAP_KEY, { date: keys[di], key: cacheKey, day: today });
       }
     } catch (e) { try { EL.push("travelsvc.forecast", e); } catch (_) {} }
     // ② 本地数据统计（真实读取，不编造）

@@ -432,5 +432,43 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
   g.wx = oldWx;
 }
 
+// CloudBase 适配器挂载点：SDK 是 esbuild 的 CJS 互操作包装，window.tcb 上只有 { default }，
+// 真正的工厂在 tcb.default.init（SDK 另挂 window.cloudbase）。只认 tcb.init 会让 boot() 静默 return，
+// window.__cloudbase 永不挂载 → 网页版云同步/AI/识图全链路降级成离线，且没有任何报错。
+{
+  const cw = fs.readFileSync(path.join(ROOT, "web/lib/cloud-web.js"), "utf8");
+  ok("cloud-web 不只认 window.tcb.init（SDK 是 { default } 包装）",
+    !/var tcb = window\.tcb;\s*\n\s*if \(!tcb \|\| typeof tcb\.init !== "function"\) return;/.test(cw));
+  ok("cloud-web 三种工厂形态兜底（tcb / tcb.default / cloudbase）",
+    /window\.tcb\.default/.test(cw) && /window\.cloudbase/.test(cw) && /typeof cands\[i\]\.init === "function"/.test(cw));
+  const sdk = fs.readFileSync(path.join(ROOT, "web/lib/cloudbase-sdk.js"), "utf8");
+  ok("SDK 产物确为 default 互操作包装（断言前提仍然成立）",
+    /__export\(index_esm_exports, \{\s*default: \(\) => /.test(sdk) || /default: \(\) => d2/.test(sdk));
+}
+
+// showModal 的 editable：4 处调用靠它做输入框（改 Key / 改云环境 / 写景点评价），
+// 忽略它会让 res.content 恒 undefined，调用方拿到空值后照样执行写 → 清空用户数据。
+{
+  const rt = fs.readFileSync(path.join(ROOT, "web/lib/runtime.js"), "utf8");
+  ok("showModal 支持 editable 输入框（否则写操作会拿到空值）",
+    /o\.editable \? '<input/.test(rt) && /if \(inp\) r\.content = inp\.value/.test(rt));
+  const css = fs.readFileSync(path.join(ROOT, "web/shell.css"), "utf8");
+  ok("模态输入框有样式（不裸样式渲染）", /\.w-minput\s*\{/.test(css));
+}
+
+// 复制失败必须走 fail：曾无条件 success，非 https 下会弹「已复制备份（N 字符）」但剪贴板是空的。
+// showLoading 必须尊重 mask：小程序默认 false（不拦触摸），网页版一律全屏拦截会让人点不动。
+{
+  const rt = fs.readFileSync(path.join(ROOT, "web/lib/runtime.js"), "utf8");
+  ok("setClipboardData 失败走 fail（不假报复制成功）",
+    /fallbackCopy\(text\) \? fin\(\) : bad\(/.test(rt) && /o\.fail && o\.fail\(r\)/.test(rt));
+  ok("fallbackCopy 返回真实结果（execCommand 返回 false 才算失败）",
+    /return r !== false;/.test(rt));
+  ok("showLoading 尊重 mask（默认不拦触摸，与小程序一致）",
+    /if \(!o\.mask\) d\.className \+= " w-loading-nomask"/.test(rt));
+  const css2 = fs.readFileSync(path.join(ROOT, "web/shell.css"), "utf8");
+  ok("无遮罩加载层不拦触摸", /\.w-loading-nomask \{[^}]*pointer-events: none/.test(css2));
+}
+
 console.log("\n结果：" + pass + " 通过 / " + fail + " 失败");
 if (fail) process.exit(1);

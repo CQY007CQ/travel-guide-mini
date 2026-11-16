@@ -257,6 +257,9 @@
   function showLoading(o) {
     o = o || {};
     var d = layer("w-loading");
+    // 小程序 showLoading 的 mask 默认为 false（不拦触摸）。曾忽略该参数，网页版一律铺满
+    // 全屏遮罩 → 「打开中 / 生成中」期间用户既点不动也滚不动，比小程序体验差一截。
+    if (!o.mask) d.className += " w-loading-nomask";
     d.innerHTML = '<div class="w-loading-box"><i class="w-spin"></i><span></span></div>';
     d.querySelector("span").textContent = o.title || "加载中";
   }
@@ -273,13 +276,23 @@
       ? '<button class="w-mb w-mb-ok">' + escHtml(o.confirmText || "确定") + "</button>"
       : '<button class="w-mb w-mb-cancel">' + escHtml(o.cancelText || "取消") + "</button>" +
         '<button class="w-mb w-mb-ok">' + escHtml(o.confirmText || "确定") + "</button>";
+    // editable 必须支持：多处用它做"改配置 / 写评价"的输入框，忽略它会让 res.content 恒为
+    // undefined，而调用方拿到空值后会执行写操作 —— 等于把用户的云环境 ID、景点评价清空。
     d.innerHTML = '<div class="w-modal-box"><div class="w-mtitle"></div><div class="w-mcontent"></div>' +
+      (o.editable ? '<input class="w-minput" type="text"/>' : "") +
       '<div class="w-mbtns">' + btns + "</div></div>";
     d.querySelector(".w-mtitle").textContent = o.title || "提示";
     d.querySelector(".w-mcontent").textContent = o.content || "";
+    var inp = d.querySelector(".w-minput");
+    if (inp) {
+      inp.placeholder = o.placeholderText || "";
+      try { setTimeout(function () { inp.focus(); }, 30); } catch (e) {}
+      inp.onkeydown = function (ev) { if (ev && ev.key === "Enter") done(true); };
+    }
     function done(ok) {
       d.remove();
       var r = { confirm: ok, cancel: !ok, errMsg: ok ? "showModal:ok" : "showModal:cancel" };
+      if (inp) r.content = inp.value || "";
       o.success && o.success(r);
       o.complete && o.complete(r);
     }
@@ -427,9 +440,17 @@
       o = o || {};
       var text = String(o.data == null ? "" : o.data);
       var fin = function () { var r = ok("setClipboardData"); o.success && o.success(r); o.complete && o.complete(r); };
+      // 失败必须走 fail：曾无条件 fin()，非 https / 拒绝授权时会弹「已复制备份（N 字符）」，
+      // 但剪贴板其实是空的 —— 用户以为备份好了，实际没落地，是最危险的一类假成功。
+      var bad = function (why) {
+        var r = { errMsg: "setClipboardData:fail " + (why || "denied") };
+        o.fail && o.fail(r); o.complete && o.complete(r);
+      };
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(fin).catch(function () { fallbackCopy(text); fin(); });
-      } else { fallbackCopy(text); fin(); }
+        navigator.clipboard.writeText(text).then(fin).catch(function () {
+          fallbackCopy(text) ? fin() : bad("clipboard-blocked");
+        });
+      } else { fallbackCopy(text) ? fin() : bad("not-supported"); }
     },
     getClipboardData: function (o) {
       o = o || {};
@@ -734,8 +755,11 @@
     ta.style.opacity = "0";
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand("copy"); } catch (e) {}
+    var r;
+    try { r = document.execCommand("copy"); } catch (e) { r = false; }
     ta.remove();
+    // 明确返回 false 才算失败；老浏览器 execCommand 返回 undefined，按成功处理（避免误报）
+    return r !== false;
   }
 
   /* ── 浏览器等价能力：日历 .ics 导出 / 地图上下文 ──

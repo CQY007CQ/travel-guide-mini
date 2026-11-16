@@ -332,6 +332,7 @@ body.has-tabbar #app { padding-bottom: 62px; }
 
 /* ── loading ── */
 .w-loading { display: flex; align-items: center; justify-content: center; pointer-events: auto; background: rgba(0, 0, 0, .18); }
+.w-loading-nomask { pointer-events: none; background: transparent; }
 .w-loading-box {
   background: rgba(0, 0, 0, .80); color: #fff; border-radius: 12px;
   padding: 18px 22px; display: flex; align-items: center; gap: 10px; font-size: 13px;
@@ -347,6 +348,13 @@ body.has-tabbar #app { padding-bottom: 62px; }
 }
 .w-mtitle { font-size: 16px; font-weight: 800; color: var(--shell-tx); }
 .w-mcontent { font-size: 13px; line-height: 1.65; color: var(--shell-tx2); margin-top: 10px; white-space: pre-wrap; }
+.w-minput {
+  width: 100%; box-sizing: border-box; margin-top: 14px; padding: 10px 12px;
+  border-radius: 9px; border: 1px solid rgba(148, 163, 184, .32);
+  background: rgba(148, 163, 184, .10); color: var(--shell-tx);
+  font-size: 14px; font-family: inherit; outline: none;
+}
+.w-minput:focus { border-color: var(--gold-2); }
 .w-mbtns { display: flex; gap: 10px; margin-top: 20px; }
 .w-mb {
   flex: 1; border: none; border-radius: 9px; padding: 11px 0;
