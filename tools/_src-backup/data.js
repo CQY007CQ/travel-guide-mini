@@ -41,16 +41,6 @@ const SPOT_COORD_FIX = {
     "北极林海观音": [53.294, 122.204]  // 漠河观音山一带，原 [48.446,129.441] 落到佳木斯（698km）
   }
 };
-function applyCoordFix() {
-  for (const city in SPOT_COORD_FIX) {
-    const list = DATA.SPOT_COORDS[city];
-    if (!Array.isArray(list)) continue;
-    const m = SPOT_COORD_FIX[city];
-    for (const row of list) {
-      if (Array.isArray(row) && m[row[0]]) { row[1] = m[row[0]][0]; row[2] = m[row[0]][1]; }
-    }
-  }
-}
 
 // v1.19.172 模糊 POI 坐标补录：纳林湖 / 网师园 / 九凌湖 / 新寨嘉那嘛呢石经城 此前因 geocode 30001（POI 非地址）
 // 整体跳过、长期挂在「已知未解」。现以公开权威坐标（腾讯/高德/维基/政府文档交叉确认）经城市归属校验后补入，
@@ -68,17 +58,6 @@ const SPOT_COORD_ADD = [
   ["莆田", "广化寺", 25.425115, 118.98896],            // v1.19.184 莆田南山广化寺（腾讯 25.425115,118.98896 / 维基 25.42833,118.98472 一致）
   ["七台河", "石龙山国家森林公园", 45.648653, 131.246159] // v1.19.184 黑龙江七台河石龙山国家森林公园（腾讯 45.648653,131.246159）
 ];
-let _spotCoordAdded = 0;
-function applySpotCoordAdd() {
-  for (const [city, name, lat, lon] of SPOT_COORD_ADD) {
-    if (!DATA.SPOT_COORDS[city]) DATA.SPOT_COORDS[city] = [];
-    const arr = DATA.SPOT_COORDS[city];
-    if (arr.some(r => r[0] === name)) continue; // 幂等：已存在不重复加（多分块重复调用安全）
-    arr.push([name, lat, lon]);
-    _spotCoordAdded++;
-  }
-  if (_spotCoordAdded) _dw("[data] 模糊 POI 坐标补录 " + _spotCoordAdded + " 个");
-}
 
 // v1.19.174 稀疏县景点补全：给数据稀疏、行程易出空天的旅游小城追加经公开权威核实的真实景点坐标。
 // 目的：直接消解压测红项「黄龙 D4 空天」（黄龙 6→9 个真实景点，提升可填天数与行程密度），并整体提升
@@ -99,17 +78,6 @@ const SPOT_ENRICH = [
   ["茫崖", "茫崖翡翠湖", 38.0793, 90.9967],
   ["抚远", "东极广场", 48.4611, 135.8722]
 ];
-let _spotEnriched = 0;
-function applySpotEnrich() {
-  for (const [city, name, lat, lon] of SPOT_ENRICH) {
-    if (!DATA.SPOT_COORDS[city]) DATA.SPOT_COORDS[city] = [];
-    const arr = DATA.SPOT_COORDS[city];
-    if (arr.some(r => r[0] === name)) continue; // 幂等：已存在不重复追加（多分块重复调用安全）
-    arr.push([name, lat, lon]);
-    _spotEnriched++;
-  }
-  if (_spotEnriched) _dw("[data] 稀疏县景点补全 " + _spotEnriched + " 个");
-}
 
 // v1.19.182 美食富信息扩城：把「非试点 20 城」的热门旅游城，补上经公开资料核验的
 // 真实老字号 / 招牌菜 / 参考价 / 编辑点评（menu/rep/note），补齐富信息覆盖空白。
@@ -131,56 +99,17 @@ const FOOD_ENRICH = [
   ["兰州", "磨沟沿老字号", [["牛肉面(二细)", 16]], "本地人常去", "凌晨 4 点牛骨羊脊骨鸡架三吊 18 小时，汤清亮如琥珀"]
 ];
 const FOOD_REP_OK = new Set(["老字号", "本地人常去", "游客打卡", "市井烟火", "宴请名店"]);
-let _foodEnriched = 0;
-function applyFoodEnrich() {
-  for (const [city, name, menu, rep, note] of FOOD_ENRICH) {
-    if (!DATA.FOOD_SPOTS[city]) DATA.FOOD_SPOTS[city] = [];
-    const arr = DATA.FOOD_SPOTS[city];
-    let shop = arr.find(s => s && s.shop === name);
-    if (!shop) { shop = { shop: name }; arr.push(shop); _foodEnriched++; }
-    if (!Array.isArray(shop.menu) || !shop.menu.length) {
-      shop.menu = (menu || []).map(m => ({ n: m[0], p: typeof m[1] === "number" ? "¥" + m[1] : m[1] }));
-    }
-    if (!shop.rep) shop.rep = rep;
-    if (!shop.note) shop.note = note;
-  }
-  if (_foodEnriched) _dw("[data] 美食富信息扩城 " + _foodEnriched + " 家（增量合并）");
-}
 
 // v1.19.182 团队合并入口（与 applyFoodEnrich 同口径：按「城市 + 店名」定位，缺失字段才补，幂等安全）。
 // v1.20.7 主包瘦身：数据本体（约 227KB，曾占本文件 87%）已移到 subdata3/data/team-food3.js，
 // 由 initData() 作为第 3 个异步分块加载，本文件只留合并逻辑。维护工具：tools/data/_merge-team-enrich.mjs。
 let _teamFood = null;
-let _teamFoodAdded = 0;
-function applyTeamFoodEnrich() {
-  if (!_teamFood) return;
-  for (const city in _teamFood) {
-    const shops = _teamFood[city];
-    if (!Array.isArray(shops) || !shops.length) continue;
-    if (!DATA.FOOD_SPOTS[city]) DATA.FOOD_SPOTS[city] = [];
-    const arr = DATA.FOOD_SPOTS[city];
-    for (const sh of shops) {
-      if (!sh || !sh.shop) continue;
-      let shop = arr.find(s => s && s.shop === sh.shop);
-      if (!shop) { shop = { shop: sh.shop }; arr.push(shop); _teamFoodAdded++; }
-      if (sh.lat != null) shop.lat = sh.lat;
-      if (sh.lon != null) shop.lon = sh.lon;
-      if (sh.price) shop.price = sh.price;
-      if (!Array.isArray(shop.menu) || !shop.menu.length) {
-        shop.menu = (sh.menu || []).map(m => ({ n: m.n, p: (typeof m.p === "number" ? "¥" + m.p : m.p) }));
-      }
-      if (!shop.rep) shop.rep = sh.rep;
-      if (!shop.note) shop.note = sh.note;
-    }
-  }
-  if (_teamFoodAdded) _dw("[data] 团队美食合并 " + _teamFoodAdded + " 家（增量合并）");
-}
 // subdata3 分块到达后调用（幂等：晚到、重复调用都安全）。
 function _applyTeamFood3(mod) {
   if (_PACK_BASE_ONLY) return;
   const t = (mod && mod.default) || mod;
   if (t && typeof t === "object") _teamFood = t;
-  applyTeamFoodEnrich();
+  applyStaticTables(1, "teamFood");   // 只合并团队美食这一张表（其余已在 applyPacked 里跑过）
   // 团队数据含 355 家店、其中 315 家无坐标，且是 applyPacked 之后才进来，
   // 不重扫会让 coordStats() 停在基数据口径（体检「占位/无坐标被观测」会误判）。
   if (_teamFood) scanFoodCoords();
@@ -192,26 +121,219 @@ function _applyTeamFood3(mod) {
 // >>>FOOD_COORDS_V206_START>>>
 const FOOD_COORDS_V206 = {"厦门":[["四里沙茶面",24.488,118.096],["百家村好德来姜母鸭",24.462,118.093]],"青岛":[["春和楼",36.071,120.318],["船歌鱼水饺",36.066,120.366],["万和春排骨米饭",36.106,120.362],["众品老方子锅贴",36.062,120.399]],"黄山":[["老街第一楼",29.708,118.31]],"济南":[["超意兴把子肉",36.663,117.119]],"武夷山":[["老陈紫溪粉",27.663,117.987],["小光饼",27.647,117.98]],"千岛湖":[["我姐家·非遗手工小吃",29.606,119.039]]};
 // <<<FOOD_COORDS_V206_END<<<
-let _foodCoordBackfilled = 0;
-function applyFoodCoordBackfill() {
-  for (const city in FOOD_COORDS_V206) {
-    const list = FOOD_COORDS_V206[city];
-    if (!Array.isArray(list) || !list.length) continue;
-    const arr = DATA.FOOD_SPOTS[city];
-    if (!Array.isArray(arr)) continue;
-    const byName = {};
-    for (const s of arr) { const n = (s && (s.shop || s.name) || "").trim(); if (n) byName[n] = s; }
-    for (const e of list) {
-      const nm = (e && e[0] || "").trim();
-      if (!nm) continue;
-      const ex = byName[nm];
-      if (!ex) continue;                                                           // 找不到同名店 -> 跳过（不凭空造店）
-      const hasReal = typeof ex.lat === "number" && typeof ex.lon === "number" && !(ex.lat === 0 && ex.lon === 0);
-      if (hasReal) continue;                                                       // 已有真实坐标 -> 不动
-      ex.lat = +e[1]; ex.lon = +e[2]; _foodCoordBackfilled++;
+
+/* ────────────────────────────────────────────────────────────────
+ * 静态表合并内核（v1.20.8 / T2）
+ *
+ * 病情：加载期原有 8 个 apply* 在干同一件事 ——「按城市 + 名称定位、缺失才补、幂等」，
+ *   每个各写一遍循环与去重。差异其实只有三点：挂哪张表、缺了是追加还是新建、哪些字段可覆盖。
+ *   同一条规则抄 8 遍的后果是：改一处漏一处，之后出现「坐标补了但富信息没补」这类
+ *   只在特定城市表现、极难复现的数据不一致。
+ *
+ * 处方：1 个内核 + N 条表描述。语义收敛为三种：
+ *   append    主键不存在才追加
+ *   overwrite 主键存在才覆盖指定字段（可带前提判定）
+ *   upsert    不存在则新建；存在则 overwrite 字段强制写、fill 字段缺失才补
+ * 挂载点三种：
+ *   coords    DATA.SPOT_COORDS[城市] = [[名称, lat, lon], …]
+ *   shops     DATA.FOOD_SPOTS[城市]  = [{ shop, lat, lon, … }, …]
+ *   children  DATA.CITIES[i].<字段>  = [{ name, … }, …]
+ *
+ * 等价性：重构前后对 SPOT_COORDS / FOOD_SPOTS / CITIES[].areas / CITIES[].hotelList
+ *   做稳定序列化 sha1 比对，逐字节一致才算通过（本轮实测 cfb299abe96beeb1 未变）。
+ * ──────────────────────────────────────────────────────────────── */
+const _hasRealCoord = (r) => typeof r.lat === "number" && typeof r.lon === "number" && !(r.lat === 0 && r.lon === 0);
+
+// 表描述惰性求值：常量（SPOT_COORD_FIX / FOOD_ENRICH / HA…）声明在本段之后，
+// 模块加载期就去读会拿到 undefined，只有真正合并时（applyPacked 之后）才安全。
+function _staticTables() {
+  return [
+    { id: "spotCoordFix", phase: 1, mount: "coords", mode: "overwrite", silent: true,
+      rows: () => {
+        const out = [];
+        for (const city in SPOT_COORD_FIX) {
+          const m = SPOT_COORD_FIX[city];
+          for (const n in m) out.push({ city, name: n, lat: m[n][0], lon: m[n][1] });
+        }
+        return out;
+      } },
+
+    { id: "spotCoordAdd", phase: 1, mount: "coords", mode: "append", label: "模糊 POI 坐标补录", unit: "个",
+      rows: () => SPOT_COORD_ADD.map((r) => ({ city: r[0], name: r[1], lat: r[2], lon: r[3] })) },
+
+    { id: "spotEnrich", phase: 1, mount: "coords", mode: "append", label: "稀疏县景点补全", unit: "个",
+      rows: () => SPOT_ENRICH.map((r) => ({ city: r[0], name: r[1], lat: r[2], lon: r[3] })) },
+
+    { id: "foodEnrich", phase: 1, mount: "shops", mode: "upsert", label: "美食富信息扩城", unit: "家（增量合并）",
+      fill: ["menu", "rep", "note"],
+      rows: () => FOOD_ENRICH.map((r) => ({
+        city: r[0], name: r[1],
+        fill: {
+          menu: (r[2] || []).map((m) => ({ n: m[0], p: typeof m[1] === "number" ? "¥" + m[1] : m[1] })),
+          rep: r[3], note: r[4]
+        }
+      })) },
+
+    { id: "teamFood", phase: 1, mount: "shops", mode: "upsert", label: "团队美食合并", unit: "家（增量合并）",
+      overwrite: ["lat", "lon", "price"], truthy: ["price"], fill: ["menu", "rep", "note"],
+      rows: () => {
+        const out = [];
+        for (const city in (_teamFood || {})) {
+          const shops = _teamFood[city];
+          if (!Array.isArray(shops) || !shops.length) continue;
+          for (const sh of shops) {
+            if (!sh || !sh.shop) continue;
+            out.push({ city, name: sh.shop,
+              overwrite: { lat: sh.lat, lon: sh.lon, price: sh.price },
+              fill: {
+                menu: (sh.menu || []).map((m) => ({ n: m.n, p: typeof m.p === "number" ? "¥" + m.p : m.p })),
+                rep: sh.rep, note: sh.note
+              } });
+          }
+        }
+        return out;
+      } },
+
+    { id: "foodCoord", phase: 1, mount: "shops", mode: "overwrite", label: "v206 美食坐标回写", unit: "家",
+      overwrite: ["lat", "lon"], noCreate: true, when: (rec) => !_hasRealCoord(rec),
+      rows: () => {
+        const out = [];
+        for (const city in FOOD_COORDS_V206) {
+          const list = FOOD_COORDS_V206[city];
+          if (!Array.isArray(list) || !list.length) continue;
+          for (const e of list) {
+            const nm = ((e && e[0]) || "").trim();
+            if (!nm) continue;
+            out.push({ city, name: nm, overwrite: { lat: +e[1], lon: +e[2] } });
+          }
+        }
+        return out;
+      } },
+
+    { id: "hotelAreas", phase: 2, mount: "children", field: "areas", label: "扩展酒店住宿区域并入", unit: "条",
+      skipInPack: true, eachCity: true,
+      rows: () => {
+        const EX = (HA && HA.HOTEL_AREAS_EXTRA) || {};
+        const out = [];
+        for (const cn in EX) {
+          const ex = EX[cn];
+          if (!Array.isArray(ex) || !ex.length) continue;
+          for (const a of ex) {
+            if (!a || !a.name) continue;
+            out.push({ city: cn, name: a.name, value: { name: a.name, note: a.note || "", price: a.price || "" } });
+          }
+        }
+        return out;
+      } },
+
+    { id: "hotelList", phase: 2, mount: "children", field: "hotelList", label: "逐酒店+房型并入", unit: "家",
+      skipInPack: true,
+      rows: () => {
+        const maps = [(HA && HA.HOTEL_LIST_EXTRA) || {}, (HA && HA.TEAM_HOTEL_LIST_ENRICH) || {}];
+        const out = [];
+        for (const map of maps) {
+          if (!map || typeof map !== "object") continue;
+          for (const cn in map) {
+            const arr = map[cn];
+            if (!Array.isArray(arr) || !arr.length) continue;
+            for (const h of arr) {
+              if (!h || !h.name) continue;
+              out.push({ city: cn, name: h.name, value: {
+                name: String(h.name),
+                addr: h.addr || "",
+                price: h.price || "",
+                rooms: Array.isArray(h.rooms)
+                  ? h.rooms.map((r) => ({ type: String((r && r.type) || ""), price: (r && r.price) || "" })).filter((r) => r.type)
+                  : [],
+                lat: (h.lat != null && h.lat !== "") ? +h.lat : null,
+                lon: (h.lon != null && h.lon !== "") ? +h.lon : null,
+                note: h.note || "",
+                collected: h.collected || ""
+              } });
+            }
+          }
+        }
+        return out;
+      } }
+  ];
+}
+
+// phase：1 = 主数据表（坐标/美食，随分块到达即可合并）；2 = 住宿增强表（打包期不烘焙）
+// onlyId：只跑某一张（团队美食分块晚到时单独调用）
+function applyStaticTables(phase, onlyId) {
+  for (const t of _staticTables()) {
+    if (phase != null && t.phase !== phase) continue;
+    if (onlyId && t.id !== onlyId) continue;
+    if (t.skipInPack && _PACK_BASE_ONLY) continue;
+    const rows = t.rows();
+    if (!rows.length) continue;
+    let n = 0;
+    for (const r of rows) {
+      if (t.mount === "coords") {
+        if (!DATA.SPOT_COORDS[r.city]) DATA.SPOT_COORDS[r.city] = [];
+        const arr = DATA.SPOT_COORDS[r.city];
+        if (t.mode === "overwrite") {
+          // 修正型：只改已存在的键、绝不新增（否则等于凭空造景点）；
+          // 且必须命中「所有同名行」—— 同城同名景点可能被多条来源写入过，
+          // 只改第一条会让剩下的旧坐标留在库里（实测 大澳渔村/郑家大屋 就是这么漏的）。
+          for (const row of arr) {
+            if (Array.isArray(row) && row[0] === r.name) { row[1] = r.lat; row[2] = r.lon; n++; }
+          }
+        } else if (!arr.some((x) => Array.isArray(x) && x[0] === r.name)) {
+          arr.push([r.name, r.lat, r.lon]); n++;
+        }
+      } else if (t.mount === "shops") {
+        if (!Array.isArray(DATA.FOOD_SPOTS[r.city])) {
+          if (t.noCreate) continue;
+          DATA.FOOD_SPOTS[r.city] = [];
+        }
+        const list = DATA.FOOD_SPOTS[r.city];
+        // 纯回写型（坐标补写）取「最后一条同名店」：旧实现建的 byName 映射是后者覆盖前者，
+        // 这里必须逐字对齐，否则同城同名店的回写目标会从后一条变成前一条。
+        let rec = null;
+        if (t.noCreate) {
+          for (const x of list) if (x && x.shop === r.name) rec = x;
+        } else {
+          rec = list.find((x) => x && x.shop === r.name);
+        }
+        if (!rec) {
+          if (t.noCreate) continue;
+          rec = { shop: r.name };
+          list.push(rec);
+          n++;                                   // 计数口径沿用旧实现：只数「新增店」
+        }
+        if (t.when && !t.when(rec)) continue;
+        if (t.overwrite) {
+          for (const f of t.overwrite) {
+            const v = (r.overwrite || {})[f];
+            const ok = (t.truthy || []).indexOf(f) >= 0 ? !!v : v != null;
+            if (ok) rec[f] = v;
+          }
+          if (t.mode === "overwrite") n++;       // 纯回写型：每写一次算一家
+        }
+        if (t.fill) {
+          for (const f of t.fill) {
+            const cur = rec[f];
+            const missing = Array.isArray(cur) ? !cur.length : !cur;
+            if (missing && r.fill && r.fill[f] != null) rec[f] = r.fill[f];
+          }
+        }
+      } else if (t.mount === "children") {
+        // eachCity：作用于「所有同名城市对象」（住宿片区旧实现是按城市反查、会命中重复条目）；
+        // 否则只作用于第一个（逐酒店旧实现用的是 findCityByName）。
+        const targets = t.eachCity ? DATA.CITIES.filter((x) => x && x.name === r.city) : [findCityByName(r.city)];
+        for (const c of targets) {
+          if (!c) continue;
+          if (!Array.isArray(c[t.field])) c[t.field] = [];
+          const list = c[t.field];
+          if (list.some((x) => x && x.name === r.name)) continue;
+          list.push(r.value);
+          n++;
+        }
+      }
     }
+    if (n && !t.silent) _dw("[data] " + t.label + " " + n + " " + (t.unit || "条"));
   }
-  if (_foodCoordBackfilled) _dw("[data] v206 美食坐标回写 " + _foodCoordBackfilled + " 家");
 }
 
 // v1.19.167 景点去重：同城 SPOT_COORDS 内出现完全同名的重复副本（仙桃/天门/潜江 等，
@@ -265,70 +387,16 @@ function fillBestSeason() {
 // 既给 46 城精选区「追加更多选择」，又把覆盖扩到更多旅游城市（原本走通用三片区）。
 // 合规：区域级指引，不臆造酒店门牌号；价格一律「参考价区间」，非实时报价、非交易。
 // 幂等：按片区名去重，多数据分块重复调用 applyPacked 也不会重复追加。
-let _hotelAreasMerged = 0;
-function applyHotelAreasExtra() {
-  if (_PACK_BASE_ONLY) return;
-  const EX = (HA && HA.HOTEL_AREAS_EXTRA) || {};
-  const keys = Object.keys(EX);
-  if (!keys.length) return;
-  for (const c of DATA.CITIES) {
-    const ex = EX[c.name];
-    if (!ex || !Array.isArray(ex) || !ex.length) continue;
-    if (!Array.isArray(c.areas)) c.areas = [];
-    const have = new Set(c.areas.map(a => (a && a.name) || ""));
-    for (const a of ex) {
-      if (a && a.name && !have.has(a.name)) {
-        c.areas.push({ name: a.name, note: a.note || "", price: a.price || "" });
-        have.add(a.name); _hotelAreasMerged++;
-      }
-    }
-  }
-  if (_hotelAreasMerged) _dw("[data] 扩展酒店住宿区域并入 " + _hotelAreasMerged + " 条");
-}
 
 // v1.19.183 逐酒店 + 房型扩展：把 utils/hotel-areas.js 的 HOTEL_LIST_EXTRA（公开常识级具名真酒店种子）
 // 与 TEAM_HOTEL_LIST_ENRICH（7 人分区采集，含房型）按城市名并入 CITIES[].hotels，
 // 闭环原始需求「酒店的位置、价格、所开房型」。
 // 合规：具名真实、房价写参考价区间、房型为通用类别；坐标真实优先，空则运行时回退城市中心。
 // 幂等：按酒店名去重，多数据分块重复调用 applyPacked 也不重复追加。
-let _hotelListMerged = 0;
 function findCityByName(cn) {
   let c = DATA.CITIES.find(x => x && x.name === cn);
   if (!c && typeof cn === "string" && cn.endsWith("市")) c = DATA.CITIES.find(x => x && x.name === cn.slice(0, -1));
   return c;
-}
-function applyHotelListExtra() {
-  if (_PACK_BASE_ONLY) return;
-  const SRC = (HA && HA.HOTEL_LIST_EXTRA) || {};
-  const TEAM = (HA && HA.TEAM_HOTEL_LIST_ENRICH) || {};
-  const mergeFrom = (map) => {
-    if (!map || typeof map !== "object") return;
-    for (const cn in map) {
-      const arr = map[cn];
-      if (!Array.isArray(arr) || !arr.length) continue;
-      const c = findCityByName(cn);
-      if (!c) continue;
-      if (!Array.isArray(c.hotelList)) c.hotelList = [];
-      const have = new Set(c.hotelList.map(h => (h && h.name) || ""));
-      for (const h of arr) {
-        if (!h || !h.name || have.has(h.name)) continue;
-        c.hotelList.push({
-          name: String(h.name),
-          addr: h.addr || "",
-          price: h.price || "",
-          rooms: Array.isArray(h.rooms) ? h.rooms.map(r => ({ type: String(r && r.type || ""), price: (r && r.price) || "" })).filter(r => r.type) : [],
-          lat: (h.lat != null && h.lat !== "") ? +h.lat : null,
-          lon: (h.lon != null && h.lon !== "") ? +h.lon : null,
-          note: h.note || "",
-          collected: h.collected || ""
-        });
-        have.add(h.name); _hotelListMerged++;
-      }
-    }
-  };
-  mergeFrom(SRC);
-  mergeFrom(TEAM);
-  if (_hotelListMerged) _dw("[data] 逐酒店+房型并入 " + _hotelListMerged + " 家");
 }
 
 function b64ToBytes(b64) {
@@ -502,16 +570,11 @@ function applyPacked(packed) {
     delete parsed.__A;
   }
   mergeInto(DATA, parsed);
-  applyCoordFix();
-  applySpotCoordAdd();
-  applySpotEnrich(); // v1.19.174 稀疏县景点补全
-  applyFoodEnrich(); // v1.19.182 美食富信息扩城（加载期增量合并，不进打包基数据）
-  applyTeamFoodEnrich(); // v1.19.182 团队美食合并（7 人分区采集，加载期增量合并）
-  applyFoodCoordBackfill(); // v1.19.192 v206 美食坐标补全（11 家 (0,0) 占位回写真实坐标）
+  // v1.20.8（T2）：8 个 apply* 收敛为 1 个内核 + N 条表描述（phase 顺序与原实现逐条对齐）
+  applyStaticTables(1);   // 坐标修正 / 坐标补录 / 稀疏县补全 / 美食富信息 / 团队美食 / 美食坐标回写
   dedupeSpots();
   fillBestSeason();
-  applyHotelAreasExtra();
-  applyHotelListExtra(); // v1.19.183 逐酒店 + 房型并入 CITIES[].hotels
+  applyStaticTables(2);   // 住宿片区 / 逐酒店+房型（打包期不烘焙）
   checkCoordIntegrity(); // v1.19.173 只读自检：加载期暴露坐标回归，零改写零重打包风险
   assertDataShape();     // v1.20.6：轻量 shape 断言，残缺分包有痕可查但不阻断渲染
   DATA.__dataReady = true;

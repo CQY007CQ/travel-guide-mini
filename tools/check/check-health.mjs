@@ -87,6 +87,13 @@ const issues = (typeof D.assertDataShape === "function") ? D.assertDataShape() :
 ck("加载期 shape 断言通过", issues.length === 0, issues.join("；"));
 const srcData = read("tools/_src-backup/data.js"), outData = read("utils/data.js");
 ck("data.js 手写双源字节一致", srcData === outData);
+// v1.20.8（T2）：加载期合并函数只允许 2 个 —— applyPacked（分块合并）+ applyStaticTables（表合并内核）。
+// 曾经有 8 个 apply*（坐标修正/坐标补录/稀疏补全/美食富信息/团队美食/坐标回写/住宿片区/逐酒店）
+// 各自抄一遍「按城市+名定位、缺失才补」，改一处漏一处；收敛后新增数据表只需加一条表描述。
+const applyFns = (srcData.match(/^function apply[A-Za-z]+/gm) || []).length;
+ck("加载期合并函数 ≤ 2 个（内核化，不再各写一份）", applyFns <= 2, "apply* = " + applyFns);
+const tableCount = (srcData.match(/\{ id: "/g) || []).length;
+ck("静态表描述 ≥ 6 条（数据表与逻辑解耦）", tableCount >= 6, "表 = " + tableCount);
 
 /* ───────── ⑤ 守卫与回归链 ───────── */
 const guards = countFiles("tools/check", ".mjs");
