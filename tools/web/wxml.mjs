@@ -331,7 +331,16 @@ function compileNode(n) {
 
     if (name === "class") { props.class = compileMixed(a.value); continue; }
     if (name === "style") { props.style = compileMixed(a.value); continue; }
-    if (name === "src") { props.src = hasMustache(a.value) ? compileMixed(a.value) : JSON.stringify(a.value); continue; }
+    if (name === "src") {
+      // v1.20.7 修的 bug：小程序里 <image src="/images/x.png"> 的「/」是**包根**，照搬到网页端就成了
+      // **站点根**。一旦页面不是挂在域名根下（平台分享页外壳、预览面板 iframe、子路径部署），
+      // 绝对路径会打到外壳的根上 → 图片 404/403 全裂；而 JS/CSS/tabBar 图标用的都是相对路径，
+      // 照样加载 —— 于是出现「页面排版文字全正常、只有图片全是碎图」这种极具误导性的现象。
+      // 统一改成相对路径：根路径部署时解析结果与原来完全一致，非根部署则自动跟随。
+      const v = String(a.value).replace(/^\/(images|brand)\//, "$1/");
+      props.src = hasMustache(v) ? compileMixed(v) : JSON.stringify(v);
+      continue;
+    }
     if (name === "id") { props.id = compileMixed(a.value); continue; }
 
     // 其余属性：布尔属性若含插值则条件设置

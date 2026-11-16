@@ -485,5 +485,19 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
   ok("data.js 不再内联团队美食块（主包瘦身防回潮）", !/const TEAM_FOOD_ENRICH\s*=/.test(dsrc));
 }
 
+// v1.20.7 修的 bug：网页端图片曾用站点绝对路径 /images/...（小程序「包根」语义照搬到网页），
+// 页面一旦挂在非域名根下（平台分享页外壳 / 预览 iframe / 子路径部署），绝对路径会打到外壳根上，
+// 图片全裂；而 JS/CSS/tabBar 图标都是相对路径，照样加载 —— 表现为「文字排版正常、只有碎图」。
+// 断言：tpl.js 不得再出现绝对图片路径，且相对路径必须真的存在。
+{
+  const tpl = fs.readFileSync(path.join(ROOT, "web/lib/tpl.js"), "utf8");
+  const abs = (tpl.match(/"\/images\//g) || []).length;
+  ok("tpl.js 无站点绝对图片路径（/images/ → images/）", abs === 0, "绝对路径 " + abs + " 处");
+  const rel = (tpl.match(/"images\//g) || []).length;
+  ok("tpl.js 使用相对图片路径", rel > 0, "相对路径 " + rel + " 处");
+  ok("tabBar 图标与页面图片路径口径一致（都用相对路径）",
+    /images\/tab-light-index\.png/.test(fs.readFileSync(path.join(ROOT, "web/lib/modules.js"), "utf8")));
+}
+
 console.log("\n结果：" + pass + " 通过 / " + fail + " 失败");
 if (fail) process.exit(1);

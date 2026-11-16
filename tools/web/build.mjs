@@ -253,7 +253,10 @@ const sz = (f) => (fs.statSync(path.join(OUT, f)).size / 1024).toFixed(0) + "KB"
 console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modules.js") + " ｜ tpl.js " + sz("tpl.js") + " ｜ app.css " + sz("app.css"));
 
 /* ───────────── 7. 静态资源 ───────────── */
-// 页面的 <image src="/images/..."> 是站点绝对路径，所以把 images/ 复制到站点根下。
+// 把 images/ 复制到 web/images/。注意：页面里的图片引用由 tools/web/wxml.mjs 统一改写成
+// **相对路径** images/...（v1.20.7 起），不再用站点绝对路径 /images/... ——
+// 绝对路径只在「部署在域名根下」时成立，一旦被平台分享页外壳或子路径挂载就全部 404，
+// 而 JS/CSS 是相对路径仍能加载，症状会误导成「页面正常、只有图片碎了」。
 {
   const src = path.join(ROOT, "images");
   const dst = path.join(ROOT, "web/images");
