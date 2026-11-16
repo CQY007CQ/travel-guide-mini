@@ -92,6 +92,23 @@ log(/delete m\[k\];\s*m\[k\] = cur;/.test(AGENT_JS),
 const maxScenes = Number((AGENT_JS.match(/const MAX_SCENES = (\d+);/) || [])[1] || 0);
 log(maxScenes >= 8, "落盘场景数(" + maxScenes + ") 覆盖全站 11 个 scene 的多数（storage 远非瓶颈）");
 
+// ── 云函数滥用防护（v1.20.8 安全完善）──
+// 真实威胁：llmProxy 是唯一部署的云函数、网页端匿名可调用，若无防护会被刷大模型额度。
+// 硬防线 = 输入上限 / 模型白名单 / max_tokens 夹紧 / 日预算熔断；频率限制仅尽力而为。
+const GUARD_JS = readFileSync(resolve(ROOT, "tools/cloud/llmProxy/guard.js"), "utf8");
+log(/validateInput\(event\)/.test(PROXY_JS) && /GUARD\.validateInput/.test(PROXY_JS),
+  "llmProxy 在做任何花钱动作前先过输入硬上限");
+log(/safeModel\(/.test(PROXY_JS) && /LLM_ALLOW_MODELS/.test(PROXY_JS),
+  "llmProxy 模型白名单：陌生模型降级到部署配置（防指定昂贵模型烧额度）");
+log(/maxTokens/.test(PROXY_JS) && /LIMITS\.maxTokens/.test(PROXY_JS),
+  "llmProxy max_tokens 夹紧到硬上限");
+log(/limiter\.allow\(/.test(PROXY_JS) && /dailyGlobal/.test(GUARD_JS),
+  "llmProxy 有频率窗口 + 单实例日预算熔断");
+log(/rate-limited/.test(PROXY_JS) && /稍后再试/.test(PROXY_JS),
+  "限流返回可读中文提示（不泄漏内部计数细节）");
+log(/return true; \/\/ 计数器异常时放行/.test(GUARD_JS),
+  "防护层 fail-open：计数异常不阻断 AI 可用性");
+
 console.log(fail === 0
   ? "\n✓ 云端 AI fail-closed 覆盖守卫通过（每个调用点都有 .catch 且失败分支优雅降级）"
   : "\n✗ 存在缺兜底的云端 AI 调用点，请在 .then 失败分支补离线/云端感知回落，并确保 .catch 存在");

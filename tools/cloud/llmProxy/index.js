@@ -27,6 +27,27 @@ const cloud = require("wx-server-sdk");
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const https = require("https");
 const url = require("url");
+// 滥用防护：纯逻辑模块，零外部依赖。真正的硬防线是输入上限 / 模型白名单 / 日预算熔断；
+// 进程内频率限制仅尽力而为（云函数多实例，换实例可绕过），不在文案里宣称「严格限流」。
+const GUARD = require("./guard.js");
+const limiter = GUARD.createLimiter();
+const LIMITS = GUARD.LIMITS;
+
+// 调用方身份：小程序端取 OPENID；网页端匿名登录取 uid。拿不到就用一个共享匿名桶，
+// 宁可让匿名调用更严格，也不能因为识别失败就无限放行。
+function callerOf(event) {
+  let ctx = {};
+  try { ctx = cloud.getWXContext ? (cloud.getWXContext() || {}) : {}; } catch (e) {}
+  const openid = String(ctx.OPENID || ctx.FROM_OPENID || "");
+  if (openid) return { key: "o:" + openid, anon: false };
+  const uid = (event && typeof event.clientId === "string") ? event.clientId : "";
+  if (uid && /^[A-Za-z0-9_-]{4,64}$/.test(uid)) return { key: "c:" + uid, anon: true };
+  return { key: "anon", anon: true };
+}
+
+function denied(reason, hint) {
+  return { ok: false, err: reason, hint: hint };
+}
 
 // 厂商预设：未显式给 BASE_URL 时，按 LLM_PROVIDER 自动补全
 const PROVIDERS = {
@@ -163,6 +184,17 @@ exports.main = async (event) => {
   if (!cfg.base || !cfg.key) return { ok: false, err: "llm-not-configured" };
 
   event = event || {};
+
+  // ① 输入硬上限：在下载图片 / 请求模型之前拦，超限调用不花一分钱 token
+  const bad = GUARD.validateInput(event);
+  if (bad.length) return denied("input-invalid", "问题内容过长或格式不对，精简后再试。");
+
+  // ② 调用预算：先于任何外部请求。频繁调用时给可读提示，不暴露内部计数细节
+  const who = callerOf(event);
+  if (!limiter.allow(who.key, who.anon)) {
+    return denied("rate-limited", "AI 请求太频繁，稍后再试；离线功能不受影响。");
+  }
+
   const messages = Array.isArray(event.messages) ? event.messages : null;
   const prompt = (typeof event.prompt === "string") ? event.prompt : "";
   const hasImage = !!(event.imageFileID || event.imageBase64 || (Array.isArray(event.imageFileIDs) && event.imageFileIDs.length));
@@ -170,9 +202,11 @@ exports.main = async (event) => {
 
   // 双模型生效：有图且配了 LLM_VISION_MODEL 时，识图请求改走视觉模型（如 qwen-vl-plus），
   // 文本仍走默认 LLM_MODEL（如 qwen-plus）。这样默认用便宜的文本模型，识图才切多模态，整体最省钱。
-  const effectiveModel = (hasImage && cfg.visionModel)
-    ? cfg.visionModel
-    : ((typeof event.model === "string" && event.model.trim()) ? event.model.trim() : cfg.model);
+  // ③ 模型白名单：调用方只能选部署时配置的模型 / 视觉模型（或环境变量显式放行的），
+  //    否则一律降级到配置模型。防止恶意传昂贵模型名或无视觉能力的模型烧额度。
+  const effectiveModel = GUARD.safeModel(
+    event.model, cfg.model, cfg.visionModel, hasImage, process.env.LLM_ALLOW_MODELS || ""
+  );
 
   // 视觉能力自检：明确已知不支持图片的模型，直接给可操作的原因，避免页面只拿到「识别失败」。
   // VISION_OK 放行含 vl/vision/4o 等视觉型号，避免误拦 deepseek-vl2 / qwen-vl-max 这类视觉模型；
@@ -227,8 +261,9 @@ exports.main = async (event) => {
   }
 
   const model = effectiveModel;
-  const temperature = (typeof event.temperature === "number") ? event.temperature : 0.7;
-  const maxTokens = (typeof event.max_tokens === "number" && event.max_tokens > 0) ? event.max_tokens : 1200;
+  // ④ 参数夹紧：max_tokens / temperature 设硬上限，防止单次调用把预算打爆
+  const temperature = GUARD.clampNum(event.temperature, 0, 2, GUARD.DEFAULTS.temperature);
+  const maxTokens = Math.round(GUARD.clampNum(event.max_tokens, 1, LIMITS.maxTokens, GUARD.DEFAULTS.maxTokens));
 
   const payload = {
     model: model,
