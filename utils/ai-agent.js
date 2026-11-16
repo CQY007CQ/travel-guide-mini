@@ -67,6 +67,8 @@ function remember(scene, role, text) {
     if (!m[k]) m[k] = [];
     m[k].push({ role: role === "assistant" ? "assistant" : "user", content: String(text || "").slice(0, 1200) });
     if (m[k].length > MAX_TURNS * 2) m[k] = m[k].slice(-MAX_TURNS * 2);
+    // 键顺序即淘汰顺序：把刚用过的场景挪到末尾（详见 check-ai-fallback 断言）。
+    const cur = m[k]; delete m[k]; m[k] = cur;
     _save();
   } catch (e) {}
 }
@@ -212,7 +214,7 @@ function parsePlanIntent(text) {
   const local = parsePlanIntentLocal(q);
   if (!q) return Promise.resolve(local);
   if (!Cloud.cloudEnabled()) return Promise.resolve(local);
-  return Cloud.aiChat({ prompt: q, system: PLAN_SYS, max_tokens: 300, temperature: 0.2 })
+  return Cloud.aiChat({ prompt: q, system: PLAN_SYS, max_tokens: 300, temperature: 0.2, timeoutMs: 8000 })
     .then(function (r) {
       if (!r || !r.ok || !r.text) return local;
       const o = extractJSON(r.text);

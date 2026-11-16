@@ -1,17 +1,11 @@
 // utils/cloud.js —— 微信云开发 / 网页版 CloudBase 统一接入层
 //
-// 目标：小程序与网页版共用同一云环境 / 集合（users/plans/wishes/footprints/notes/feedback/ai_cache），
-//       实现「小程序生成的行程，网页版能接着看；网页版收藏的足迹，小程序能看到」的互通。
-//
-// 两端实现：
-//   · 小程序端：基于原生 wx.cloud（零适配，Key 只放云函数，绝不下发）
-//   · 网页端：基于 @cloudbase/js-sdk（由 web/lib/cloud-web.js 适配器预先 init 并挂到 window.__cloudbase）
-//
-// 合规铁律（呼应高德 Key 泄露教训）：
-//   · 云环境 ID 走配置（keys.cloudEnv），绝不写死进 git；缺失即 fail-closed，云端能力整体降级，不抛错阻断主流程。
-//   · 真正的密钥（LLM Key 等）只存在于云函数环境变量，小程序 / 网页端代码里一个字都不出现。
-//
-// 设计原则：本地优先。云同步是「增强项」，任何联网失败都回落本地，绝不阻塞行程本身。
+// 小程序与网页版共用同一云环境与集合（users/plans/wishes/footprints/notes/feedback/ai_cache），
+// 实现「小程序生成的行程网页版能接着看、网页版收藏的足迹小程序能看到」的互通。
+//   小程序端：原生 wx.cloud；网页端：@cloudbase/js-sdk（cloud-web.js 预先 init 并挂 window.__cloudbase）。
+// 铁律：云环境 ID 走 keys.cloudEnv，缺失即 fail-closed 整体降级（不阻断主流程）；
+//       LLM 密钥只存在于云函数环境变量，前端代码一个字都不出现。
+// 设计原则：本地优先，云同步是增强项，任何联网失败都回落本地。
 
 const KEYS = require("./keys.js");
 const S = require("./store.js");
@@ -39,10 +33,6 @@ function setPairedUid(code) {
     return true;
   } catch (e) { return false; }
 }
-function clearPairedUid() {
-  try { S.del(PAIRED_KEY); } catch (e) {}
-}
-
 // 是否运行在网页版（@cloudbase/js-sdk 适配器已挂 window.__cloudbase）。
 // 注意：网页版 runtime 也提供 window.wx 垫片，所以不能用「typeof wx === undefined」判别，
 // 必须以「window.__cloudbase 是否被适配器挂载」为唯一判据，否则会误走 wx.cloud 分支。
@@ -163,10 +153,8 @@ function ensureUid() {
 }
 
 // ── AI 接入（共用云端 llmProxy 强模型网关，fail-closed） ──
-// 组装本地真实上下文（行程 / 景点 / 城市 / 预算），作为 grounding 注入 LLM。
-// 零伪造：这里只读取用户本机已有行程数据，不编造任何坐标 / 票价 / 医院。
 // 组装本地真实上下文（行程 / 景点 / 城市 / 预算 / 天气 / 花费 / 想去清单），作为 grounding 注入 LLM。
-// 零伪造：这里只读取用户本机已有行程数据，不编造任何坐标 / 票价 / 医院 / 天气。
+// 零伪造：只读取用户本机已有行程数据，不编造任何坐标 / 票价 / 医院 / 天气。
 // 每个派生维度都用 try/catch 隔离，任一助手缺失都不会让整段上下文失效（强模型调用永不因此崩）。
 function aiContextOf(plan, page) {
   const lines = [];
@@ -283,8 +271,15 @@ function aiChannelStats() {
   return { enabled: cloudEnabled(), calls: _aiCalls, ok: _aiOk, fail: _aiFail };
 }
 
+// 客户端等待上限必须 > 云端内部等待（llmProxy postJSON 18000ms）：否则模型慢时云端已答完、
+// 客户端已超时回落，白等白花 token 还拿更差的离线答案。取舍见 check-ai-fallback.mjs 时序断言。
+const AI_TEXT_TIMEOUT_MS = 21000;
+// 识图云端要先串行下载图片再请求模型，下载耗时在等待之外，客户端留更宽。
+const AI_VISION_TIMEOUT_MS = 25000;
+
 // 调云端 llmProxy：传入对话 / 单轮问题 + 本地上下文，返回 { ok, text, model, source }。
 // 任何失败（云未开 / 未配置 / 网络错 / 超时）都返回 { ok:false }，调用方必须回落离线引擎，绝不白屏。
+// opts.timeoutMs 可按场景覆盖：本地已有答案的轻调用（如意图解析）不该陪云端干等。
 function aiChat(opts) {
   opts = opts || {};
   return new Promise(function (resolve) {
@@ -299,7 +294,8 @@ function aiChat(opts) {
       temperature: (typeof opts.temperature === "number") ? opts.temperature : null,
       max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : null
     };
-    withTimeout(callFunction("llmProxy", payload), 15000).then(function (r) {
+    const tmo = (typeof opts.timeoutMs === "number" && opts.timeoutMs > 0) ? opts.timeoutMs : AI_TEXT_TIMEOUT_MS;
+    withTimeout(callFunction("llmProxy", payload), tmo).then(function (r) {
       if (r && r.ok && r.text) { _aiOk++; resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" }); }
       else { _aiFail++; resolve({ ok: false, err: (r && r.err) || "ai-failed", raw: r }); }
     });
@@ -307,7 +303,9 @@ function aiChat(opts) {
 }
 
 // 上传本地图片到云存储，返回 fileID（拍照识物用；小程序 + 网页双端）。
-// filePath 在小程序是本地临时路径，在网页是 <input type=file> 拿到的 File/Blob 对象（runtime wx.chooseMedia 垫片产出）。
+// filePath 在小程序是本地临时路径，在网页是 <input type=file> 拿到的 File/Blob（runtime 垫片产出）。
+// 超时 12s：识物前已 quality=60 / 900px 压缩（约 100-200KB），12s 足够；
+// 原先 20s 会让一次坏网上传白等更久，而失败也只是丢这一张（调用方 catch 成 ""，其余照常识别）。
 function uploadImage(filePath) {
   return new Promise(function (resolve, reject) {
     let done = false;
@@ -315,7 +313,7 @@ function uploadImage(filePath) {
       if (done) return;
       done = true;
       reject(new Error("upload-timeout"));
-    }, 20000);
+    }, 12000);
     const ok = function (v) { if (done) return; done = true; try { clearTimeout(timer); } catch (e) {} resolve(v); };
     const bad = function (e) { if (done) return; done = true; try { clearTimeout(timer); } catch (e2) {} reject(e); };
     try {
@@ -367,7 +365,7 @@ function aiVision(opts) {
       max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : 700
     };
     if (!payload.imageFileID && !payload.imageFileIDs && !payload.imageBase64) { resolve({ ok: false, err: "no-image" }); return; }
-    withTimeout(callFunction("llmProxy", payload), 25000).then(function (r) {
+    withTimeout(callFunction("llmProxy", payload), AI_VISION_TIMEOUT_MS).then(function (r) {
       if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
       else resolve({ ok: false, err: (r && (r.hint || r.err)) || "vision-failed", raw: r });
     });
@@ -386,7 +384,6 @@ module.exports = {
   ensureUid: ensureUid,
   getPairedUid: getPairedUid,
   setPairedUid: setPairedUid,
-  clearPairedUid: clearPairedUid,
   aiContextOf: aiContextOf,
   aiChat: aiChat,
   aiChannelStats: aiChannelStats,

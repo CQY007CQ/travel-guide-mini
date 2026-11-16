@@ -238,7 +238,13 @@ exports.main = async (event) => {
   };
 
   try {
-    const j = await postJSON(endpointOf(cfg.base), payload, cfg.key, 18000);
+    // 云函数整体执行上限 20s。识图要先「串行下载图片 → 转 base64 → 再请求模型」，
+    // 若仍固定等 18000ms，下载耗时（最多 3 张）会把总时长顶破 20s 上限，
+    // 被平台直接杀掉 —— 前端只能拿到 -504002「函数执行失败」这种黑盒错误，
+    // 用户还以为是服务挂了。有图时主动收缩模型等待、把额度留给下载，
+    // 宁可返回可读的 timeout（前端会翻成人话并可重试），也不要无声被杀。
+    const modelTimeoutMs = imageDataUrls.length ? 13000 : 18000;
+    const j = await postJSON(endpointOf(cfg.base), payload, cfg.key, modelTimeoutMs);
     const text = extractText(j);
     if (!text) return { ok: false, err: "empty-response" };
     return { ok: true, text: text, model: model, source: providerOf(cfg.base) };

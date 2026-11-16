@@ -58,6 +58,37 @@ for (const f of files) {
 }
 
 log(sites > 0, "共扫描到 AIAgent.ask 调用点 = " + sites + "（期望 ≥8）");
+
+// ── 超时时序契约：客户端等待上限必须大于云端内部等待 ──
+// 违例症状极隐蔽、且只在「模型较慢」时出现：云端其实已经答完并正常返回，
+// 客户端却早已超时回落离线 —— 用户白等十几秒、token 白花，最终拿到质量更差的离线答案，
+// 界面上还看不出任何异常（离线回答本身是合法降级）。曾实测客户端 15s / 云端 18s 就是这种倒挂。
+const CLOUD_JS = readFileSync(resolve(ROOT, "utils/cloud.js"), "utf8");
+const PROXY_JS = readFileSync(resolve(ROOT, "tools/cloud/llmProxy/index.js"), "utf8");
+
+const cloudTextWait = Number((PROXY_JS.match(/imageDataUrls\.length \? (\d+) : (\d+)/) || [])[2] || 0);
+const cloudVisWait = Number((PROXY_JS.match(/imageDataUrls\.length \? (\d+) : (\d+)/) || [])[1] || 0);
+const clientTextTmo = Number((CLOUD_JS.match(/const AI_TEXT_TIMEOUT_MS = (\d+);/) || [])[1] || 0);
+const clientVisTmo = Number((CLOUD_JS.match(/const AI_VISION_TIMEOUT_MS = (\d+);/) || [])[1] || 0);
+
+log(cloudTextWait > 0 && cloudVisWait > 0, "云端按是否带图分配模型等待（带图更短，给图片下载留额度）");
+log(clientTextTmo > cloudTextWait,
+  "客户端文本等待(" + clientTextTmo + "ms) > 云端文本等待(" + cloudTextWait + "ms)，不白扔已成功的回答");
+log(clientVisTmo > cloudVisWait,
+  "客户端识图等待(" + clientVisTmo + "ms) > 云端识图等待(" + cloudVisWait + "ms)");
+log(/withTimeout\(callFunction\("llmProxy", payload\), tmo\)/.test(CLOUD_JS) &&
+    /opts\.timeoutMs > 0\) \? opts\.timeoutMs : AI_TEXT_TIMEOUT_MS/.test(CLOUD_JS),
+  "aiChat 超时统一走常量兜底，仅允许调用方按场景显式覆盖（不各处硬编码）");
+// 意图解析是「本地已算好、云端只为更准」的可选增强，绝不能让它把首页生成拖到 20s。
+const AGENT_JS = readFileSync(resolve(ROOT, "utils/ai-agent.js"), "utf8");
+const intentTmo = Number((AGENT_JS.match(/timeoutMs: (\d+)/) || [])[1] || 0);
+log(intentTmo > 0 && intentTmo < cloudTextWait,
+  "行程意图解析用短超时(" + intentTmo + "ms < 云端 " + cloudTextWait + "ms)：本地已有结果，不干等云端");
+// 场景记忆只留 MAX_SCENES 个键，淘汰顺序 = 键顺序。必须把刚用过的挪到末尾，
+// 否则被淘汰的是「最早创建」的场景——常用页反而先失忆。
+log(/delete m\[k\];\s*m\[k\] = cur;/.test(AGENT_JS),
+  "场景记忆淘汰最久未用（把刚用过的场景挪到末尾），不是最早创建");
+
 console.log(fail === 0
   ? "\n✓ 云端 AI fail-closed 覆盖守卫通过（每个调用点都有 .catch 且失败分支优雅降级）"
   : "\n✗ 存在缺兜底的云端 AI 调用点，请在 .then 失败分支补离线/云端感知回落，并确保 .catch 存在");

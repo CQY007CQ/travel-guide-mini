@@ -146,6 +146,10 @@ ck("网页 AI 把「拍照识物」引导到识物页，不误答出片点",
 ck("网页直连未配置/失效时静默回落，不向用户弹 Base URL 技术警告",
   /if \(!base\) \{ onErr\(null\);/.test(webAiJs) && /if \(err\) pushBot/.test(webAiJs) &&
   !/onErr\("Base URL 不合法：仅支持 https/.test(webAiJs));
+// 浏览器 fetch 无内建超时：网关半挂会让面板永久「思考中」，用户只能刷新。
+ck("网页直连大模型有硬超时中止，且超时与跨域分开收口",
+  /new AbortController\(\)/.test(webAiJs) && /signal: ac \? ac\.signal/.test(webAiJs) &&
+  /aborted \?/.test(webAiJs) && /网关未回包/.test(webAiJs));
 
 console.log("  更强 AI / 全站适配防回潮守卫: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);

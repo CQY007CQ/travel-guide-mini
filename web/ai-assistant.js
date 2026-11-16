@@ -1095,15 +1095,32 @@
     var msgs = [{ role: "system", content: sys }].concat(history.map(function (m) {
       return { role: m.user ? "user" : "assistant", content: m.text };
     }));
+    // 浏览器 fetch 本身没有超时：自建网关半挂（TCP 通但不回包）时会永久「思考中」，
+    // 用户只能刷新页面重来。这里加 AbortController 硬超时，与云端通道的等待额度对齐。
+    var ac = null, tid = null, aborted = false;
+    try {
+      if (typeof AbortController === "function") {
+        ac = new AbortController();
+        tid = setTimeout(function () { aborted = true; try { ac.abort(); } catch (e) {} }, 22000);
+      }
+    } catch (e) {}
+    var stopTimer = function () { if (tid) { try { clearTimeout(tid); } catch (e) {} tid = null; } };
     fetch(base + "/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + c.apiKey },
       body: JSON.stringify({ model: c.model || "gpt-4o-mini", messages: msgs, temperature: 0.6 }),
+      signal: ac ? ac.signal : undefined,
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (o) {
+        stopTimer();
         if (!o.ok || !o.j.choices || !o.j.choices[0]) { onErr("大模型接口返回异常，已切换离线助手"); return; }
         onDone(o.j.choices[0].message.content || "");
-      }).catch(function () { onErr("大模型请求失败（多为浏览器跨域/CORS 或 CSP 限制），已切换离线助手"); });
+      }).catch(function () {
+        stopTimer();
+        // 超时和跨域是两回事：混成一句会让用户去查 CORS，实际只是网关不回包。
+        onErr(aborted ? "大模型接口 22 秒无响应（网关未回包），已切换离线助手"
+          : "大模型请求失败（多为浏览器跨域/CORS 或 CSP 限制），已切换离线助手");
+      });
   }
   /** 统一入口：优先云端强模型网关（llmProxy，前端零 Key），失败再回落用户自有 Key 直连。 */
   function callLLM(history, ctx, onDone, onErr) {
