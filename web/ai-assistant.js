@@ -1082,7 +1082,9 @@
   function callLLMDirect(history, ctx, onDone, onErr) {
     var c = llmCfg();
     var base = safeBaseURL(c.baseURL);
-    if (!base) { onErr("Base URL 不合法：仅支持 https，且不能是本机/内网地址"); return; }
+    // 直连是可选兜底：云端失败才走到这里。此时用户那笔失效/不合规的旧配置不该再弹警告刷屏，
+    // 静默回落离线助手即可（离线回答本身已声明来源）。配置页保存时仍会明确提示格式，不掩盖填错。
+    if (!base) { onErr(null); return; }   // null = 静默回落，不弹空警告
     var p = ctx.plan;
     var sys = WEB_MASTER + "\n\n" + sceneSystemOf(lastQuestion(history)) +
       "\n\n【本机上下文】当前页面：" + ctx.title + "（" + ctx.path + "）。" +
@@ -1385,7 +1387,9 @@
       callLLM(history, ctx, function (txt) {
         clearTyping(); pushBot(escapeHtml(txt).replace(/\n/g, "<br/>"));
       }, function (err) {
-        clearTyping(); pushBot("⚠️ " + escapeHtml(err) + "\n已回退到内置离线助手：");
+        clearTyping();
+        // err=null 表示可选直连未配置/已失效，静默回落即可，不再弹技术警告刷屏
+        if (err) pushBot("⚠️ " + escapeHtml(err) + "\n已回退到内置离线助手：");
         var r = replyAndRemember(v, ctx); pushBot(r.html, r.actions); applyAuto(r);
       });
       return;
