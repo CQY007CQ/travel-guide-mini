@@ -6,7 +6,8 @@
  *       每次全量回归自动打印并做跨层断言，让结构性问题（体积逼近红线 / 数据 shape 异常 /
  *       坐标回归 / 门禁回潮 / 触点丢失）在一条输出里可见，而不是逐个脚本翻日志。
  *
- * 六层覆盖：① 包体与余量 ② 数据规模 ③ 坐标健康 ④ 结构自检 ⑤ 守卫与回归链 ⑥ 全站 AI 触点。
+ * 七层覆盖：① 包体与余量 ② 数据规模 ③ 坐标健康 ④ 结构自检 ⑤ 守卫与回归链 ⑥ 全站 AI 触点
+ *          ⑦ 单文件规模棘轮（T4：随包 JS ≤ 800 行，超标必须登记且名单只减不增）。
  * 只读：不改任何文件、不联网、不写存储；任何单项取数失败都标「未取到」而不伪造数字。
  */
 import { createRequire } from "module";
@@ -169,6 +170,56 @@ ck("真值全部取到（0 表示取数失败，不是真实值）",
   FIGS.every(([k, v]) => v > 0 || ZERO_OK.has(k)),
   FIGS.filter(([k, v]) => !v && !ZERO_OK.has(k)).map(([k]) => k).join(",") || "");
 
+/* ───────── ⑦ 单文件规模棘轮（T4）─────────
+   动机：8267 行的 ai-deep-auto.js / 1708 行的 plan.js 这类巨型文件，代价不在运行期，
+   而在「改一处要读半天 + 六个分支机合并必冲突」。拆完之后必须留一条硬线，
+   否则下次顺手再塞一个功能就长回去了。
+   口径：
+     · 随包发布的 JS（app.js / pages / subpkg / subai / utils）单文件 ≤ 800 行，零例外。
+       subdata* 是 pack-data 的生成产物，由「data≤1950KB」预算线约束，不在这里重复管。
+     · 非随包的源文件（tools/）超过 800 行必须逐条登记在 OVERSIZE_ALLOWED 里，
+       并断言「登记项依然存在且依然超标」—— 拆完就得从名单删掉，名单只减不增。
+       这是「显式登记」而不是「悄悄放过」：每次全量回归都会把这些文件打印出来。 */
+console.log("【单文件规模】");
+const SIZE_LIMIT = 800;
+const SHIPPED_DIRS = ["pages", "subpkg", "subai", "utils"];
+const OVERSIZE_ALLOWED = new Map([
+  // 逻辑真源（build-min 的输入），不随包发布；拆它们属于算法内核级重构，另立项。
+  ["tools/_src-backup/travel.js", "行程生成/导航/百科内核，6729 行逻辑真源"],
+  ["tools/_src-backup/planner.js", "行程编排真源，按天/预算/节奏耦合度高"],
+  ["tools/_src-backup/emergency-data.src.js", "应急数据表，条目式结构"]
+]);
+function walkJs(dir, out) {
+  let ents = [];
+  try { ents = readdirSync(path.join(ROOT, dir), { withFileTypes: true }); } catch (e) { return out; }
+  for (const e of ents) {
+    if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+    const rel = dir + "/" + e.name;
+    if (e.isDirectory()) walkJs(rel, out);
+    else if (e.name.endsWith(".js")) out.push(rel);
+  }
+  return out;
+}
+const lineCount = (rel) => {
+  try { return readFileSync(path.join(ROOT, rel), "utf8").split("\n").length; } catch (e) { return -1; }
+};
+const shipped = ["app.js"].concat(SHIPPED_DIRS).reduce((a, d) => walkJs(d, a), []);
+const shippedBig = shipped.map((f) => [f, lineCount(f)]).filter(([, c]) => c > SIZE_LIMIT);
+ck("随包发布 JS 单文件 ≤ " + SIZE_LIMIT + " 行（" + shipped.length + " 个文件，零例外）",
+  shippedBig.length === 0, shippedBig.map(([f, c]) => f + "=" + c).join(","));
+
+const toolJs = walkJs("tools", []).filter((f) => !f.startsWith("tools/data/"));
+// tools/data/ 是采集/导入管线的数据表（十万行级条目），它的大是「数据量」不是「逻辑耦合」，
+// 由各自导入脚本与坐标护栏管，不套 800 行线；这里只量「要人读的逻辑源码」。
+const toolBig = toolJs.map((f) => [f, lineCount(f)]).filter(([, c]) => c > SIZE_LIMIT);
+const unregistered = toolBig.filter(([f]) => !OVERSIZE_ALLOWED.has(f)).map(([f, c]) => f + "=" + c);
+ck("tools/ 超标文件均已登记（新增超标必须登记或拆掉）", unregistered.length === 0, unregistered.join(","));
+// 名单防僵化：登记项拆干净了就必须删登记，否则名单会变成「历史遗留免死金牌」。
+const staleAllow = [...OVERSIZE_ALLOWED.keys()].filter((f) => lineCount(f) <= SIZE_LIMIT);
+ck("规模豁免名单无过期项（拆完要删登记，名单只减不增）", staleAllow.length === 0, staleAllow.join(","));
+ck("规模豁免仅限非随包源文件", [...OVERSIZE_ALLOWED.keys()].every((f) => f.startsWith("tools/")),
+  [...OVERSIZE_ALLOWED.keys()].filter((f) => !f.startsWith("tools/")).join(","));
+
 console.log("\n  全盘体检: " + (n - fail) + "/" + n + " 通过" +
-  (fail ? "" : "  · 六层指标无结构性异常"));
+  (fail ? "" : "  · 七层指标无结构性异常"));
 if (fail) process.exit(1);

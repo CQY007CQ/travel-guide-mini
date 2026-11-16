@@ -5,6 +5,7 @@
 import { createRequire } from "module";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { pageSrc } from "../lib/page-src.mjs";
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve("utils/..");
@@ -93,7 +94,8 @@ for (const f of ["pages/today/today.js", "pages/plan/plan.js", "pages/help/help.
   "subpkg/assistant/assistant.js", "subpkg/prep/prep.js", "subpkg/food/food.js", "subpkg/lens/lens.js",
   "subai/deep/deep.js", "subpkg/toolkit/toolkit.js"]) {
   let src = "";
-  try { src = readFileSync(resolve(ROOT, f), "utf8"); } catch (e) { continue; }
+  // T4 拆文件后方法分散到同目录模块，按「页面 + 兄弟模块」扫描，场景漂移守卫覆盖不缩水
+  try { src = pageSrc(f, ROOT); } catch (e) { continue; }
   const m = src.match(/AIAgent\.ask\(\s*"([^"]+)"/g) || [];
   m.forEach(function (s) { const k = s.match(/"([^"]+)"/)[1]; if (ASK_SRC.indexOf(k) < 0) ASK_SRC.push(k); });
 }

@@ -11,6 +11,7 @@
  */
 import fs from "fs";
 import path from "path";
+import { pageSrc } from "../lib/page-src.mjs";
 
 const ROOT = process.cwd();
 let n = 0, bad = 0;
@@ -48,7 +49,7 @@ ok("utils/travel.js 仍导出 dailyInspire（函数保留，仅下线 UI）", tr
 ok("保留其单测 tools/test/_test-daily-insp.mjs", fs.existsSync(path.join(ROOT, "tools/test/_test-daily-insp.mjs")));
 
 // 四、不误伤：盲盒（inspirePicks）与更多页灵感（inspire）是另外两个功能，必须还在
-const idx = read("pages/index/index.js");
+const idx = pageSrc("pages/index/index.js");
 const more = read("pages/more/more.js");
 ok("首页盲盒 inspirePicks 仍在（另一个功能）", idx.indexOf("inspirePicks") >= 0);
 ok("更多页「去哪儿好呢」inspire 仍在（另一个功能）", more.indexOf("T.inspire(") >= 0);

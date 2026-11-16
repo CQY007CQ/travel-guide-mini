@@ -72,10 +72,23 @@ for (const city of pick) {
 const out = { v: 1, updated: "2026-11-auto", auto: true, cities };
 // 无新增城市时直接跳过写盘：写一个 cities:{} 的空壳会把已有机卡片整体清空，
 // 而这种损失在下一次「打开深度玩法页」时才看得出来。
+const BANNER = [
+  "// 自动衍生深度卡片（AI 辅助生成，2026-11）",
+  "// 零伪造：仅引用 utils/data.js 中真实存在的景点名 / 美食店名 / 坐标；",
+  "//   价格 / 简介 / 开放时间 / 班次等缺失字段一律不臆造；行程节奏用真实坐标就近串联。",
+  "// 与 ai-deep.js（人工核心）、ai-deep-extra.js（人工扩写）分离，便于人工复核与回退。",
+  "// 重新生成：node tools/team/build-deep-cards.mjs"
+].join("\n");
 if (!Object.keys(cities).length) {
   console.log("ℹ️ 无新增城市，未改动文件（目标 " + TARGET + " 已被人工卡片 " + have.size + " 城覆盖）");
 } else {
-  const r = writeDeepAuto(out);
+  const r = writeDeepAuto(out, process.cwd(), {
+    dir: "subai/data/deep-auto",
+    entry: "subai/data/ai-deep-auto.js",
+    banner: BANNER,
+    label: "自动衍生深度卡片",
+    humanEdited: false
+  });
   console.log("✅ 写出 subai/data/deep-auto/pNN.js " + r.parts + " 块 + 聚合入口 subai/data/ai-deep-auto.js（" + r.entryLines + " 行）："
     + Object.keys(cities).length + " 城，总卡片数 " + (have.size + Object.keys(cities).length));
 }

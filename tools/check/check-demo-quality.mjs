@@ -19,6 +19,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { pageSrc } from "../lib/page-src.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -71,12 +72,13 @@ const checks = [
   ["最近玩过：按城市唯一，杜绝 wx:key 重复", () => {
     const t = read("tools/_src-backup/travel.js");
     must(t.includes('String(x.city || "") === String(item.city)'), "pushRecent 去重键回潮");
-    const i = read("pages/index/index.js");
+    // T4 拆文件后首页方法分散到同目录 m-*.js / index-ctx.js，按源码文本断言统一走 pageSrc
+    const i = pageSrc("pages/index/index.js");
     must(i.includes("function _uniqRecent"), "首页缺少 _uniqRecent 兜底（历史脏数据仍会重复）");
     must(count(i, "_uniqRecent(T.getRecent())") >= 3, "recents 展示未全部去重");
   }],
   ["首页：省份索引越界钳制 + provName 空串兜底", () => {
-    const i = read("pages/index/index.js");
+    const i = pageSrc("pages/index/index.js");
     must(i.includes("if (!isFinite(i) || i < 0 || i >= provs.length) i = 0;"), "_fillProv 缺少 idx 钳制");
     must(i.includes("provName: prov, cityIdx"), "provName 未使用兜底后的 prov");
     must(i.includes('provName: cfg.provName || ""'), "草稿恢复缺少 provName 兜底");

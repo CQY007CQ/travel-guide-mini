@@ -149,8 +149,8 @@ node tools/test/_test-foodmap.mjs           # 菜名→店铺匹配（16 条断�
 node tools/_test-v11987-insp-ui.mjs    # 今日正当时 灵感卡接线
 node tools/test/_test-v11988-sharecard.mjs  # 转发黑金卡生成
 node tools/_test-v11989-sharetitle.mjs # 分享即种草
-node tools/test/_test-plan-handlers.mjs     # 行程页 14 个交互 handler
-node tools/test/_test-v11993-bootsmoke.mjs  # 17 页启动冒烟（抓分包 require 层级错误）
+node tools/test/_test-plan-handlers.mjs     # 行程页 46 项交互回归（拖拽之外的 handler）
+node tools/test/_test-v11993-bootsmoke.mjs  # 21 页启动冒烟（抓分包 require 层级错误）
 ```
 
 写回归脚本的约定：**从源码里 `indexOf` 抽出真实 handler 文本，塞进 vm 沙盒跑**，而不是照着逻辑另抄一份 —— 否则源码改了测试照样是绿的，等于没测。
@@ -173,6 +173,31 @@ node tools/check/check-pkgsize.mjs    # 体积真值（主包/各分包/data-pac
 它串在回归链的「材料口径一致性」step 里一起跑，不单独占一步。
 
 > 改数据或改包体之后，**不要凭印象改文档**：先跑上面两条命令，照输出抄。
+
+### 单文件规模：800 行是硬线，不是建议
+
+巨型文件的代价不在运行期，而在「改一处要读半天」和「六台分支机合并必冲突」。已拆的：
+
+| 原文件 | 原行数 | 现状 |
+| --- | --- | --- |
+| `pages/plan/plan.js` | 1708 | 84 行装配 + `p-render` / `p-edit` / `p-svc` / `p-share` / `p-note` + `plan-ctx` |
+| `pages/index/index.js` | 1409 | 177 行装配 + `m-generate` / `m-config` / `m-form` / `m-tile` + `index-ctx` |
+| `subai/data/ai-deep-auto.js` | 8267 | 64 行聚合入口 + `deep-auto/p01..p12`（每块 ≤780 行） |
+| `subai/data/ai-deep-extra.js` | 3185 | 46 行聚合入口 + `deep-extra/p01..p06` |
+| `subai/data/ai-deep.js` | 1302 | 37 行聚合入口 + `deep-core/p01..p03` |
+
+拆分只是换住所，不是改行为：方法体按成员边界原样搬运（`tools/dev/page-split.mjs`），
+逐个方法比 sha1（`tools/dev/_page-members-snapshot.mjs`），三份内容库比整体指纹。
+判定这个改动是否等价，看的是指纹，不是「跑一遍看着没问题」。
+
+**门禁**：`check-health.mjs` 第 ⑦ 层断言「随包发布 JS 单文件 ≤ 800 行，零例外」。
+`tools/` 下确实需要超标的逻辑源码要逐条登记在 `OVERSIZE_ALLOWED`（当前 3 条），
+且断言「登记项仍超标」——拆完不删登记会判红，名单只能变短。
+`tools/data/` 是数据表（十万行级条目），按数据量而非逻辑耦合治理，不套这条线。
+
+**按源码文本断言的门禁**：页面方法搬走后，仍有门禁用 `readFileSync("pages/plan/plan.js")`
+做正则断言。这类检查一律改走 `tools/lib/page-src.mjs` 的 `pageSrc()`（页面 + 同目录
+`p-*.js` / `m-*.js`）——扫描面变大，强度不降；直接读单文件会让断言**静默失效**变成假绿。
 
 ---
 

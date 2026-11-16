@@ -24,6 +24,20 @@ export const PART_MAX_LINES = 780;
 const DIR = "subai/data/deep-auto";
 const ENTRY = "subai/data/ai-deep-auto.js";
 
+/**
+ * 入口文件里「生成区」的起始标记。
+ * 人工写的声明头在这个标记之前；标记之后全是生成内容。
+ * 重新生成时必须按这个标记切一刀，否则「把上次生成的索引当成人工头再拼一遍」
+ * 会让入口文件每跑一次就膨胀一次（实测第二次重写就出现重复块）。
+ */
+export const ENTRY_SENTINEL = "// ── 分块聚合入口（对外形状与原单文件完全一致）─────────────────────────";
+
+/** 从已有入口文件里取出「人工声明头」（没有标记就取 module.exports 之前） */
+export function bannerOf(entryText) {
+  const i = entryText.indexOf(ENTRY_SENTINEL);
+  const head = i >= 0 ? entryText.slice(0, i) : entryText.slice(0, Math.max(0, entryText.indexOf("module.exports")));
+  return head.trim();
+}
 /** 把一个城市条目渲染成 part 文件里的两空格缩进形态 */
 function cityLines(name, obj) {
   const body = JSON.stringify({ [name]: obj }, null, 2) // 形如 { "城": {...} }
@@ -33,11 +47,13 @@ function cityLines(name, obj) {
   return body.map((l) => "  " + l);
 }
 
-function partHead(i, total, from, to) {
+function partHead(i, total, from, to, label, entryName, humanEdited) {
   return [
-    "// 自动衍生深度卡片 · 分块 " + i + "/" + total + "（第 " + from + "~" + to + " 城）",
-    "// 由 tools/lib/deep-auto-out.mjs 生成，请勿手改；重新生成：node tools/team/build-deep-cards.mjs",
-    "// 聚合入口：subai/data/ai-deep-auto.js（对外形状与原单文件一致）",
+    "// " + label + " · 分块 " + i + "/" + total + "（第 " + from + "~" + to + " 城）",
+    humanEdited
+      ? "// 人工维护：改城市内容直接改这里（同城的所有块合起来才是一份完整内容库）"
+      : "// 由 tools/lib/deep-auto-out.mjs 生成，请勿手改；重新生成：node tools/team/build-deep-cards.mjs",
+    "// 聚合入口：" + entryName + "（对外形状与原单文件一致）",
     "module.exports = {",
     "  cities: {"
   ];
@@ -46,16 +62,27 @@ const PART_TAIL = ["  }", "};", ""];
 
 /**
  * 把 { v, updated, auto, cities } 写成「分块 + 聚合入口」。
- * 返回 { parts, entryLines }，便于调用方打印与门禁核对。
+ * 三份城市内容库（ai-deep 人工核心 / ai-deep-extra 人工扩写 / ai-deep-auto 自动衍生）
+ * 形状一致，落盘逻辑共用一份：差异只有「分块目录、入口文件名、自己的声明头」。
+ *
+ * @param {object} out        内容对象
+ * @param {string} root       仓库根
+ * @param {{dir?:string, entry?:string, banner?:string}} opts 目录 / 入口 / 人工声明头（原样保留）
+ * @returns {{parts:number, entryLines:number, cities:number}}
  */
-export function writeDeepAuto(out, root = process.cwd()) {
+export function writeDeepAuto(out, root = process.cwd(), opts = {}) {
+  const DIRX = opts.dir || DIR;
+  const ENTRYX = opts.entry || ENTRY;
+  const BANNER = bannerOf((opts.banner || "").trim() || "module.exports");
+  const LABEL = opts.label || "自动衍生深度卡片";
+  const HUMAN = !!opts.humanEdited;
   const names = Object.keys(out.cities || {});
   if (!names.length) throw new Error("writeDeepAuto: cities 为空，拒绝写出（会产生加载期空内容）");
 
   // 逐城算行数 → 贪心装箱，保持原始顺序不变
   const bundles = [];
   let cur = [], curLines = 0;
-  const headLines = partHead(1, 1, 1, 1).length + PART_TAIL.length;
+  const headLines = partHead(1, 1, 1, 1, LABEL, ENTRYX, HUMAN).length + PART_TAIL.length;
   for (const n of names) {
     const lines = cityLines(n, out.cities[n]).length;
     if (cur.length && curLines + lines > PART_MAX_LINES - headLines) {
@@ -70,7 +97,7 @@ export function writeDeepAuto(out, root = process.cwd()) {
   const total = bundles.length;
 
   // 清掉上一轮多出来的分块（改名/合并时不能留下孤儿文件，否则聚合入口写不到它们却仍占体积）
-  const absDir = path.join(root, DIR);
+  const absDir = path.join(root, DIRX);
   fs.mkdirSync(absDir, { recursive: true });
   const keep = new Set();
   for (let i = 1; i <= total; i++) keep.add("p" + String(i).padStart(2, "0") + ".js");
@@ -82,7 +109,7 @@ export function writeDeepAuto(out, root = process.cwd()) {
   for (let i = 1; i <= total; i++) {
     const names2 = bundles[i - 1];
     const to = from + names2.length - 1;
-    const lines = [...partHead(i, total, from, to)];
+    const lines = [...partHead(i, total, from, to, LABEL, ENTRYX, HUMAN)];
     for (let k = 0; k < names2.length; k++) {
       const one = cityLines(names2[k], out.cities[names2[k]]);
       // 城市之间要有逗号：补在上一块的最后一行（漏逗号是只能靠跑起来才发现的语法错）
@@ -96,21 +123,28 @@ export function writeDeepAuto(out, root = process.cwd()) {
   }
 
   // 聚合入口：静态 require 逐个列出（微信编译期硬要求）
+  const base = path.basename(DIRX);
   const L = [];
-  L.push("// 自动衍生深度卡片 · 聚合入口（对外形状与原单文件完全一致）");
-  L.push("// 零伪造：仅引用 utils/data.js 中真实存在的景点名 / 美食店名 / 坐标；");
-  L.push("//   价格 / 简介 / 开放时间 / 班次等缺失字段一律不臆造；行程节奏用真实坐标就近串联。");
-  L.push("// 与 ai-deep.js（人工核心）、ai-deep-extra.js（人工扩写）分离，便于人工复核与回退。");
-  L.push("//");
-  L.push("// 为什么切成 " + total + " 块：单文件曾达 8267 行，认知负荷与合并冲突面过大（T4）。");
-  L.push("// 内容本体在 subai/data/deep-auto/pNN.js，本文件只做聚合，不再承载数据。");
-  L.push("// 重新生成：node tools/team/build-deep-cards.mjs");
+  if (BANNER) { L.push(BANNER); L.push(""); }
+  L.push(ENTRY_SENTINEL);
+  L.push("// 为什么切成 " + total + " 块：单文件曾达数千行，认知负荷与合并冲突面过大（T4）。");
+  L.push("// 内容本体在 subai/data/" + base + "/pNN.js，本文件只做聚合，不再承载数据。");
+  L.push("// 下面按 p01→p" + String(total).padStart(2, "0") + " 列出了每块覆盖的城市，改内容直接去对应块。");
   L.push("//");
   L.push("// 两个不能改的地方：");
   L.push("//   1) require 必须逐个写静态字面量 —— 微信编译期不解析拼接出来的路径；");
   L.push("//   2) 合并必须按 p01→p" + String(total).padStart(2, "0") + " 顺序，键序即展示顺序，不可 sort。");
+  L.push("");
+  L.push("// 城市 → 分块索引（生成，供人工定位；查找请用 grep \"\\\"城市名\\\":\" subai/data/" + base + "/）");
+  let cursor = 0;
   for (let i = 1; i <= total; i++) {
-    L.push("const P" + String(i).padStart(2, "0") + " = require(\"./deep-auto/p" + String(i).padStart(2, "0") + ".js\");");
+    const ns = bundles[i - 1];
+    L.push("//   p" + String(i).padStart(2, "0") + "（" + ns.length + " 城）：" + ns[0] + " … " + ns[ns.length - 1]);
+    cursor += ns.length;
+  }
+  L.push("");
+  for (let i = 1; i <= total; i++) {
+    L.push("const P" + String(i).padStart(2, "0") + " = require(\"./" + base + "/p" + String(i).padStart(2, "0") + ".js\");");
   }
   L.push("");
   L.push("const PARTS = [");
@@ -132,7 +166,7 @@ export function writeDeepAuto(out, root = process.cwd()) {
   L.push("};");
   L.push("");
   const entrySrc = L.join("\n");
-  fs.writeFileSync(path.join(root, ENTRY), entrySrc);
+  fs.writeFileSync(path.join(root, ENTRYX), entrySrc);
 
   return { parts: total, entryLines: entrySrc.split("\n").length - 1, cities: names.length };
 }

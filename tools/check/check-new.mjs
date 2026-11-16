@@ -8,6 +8,7 @@ global.wx = {
   navigateTo: () => {}, switchTab: () => {}, reLaunch: () => {}, navigateBack: () => {}
 };
 import { createRequire } from "module";
+import { pageSrc } from "../lib/page-src.mjs";
 const req = createRequire(process.cwd() + "/");
 const T = req("./utils/travel.js");
 const INS = req("./subpkg/utils/insights.js");
@@ -1086,7 +1087,7 @@ assert("天气缓存：有 6 小时硬过期", SVCJS.indexOf("6 * 3600 * 1000") 
 assert("预报快照：校验城市 cacheKey", SVCJS.indexOf("snap.key === cacheKey") >= 0);
 // 首页 AI 已重构为模式无关的 ai-entry→assistant 路径，旧的「仅单城」内联生成器已移除
 const IDX_WXML = req("fs").readFileSync("./pages/index/index.wxml", "utf8");
-const IDX_JS = req("fs").readFileSync("./pages/index/index.js", "utf8");
+const IDX_JS = pageSrc("pages/index/index.js");
 assert("首页 AI：走模式无关 ai-entry(generate) 入口", /ai-entry[^>]*topic="generate"/.test(IDX_WXML), "index.wxml 缺少 ai-entry topic=generate");
 assert("首页 AI：已移除旧的单城内联生成器(防回潮)", IDX_JS.indexOf("AI 生成暂只支持单城") < 0 && IDX_JS.indexOf("aiGenerate") < 0);
 // v1.20.7：AI 一句话生成（自然语言→行程参数→直接生成行程）接线在 assistant 分包（不占主包体积红线）
