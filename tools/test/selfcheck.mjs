@@ -8,6 +8,8 @@ global.wx = {
   navigateTo: () => {}, switchTab: () => {}, reLaunch: () => {}, navigateBack: () => {}
 };
 import { createRequire } from "module";
+// T4 拆文件后行程页方法分散到同目录 p-*.js；按源码文本断言统一走 pageSrc。
+import { pageSrc } from "../lib/page-src.mjs";
 const req = createRequire(process.cwd() + "/");
 const T = req("./utils/travel.js");
 const D = T.D;
@@ -41,7 +43,7 @@ assert("baikeKeyword 组合名取主段", T.baikeKeyword("天安门广场 + 故�
 // v1.20.5 百科彻底离线化：实测 baike.baidu.com/item/* 与 /search/word?word=* 均 403「安全验证」，
 // /search?word=* 只回首页壳，www.baidu.com/s?wd=* 首访 200 但重复请求 302 到 wappass 图形验证码。
 // 「复制链接到浏览器」没有任何入口能保证可用 → 零外链；有收录弹窗展示，无收录明确提示。
-const _planSrc = req("fs").readFileSync("pages/plan/plan.js", "utf8");
+const _planSrc = pageSrc("pages/plan/plan.js");
 const _plannerSrc = req("fs").readFileSync("tools/_src-backup/planner.js", "utf8");
 assert("baikeUrl 已移除，不再生成任何百科外链", typeof T.baikeUrl === "undefined");
 // 2026-11-09：用户明确要求「有弹窗的同时也把网址复制」→ 恢复复制（仍保留离线弹窗与未收录提示）。

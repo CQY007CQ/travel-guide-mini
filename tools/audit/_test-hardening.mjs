@@ -13,6 +13,7 @@ import { createRequire } from "module";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { pageSrc } from "../lib/page-src.mjs";
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -145,7 +146,7 @@ await T.ready();
 
 // ── v1.20.6 日历：小程序无写系统日历 API → 失败要落到 .ics 文件（不能只弹一句提示）──
 {
-  const _planSrc2 = fs.readFileSync(path.join(ROOT, "pages/plan/plan.js"), "utf8");
+  const _planSrc2 = pageSrc("pages/plan/plan.js");
   ok("v1.20.6 日历写入失败时提供 .ics 文件", /_shareICS\(plan\)/.test(_planSrc2) && /shareFileMessage/.test(_planSrc2));
   // 深度卡：切行程后必须清空/丢弃旧结果，否则会出现「井冈山行程显示太原深度玩法」
   ok("v1.20.6 深度卡不残留旧城市",

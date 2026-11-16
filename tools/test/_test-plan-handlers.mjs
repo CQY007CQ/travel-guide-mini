@@ -8,6 +8,8 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
 import vm from "vm";
+// T4 拆文件后行程页方法分散到 pages/plan/plan.js + 同目录 p-*.js；抽取统一走 pageSrc（页面 + 兄弟模块）。
+import { pageSrc } from "../lib/page-src.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLAN_JS = path.join(__dirname, "..", "..", "pages", "plan", "plan.js");
@@ -16,7 +18,7 @@ const PLAN_JS = path.join(__dirname, "..", "..", "pages", "plan", "plan.js");
 // 注意：plan.js 原始方法是 1 空格缩进（闭合 \n },），v1.19.109 抽出的 6 个 wrapper 是 2 空格（\n  },）。
 // 两种缩进都要兼容，否则 indexOf 会跳到很远的 }, 把多个方法串在一起导致语法错。
 const grab = (name) => {
-  const s = readFileSync(PLAN_JS, "utf8");
+  const s = pageSrc(PLAN_JS);
   const re = new RegExp(name + "\\(([^)]*)\\)\\s*\\{");
   const m = re.exec(s);
   if (!m) throw new Error("method not found: " + name);

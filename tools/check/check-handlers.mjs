@@ -4,6 +4,8 @@
 // 用法：cd 项目根 && node tools/check/check-handlers.mjs
 import fs from "fs";
 import path from "path";
+// T4 拆文件后，页面的处理器可能住在同目录 p-*.js / m-*.js 里；兄弟模块清单由 page-src 单点定义。
+import { pageModules } from "../lib/page-src.mjs";
 
 const ROOT = process.cwd();
 const ROOT_PATH = path.resolve(ROOT);
@@ -73,11 +75,21 @@ function skipRegex(src, i) {
 
 // 提取 Page({...}) / Component({...}) 顶层与 methods 内 key（支持 key:value 与 key(){} 简写）
 // 兼容自定义组件：组件用 Component({...}) 且处理器写在 methods 内（深度 2）。
-function pageTopKeys(src) {
-  let pi = src.indexOf("Page(");
-  if (pi < 0) pi = src.indexOf("Component(");
-  if (pi < 0) return null;
-  const oi = src.indexOf("{", pi);
+// mode === "module"：解析 T4 拆分出的同目录模块 `module.exports = {...}`，只取顶层 key
+//   （不取深度 2 —— 否则嵌套对象的 key 会混进候选集，把真正的漏配掩盖掉）。
+function pageTopKeys(src, mode) {
+  let oi = -1, onlyTop = false;
+  if (mode === "module") {
+    const mi = src.indexOf("module.exports");
+    if (mi < 0) return null;
+    oi = src.indexOf("{", mi);
+    onlyTop = true;
+  } else {
+    let pi = src.indexOf("Page(");
+    if (pi < 0) pi = src.indexOf("Component(");
+    if (pi < 0) return null;
+    oi = src.indexOf("{", pi);
+  }
   if (oi < 0) return null;
   const keys = new Set();
   let depth = 0;
@@ -92,7 +104,7 @@ function pageTopKeys(src) {
       if (depth === 0) break;
       continue;
     }
-    if (depth !== 1 && depth !== 2) continue;
+    if (depth !== 1 && !(depth === 2 && !onlyTop)) continue;
     if (/[A-Za-z_$]/.test(c)) {
       let j = i;
       while (j < src.length && /[A-Za-z0-9_$]/.test(src[j])) j++;
@@ -130,6 +142,13 @@ for (const wf of wxmlFiles) {
   if (!used.size) { ok("无事件处理器 " + rel); continue; }
   const keys = pageTopKeys(fs.readFileSync(jsFile, "utf-8"));
   if (!keys) { bad("Page 对象解析 " + rel, "js 中找不到 Page({...})"); continue; }
+  // T4：巨型页面已拆成「基础对象 + Object.assign(同目录模块)」。
+  // 处理器住在哪个文件由拆分决定，这里必须把同目录模块的顶层 key 一并算入，
+  // 否则拆分本身会让「事件配对」变成一片假红（或更糟：跳过检查后假绿）。
+  for (const mf of pageModules(rel, ROOT)) {
+    const mk = pageTopKeys(fs.readFileSync(path.join(ROOT, mf), "utf-8"), "module");
+    if (mk) for (const n of mk) keys.add(n);
+  }
   const miss = [...used].filter(n => !keys.has(n));
   checked++;
   if (miss.length) bad("事件配对 " + rel, "缺处理器: " + miss.join(", "));

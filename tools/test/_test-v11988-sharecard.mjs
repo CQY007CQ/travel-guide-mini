@@ -5,9 +5,16 @@
 // stamp 短路 + 失败静默、onShareAppMessage 有图接 imageUrl / 无图回退。
 import { readFileSync } from "fs";
 import vm from "vm";
+// T4 拆文件后，行程页方法分散到 pages/plan/plan.js + 同目录 p-*.js；
+// 抽取统一走 pageSrc（页面 + 兄弟模块），断言面只增不减。
+import { pageSrc } from "../lib/page-src.mjs";
 // v1.19.109：行程页分享绘制已抽到 utils/plan-poster.js（v1.20.3 迁到分包 subpkg/utils），本测试沙盒需注入该模块（否则 PP 未定义）
 import planPoster from "../../subpkg/utils/plan-poster.js";
 const PP = planPoster;
+
+// T4：分享绘制方法已搬到 pages/plan/p-share.js，那里通过 ctx 取懒加载的 PP（`C.PP`），
+// 沙盒同样注入一个 C，指向同一个 plan-poster 模块 —— 测的仍是真实代码。
+const mkCtx = (o) => { if (!o.C) o.C = { PP }; vm.createContext(o); return o; };
 
 let fail = 0;
 const ok = (name, cond, extra = "") => {
@@ -17,7 +24,7 @@ const ok = (name, cond, extra = "") => {
 
 // 方法定义体 → 函数表达式（vm 里可执行）：去掉方法名签名与尾部逗号
 const grab = (file, name) => {
-  const s = readFileSync(file, "utf8");
+  const s = pageSrc(file);
   const re = new RegExp(name + "\\(([^)]*)\\)\\s*\\{");
   const m = re.exec(s);
   if (!m) throw new Error("method not found: " + name);
@@ -33,7 +40,7 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
 {
   const src = grab("pages/plan/plan.js", "_shareCardModel");
   const ctx = { app: { globalData: { plan: PLAN } }, PP };
-  vm.createContext(ctx);
+  mkCtx(ctx);
   const page = { data: { summary: "兜底", modeTxt: "", view: [{ items: [{ n: "晋祠" }] }, { items: [{ n: "蒙山" }, { n: "x", f: 1 }] }] } };
   const m = vm.runInContext("(" + src + ")", ctx).call(page);
   ok("model：尺寸 5:4（750×600）", m.W === 750 && m.H === 600);
@@ -44,7 +51,7 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
 
   // 省与市同名（直辖市）不带省
   const ctx2 = { app: { globalData: { plan: { cityName: "北京", province: "北京", days: PLAN.days } } }, PP };
-  vm.createContext(ctx2);
+  mkCtx(ctx2);
   const m2 = vm.runInContext("(" + src + ")", ctx2).call({ data: { view: [] } });
   ok("model：直辖市不重复带省名", m2.prov === "");
 }
@@ -61,7 +68,7 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
     scale() {}, set globalAlpha(v) {}, set fillStyle(v) {}, set font(v) {}, set lineWidth(v) {}, set strokeStyle(v) {}, set textAlign(v) {},
   };
   const sandbox = { ctx, PP };
-  vm.createContext(sandbox);
+  mkCtx(sandbox);
   vm.runInContext("(" + src.replace(/ctx/g, "ctx") + ")", sandbox).call(null, ctx, 750, { W: 750, H: 600, cityName: "太原", prov: "山西", daysN: 3, spots: 9, mode: "平衡舒适" });
   ok("draw：全屏底色 fillRect", calls.fillRect >= 1);
   ok("draw：两处渐变（底+金字）", calls.gradient === 2, "gradients=" + calls.gradient);
@@ -91,7 +98,7 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
   };
   const model = { W: 750, H: 600, cityName: "太原", prov: "山西", daysN: 2, spots: 2, mode: "平衡舒适" };
   const page = { __shareImg: null, __shareStamp: null, _shareCardModel: () => model, _drawShareCard: () => {} };
-  vm.createContext(ctx);
+  mkCtx(ctx);
   vm.runInContext("(" + src + ")", ctx).call(page);
   ok("ensure：生成了分享卡 tempFilePath", page.__shareImg === "wxfile://tmp_share.png");
   const n = queried;
@@ -108,7 +115,7 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
   const src = grab("pages/plan/plan.js", "onShareAppMessage");
   const mk = (shareImg) => {
     const ctx = { app: { globalData: { plan: PLAN } } };
-    vm.createContext(ctx);
+    mkCtx(ctx);
     const page = { __shareImg: shareImg };
     return vm.runInContext("(" + src + ")", ctx).call(page);
   };

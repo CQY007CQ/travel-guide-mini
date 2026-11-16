@@ -24,6 +24,8 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
 import vm from "vm";
+// T4 拆文件后，行程页方法分散到 pages/plan/plan.js + 同目录 p-*.js；抽取统一走 pageSrc（页面 + 兄弟模块）。
+import { pageSrc } from "../lib/page-src.mjs";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
@@ -39,7 +41,7 @@ const ok = (name, cond, extra = "") => {
 
 // 方法定义体 → 函数表达式（沿用 _test-v11988-sharecard.mjs 的成熟约定）
 const grab = (name) => {
-  const s = read(PLAN_JS);
+  const s = pageSrc(PLAN_JS);
   const re = new RegExp(name + "\\(([^)]*)\\)\\s*\\{");
   const m = re.exec(s);
   if (!m) throw new Error("method not found: " + name);
@@ -49,7 +51,7 @@ const grab = (name) => {
   return s.slice(i, j + 4).replace(re, "function(" + m[1] + "){");
 };
 const fnShare = grab("onShareImg");
-const srcCard = read(PLAN_JS).slice(read(PLAN_JS).indexOf("_ensureShareCard()"));
+const srcCard = pageSrc(PLAN_JS).slice(pageSrc(PLAN_JS).indexOf("_ensureShareCard()"));
 
 const MODEL = {
   W: 600, H: 1312, padX: 40, cityName: "西安",

@@ -9,6 +9,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { pageSrc } from "../lib/page-src.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const LIB = path.join(ROOT, "web/lib");
@@ -143,7 +144,8 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
 {
   const rt = fs.readFileSync(path.join(LIB, "runtime.js"), "utf8");
   const css = fs.readFileSync(path.join(ROOT, "web/shell.css"), "utf8");
-  const plan = fs.readFileSync(path.join(ROOT, "pages/plan/plan.js"), "utf8");
+  // T4 拆文件后行程页方法分散到 pages/plan/p-*.js；读源码断言统一走 pageSrc（页面 + 兄弟模块）。
+  const plan = pageSrc("pages/plan/plan.js", ROOT);
   ok("addPhoneCalendar 不再静默 fail，走 .ics 导出",
     /addPhoneCalendar:\s*function/.test(rt) && /downloadICS\(o\)/.test(rt) && !/addPhoneCalendar:\s*function\s*\(\s*o\s*\)\s*\{\s*o\s*&&\s*o\.fail/.test(rt));
   ok(".ics 是标准 VCALENDAR / VEVENT / VALARM",

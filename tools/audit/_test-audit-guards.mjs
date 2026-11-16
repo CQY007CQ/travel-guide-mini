@@ -17,6 +17,7 @@ import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
+import { pageSrc } from "../lib/page-src.mjs";
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -232,7 +233,7 @@ guard("百科外链仅限 onBaike 复制网址（其余位置零外链）", () =
   // travel/planner 与 plan.js 其它位置仍必须零外链（不得回潮成 <a>/跳转）。
   const hard = ["tools/_src-backup/travel.js", "tools/_src-backup/planner.js"];
   const badHard = hard.filter((f) => /baike\.baidu\.com|www\.baidu\.com\/s/.test(codeOnly(readSrc(f))));
-  const s = codeOnly(readSrc("pages/plan/plan.js"));
+  const s = codeOnly(pageSrc("pages/plan/plan.js"));
   const n1 = (s.match(/baike\.baidu\.com/g) || []).length;
   const n2 = (s.match(/www\.baidu\.com\/s/g) || []).length;
   return [badHard.length === 0 && n1 === 1 && n2 === 0,
@@ -250,7 +251,7 @@ guard("baikeInfo.has 只由地点级真实内容决定", () => {
     "has 定义位置=" + at + " / 城市级 extras=" + cityAt];
 });
 guard("onBaike 弹窗 + 复制景点网址（2026-11-09 用户要求）", () => {
-  const s = codeOnly(readSrc("pages/plan/plan.js"));
+  const s = codeOnly(pageSrc("pages/plan/plan.js"));
   const i = s.indexOf("onBaike(e)");
   const body = s.slice(i, i + 2200);
   return [i >= 0 && body.indexOf("该地点暂未收录百科") >= 0
