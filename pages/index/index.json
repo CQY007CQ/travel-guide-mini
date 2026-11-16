@@ -1,4 +1,9 @@
 {
   "navigationBarTitleText": "生成攻略",
-  "usingComponents": { "ai-entry": "../../subpkg/ai-entry/ai-entry" }
+  "usingComponents": {
+    "ai-entry": "../../subpkg/ai-entry/ai-entry"
+  },
+  "componentPlaceholder": {
+    "ai-entry": "view"
+  }
 }

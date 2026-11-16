@@ -109,6 +109,23 @@ for (const p of real.filter(x => /^pages\//.test(x))) {
   if (tags.some(t => !/inline/.test(t))) inlineBad.push(p);
 }
 ck("主包页 AI 入口一律 inline（不压 tabBar）", inlineBad.length === 0, inlineBad.join(","));
+// v1.20.7 修的真 bug：微信禁止主包页面直接使用分包内自定义组件 —— 页面 json 里写
+// "../../subpkg/ai-entry/ai-entry" 时，运行期报 `Component is not found in path ...`，
+// 组件**静默不渲染**（首页/更多页的 AI 胶囊从来没出现过，用户只能从九宫格 tile 进 AI）。
+// 官方解法是给页面配 componentPlaceholder，组件会在分包就绪后正常挂载。
+// 上面那条 inline 断言只查 wxml 属性，正好是「查字符串造成假绿」——所以这里补一条结构断言。
+let phBad = [];
+for (const p of real.filter(x => /^pages\//.test(x))) {
+  let j = null;
+  try { j = JSON.parse(read(p + ".json")); } catch (e) { continue; }
+  const uc = (j && j.usingComponents) || {};
+  const target = String(uc["ai-entry"] || "");
+  if (!target) continue;
+  const isSubPkg = /subpkg|subai|subdata/.test(target);
+  const hasPh = !!(j.componentPlaceholder && j.componentPlaceholder["ai-entry"]);
+  if (isSubPkg && !hasPh) phBad.push(p);
+}
+ck("主包页引用分包组件时已声明 componentPlaceholder", phBad.length === 0, phBad.join(","));
 ck("每个入口 topic 都在场景表内",
   (function () {
     for (const p of real) {

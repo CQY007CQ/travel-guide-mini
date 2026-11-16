@@ -1,4 +1,9 @@
 {
   "navigationBarTitleText": "更多",
-  "usingComponents": { "ai-entry": "../../subpkg/ai-entry/ai-entry" }
+  "usingComponents": {
+    "ai-entry": "../../subpkg/ai-entry/ai-entry"
+  },
+  "componentPlaceholder": {
+    "ai-entry": "view"
+  }
 }
