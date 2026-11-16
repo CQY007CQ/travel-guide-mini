@@ -17,9 +17,8 @@ const app = getAppSafe();
 const PACE_TXT = ["轻松", "平衡", "特种兵"];
 const MODE_TXT = ["不指定", "亲子", "情侣", "独行", "老人"];
 
-function iso(t) {
-  return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
-}
+// v1.20.8（T2）：日期格式化收敛到 store.js 单点（页面不再手写 padStart）
+function iso(t) { return S.fmtLocalDate(t); }
 
 // v1.19.197：「最近玩过」按城市唯一。历史 storage 里可能已存在同城多条
 // （旧 pushRecent 把 days/depart 也纳入去重键），而首页 recents 用
@@ -150,6 +149,9 @@ Page(SafePage({
           provinces: provs
         });
         wx.showToast({ title: "初始化降级，仍可使用", icon: "none" });
+        // v1.20.8（T1）：界面已提示，但「哪一步降级了」此前完全无痕 —— 用户报「首页少了东西」时查不到原因。
+        // note() 自身保证不抛错，故不再套一层 try/catch（多一层空 catch 反而增加静默面）。
+        require("../../utils/errlog.js").note("index", e, "首页初始化降级");
       } catch (_) {}
     }
   },
@@ -1315,9 +1317,9 @@ Page(SafePage({
   _draftTimeTxt(ts) {
     if (!ts) return "";
     const dt = new Date(ts), now = new Date();
-    const hh = String(dt.getHours()).padStart(2, "0"), mm = String(dt.getMinutes()).padStart(2, "0");
-    if (dt.toDateString() === now.toDateString()) return "今天 " + hh + ":" + mm;
-    return (dt.getMonth() + 1) + "月" + dt.getDate() + "日 " + hh + ":" + mm;
+    const hhmm = S.fmtHM(dt);   // v1.20.8（T2）：收敛到 store.js 单点
+    if (dt.toDateString() === now.toDateString()) return "今天 " + hhmm;
+    return (dt.getMonth() + 1) + "月" + dt.getDate() + "日 " + hhmm;
   },
   // 收集当前首页全部配置（目的地 + 设置），用于存草稿
   _collectCfg() {

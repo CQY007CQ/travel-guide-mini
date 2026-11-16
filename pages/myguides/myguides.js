@@ -2,6 +2,7 @@ const { getAppSafe, SafePage } = require("../../utils/app.js");
 const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地计数，失败静默）
 const T = require("../../utils/travel.js");
 const EL = require("../../utils/errlog.js");      // v1.19.205：读取存档失败留痕，不再伪装成空列表
+const S = require("../../utils/store.js");       // v1.20.8（T2）：日期格式化唯一出口（fmtLocalDate/fmtDateTime/fmtClock）
 const app = getAppSafe();
 
 // v1.19.179 「我的攻略」本地库：复用既有行程存档(miniPlansV1，上限 10 份，同 sig 自动覆盖)，
@@ -45,9 +46,7 @@ Page(SafePage({
   reload() { this._load(); },
   _fmt(ts) {
     if (!ts) return "";
-    const d = new Date(ts);
-    const p = n => String(n).padStart(2, "0");
-    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+    return S.fmtDateTime(ts);   // v1.20.8（T2）：收敛到 store.js 单点
   },
 
   // 打开：把存档回写 planV1 并注入 globalData，再进行程页（与「出发→生成」后的打开路径完全一致）。

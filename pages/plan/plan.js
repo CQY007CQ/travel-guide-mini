@@ -49,8 +49,8 @@ function getSeason(month) {
 }
 // v1.8.5 C5：本地今日 YMD（对比天卡 date 用）
 function ymdLocal() {
- const d = new Date();
- return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+ // v1.20.8（T2）：日期拼接统一走 S.fmtLocalDate，页面不再手写 padStart（口径见 store.js）
+ return S.fmtLocalDate(new Date());
 }
 
 Page(SafePage({

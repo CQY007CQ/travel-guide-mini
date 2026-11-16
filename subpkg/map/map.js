@@ -48,13 +48,13 @@ Page(SafePage({
     // v1.15：当天景点按标签筛选（再次点击取消）
   // v1.17.10：拿到地图上下文后才能主动移动视野
   onReady() {
-    try { this._mapCtx = wx.createMapContext("map", this); } catch (e) { this._mapCtx = null; }
+    try { this._mapCtx = wx.createMapContext("map", this); } catch (e) { this._mapCtx = null; EL.note("map", e, "地图上下文创建失败（定位/视野联动不可用）"); }
   },
   // 把视野框到当天所有点（点太少时以该点为中心放大，避免过度缩放）
   _fitDay(points) {
     const pts = (points || []).filter(p => p && p.latitude && p.longitude);
     if (!pts.length) return;
-    if (!this._mapCtx) { try { this._mapCtx = wx.createMapContext("map", this); } catch (e) { return; } }
+    if (!this._mapCtx) { try { this._mapCtx = wx.createMapContext("map", this); } catch (e) { EL.note("map", e, "地图上下文懒创建失败"); return; } }
     try {
       if (pts.length === 1) {
         this._mapCtx.moveToLocation({ latitude: pts[0].latitude, longitude: pts[0].longitude });

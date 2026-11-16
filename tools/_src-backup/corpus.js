@@ -64,6 +64,12 @@ function corpusStats() {
   // 只有城心坐标的城市不算「收录医院」，单独统计，UI 走地图搜索降级
   const approxCities = _countKeys(APPROX);
   const provinces = _countKeys(D.PROVINCE_CITIES);
+  // v1.20.8：体验条数一并在这里算。
+  // 单独在外面加一处 `for (cities) sum(experiences)` 是典型的「同一事实两个真相源」——
+  // 城市去重规则（limited 别名）只存在于 _realCities() 里，外面照抄一遍迟早抄错。
+  // 实测：别名条目（limited）的 experiences 恒为 0，故对 real 求和即全量、无重复计数。
+  let experiences = 0;
+  for (const c of real) if (c && Array.isArray(c.experiences)) experiences += c.experiences.length;
 
   const clim = {};
   for (const c of real) { const k = c.climate || "temperate"; clim[k] = (clim[k] || 0) + 1; }
@@ -81,7 +87,7 @@ function corpusStats() {
   return {
     ready: !!(D.__dataReady),
     cities, cityEntries, aliasEntries, spotCities, spots, spotInfo, foods,
-    hospitalCities, hospitals, approxCities, provinces,
+    hospitalCities, hospitals, approxCities, provinces, experiences,
     climate, region,
     // 一句话总览（用于卡片头）—— 全部为真实打包数据，不夸大覆盖；
     // 显式带出「城市池 751 条 / 含 327 条别名」，回应「不是查到 700 多城吗」的疑问

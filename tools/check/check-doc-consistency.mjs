@@ -21,8 +21,9 @@
 import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
-import { execFileSync, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
+import { materialText } from "../lib/doc-text.mjs";
 
 const require = createRequire(import.meta.url);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -53,31 +54,9 @@ ok("allcheck 步数可解析（" + STEPS + " 步）", STEPS > 0);
 ok("推荐单测项数可解析（" + ASSERT + " 项）", ASSERT > 0 && testRun.status === 0);
 console.log("    真值：版本 " + VER + " ｜ 回归 " + STEPS + " 步 ｜ 单测 " + ASSERT + " 项 ｜ 当前 " + MONTH + " 月");
 
-/* ── ② 材料文本提取（docx / pptx / md） ── */
-function unzip(p, member) {
-  try { return execFileSync("unzip", ["-p", p, member], { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }); }
-  catch (e) { return ""; }
-}
-function xmlText(xml) {
-  return [...xml.matchAll(/<(?:(?:w:t)|(?:a:t))(?:\s[^>]*)?>([\s\S]*?)<\/(?:(?:w:t)|(?:a:t))>/g)]
-    .map(m => m[1].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"').replace(/&#39;/g, "'"))
-    .join(" ");
-}
-function materialText(p) {
-  if (!fs.existsSync(p)) return null;
-  if (p.endsWith(".docx")) return xmlText(unzip(p, "word/document.xml"));
-  if (p.endsWith(".pptx")) {
-    const list = (() => {
-      try { return execFileSync("unzip", ["-Z1", p], { encoding: "utf8" }); } catch (e) { return ""; }
-    })();
-    return list.split("\n")
-      .filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n.trim()))
-      .sort((a, b) => Number(a.match(/slide(\d+)/)[1]) - Number(b.match(/slide(\d+)/)[1]))
-      .map(n => xmlText(unzip(p, n.trim()))).join("\n");
-  }
-  return read(p);
-}
+/* ── ② 材料文本提取（docx / pptx / md） ──
+   v1.20.8：提取逻辑抽到 tools/lib/doc-text.mjs，与「文档数字与实测一致」门禁共用同一份实现。
+   同一个文件被两道门禁分别解析、规则各写一遍，迟早会一边绿一边红。 */
 
 // 第三列 external=true：交付材料放在仓库父目录（outputs/），不随仓库分发。
 // CI 的 actions/checkout 只检出仓库自身，父目录必然为空 —— 旧版把这几项当必填，

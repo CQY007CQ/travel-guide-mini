@@ -94,8 +94,7 @@ Page(SafePage({
     const keys = cache ? Object.keys(cache).sort() : [];
     // 缓存 key 是「抓取那一刻」的第一天，不一定是今天：缓存 6 小时有效，跨零点后仍可能命中，
     // 直接用 keys[0] 会把「今天降温」当成「明天降温」播给用户。按真实今天定位。
-    const _nw = new Date(), _p2 = (n) => String(n).padStart(2, "0");
-    const todayStr = _nw.getFullYear() + "-" + _p2(_nw.getMonth() + 1) + "-" + _p2(_nw.getDate());
+    const todayStr = S.fmtLocalDate(new Date());   // v1.20.8（T2）：收敛到 store.js 单点
     let di = keys.indexOf(todayStr);
     if (di < 0) di = 0;
     let deltas = [], note = "";

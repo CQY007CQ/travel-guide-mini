@@ -6,11 +6,19 @@
 //   直接调用 wx.setStorageSync 的路径（不同页面各自维护 storage），单向缓存会读到过期值，
 //   比少一次同步读（getStorageSync 本身就是内存读，开销极小）危险得多。
 //   因此这里只做校验与统一失败提示，不做缓存；业务侧需要复用请自己在闭包里暂存。
+// v1.20.8（T1）：失败不再只靠 UI 提示，统一留一条可检索痕迹。
+//   此前「写失败」只有 toast（且整个会话只提示一次）、「删除失败 / 读失败」完全静默 ——
+//   用户反馈「数据没了」时无从判断是配额满、被系统清理还是读写异常。
+//   diag 只做记录与去重，绝不抛错，不会把降级变成崩溃。
+// 注意：errlog.js 自己 require 了本文件，所以这里必须「调用时懒取」，不能在模块级 require ——
+// 否则 store 加载到一半就把 errlog 拉起来，errlog 拿到的是半初始化的 exports，S.get 会 undefined。
+const _note = (err, extra) => { try { require("./errlog.js").note("store", err, extra); } catch (e) { /* errlog 自身不可用（极端裁剪/循环依赖）时放弃留痕，不允许它连累存储主流程 */ } };
+
 const get = (k, def) => {
   try {
     const v = wx.getStorageSync(k);
     return v === "" || v === undefined || v === null ? def : v;
-  } catch (e) { return def; }
+  } catch (e) { _note("store", e, "读取失败: " + k); return def; }
 };
 
 // 数组型键的类型守卫：读到非数组（脏数据 / 旧版本结构）时降级为 []
@@ -28,6 +36,7 @@ const getObj = (k) => {
 let _warned = false;          // 同一次会话只提示一次，避免刷屏
 const set = (k, v) => {
   try { wx.setStorageSync(k, v); return true; } catch (e) {
+    _note("store", e, "写入失败（可能配额已满）: " + k);
     if (!_warned) {
       _warned = true;
       try {
@@ -41,7 +50,7 @@ const set = (k, v) => {
   }
 };
 
-const del = (k) => { try { wx.removeStorageSync(k); } catch (e) {} };
+const del = (k) => { try { wx.removeStorageSync(k); } catch (e) { _note("store", e, "删除失败: " + k); } };
 
 // 存储用量：{ current, limit, keys, pct }（单位 KB）
 const usage = () => {
@@ -53,7 +62,7 @@ const usage = () => {
       keys: (i.keys || []).length,
       pct: Math.min(100, Math.round((i.currentSize || 0) / (i.limitSize || 10240) * 100))
     };
-  } catch (e) { return null; }
+  } catch (e) { _note("store", e, "读取存储用量失败"); return null; }
 };
 
 // 单个键的估算占用（KB）
@@ -66,13 +75,36 @@ const sizeOf = (k) => {
   } catch (e) { return 0; }
 };
 
-// v1.11：入参可能不是 Date（fuzz 抓到 t.getFullYear is not a function）→ 尽力转换，失败退回今天
+// ── 日期/时间格式化：全仓唯一出口（v1.20.8 / T2）────────────────────────────
+// 原先 8 个页面各自写 String(n).padStart(2,"0") 拼日期（plan / index / more / myguides /
+// ai-brain / travelsvc…），改一处漏一处：曾出现「有的地方带秒、有的不带」「跨零点后取到昨天」。
+// 现在只保留这里一处，页面一律调 S.fmtLocalDate / S.fmtDateTime / S.fmtClock。
+// 校验规则固化在 check-demo-quality.mjs：页面里再出现手写 padStart 日期拼接即判红。
+const _p2 = (n) => (n < 10 ? "0" : "") + n;
+// 入参可能不是 Date（fuzz 抓到 t.getFullYear is not a function）→ 尽力转换，失败退回今天
+const _toDate = (t) => {
+  if (t instanceof Date) return t;
+  if (t) { const p = new Date(t); if (!isNaN(p.getTime())) return p; }
+  return new Date();
+};
 const fmtLocalDate = (t) => {
-  let d = t instanceof Date ? t : null;
-  if (!d && t) { const p = new Date(t); if (!isNaN(p.getTime())) d = p; }
-  if (!d) d = new Date();
-  return d.getFullYear() + "-"
-    + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const d = _toDate(t);
+  return d.getFullYear() + "-" + _p2(d.getMonth() + 1) + "-" + _p2(d.getDate());
+};
+// YYYY-MM-DD HH:mm（存档 / 历史列表用）
+const fmtDateTime = (t) => {
+  const d = _toDate(t);
+  return fmtLocalDate(d) + " " + _p2(d.getHours()) + ":" + _p2(d.getMinutes());
+};
+// HH:mm（当天时刻提示，如「今天 08:05 出发」）
+const fmtHM = (t) => {
+  const d = _toDate(t);
+  return _p2(d.getHours()) + ":" + _p2(d.getMinutes());
+};
+// HH:mm:ss（诊断日志时间戳用）
+const fmtClock = (t) => {
+  const d = _toDate(t);
+  return _p2(d.getHours()) + ":" + _p2(d.getMinutes()) + ":" + _p2(d.getSeconds());
 };
 
 // v1.19.58：行程草稿（保存 / 恢复首页配置）。最多保留 20 条，超出丢弃最旧。
@@ -100,8 +132,8 @@ const getJSON = (k, def) => {
     const raw = wx.getStorageSync(k);
     if (raw === "" || raw === undefined || raw === null) return def;
     if (typeof raw !== "string") return raw;            // 已是对象（旧版本直存）则直接返回
-    try { return JSON.parse(raw); } catch (e) { return def; }
-  } catch (e) { return def; }
+    try { return JSON.parse(raw); } catch (e) { _note("store", e, "JSON 解析失败: " + k); return def; }
+  } catch (e) { _note("store", e, "读取失败: " + k); return def; }
 };
 
 // 写：序列化失败（循环引用 / 不可序列化）回落 false，由调用方决定降级；不抛错。
@@ -109,4 +141,4 @@ const setJSON = (k, v) => {
   try { return set(k, JSON.stringify(v)); } catch (e) { return false; }
 };
 
-module.exports = { get, getArr, getObj, set, del, usage, sizeOf, fmtLocalDate, getDrafts, saveDraft, delDraft, getJSON, setJSON };
+module.exports = { get, getArr, getObj, set, del, usage, sizeOf, fmtLocalDate, fmtDateTime, fmtClock, getDrafts, saveDraft, delDraft, getJSON, setJSON };

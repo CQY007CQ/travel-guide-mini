@@ -18,7 +18,14 @@ import path from "path";
 const req = createRequire(fileURLToPath(import.meta.url));
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (p) => readFileSync(path.join(ROOT, p), "utf8");
+const T = req(path.join(ROOT, "utils/travel.js"));
 const D = req(path.join(ROOT, "utils/data.js"));
+// v1.20.8（T5 口径统一）：先跑到「运行时状态」再取数。
+// 背景：数据分块（data-packed / data-packed2 / team-food3）在 Node 下是 ready() 时同步补齐的，
+//   基础 require 只拿到第一层。旧版体检直接报 require 后的中间态（城市池 751 / 美食 9256），
+//   而用户在 App 里看到的是 ready() 之后的 868 / 9569 —— 同一事实两个数字，文档无论抄哪一个都会
+//   与另一半对不上。此处统一为「用户实际所见」口径，并由 [fig] 行对外输出真值。
+const READY_OK = (() => { try { T.ready(); return true; } catch (e) { return false; } })();
 
 let n = 0, fail = 0;
 function ck(name, cond, extra) {
@@ -52,11 +59,13 @@ if (mainKB != null && HEADROOM_LIMIT - mainKB < 16) {
 }
 
 /* ───────── ② 数据规模（只报真实值，不写死期望） ───────── */
-let cities = 0, spots = 0, foods = 0;
+const C = req(path.join(ROOT, "utils/corpus.js"));
+const CS = (() => { try { return C.corpusStats(); } catch (e) { return null; } })();
+let cities = 0, spots = 0, foods = 0, foodShops = 0;
 if (Array.isArray(D.CITIES)) cities = D.CITIES.length;
 for (const c in (D.SPOT_COORDS || {})) if (Array.isArray(D.SPOT_COORDS[c])) spots += D.SPOT_COORDS[c].length;
-for (const c in (D.FOOD_SPOTS || {})) if (Array.isArray(D.FOOD_SPOTS[c])) foods += D.FOOD_SPOTS[c].length;
-console.log("  ── 规模: 城市池 " + cities + " 条 / 景点 " + spots + " 点 / 美食 " + foods + " 家");
+for (const c in (D.FOOD_SPOTS || {})) if (Array.isArray(D.FOOD_SPOTS[c]) && D.FOOD_SPOTS[c].length) { foods++; foodShops += D.FOOD_SPOTS[c].length; }
+console.log("  ── 规模: 城市池 " + cities + " 条 / 景点 " + spots + " 点 / 美食 " + foodShops + " 家（" + foods + " 城）");
 ck("核心数据三项均非空", cities > 0 && spots > 0 && foods > 0);
 
 /* ───────── ③ 坐标健康 ───────── */
@@ -109,6 +118,49 @@ ck("无入口的只剩 AI 能力页自身",
 ck("页面级 grounding 与健康快照都在",
   /_contextOf\(/.test(read("subpkg/assistant/assistant.js")) &&
   /_healthLines\(\)/.test(read("pages/more/more.js")));
+
+/* ───────── ⑦ 数字真值输出（T5：文档不再手写漂移值） ───────── */
+console.log("【数字真值 · 文档引用这些】");
+ck("运行时数据已就绪（规模口径统一的前提）", READY_OK, READY_OK ? "ready() 成功" : "ready() 抛错，下面的规模是中间态");
+// 体验条数不在本文件里重算：城市去重规则（limited 别名）只存在于 corpus.js 的 _realCities()，
+// 这里照抄一遍就是第二个真相源。corpus.js v1.20.8 起直接输出 experiences。
+const exp = CS ? CS.experiences : 0;
+let enCities = 0, enShops = 0;
+for (const c in (D.FOOD_SPOTS || {})) {
+  const arr = D.FOOD_SPOTS[c] || [];
+  let hit = 0;
+  arr.forEach((s) => { if (s && (s.menu || s.rep || s.note || s.repKey)) hit++; });
+  if (hit) enCities++;
+  enShops += hit;
+}
+const FIGS = [
+  ["city_entries", cities],
+  ["cities_real", CS ? CS.cities : 0],
+  ["city_aliases", CS ? CS.aliasEntries : 0],
+  ["spots", spots],
+  ["spot_info", CS ? CS.spotInfo : 0],
+  ["spot_cities", CS ? CS.spotCities : 0],
+  ["food_shops", foodShops],
+  ["food_cities", foods],
+  ["food_enrich_shops", enShops],
+  ["food_enrich_cities", enCities],
+  ["experiences", exp],
+  ["hospitals", CS ? CS.hospitals : 0],
+  ["hospital_cities", CS ? CS.hospitalCities : 0],
+  ["approx_cities", CS ? CS.approxCities : 0],
+  ["provinces", CS ? CS.provinces : 0],
+  ["main_raw_kb", mainKB == null ? 0 : mainKB],
+  ["main_headroom_kb", mainKB == null ? 0 : HEADROOM_LIMIT - mainKB],
+  ["steps", steps],
+  ["guards", guards],
+  ["tests", tests],
+];
+for (const [k, v] of FIGS) console.log("[fig] " + k + "=" + v);
+// 余量允许为 0（= 刚好顶线），不属于「取数失败」，单独排除，避免误报成数据没读到。
+const ZERO_OK = new Set(["main_headroom_kb"]);
+ck("真值全部取到（0 表示取数失败，不是真实值）",
+  FIGS.every(([k, v]) => v > 0 || ZERO_OK.has(k)),
+  FIGS.filter(([k, v]) => !v && !ZERO_OK.has(k)).map(([k]) => k).join(",") || "");
 
 console.log("\n  全盘体检: " + (n - fail) + "/" + n + " 通过" +
   (fail ? "" : "  · 六层指标无结构性异常"));

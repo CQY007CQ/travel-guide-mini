@@ -20,6 +20,17 @@ const req = createRequire(process.cwd() + "/");
 process.env.PACK_BASE_ONLY = "1";
 const D = req("./utils/data.js");
 
+// v1.20.8（T3）：开关自检 —— 上面这行「设了环境变量」不等于「data.js 认了」。
+// 早期把开关设在 require 之后、或改了 data.js 里的开关读取条件，都会静默失效：
+// 症状是 data-packed 每跑一次胖一点（enrich 被烘焙）、改了主包 enrich 表线上却不生效。
+// 这类漂移此前靠「人记得先 git checkout 旧产物」维持，属于靠记忆维持的正确性，必须堵死。
+if (D.__packBaseOnly !== true) {
+  console.error("❌ 打包期开关未生效：data.js 没有按 PACK_BASE_ONLY 只取基数据。");
+  console.error("   若继续打包，团队美食 / 酒店片区 / 逐店酒店会被烘焙进 data-packed*（体积虚胖 + 双真相源）。");
+  console.error("   排查：utils/data.js 是否与 tools/_src-backup/data.js 一致（漏跑 cp 会让旧产物覆盖新逻辑）。");
+  process.exit(1);
+}
+
 // ── v1.19.174 打包期坐标完整性硬门禁 ─────────────────────────────────
 // 复用加载期同款 checkCoordIntegrity()（v1.19.156 规则：距城心>300km且跨省 或 >1200km），
 // D 此刻已是「SPOT_COORD_FIX 等覆盖层生效后的最终数据」，故 7 个历史误编码已被修正、不会误报；
@@ -277,7 +288,12 @@ function splitData(D, maxB64) {
   // __A 是「键别名正向映射」，由下方统一注入每个分块（保证多分包各自可独立还原），这里先排除避免被随机切走；
   // 同时排除函数类型的值（如 initData / checkCoordIntegrity 等挂在 DATA 上的方法），函数无法 JSON 序列化、
   // 若漏网会让 Buffer.from(JSON.stringify(fn)) 收到 undefined 而崩溃（v1.19.173 加 checkCoordIntegrity 后暴露）。
-  const keys = Object.keys(D).filter(k => k !== "__dataReady" && k !== "initData" && k !== "__A" && typeof D[k] !== "function");
+  // v1.20.8（T3）：`__` 前缀一律视为「运行期元信息」，不参与打包。
+  // 原来只点名排除 __dataReady，新增 __packBaseOnly（打包期自检标记）时就得记得同步改这行 ——
+  // 忘了就会把布尔标记写进每个分块。改成前缀规则，新增元字段无需再改代码。
+  const META_PREFIX = "__";
+  const keys = Object.keys(D).filter(k =>
+    !k.startsWith(META_PREFIX) && k !== "initData" && typeof D[k] !== "function");
   const chunks = []; let cur = {}; let curB = 0;
   const flush = () => { if (Object.keys(cur).length) { chunks.push(cur); cur = {}; curB = 0; } };
   for (const k of keys) {

@@ -256,7 +256,10 @@ step "单测 分享图导出 (生成失败防回潮)" "$NODE" tools/test/_test-s
 # v1.19.200：美食页对象方法裸调用导致整页假空态，固化为运行时 + 全仓静态回归
 step "单测 美食页渲染 (假空态防回潮)" "$NODE" tools/test/_test-food-render.mjs
 # v1.19.201：推荐引擎月份漂移 + 考核材料数字口径漂移，固化为「动态真值 vs 材料文本」门禁
-step "材料口径一致性 (版本/回归项/单测数/榜单)" "$NODE" tools/check/check-doc-consistency.mjs
+# v1.20.8：再串一道「文档数字与实测一致」（体积/城市/店数/医院等数字由 check-pkgsize、
+#   check-health 输出真值，文档与交付材料逐处比对）。两道同类门禁合并进同一 step，
+#   不新增 step —— 61 步口径被考核材料锁死，加减步会连带触发材料校验失败。
+step "材料口径一致性 (版本/回归项/单测数/榜单/实测数字)" bash -c '"$1" tools/check/check-doc-consistency.mjs && "$1" tools/check/check-doc-numbers.mjs' _ "$NODE"
 # v1.19.203：门票清单长票价把景点名挤成逐字竖排，固化为「全量数据拆分 + CSS 限宽」回归
 step "单测 门票清单布局 (逐字竖排防回潮)" "$NODE" tools/test/_test-ticket-layout.mjs
 # v1.19.204：帮助页离线规模统计把医院读成 0（数据真源在 emergency-data 而非 data.js），
@@ -281,7 +284,11 @@ step "合并门禁 (utils 与 _src-backup 一致)" bash -c '
     if ! cmp -s "$f" "tools/_src-backup/$(basename "$f")"; then echo "  ✗ $f 与 tools/_src-backup/$(basename "$f") 不一致（手写双源漂移：改了 _src-backup 忘 cp 到 utils）"; BAD=1; fi
   done
   [ $BAD -eq 0 ] && echo "  ✓ utils 与 _src-backup 一致（含手写 keys.js/data.js）"
-  exit $BAD
+  [ $BAD -ne 0 ] && exit 1
+  # v1.20.8（T3）：数据产物同样纳入「产物 == 源」门禁。pack-data 现在只取基数据且幂等，
+  # 本断言把「改了数据源漏重打包」「手工改过 data-packed*」从「上线后才发现的陈旧数据」前移到回归即拦。
+  "$1" tools/build/_check-pack-idempotent.mjs || exit 1
+  exit 0
 ' _ "$NODE"
 
 # v1.20.0：网页版 —— 把小程序同一份源码（utils + 页面 JS + WXML + WXSS）编译到浏览器。
@@ -290,7 +297,7 @@ step "合并门禁 (utils 与 _src-backup 一致)" bash -c '
 # 必须用位置参数传进去。管道必须开 pipefail，否则 smoke 失败会被 tail 的退出码吞掉，门禁假绿。
 # 审计加固单测 + AI 双守卫串在同一 step 里跑，不新增 step —— 61 步口径与考核材料无需跟着改。
 # AI 守卫此前只在 CI/自迭代里按需调用，等于没有自动护栏；今晚新增的双端能力对齐断言必须随每次回归跑。
-step "审计整改 + AI 全场景守卫 (不回潮)" bash -c '"$1" tools/audit/_test-audit-guards.mjs && "$1" tools/audit/_test-hardening.mjs && "$1" tools/audit/_test-roster-integrity.mjs && "$1" tools/check/check-ai-scenarios.mjs && "$1" tools/check/check-ai-fallback.mjs && "$1" tools/test/_test-lens-vision.mjs && "$1" tools/check/check-lens.mjs && "$1" tools/test/_test-ai-reach.mjs && "$1" tools/check/check-ai-reach.mjs && "$1" tools/test/_test-optimizations.mjs && "$1" tools/check/check-health.mjs' _ "$NODE"
+step "审计整改 + AI 全场景守卫 (不回潮)" bash -c '"$1" tools/audit/_test-audit-guards.mjs && "$1" tools/audit/_test-hardening.mjs && "$1" tools/audit/_test-roster-integrity.mjs && "$1" tools/check/check-ai-scenarios.mjs && "$1" tools/check/check-ai-fallback.mjs && "$1" tools/test/_test-lens-vision.mjs && "$1" tools/check/check-lens.mjs && "$1" tools/test/_test-ai-reach.mjs && "$1" tools/check/check-ai-reach.mjs && "$1" tools/test/_test-optimizations.mjs && "$1" tools/check/check-health.mjs && "$1" tools/check/check-observability.mjs' _ "$NODE"
 
 step "网页版 构建与引擎冒烟 (与小程序同源)" bash -c 'set -o pipefail; "$1" tools/web/build.mjs >/dev/null && "$1" tools/web/smoke.mjs | tail -4' _ "$NODE"
 

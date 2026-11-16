@@ -78,10 +78,8 @@ function _remember(text, r, ctx) {
   } catch (e) {}
 }
 
-/* 本地日期 yyyy-mm-dd */
-function localDate(d) {
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-}
+/* 本地日期 yyyy-mm-dd（v1.20.8 T2：收敛到 store.js 单点） */
+function localDate(d) { return S.fmtLocalDate(d); }
 
 /* 天数解析：中文数字 / 阿拉伯数字 + 天/日/晚，夹在 1~14 */
 const NUM_CN = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };

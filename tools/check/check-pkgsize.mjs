@@ -159,3 +159,32 @@ if (qbad) {
   process.exit(3);
 }
 console.log("  ✓ 代码质量面板三项指标均达标（主包 1.5M / 图片 200K / 图标尺寸）");
+
+// ────────────────────────────────────────────────────────────────
+// v1.20.8（T5）：把体积数字输出成机器可读行，供 check-doc-numbers.mjs 断言文档口径。
+//
+// 动机：README / 功能清单 / 讲稿 / 计划书 / PPT 里手写的「主包 660KB」「data-packed 约 1828KB」
+//   这类数字写死就必然漂移（实测已发生两轮：主包 660→1418KB、data-packed 1828→1924KB）。
+//   本脚本是体积的唯一计算者，因此也由它输出真值；文档与门禁都只消费这里的 [fig] 行，
+//   任何人想改口径都只能改这一处，不会再出现「脚本一个数、文档一个数」。
+// 格式固定 `[fig] key=value`，value 一律纯数字（KB 取整），便于正则直接解析。
+// ────────────────────────────────────────────────────────────────
+const figs = [
+  ["main_raw_kb", mainRawKB],
+  ["main_gzip_kb", Math.round(pkgs["__main__"].gzip / 1024)],
+  ["img_kb", imgKB],
+  // 分包 gzip 合计 + 总包体：交付材料里「四个分包合计约 2.1MB / 总包体约 2.8M」说的就是这个口径，
+  // 但它一直靠人手加，主包瘦身 227KB 之后没人重算 —— 典型的手写漂移。由脚本算。
+  // 总包体刻意用「已取整的两项相加」，不用原始字节再取整：否则文档里 561 + 2,160 会算出 2,721，
+  // 而门禁报 2,722，差 1KB 的舍入差会变成「材料自相矛盾」的假 bug。
+  ["sub_gzip_total_kb", Math.round(subs.reduce((s, r) => s + pkgs[r].gzip, 0) / 1024)],
+  ["total_gzip_kb", Math.round(pkgs["__main__"].gzip / 1024) + Math.round(subs.reduce((s, r) => s + pkgs[r].gzip, 0) / 1024)],
+];
+subs.forEach((r) => figs.push(["pkg_" + r.replace(/[^a-z0-9]/gi, "_") + "_raw_kb", Math.round(pkgs[r].raw / 1024)]));
+// data-packed 系列单独报：它是「数据分包被撑爆」的盯防对象，也是文档最常引用的体积数字。
+for (const dp of ["subdata/data/data-packed.js", "subdata2/data/data-packed2.js", "subdata3/data/team-food3.js"]) {
+  if (!fs.existsSync(dp)) continue;
+  const key = dp.split("/").pop().replace(/\.js$/, "").replace(/-/g, "_");
+  figs.push([key + "_kb", Math.round(fs.statSync(dp).size / 1024)]);
+}
+for (const [k, v] of figs) console.log(`[fig] ${k}=${v}`);

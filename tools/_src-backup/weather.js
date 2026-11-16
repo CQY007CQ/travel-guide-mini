@@ -17,6 +17,9 @@
 // 失败/不可用：Key 未配置、断网、超预报窗口、Key 无效 → 静默降级（天气卡隐藏/提示），绝不影响行程主流程。
 const T = require("./travel.js");
 
+// v1.20.8（T1）：天气失败此前只回报 {type:"net"} 给 UI，服务端错误码 / 解析异常则彻底静默。
+//   UI 上有提示、但开发侧查不到「是 Key 失效、配额耗尽还是响应结构变了」，故补一条痕迹。
+const EL = require("./errlog.js");
 const KEYS = require("./keys.js"); // v1.19.184：Key 统一走 keys.js 单出口（fail-closed，合规归一，严禁散落硬编码）
 
 // 和风天气现象文字 → 归一化 icon / 合成 WMO 码 / 雨雪判定（合成码只为复用既有的 riskOf/outfitIndex）
@@ -62,7 +65,7 @@ function coordOf(cityName) {
   try {
     const c = T.P.getCoord(cityName);
     if (c && c.lat != null && c.lon != null) return c;
-  } catch (e) {}
+  } catch (e) { EL.note("weather", e, "取城市坐标失败: " + cityName); }
   return null;
 }
 
@@ -97,10 +100,10 @@ function _diskSet(k, v) {
     if (idx.length > 6) {
       const drop = idx.slice(0, idx.length - 6);
       idx = idx.slice(idx.length - 6);
-      for (const d of drop) { try { wx.removeStorageSync(_PK + d.k); } catch (e) {} }
+      for (const d of drop) { try { wx.removeStorageSync(_PK + d.k); } catch (e) { /* 淘汰旧缓存键失败只影响占用，不影响本次预报 */ } }
     }
     wx.setStorageSync("wxcacheIdxV1", idx);
-  } catch (e) {}
+  } catch (e) { EL.note("weather", e, "天气磁盘缓存写入失败（不影响本次预报）"); }
 }
 
 // 多城行程：每天归属的城市（day.cityName 优先，缺失时按 segments 区间回退，再回退 plan.cityName）。
@@ -217,7 +220,11 @@ function fetchPlanWeather(plan, cb) {
         try {
           const d = res && res.data;
           if (!d || d.code !== "200" || !Array.isArray(d.daily)) {
-            if (d) setErr(classifyApiError(d)); // API 返回错误码（Key 无效/超额度/参数等）
+            if (d) { // API 返回错误码（Key 无效/超额度/参数等）
+              const _e = classifyApiError(d);
+              EL.note("weather", (_e && _e.type) || "api", "接口错误: " + ((_e && _e.msg) || ""));
+              setErr(_e);
+            }
             byCity[city] = { byDate: {}, city: city };
           } else {
             const byDate = normDaily(d.daily);
@@ -225,7 +232,7 @@ function fetchPlanWeather(plan, cb) {
             _diskSet(wkey, byDate); // v1.19.180 同时落盘，冷启动可直接复用
             byCity[city] = { byDate: byDate, city: city };
           }
-        } catch (e) { byCity[city] = { byDate: {}, city: city }; }
+        } catch (e) { EL.note("weather", e, "响应解析失败: " + city); byCity[city] = { byDate: {}, city: city }; }
         pending--; finish();
       },
       fail() {
@@ -234,6 +241,7 @@ function fetchPlanWeather(plan, cb) {
           setTimeout(function () { loadCity(city, c, wkey, attempt + 1); }, 400 * attempt);
           return;
         }
+        EL.note("weather", "net", "重试 " + MAX_RETRY + " 次后仍失败: " + city);
         setErr({ type: "net", msg: "天气加载失败，请重试" });
         byCity[city] = { byDate: {}, city: city };
         pending--; finish();

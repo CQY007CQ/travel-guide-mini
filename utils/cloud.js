@@ -9,6 +9,7 @@
 const KEYS = require("./keys.js");
 const S = require("./store.js");
 const T = require("./travel.js");   // grounding 助手（预算/阶段/花费/想去/天气快照/体检），零伪造只读本机数据
+const EL = require("./errlog.js");  // v1.20.8（T1）：降级痕迹统一出口（与 SafePage 同一环形缓冲），禁止这里再静默吞失败
 
 let _inited = false;
 let _initPromise = null;
@@ -30,7 +31,7 @@ function setPairedUid(code) {
     S.set(PAIRED_KEY, code);
     _uid = code;
     return true;
-  } catch (e) { return false; }
+  } catch (e) { EL.note("cloud", e, "写入配对同步码失败"); return false; }
 }
 // 是否运行在网页版（@cloudbase/js-sdk 适配器已挂 window.__cloudbase）。
 // 注意：网页版 runtime 也提供 window.wx 垫片，所以不能用「typeof wx === undefined」判别，
@@ -69,7 +70,7 @@ function init() {
             resolve(true);
           } else resolve(false);
         } else resolve(false);
-      } catch (e) { resolve(false); }
+      } catch (e) { EL.note("cloud", e, "云开发 init 失败，云同步与云端 AI 整体降级为本地"); resolve(false); }
     });
   })();
   return _initPromise;
@@ -100,7 +101,7 @@ function callFunction(name, data) {
         if (!cb || typeof cb.callFunction !== "function") { reject(new Error("cloud-web-not-ready")); return; }
         cb.callFunction({ name: name, data: data || {} })
           .then(function (res) { resolve(res && res.result); })
-          .catch(function (err) { reject(err); });
+          .catch(function (err) { EL.note("cloud", err, "云函数调用失败: " + name); reject(err); });
         return;
       }
       if (typeof wx === "undefined" || !wx.cloud || typeof wx.cloud.callFunction !== "function") {
@@ -127,7 +128,7 @@ function localUid() {
     }
     _uid = u;
     return u;
-  } catch (e) { return "u_anon_" + Math.random().toString(36).slice(2, 8); }
+  } catch (e) { EL.note("cloud", e, "本地 uid 读写失败，使用匿名 uid"); return "u_anon_" + Math.random().toString(36).slice(2, 8); }
 }
 
 // 确保拿到跨端一致的 uid：小程序优先 openid（经云函数同步回写），失败回落本地 guid。
@@ -143,11 +144,11 @@ function ensureUid() {
       .then(function (r) {
         if (r && r.openid) {
           _uid = r.openid;
-          try { S.set(OPENID_KEY, r.openid); } catch (e2) {}
+          try { S.set(OPENID_KEY, r.openid); } catch (e2) { EL.note("cloud", e2, "openid 回写本地失败，跨端一致性降级"); }
           resolve(r.openid);
         } else resolve(local);
       })
-      .catch(function () { resolve(local); });
+      .catch(function (e) { EL.note("cloud", e, "whoami 失败，回落本地 uid（跨端行程可能对不上）"); resolve(local); });
   });
 }
 
@@ -176,18 +177,18 @@ function aiContextOf(plan, page) {
     try {
       const bg = T.budgetGauge(plan);
       if (bg && bg.txt) lines.push("预算：" + bg.txt + (bg.over ? "（已超预算，提醒控制）" : "") + "。");
-    } catch (e) {}
+    } catch (e) { EL.note("ai", e, "上下文·预算维度缺失（AI 仍作答）"); }
   }
   try {
     const ts = T.todayState(plan);
     if (ts && ts.phase === "before" && ts.daysLeft != null) lines.push("距出发还有 " + ts.daysLeft + " 天（尚未出行）。");
     else if (ts && ts.phase === "during") lines.push("行程正在进行中。");
     else if (ts && ts.phase === "after") lines.push("行程已结束（可作复盘）。");
-  } catch (e) {}
+  } catch (e) { EL.note("ai", e, "上下文·行程阶段维度缺失（AI 仍作答）"); }
   try {
     const today = T.todaySpent(), total = T.totalSpent();
     if (total > 0) lines.push("本机已记录花费：今日 ¥" + Math.round(today) + " / 累计 ¥" + Math.round(total) + "。");
-  } catch (e) {}
+  } catch (e) { EL.note("ai", e, "上下文·花费维度缺失（AI 仍作答）"); }
   const seen = new Set(), spots = [];
   for (const d of plan.days) {
     if (!d || !Array.isArray(d.items)) continue;
@@ -208,7 +209,7 @@ function aiContextOf(plan, page) {
       const wish = T.wishPicksFor(city) || [];
       if (wish.length) lines.push("用户在本机还收藏了想去（" + city + "，" + wish.length + " 个）：" + wish.slice(0, 15).join("、") + (wish.length > 15 ? " 等" : "") + "。");
     }
-  } catch (e) {}
+  } catch (e) { EL.note("ai", e, "上下文·想去清单维度缺失（AI 仍作答）"); }
   // 天气缓存快照（本地缓存、非实时，明确标注，绝不冒充实时天气）
   try {
     const snap = S.get("svcWxSnapV1", null);
@@ -219,7 +220,7 @@ function aiContextOf(plan, page) {
       if (typeof d.wind === "number" && d.wind >= 40) w += "，大风";
       lines.push("天气（本地缓存、" + (snap.date || "未知日期") + "、非实时）：" + w + "。");
     }
-  } catch (e) {}
+  } catch (e) { EL.note("ai", e, "上下文·天气维度缺失（AI 仍作答）"); }
   // 客流经验提示（非实时离线规则，不伪装实时拥挤度）
   try {
     const fd = plan.depart ? String(plan.depart).slice(0, 10) : "";
@@ -227,7 +228,7 @@ function aiContextOf(plan, page) {
       const ct = T.crowdTipOf(fd);
       if (ct && ct.txt) lines.push("出发日客流经验提示（非实时）：" + ct.txt + "。");
     }
-  } catch (e) {}
+  } catch (e) { EL.note("ai", e, "上下文·客流提示维度缺失（AI 仍作答）"); }
   // 行程体检（真实自检分 + 建议）
   try {
     const ck = T.planCheckup(plan);
@@ -236,7 +237,7 @@ function aiContextOf(plan, page) {
       if (Array.isArray(ck.tips) && ck.tips.length) s += "；建议：" + ck.tips.slice(0, 2).join("；") + "。";
       lines.push(s);
     }
-  } catch (e) {}
+  } catch (e) { EL.note("ai", e, "上下文·行程体检维度缺失（AI 仍作答）"); }
   return lines.join("\n");
 }
 
@@ -253,7 +254,7 @@ function withTimeout(p, ms) {
     const finish = function (v) {
       if (done) return;
       done = true;
-      try { clearTimeout(timer); } catch (e) {}
+      try { clearTimeout(timer); } catch (e) { /* 定时器已触发或环境无定时器，清理失败无副作用 */ }
       resolve(v);
     };
     p.then(finish).catch(function (e) { finish({ ok: false, err: String((e && e.message) || e) }); });
@@ -292,7 +293,12 @@ function aiChat(opts) {
     const tmo = (typeof opts.timeoutMs === "number" && opts.timeoutMs > 0) ? opts.timeoutMs : AI_TEXT_TIMEOUT_MS;
     withTimeout(callFunction("llmProxy", payload), tmo).then(function (r) {
       if (r && r.ok && r.text) { _aiOk++; resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" }); }
-      else { _aiFail++; resolve({ ok: false, err: (r && r.err) || "ai-failed", raw: r }); }
+      else {
+        _aiFail++;
+        const _why = (r && r.err) || "ai-failed";
+        EL.note("ai", _why, "云端回答不可用，已回落离线引擎");
+        resolve({ ok: false, err: _why, raw: r });
+      }
     });
   });
 }
@@ -309,8 +315,8 @@ function uploadImage(filePath) {
       done = true;
       reject(new Error("upload-timeout"));
     }, 12000);
-    const ok = function (v) { if (done) return; done = true; try { clearTimeout(timer); } catch (e) {} resolve(v); };
-    const bad = function (e) { if (done) return; done = true; try { clearTimeout(timer); } catch (e2) {} reject(e); };
+    const ok = function (v) { if (done) return; done = true; try { clearTimeout(timer); } catch (e) { /* 清理失败无副作用 */ } resolve(v); };
+    const bad = function (e) { if (done) return; done = true; try { clearTimeout(timer); } catch (e2) { /* 清理失败无副作用 */ } EL.note("lens", e, "图片上传失败"); reject(e); };
     try {
       if (!filePath) { bad(new Error("empty-file-path")); return; }
       const m = String(filePath.name || filePath).match(/\.(\w+)$/);
@@ -362,7 +368,11 @@ function aiVision(opts) {
     if (!payload.imageFileID && !payload.imageFileIDs && !payload.imageBase64) { resolve({ ok: false, err: "no-image" }); return; }
     withTimeout(callFunction("llmProxy", payload), AI_VISION_TIMEOUT_MS).then(function (r) {
       if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
-      else resolve({ ok: false, err: (r && (r.hint || r.err)) || "vision-failed", raw: r });
+      else {
+        const _why = (r && (r.hint || r.err)) || "vision-failed";
+        EL.note("lens", _why, "云端识图不可用");
+        resolve({ ok: false, err: _why, raw: r });
+      }
     });
   });
 }

@@ -110,7 +110,7 @@ Page(SafePage({
       } else {
         wx.showToast({ title: "当前版本不支持选图", icon: "none" });
       }
-    } catch (e) { wx.showToast({ title: "打开相机失败", icon: "none" }); }
+    } catch (e) { wx.showToast({ title: "打开相机失败", icon: "none" }); EL.note("lens", e, "相机/选图打开失败"); }
   },
 
   _addImgs(paths) {

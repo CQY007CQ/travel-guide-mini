@@ -599,6 +599,11 @@ DATA.initData = initData;
 DATA.checkCoordIntegrity = checkCoordIntegrity; // v1.19.173 暴露给单测：返回越界坐标数
 DATA.coordStats = coordStats;                   // v1.20.6 暴露给健康快照 / 全盘体检门禁
 DATA.assertDataShape = assertDataShape;         // v1.20.6 暴露给单测：返回结构问题清单
+// v1.20.8（T3）：把「打包期只取基数据」这一事实暴露给 pack-data.mjs 自检。
+// 没有这个标记，开关一旦被绕过（有人 unset PACK_BASE_ONLY 或改早退条件），
+// 打包就会把 enrich 静默烘焙进 data-packed*，症状是「体积慢慢涨、改主包数据不生效」——
+// 两种都极难定位。打包端据此 fail-fast，而不是靠人记得别那么做。
+DATA.__packBaseOnly = _PACK_BASE_ONLY;
 
 // Node / 测试环境（没有 require.async 且非浏览器）：模块加载即同步就绪，保证 allcheck/tools 照常同步 require。
 // 浏览器刻意不在此处同步 applyPacked —— data.js 是 async 懒加载，注册工厂与解包时机由 initData 的

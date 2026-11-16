@@ -201,6 +201,35 @@ const checks = [
     }
     must(!hits.length, "存在调试/动态执行残留: " + hits.slice(0, 8).join("；"));
     return files.length + " 个发布 JS 洁净";
+  }],
+  /* v1.20.8（T2）：日期/时间格式化只允许一个出口（utils/store.js）。
+     以前 plan / index / more / myguides / ai-brain / travelsvc 各写一遍
+     `String(n).padStart(2,"0")` 拼日期，结果口径分叉（有的带秒有的不带、
+     跨零点取到昨天）。这里禁止页面与分包再手写，避免再次分叉。 */
+  ["日期格式化单点（页面禁手写 padStart 拼接）", () => {
+    const dirs = ["pages", "subpkg", "subai", "utils", "app.js"];
+    const bad = [];
+    const walk = (p) => {
+      const abs = path.join(ROOT, p);
+      const st = fs.statSync(abs);
+      if (st.isFile()) {
+        if (!/\.js$/.test(abs)) return;
+        if (/\/utils\/(travel|planner|weather|geo|corpus|pako-inflate|store)\.js$/.test(abs)) return; // 压缩产物/单点自身
+        if (/data-packed|team-food3|modules\.js|tpl\.js/.test(abs)) return;
+        const src = fs.readFileSync(abs, "utf8");
+        if (/padStart\(\s*2\s*,\s*["']0["']\s*\)/.test(src) && /getFullYear|getMonth|getDate|getHours|getMinutes/.test(src)) {
+          bad.push(path.relative(ROOT, abs));
+        }
+        return;
+      }
+      for (const e of fs.readdirSync(abs)) walk(p + "/" + e);
+    };
+    for (const d of dirs) walk(d);
+    must(!bad.length, "页面里仍手写日期拼接（应改用 S.fmtLocalDate / fmtDateTime / fmtHM / fmtClock）: " + bad.slice(0, 6).join("、"));
+    const st = fs.readFileSync(path.join(ROOT, "utils/store.js"), "utf8");
+    must(/fmtLocalDate/.test(st) && /fmtDateTime/.test(st) && /fmtClock/.test(st) && /fmtHM/.test(st),
+      "utils/store.js 未导出完整日期格式化 API");
+    return "单点 utils/store.js（4 个 API）";
   }]
 ];
 

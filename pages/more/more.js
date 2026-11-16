@@ -3,6 +3,7 @@ const AN = require("../../utils/analytics.js");   // 轻量使用统计（本地
 // more：功能聚合（分组）+ 想玩清单（内嵌可管理）
 const T = require("../../utils/travel.js");
 const EL = require("../../utils/errlog.js"); // v1.19.106：本地错误日志（被 SafePage / app.onError 兜住的异常）
+const S = require("../../utils/store.js");       // v1.20.8（T2）：日期格式化唯一出口（fmtLocalDate/fmtDateTime/fmtClock）
 const KEYS = require("../../utils/keys.js"); // v1.19.188：第三方密钥统一出口（含运行时注入 setKeys）
 const Cloud = require("../../utils/cloud.js"); // v1.20.8：云端能力接入层（cloudEnv 配置驱动，fail-closed）
 const TOOL_GROUPS = require("../../utils/toolkit-groups.js").ITEM_GROUPS;
@@ -119,8 +120,7 @@ Page(SafePage({
     // 弹窗承诺「下周末出发」→ 必须落到周六。原来纯 +7 天会得到「下周一」，与文案不符。
     const d = new Date();
     d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
-    const pad = n => String(n).padStart(2, "0");
-    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    return S.fmtLocalDate(d);   // v1.20.8（T2）：收敛到 store.js 单点
   },
   _gen(name, province, days) {
     try {
@@ -420,10 +420,8 @@ Page(SafePage({
   onErrLog() {
     const n = EL.count();
     const health = this._healthLines().join("\n");
-    const pad = (x) => String(x).padStart(2, "0");
     const logs = n ? EL.recent().slice(-10).reverse().map((x, i) => {
-      const d = new Date(x.t || Date.now());
-      const ts = pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+      const ts = S.fmtClock(x.t || Date.now());   // v1.20.8（T2）：收敛到 store.js 单点
       return (i + 1) + ". " + ts + " [" + (x.label || "") + "] " + (x.msg || "");
     }).join("\n") : "";
     const tx = health + "\n\n── 最近异常 ──\n" + (logs || "暂无异常记录 ✓");
