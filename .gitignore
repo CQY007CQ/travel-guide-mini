@@ -67,3 +67,6 @@ tools/_tmp-*
 tools/_scratch-*
 # 官方名录抓取缓存（可随时用 --fetch 重建，候选池 candidates.json 已进 git 且自带来源 URL）
 tools/official-roster/cache/
+
+# 本地云开发登录配置（只在本机，含环境与登录缓存，不入库）
+.cloudbase/
