@@ -8,7 +8,7 @@ import zlib from "zlib";
 
 // web/ 是网页版产物（v1.20.0），已在 project.config.json 的 packOptions.ignore 排除，不进小程序包
 // v1.20.6 迭代 #9：门禁改为直接读取 project.config.json 的 packOptions.ignore（权威排除清单），
-// 避免「真包已排除、门禁却仍计入」的漂移（如 prompt-lab/、package-lock.json 这类纯开发/Node 产物）。
+// 避免「真包已排除、门禁却仍计入」的漂移（如 tools/prompt/lab/、package-lock.json 这类纯开发/Node 产物）。
 const EXC = new Set(["tools", "shots", ".qr", "outputs", "node_modules", ".git", ".workbuddy", "web", "docs"]);
 const FILE_IGNORE = new Set();
 const SUFFIX_IGNORE = new Set();

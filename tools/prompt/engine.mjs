@@ -8,7 +8,7 @@
  *
  * 设计原则：
  *   · 不联网、不调用大模型、不编造执行结果 —— 评分是对「提示词文本契约」的静态体检，
- *     与 prompt-lab 的真机执行评测互补（后者有真实 runs/*.md 证据）。
+ *     与 tools/prompt/lab/ 的真机执行评测互补（后者有真实 runs/*.md 证据）。
  *   · 所有分数可复算：同一输入必得同一输出，便于纳入门禁防回潮。
  *
  * 用法：node tools/prompt/engine.mjs [--json out.json]

@@ -100,6 +100,7 @@ miniprogram-travel/
 │   ├── insights.js                     本机数据洞察（真实记账·存档·足迹聚合）
 │   └── store.js / weather.js / toolkit-groups.js
 ├── tools/                            数据管道与回归链（不打包，见 project.config.json）
+│                                     —— 各子目录职责与「故意不进链」清单见 tools/README.md
 ├── images/                           图标与 tabBar 图
 └── docs/                            研发文档归档（不参与编译）
     ├── README.md       本目录索引

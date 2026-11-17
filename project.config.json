@@ -69,10 +69,6 @@
         "type": "folder"
       },
       {
-        "value": "prompt-lab",
-        "type": "folder"
-      },
-      {
         "value": "package-lock.json",
         "type": "file"
       }
