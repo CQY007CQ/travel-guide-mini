@@ -11,7 +11,7 @@
  * 判据（每条都对应一个真实踩过的坑）：
  *   ① 根目录白名单：根只放运行入口与配置。历史上根目录堆过 35 个散落文档、prompt-lab/、
  *      交付 md，导致「哪个文件是程序入口」看不出来。
- *   ② 包内目录只允许源码与资源：pages、subpkg、subdata1..3、subai、utils、images 里出现 .md/.log/.bak
+ *   ② 包内目录只允许源码与资源：pages、components、subpkg、subdata1..3、subai、utils、images 里出现 .md/.log/.bak
  *      会被打进小程序包（包体预算 1536KB，且用户能下载到）。曾把 test 报告塞进 subpkg。
  *   ③ 全仓无系统垃圾：.DS_Store / ._* / *.bak / *.orig。macOS 的 .DS_Store 会被 git 忽略，
  *      所以它们只堆在本地、永远不会被 CI 发现，只能靠这类门禁。
@@ -50,7 +50,7 @@ const ROOT_FILES = new Set([
   ".gitignore", ".nvmrc",
 ]);
 const ROOT_DIRS = new Set([
-  "pages", "subpkg", "subai", "subdata", "subdata2", "subdata3", "utils", "images",
+  "pages", "components", "subpkg", "subai", "subdata", "subdata2", "subdata3", "utils", "images",
   "tools", "docs", "web", "node_modules",
   ".git", ".github", ".workbuddy", ".cloudbase",
 ]);
@@ -62,7 +62,8 @@ console.log("【① 根目录白名单】");
 }
 
 /* ───────── ② 包内目录只允许源码与资源 ───────── */
-const PKG_DIRS = ["pages", "subpkg", "subdata", "subdata2", "subdata3", "subai", "utils", "images"];
+// components/ 是主包公共组件目录（v1.20.17 起 ai-entry 在此），同样只许源码与资源。
+const PKG_DIRS = ["pages", "components", "subpkg", "subdata", "subdata2", "subdata3", "subai", "utils", "images"];
 const PKG_EXT = new Set([".js", ".wxml", ".wxss", ".json", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ttf", ".otf"]);
 function walk(dir, out = []) {
   for (const n of list(dir)) {
@@ -120,7 +121,7 @@ console.log("【④ 空目录】");
 /* ───────── ⑤ utils 无孤儿模块 ───────── */
 console.log("【⑤ utils 孤儿模块】");
 {
-  const CODE_DIRS = ["pages", "subpkg", "subdata", "subdata2", "subdata3", "subai", "utils",
+  const CODE_DIRS = ["pages", "components", "subpkg", "subdata", "subdata2", "subdata3", "subai", "utils",
     "tools/web", "tools/build", "tools/test", "tools/check", "tools/audit", "tools/data", "tools/dev", "tools/prompt"];
   const sources = [path.join(ROOT, "app.js")];
   for (const d of CODE_DIRS) for (const f of walk(path.join(ROOT, d))) {

@@ -209,7 +209,7 @@ const checks = [
      `String(n).padStart(2,"0")` 拼日期，结果口径分叉（有的带秒有的不带、
      跨零点取到昨天）。这里禁止页面与分包再手写，避免再次分叉。 */
   ["日期格式化单点（页面禁手写 padStart 拼接）", () => {
-    const dirs = ["pages", "subpkg", "subai", "utils", "app.js"];
+    const dirs = ["pages", "components", "subpkg", "subai", "utils", "app.js"];
     const bad = [];
     const walk = (p) => {
       const abs = path.join(ROOT, p);

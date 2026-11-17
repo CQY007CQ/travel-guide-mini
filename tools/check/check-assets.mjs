@@ -23,7 +23,7 @@ function walk(dir) {
     else if (/\.(wxml|js|json)$/.test(e.name)) files.push(p);
   }
 }
-["app.json", "pages", "subpkg", "subai", "utils"].forEach((x) => {
+["app.json", "pages", "components", "subpkg", "subai", "utils"].forEach((x) => {
   if (!fs.existsSync(x)) return;
   if (fs.statSync(x).isFile()) files.push(x);
   else walk(x);

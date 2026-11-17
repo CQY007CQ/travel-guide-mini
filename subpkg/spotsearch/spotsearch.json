@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "按标签找景点",
-  "usingComponents": { "ai-entry": "../ai-entry/ai-entry" }
+  "usingComponents": {
+    "ai-entry": "../../components/ai-entry/ai-entry"
+  }
 }

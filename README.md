@@ -12,7 +12,7 @@
 交通动线与步行量、能直接导航的真实坐标、预算拆解、打包清单、逐日天气（联网时才有，
 断网自动降级）。城市数据与坐标随分包下发，**装机后完全不需要网络**。
 
-- 版本：`1.20.16`
+- 版本：`1.20.17`
 - AppID：`wxa365d49bc3366f95`（个人主体）
 - 基础库：`3.8.12`
 - 页面：主包 7 页（含 4 个 tabBar）+ 分包 14 页（以 `app.json` 为准）
@@ -87,6 +87,10 @@ miniprogram-travel/
 ├── subpkg/                           功能分包：map food ledger prep assistant guide toolkit
 ├── subdata/ subdata2/ subdata3/      数据分包：deflate+base64 编码的城市数据块 + 占位页
 ├── subai/                            内容分包：100 城深度玩法（ai-deep.js + ai-deep-extra.js）+ deep 页
+├── components/                       **主包**公共自定义组件（所有包都能引）
+│   └── ai-entry/                     全站「问 AI」悬浮入口 + 页面级 AI 上下文（ai-context.js）
+│                                     ⚠️ 组件不能放分包：主包页与「另一个分包」都引不到，
+│                                     运行期只报 Component is not found 且组件静默不渲染
 ├── utils/                            ⚠️ 多为生成产物
 │   ├── data.js          数据 holder（src: tools/_src-backup/data.js）
 │   ├── planner.js       行程生成算法（src: tools/_src-backup/planner.js）
@@ -205,7 +209,7 @@ node tools/check/check-pkgsize.mjs    # 体积真值（主包/各分包/data-pac
 ## 六、发版
 
 ```bash
-cli upload --project "$(pwd)" --version 1.20.16 --desc "说明"
+cli upload --project "$(pwd)" --version 1.20.17 --desc "说明"
 ```
 
 - **不要传 `--info-output`**（本环境会触发 `二维码输出路径无效 code 17`）

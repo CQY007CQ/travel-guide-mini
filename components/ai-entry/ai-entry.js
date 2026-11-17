@@ -1,13 +1,19 @@
-// subpkg/ai-entry/ai-entry.js —— 全站统一「问 AI」悬浮入口组件（分包内复用，零主包体积）
-// 任何分包页引入即可获得一个固定悬浮的 AI 按钮：点一下跳到 assistant 的对应场景深链，
+// components/ai-entry/ai-entry.js —— 全站统一「问 AI」悬浮入口组件（**主包**公共组件）
+// 任何页面引入即可获得一个固定悬浮的 AI 按钮：点一下跳到 assistant 的对应场景深链，
 // 并带入当前行程城市，让 AI 在「这座城 · 这几天」的语境下回答。AI 大脑在 assistant 页，
-// 不在本组件，故本组件几乎零逻辑、零体积，可安全织入任意分包页。
+// 不在本组件，故本组件几乎零逻辑、零体积。
+//
+// v1.20.17 修的真 bug：本组件曾放在 subpkg/ai-entry/，而 subai/deep/deep 是**另一个分包**的页面。
+// 微信禁止跨分包引用自定义组件 —— 运行期报 `Component is not found in path "subpkg/ai-entry/ai-entry"`
+// 且**静默不渲染**（deep 页的 AI 入口从来没出现过）。主包页靠 componentPlaceholder 侥幸能用，
+// 分包页没有这层兜底就直接失效。共享组件只有放主包才对所有包成立，故迁到 components/。
+// 代价：主包 +约 4KB（raw 1418→1422KB / 1536KB 线），换来 15 个页面路径统一、无占位符依赖。
 //
 // v1.20.6 增强：跳转前用 ai-context.js 按 topic 采集「这一页此刻的真实数据」，
 // 存进 globalData.__aiPageCtx（纯内存、5 分钟失效、限长 1200 字），助手页读取后注入 grounding。
 // 这样 17 个入口无需各自改代码，AI 就知道你是在账本页（真实花费）还是美食页（真实店数）发问。
 const T = require("../../utils/travel.js");
-const AIContext = require("../assistant/ai-context.js");
+const AIContext = require("./ai-context.js");
 
 Component({
   properties: {

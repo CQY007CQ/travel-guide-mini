@@ -143,7 +143,7 @@ const POINTS = [
   ["AI 清空会话失败（用户以为已清）", "utils/ai-agent.js", /清空会话失败/],
   ["离线大脑会话快照读取失败", "subpkg/assistant/ai-brain.js", /会话快照读取失败/],
   ["离线大脑会话快照落盘失败", "subpkg/assistant/ai-brain.js", /会话快照落盘失败/],
-  ["AI grounding 取名失败（易诱发泛话/臆造）", "subpkg/assistant/ai-context.js", /取真实店名\/景点名失败/],
+  ["AI grounding 取名失败（易诱发泛话/臆造）", "components/ai-entry/ai-context.js", /取真实店名\/景点名失败/],
 ];
 const lost = POINTS.filter(([, file, re]) => !re.test(read(file))).map(([n]) => n);
 ok(POINTS.length + " 个关键降级点全部留痕", lost.length === 0, lost.slice(0, 5).join(" ; "));

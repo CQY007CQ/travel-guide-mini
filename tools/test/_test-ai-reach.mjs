@@ -14,7 +14,7 @@ import path from "path";
 const req = createRequire(fileURLToPath(import.meta.url));
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const R = req(path.join(ROOT, "subpkg/assistant/ai-reason.js"));
-const A = req(path.join(ROOT, "subpkg/assistant/ai-context.js"));
+const A = req(path.join(ROOT, "components/ai-entry/ai-context.js"));
 const D = req(path.join(ROOT, "utils/data.js"));
 const appJson = JSON.parse(readFileSync(path.join(ROOT, "app.json"), "utf8"));
 

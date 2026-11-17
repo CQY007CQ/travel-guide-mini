@@ -1,1 +1,6 @@
-{ "navigationBarTitleText": "记账", "usingComponents": { "ai-entry": "../ai-entry/ai-entry" } }
+{
+  "navigationBarTitleText": "记账",
+  "usingComponents": {
+    "ai-entry": "../../components/ai-entry/ai-entry"
+  }
+}

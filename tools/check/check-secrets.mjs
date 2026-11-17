@@ -30,7 +30,7 @@ import path from "path";
 const ROOT = process.cwd();
 
 // 会打进小程序包的目录：只有这些需要额外执行「运行时零外部依赖」类规则
-const SHIPPED = ["app.js", "app.json", "utils", "pages", "subpkg", "subai", "subdata", "subdata2", "subdata3"];
+const SHIPPED = ["app.js", "app.json", "utils", "pages", "components", "subpkg", "subai", "subdata", "subdata2", "subdata3"];
 const SKIP = new Set([".git", "node_modules", ".workbuddy", "coverage", "web/images"]);
 const TEXT_EXT = /\.(js|mjs|cjs|json|wxml|wxss|md|html|htm|sh|py|ts|txt|yml|yaml|ini|conf|key|keys|env)$/i;
 const MAX_SIZE = 2.5 * 1024 * 1024;   // 数据块跳过（内含 base64，一定误报）

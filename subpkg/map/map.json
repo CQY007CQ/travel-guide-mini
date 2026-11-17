@@ -1,1 +1,6 @@
-{ "navigationBarTitleText": "地图导引", "usingComponents": { "ai-entry": "../ai-entry/ai-entry" } }
+{
+  "navigationBarTitleText": "地图导引",
+  "usingComponents": {
+    "ai-entry": "../../components/ai-entry/ai-entry"
+  }
+}

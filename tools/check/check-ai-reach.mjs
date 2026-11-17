@@ -29,8 +29,8 @@ function ck(name, cond, extra) {
   console.log("  [fail] " + name + (extra ? "  → " + extra : ""));
 }
 
-const entry = code(read("subpkg/ai-entry/ai-entry.js"));
-const ctx = code(read("subpkg/assistant/ai-context.js"));
+const entry = code(read("components/ai-entry/ai-entry.js"));
+const ctx = code(read("components/ai-entry/ai-context.js"));
 const reason = code(read("subpkg/assistant/ai-reason.js"));
 const asst = code(read("subpkg/assistant/assistant.js"));
 const wxml = code(read("subpkg/assistant/assistant.wxml"));
@@ -39,8 +39,9 @@ const moreJsA = code(read("pages/more/more.js"));
 const webAiJs = code(read("web/ai-assistant.js"));
 
 /* ---------- ① 页面级 grounding ---------- */
-ck("新增纯逻辑模块都在 assistant 分包（主包零增长）",
-  /const AIContext = require\("\.\.\/assistant\/ai-context\.js"\)/.test(entry));
+ck("AI 入口与上下文模块同处主包公共组件目录（依赖不跨包）",
+  /require\("\.\/ai-context\.js"\)/.test(entry) &&
+  /require\("\.\.\/\.\.\/utils\/travel\.js"\)/.test(ctx));
 ck("AI 入口跳转前采集来源页真实上下文",
   /AIContext\.build\(this\.data\.topic/.test(entry) && /__aiPageCtx/.test(entry));
 ck("上下文走内存传递且限长、5 分钟失效",
@@ -110,23 +111,47 @@ for (const p of real.filter(x => /^pages\//.test(x))) {
   if (tags.some(t => !/inline/.test(t))) inlineBad.push(p);
 }
 ck("主包页 AI 入口一律 inline（不压 tabBar）", inlineBad.length === 0, inlineBad.join(","));
-// v1.20.7 修的真 bug：微信禁止主包页面直接使用分包内自定义组件 —— 页面 json 里写
-// "../../subpkg/ai-entry/ai-entry" 时，运行期报 `Component is not found in path ...`，
-// 组件**静默不渲染**（首页/更多页的 AI 胶囊从来没出现过，用户只能从九宫格 tile 进 AI）。
-// 官方解法是给页面配 componentPlaceholder，组件会在分包就绪后正常挂载。
-// 上面那条 inline 断言只查 wxml 属性，正好是「查字符串造成假绿」——所以这里补一条结构断言。
-let phBad = [];
-for (const p of real.filter(x => /^pages\//.test(x))) {
-  let j = null;
-  try { j = JSON.parse(read(p + ".json")); } catch (e) { continue; }
-  const uc = (j && j.usingComponents) || {};
-  const target = String(uc["ai-entry"] || "");
-  if (!target) continue;
-  const isSubPkg = /subpkg|subai|subdata/.test(target);
-  const hasPh = !!(j.componentPlaceholder && j.componentPlaceholder["ai-entry"]);
-  if (isSubPkg && !hasPh) phBad.push(p);
+// v1.20.7 修过一次同类真 bug：主包页写 "../../subpkg/ai-entry/ai-entry" → 运行期
+// `Component is not found in path ...`，组件**静默不渲染**（首页/更多页的 AI 胶囊从没出现过）。
+// 上面那条 inline 断言只查 wxml 属性，正好是「查字符串造成假绿」——所以补结构断言。
+//
+// v1.20.17 又抓到同一根因的第二例：subai/deep 是**另一个分包**的页面，也引用了 subpkg/ai-entry。
+// 微信的规则是「分包可以引用主包，主包与其他分包都不能互相引用组件」，分包页没有
+// componentPlaceholder 这层兜底，于是 AI 入口在 deep 页彻底不存在，而当时这条断言
+// 只遍历 `pages/`（filter(/^pages\//)），完全看不到它 —— 覆盖不全造成的假绿。
+// 现在改为对**全部页面**做「页面与所引用组件必须同包」的通用断言；
+// ai-entry 已迁到主包 components/，主包页也不再需要 componentPlaceholder 兜底。
+// 微信的引用规则不是「必须同包」，而是**单向允许**：
+//   ✅ 分包页 → 主包组件（主包一定先于分包就绪）
+//   ❌ 主包页 → 分包组件（分包可能还没下载）
+//   ❌ 分包 A → 分包 B（分包之间互不可见，也不会自动触发对方下载）
+// 违规的失败形态都是**静默**：`Component is not found in path`、组件不渲染、无兜底。
+// ai-entry 迁到主包 components/ 后，15 个页面全部落在 ✅ 这一格，主包页也不再需要
+// componentPlaceholder 兜底。
+{
+  const PKG_ROOTS = ((appJson && appJson.subPackages) || [])
+    .map(sp => String(sp.root || "").replace(/\/$/, "")).filter(Boolean);
+  const pkgOf = (p) => PKG_ROOTS.find(r => p === r || p.startsWith(r + "/")) || "(main)";
+  const crossPkg = [], phLeft = [];
+  for (const p of real) {
+    let j = null;
+    try { j = JSON.parse(read(p + ".json")); } catch (e) { continue; }
+    if (j.componentPlaceholder && j.componentPlaceholder["ai-entry"]) phLeft.push(p);
+    const uc = (j && j.usingComponents) || {};
+    for (const name of Object.keys(uc)) {
+      const raw = String(uc[name] || "");
+      if (!raw || raw.charAt(0) !== ".") continue;     // 插件 / npm 路径不在本条契约内
+      const target = path.posix.normalize(path.posix.join(path.posix.dirname(p), raw));
+      const pagePkg = pkgOf(p), compPkg = pkgOf(target);
+      if (compPkg === "(main)" || compPkg === pagePkg) continue;   // ✅ 合法方向
+      crossPkg.push(p + " → " + raw + "（" + pagePkg + " → " + compPkg + "）");
+    }
+  }
+  ck("页面未跨包引用自定义组件（仅允许「分包→主包」；主包→分包、分包A→分包B 均运行期静默失效）",
+    crossPkg.length === 0, crossPkg.slice(0, 3).join(" ; "));
+  ck("不再依赖 componentPlaceholder 兜底（组件已在主包，占位符属冗余配置）",
+    phLeft.length === 0, phLeft.join(","));
 }
-ck("主包页引用分包组件时已声明 componentPlaceholder", phBad.length === 0, phBad.join(","));
 ck("每个入口 topic 都在场景表内",
   (function () {
     for (const p of real) {

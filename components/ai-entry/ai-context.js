@@ -1,4 +1,9 @@
-// ai-context.js —— 全站「页面级 AI 上下文」组装（assistant 分包，主包零增长）
+// ai-context.js —— 全站「页面级 AI 上下文」组装（主包，随 ai-entry 一起放 components/ 公共组件目录）
+//
+// v1.20.17：本模块原在 subpkg/assistant/，因 ai-entry 迁到主包 components/ 而同步迁出分包。
+// 原因不是「主包零增长」不重要，而是**跨包引用根本不成立**：主包组件 require 分包 js 违规，
+// 分包页面引用主包组件才合法。放在同一目录后 require 变成 ./ai-context.js，依赖链不再跨包。
+// 体积 8.7KB，主包仍在 1.5M 线内（1422/1536KB）。
 //
 // 背景：v1.20.6 前，ai-entry 跳助手只带 topic + city，AI 到了助手页只知道「从哪页来、哪座城」，
 //       不知道这一页此刻显示的真实数据 —— 在账本页问「我这趟花超了吗」和在首页问，得到的回答一样泛。

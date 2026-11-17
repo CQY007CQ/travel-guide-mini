@@ -1,1 +1,6 @@
-{ "navigationBarTitleText": "旅客服务", "usingComponents": { "ai-entry": "../ai-entry/ai-entry" } }
+{
+  "navigationBarTitleText": "旅客服务",
+  "usingComponents": {
+    "ai-entry": "../../components/ai-entry/ai-entry"
+  }
+}

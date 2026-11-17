@@ -221,7 +221,7 @@ ck("真值全部取到（0 表示取数失败，不是真实值）",
        这是「显式登记」而不是「悄悄放过」：每次全量回归都会把这些文件打印出来。 */
 console.log("【单文件规模】");
 const SIZE_LIMIT = 800;
-const SHIPPED_DIRS = ["pages", "subpkg", "subai", "utils"];
+const SHIPPED_DIRS = ["pages", "components", "subpkg", "subai", "utils"];
 const OVERSIZE_ALLOWED = new Map([
   // 逻辑真源（build-min 的输入），不随包发布；拆它们属于算法内核级重构，另立项。
   ["tools/_src-backup/travel.js", "行程生成/导航/百科内核，6729 行逻辑真源"],

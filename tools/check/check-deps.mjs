@@ -21,7 +21,7 @@ const ROOT = process.cwd();
 // 已知可选依赖（被 try/catch 包裹，缺失不影响运行）。新增可选补丁时在此追加。
 const ALLOW = new Set([]);
 
-const SCAN_DIRS = ["tools", "pages", "subpkg", "utils", "subai"];
+const SCAN_DIRS = ["tools", "pages", "components", "subpkg", "utils", "subai"];
 // 备份/真源目录不扫：_src-backup 里的 require.async 是给 utils/ 运行时用的路径，
 // 相对基准与本目录不同，扫了必然误报；_bak-* 只是历史备份，不参与运行；
 // _archive 为清理仓库时归档的死代码（git mv 保留历史），其相对引用基准已随搬移失效，同样不参与运行。

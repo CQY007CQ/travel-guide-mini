@@ -1,9 +1,6 @@
 {
   "navigationBarTitleText": "旅途应急",
   "usingComponents": {
-    "ai-entry": "../../subpkg/ai-entry/ai-entry"
-  },
-  "componentPlaceholder": {
-    "ai-entry": "view"
+    "ai-entry": "../../components/ai-entry/ai-entry"
   }
 }
