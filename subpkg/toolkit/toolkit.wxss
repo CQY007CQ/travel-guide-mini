@@ -2,7 +2,8 @@
 .tk-head { padding: 8rpx 4rpx 20rpx; }
 .tk-title { font-size: calc(40rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #1c2433); }
 .tk-sub { margin-top: 6rpx; font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #7d8aa0); }
-.tk-hint { font-size: calc(23rpx * var(--fs, 1)); color: var(--gold, #c9a04a); padding: 0 4rpx 16rpx; }
+/* 浅色主题下 --gold(#d4a94e) 压在 #eaeff7 上仅 1.90:1，等于看不见；金色文字一律走 --gold-tx */
+.tk-hint { font-size: calc(23rpx * var(--fs, 1)); color: var(--gold-tx, #89661e); padding: 0 4rpx 16rpx; }
 
 .group-title { font-size: calc(25rpx * var(--fs, 1)); font-weight: 600; color: var(--t3, #7d8aa0); margin: 26rpx 8rpx 12rpx; }
 

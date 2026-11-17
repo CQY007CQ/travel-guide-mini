@@ -618,6 +618,9 @@ function runSpotExplain(text, city, ctx) {
   if (r.intro) lines.push(r.intro);
   if (r.how) lines.push("怎么玩：" + r.how);
   if (r.route) lines.push("怎么去：" + r.route);
+  // 测控说明（勿"统一"掉）：联网通道（LLM）被禁止输出任何报价，是因为它会编；
+  // 这里是确定性通道，票价取自 App 本地真实收录，且下文有「以上为 App 本地真实收录」的出处声明。
+  // 两者不是口径冲突，是能力差异 —— 把这里也改成"以景区公告为准"会白丢真实数据。
   if (r.ticket && r.ticket.known) lines.push("门票：" + (r.ticket.price || "") + (r.ticket.book ? "（需预约）" : "") + (r.ticket.where ? " · " + r.ticket.where : ""));
   if (r.booking) lines.push("预约提示：" + r.booking);
   lines.push("（离线模式：以上为 App 本地真实收录；联网后点「AI 讲解这个景点」可获取延伸讲解）");

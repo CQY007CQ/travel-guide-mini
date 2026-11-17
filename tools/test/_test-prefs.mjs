@@ -4,6 +4,11 @@
 // 3) 回填：applyLearned(部分 opts) 用已学偏好补齐缺失字段，但不覆盖显式传入字段
 // 4) 确定性：同入参两次学习结果稳定
 import { createRequire } from "module";
+import { installWxShim } from "./_wx-shim.mjs";
+// v1.20.11（测控整改）：本测试原本写着「Node 无 wx，走 _prefCache 退化路径」——
+// 而它测的是**跨会话**偏好学习：真正要验的恰恰是「关掉 App 再打开还能读回来」。
+// 不装垫片时只验了内存缓存，存储往返从没被覆盖。现装垫片，补两条落盘/重载断言。
+const shim = installWxShim();
 const req = createRequire(process.cwd() + "/");
 const T = req("./utils/travel.js");
 
@@ -51,6 +56,24 @@ const ok = (c, m) => { if (!c) { console.error("  ✗ " + m); fails++; } else co
   const b = T.getPrefs();
   const stripAt = (p) => { const o = Object.assign({}, p || {}); delete o.at; return JSON.stringify(o); };
   ok(stripAt(a) === stripAt(b), "确定性: 同入参两次学习结果稳定");
+
+  // 5b) 落盘：偏好必须真的写进 storage（不是只在内存里）
+  const rawPrefs = shim.dump()["learnedPrefsV1"];
+  const stored = typeof rawPrefs === "string" ? JSON.parse(rawPrefs) : rawPrefs;
+  ok(!!stored, "落盘: learnedPrefsV1 已写入 wx storage");
+  ok(!!stored && stored.city === "北京", "落盘: storage 里的城市与最后学习一致（北京）");
+
+  // 5c) 跨会话：丢掉模块内存态后重新加载，必须从 storage 读回同一份偏好
+  //     （这才是「跨会话」三个字的真实含义；旧版到 5b 就停了）
+  try {
+    delete req.cache[req.resolve("./utils/travel.js")];
+    const T2 = req("./utils/travel.js");
+    await T2.ready();
+    const p2 = T2.getPrefs();
+    ok(p2 && p2.city === "北京" && p2.days === 3, "跨会话: 重载后从 storage 读回偏好（北京/3天）");
+  } catch (e) {
+    ok(false, "跨会话: 重载读取抛错 " + (e && e.message));
+  }
 
   // 6) 空/异常入参不崩
   let threw = false;

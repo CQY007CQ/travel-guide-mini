@@ -120,14 +120,19 @@ const _cityIndex = () => {
 // v1.19.79：同名「X市」↔「X」归并。
 // 库里同时有「安康」(有数据) 与「安康市」(零景点) 这类重名条目，用户选/搜「安康市」会生成空白。
 // 统一把名称收敛到「带数据的那个」变体：优先原样(有数据) → 否则剥「市」 → 再否则补「市」。
+// 测控 P2-3：原先只剥「市」后缀，用户/分享链接里常见的「丽江古城」「丽江地区」
+// 都不归一 → findCity 落进通用模板城，生成一份「当地代表性景点」的伪行程。
+// 改为按「长后缀优先」逐个剥，只在剥完能命中真实城市时才归一，命中不了保持原样（零风险）。
+const _CITY_SUFFIXES = ["维吾尔自治区", "特别行政区", "自治区", "自治州", "自治县", "地区", "古城", "景区", "新区", "县城", "市"];
 function canonCityName(name) {
   if (!name || typeof name !== "string") return name;
   const idx = _cityIndex();
   const hasData = (n) => { const c = idx.get(n); return !!(c && Array.isArray(c.experiences) && c.experiences.length); };
   if (hasData(name)) return name;
-  if (name.endsWith("市")) {
-    const s = name.slice(0, -1);
-    if (idx.has(s)) return s;
+  for (const suf of _CITY_SUFFIXES) {
+    if (name.length <= suf.length || !name.endsWith(suf)) continue;
+    const t = name.slice(0, -suf.length);
+    if (idx.has(t) || hasData(t)) return t;
   }
   const withSuffix = name + "市";
   if (idx.has(withSuffix) && hasData(withSuffix)) return withSuffix;

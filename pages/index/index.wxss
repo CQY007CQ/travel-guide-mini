@@ -421,7 +421,7 @@
 
 .bc-top { display: flex; align-items: center; gap: 14rpx; }
 
-.bc-no { font-size: calc(22rpx * var(--fs, 1)); color: var(--on-gold, #fff); background: var(--acc, #b3872e); border-radius: 12rpx; padding: 2rpx 12rpx; font-weight: 700; }
+.bc-no { font-size: calc(22rpx * var(--fs, 1)); color: var(--on-gold, #14100a); background: var(--gold, #d4a94e); border-radius: 12rpx; padding: 2rpx 12rpx; font-weight: 700; }
 
 .bc-name { font-size: calc(32rpx * var(--fs, 1)); font-weight: 800; }
 
@@ -456,7 +456,7 @@
 .day-preset { display: flex; align-items: center; flex-wrap: wrap; gap: 10rpx; margin: 4rpx 0 10rpx; }
 .day-preset .dp-t { font-size: calc(22rpx * var(--fs, 1)); color: var(--tx-3, #64748b); margin-right: 2rpx; }
 .day-preset .dp-chip { font-size: calc(23rpx * var(--fs, 1)); padding: 6rpx 20rpx; border-radius: 22rpx; color: var(--tx-2, #46536b); background: rgba(var(--ln-rgb, 100, 116, 139), .08); border: 1rpx solid transparent; }
-.day-preset .dp-chip.on { color: var(--chip-tx, #14100a); background: var(--gold, #d4a94e); font-weight: 700; }
+.day-preset .dp-chip.on { color: var(--on-gold, #14100a); background: var(--gold, #d4a94e); font-weight: 700; }
 .day-preset .dp-hint { font-size: calc(20rpx * var(--fs, 1)); color: var(--tx-3, #64748b); margin-left: auto; }
 .pk-search-row { display: flex; align-items: center; gap: 12rpx; }
 .pk-search-row .pk-search { flex: 1; }
@@ -517,7 +517,7 @@
 .df-badge {
   flex: 0 0 auto; width: 52rpx; height: 52rpx; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: var(--red, #cc3d3d); color: #fff;
+  background: var(--red, #cc3d3d); color: var(--on-red, #fff);
   font-size: calc(34rpx * var(--fs, 1)); font-weight: 900;
 }
 .df-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }

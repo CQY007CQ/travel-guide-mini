@@ -75,7 +75,7 @@
 .spot-sec:first-of-type { border-top: none; padding-top: 4rpx; }
 .spot-lab { font-size: calc(23rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); font-weight: 700; margin-bottom: 8rpx; }
 .spot-txt { font-size: calc(27rpx * var(--fs, 1)); color: var(--t1, #dce5f0); line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
-.spot-tag { display: inline-block; margin-left: 12rpx; font-size: calc(20rpx * var(--fs, 1)); color: #fff;
+.spot-tag { display: inline-block; margin-left: 12rpx; font-size: calc(20rpx * var(--fs, 1)); color: var(--on-red, #fff);
   background: var(--red, #e56a6a); border-radius: 8rpx; padding: 2rpx 12rpx; vertical-align: 2rpx; }
 .spot-empty { font-size: calc(25rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); line-height: 1.7; padding: 8rpx 0; }
 

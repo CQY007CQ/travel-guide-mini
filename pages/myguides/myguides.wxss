@@ -23,7 +23,7 @@
 .mg-del { flex: none; font-size: calc(24rpx * var(--fs, 1)); color: #c0563f; padding: 6rpx 14rpx; border-radius: 999rpx; background: rgba(192,86,63,.1); }
 .td .mg-del { color: #e08c78; background: rgba(224,140,120,.14); }
 .mg-meta { margin-top: 12rpx; font-size: calc(24rpx * var(--fs, 1)); }
-.mg-go { margin-top: 16rpx; font-size: calc(26rpx * var(--fs, 1)); font-weight: 600; color: var(--gold, #d4a94e); }
+.mg-go { margin-top: 16rpx; font-size: calc(26rpx * var(--fs, 1)); font-weight: 600; color: var(--gold-tx, #89661e); }
 
 .tip { margin-top: 12rpx; padding: 0 6rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--tx-2, #6b7689); }
 

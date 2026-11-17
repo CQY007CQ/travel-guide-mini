@@ -452,7 +452,11 @@ function buildPlanDays(city, days, depart, budgetKey, opts){
  // v1.11：city 可能为 null/undefined（fuzz 抓到 Cannot read properties of null (reading 'hotels')）
  const hotelList = (city && city.hotels) || GEN_HOTELS;
  const hotel = hotelList.find(h=>h.tier===tierOf[tierKey]) || hotelList[1] || hotelList[0];
- const hotelPick = `${hotel.place}｜${hotel.brands}`;
+ // 测控 P1-3：原本把「片区｜品牌串」整串塞进「入住「…」」，847/847 个城市生成的行程
+ // 都渲染成「抵达 + 入住「市中心/高铁站附近｜全季·亚朵·维也纳·丽枫」」——
+ // 用户会真去找一家叫这个名字的酒店。片区名才是「住哪」，品牌是可选项，拆开。
+ const hotelPick = `${hotel.place}`;
+ const hotelBrands = String(hotel.brands || "").split("·").map(x => x.trim()).filter(Boolean);
  const foodsAdj = profileAdjustedFoods(city.foods);
  const firstFood = (foodsAdj && foodsAdj[0]) || "本地特色早餐";
  // 按食物类型选量词：面/粉/粥→碗、火锅/宴→顿、乳鸽/烧鸡→只、其余→份
@@ -763,7 +767,8 @@ function buildPlanDays(city, days, depart, budgetKey, opts){
    }
   } else if(isFirst){
    theme = days===1 ? "一日精华游" : "抵达 · 初见"+(days>2?"，先逛市区精华":"");
-   items.push({name:`抵达 + 入住「${hotelPick}」`,period:"上午",note:`放好行李，先在附近吃个本地午餐（推荐尝：${firstFood}）`});
+   items.push({name:`抵达 + 入住「${hotelPick}」`,period:"上午",
+    note:`放好行李，先在附近吃个本地午餐（推荐尝：${firstFood}）`+(hotelBrands.length?`；该片区可选 ${hotelBrands.join(" / ")}`:"")});
    if(style === "speed"){
     push(items, "下午", ["下午","全天"], i+1, 0);
     push(items, "傍晚", ["傍晚","下午","晚上","全天"], i+1, 1);
@@ -1417,7 +1422,8 @@ function buildProvincePlanDays(province, days, depart, budgetKey, style, stayMou
   const fc = findCity(c, province) || {};
   const hl = fc.hotels || GEN_HOTELS;
   const h = hl.find(x=>x.tier===tier) || hl[1] || hl[0];
-  return `${c} · ${h.place}｜${String(h.brands).split("·")[0]}`;
+  // 同理：名字只留「城市 · 片区」，不再拼品牌（品牌是候选，不是这家酒店的名字）
+  return `${c} · ${h.place}`;
  };
  // 7. 按天生成 items（组内跨城时加「前往」转场条目）
  const planDays = [];
@@ -1946,7 +1952,10 @@ function findCity(name, province){
  // 通用城市：优先「本市」景点库（含第二层补充，精确去重 + 语义去重）；未收录才回退省级地标（明确标注可能位于省内其他城市）
  const lmList = dedupSpots((CITY_LANDMARKS[name]||[]).concat(CITY_LANDMARKS_EXTRA[name]||[]).concat(CITY_LANDMARKS_EXTRA2[name]||[]).concat(CITY_LANDMARKS_EXTRA3[name]||[]).concat(CITY_LANDMARKS_EXTRA4[name]||[]).concat(CITY_LANDMARKS_EXTRA5[name]||[]).concat(CITY_LANDMARKS_EXTRA6[name]||[]).concat(CITY_LM_PATCH[name]||[]));
  const isProvinceFallback = lmList.length === 0;
- const landmarks = lmList.length ? lmList : (PROVINCE_LANDMARKS[province] || ["当地代表性景点"]);
+ // 测控 P2-1：末位回退名原本是「当地代表性景点」—— 它会被当成真实景点名渲染进行程，
+ // 而实际没有任何景点数据（模板城/无地标省）。改名让「没有具体景点」这件事写在文案里，
+ // 而不是让用户以为我们收录了一家叫「当地代表性景点」的地方。
+ const landmarks = lmList.length ? lmList : (PROVINCE_LANDMARKS[province] || ["城市地标广场（通用建议，具体景点请用景点页搜索）"]);
  const periods = ["上午","下午","晚上","全天"];
  const cityFoods = PROVINCE_CITY_FOODS[name];
  return {

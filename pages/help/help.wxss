@@ -34,7 +34,7 @@
   padding: 0 34rpx;
   box-sizing: border-box;
   background: var(--red, #cc3d3d);
-  color: #fff;
+  color: var(--on-red, #fff);
 }
 .eh-call:active { opacity: .9; }
 .eh-call-left { display: flex; flex-direction: column; gap: 8rpx; }
@@ -150,7 +150,7 @@
   background: rgba(var(--ln-rgb, 19, 29, 49), .08);
 }
 .er-er {
-  color: #fff;
+  color: var(--on-red, #fff);
   background: var(--red, #cc3d3d);
   font-weight: 700;
 }
