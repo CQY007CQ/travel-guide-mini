@@ -388,6 +388,7 @@
               data-p="{{item}}" catchtap="onPickProv">{{item}}</text>
       </scroll-view>
       <input class="ps-search" placeholder="输入城市名 / 省名搜索…" value="{{pickKw}}" bindinput="onPickKw" focus/>
+      <view wx:if="{{pickMore > 0}}" class="ps-more">已显示前 {{pickList.length}} 个，还有 {{pickMore}} 个 · 继续输入或选省份缩小范围</view>
       <scroll-view scroll-y class="ps-list">
         <view wx:for="{{pickList}}" wx:key="name"
               class="ps-item {{item.guide ? 'guide' : ''}} {{item.all ? 'all' : ''}} {{item.limited ? 'limited' : ''}}" data-i="{{index}}" bindtap="chooseFromPicker">

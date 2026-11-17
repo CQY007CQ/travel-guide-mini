@@ -35,7 +35,7 @@ Page(SafePage(Object.assign({
     recExamples: ["人少的古镇 三天", "海边亲子 五天", "沙漠摄影 四天", "温泉放松 周末两天"],
     destLabel: "",
     // 城市搜索选择器（目的地/出发地 共用弹层）
-    showPicker: false, pickMode: "", pickTitle: "", pickList: [], pickKw: "", pickProv: "",
+    showPicker: false, pickMode: "", pickTitle: "", pickList: [], pickKw: "", pickProv: "", pickMore: 0,
     days: 4, daysText: "4 天", dayPresets: [3, 5, 7],
     // v1.19.77：模板路线 —— 热门城市 + 建议天数（数据均已在库，城市名与 CITIES 完全一致）
     tpls: [

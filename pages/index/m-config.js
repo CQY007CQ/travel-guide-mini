@@ -259,7 +259,14 @@ module.exports = {
       list = [{ name: prov + " · 全省精华", province: prov, guide: true, all: true }].concat(list);
     }
     if (kw) list = list.filter(x => x.name.includes(kw) || x.province.includes(kw));
-    this.setData({ pickList: list });
+    // v1.20.12：渲染窗口上限 300，与同文件想玩池 poolFiltered 同一惯例。
+    // 「全部省份」视图有 872 城，一次 setData 全量列表约 35KB、要渲染 872 行；
+    // 只下发前 300 条并把剩余数量交给视图提示，用户继续输入或点省份即可收敛。
+    // 注意 chooseFromPicker 用的是 pickList 的下标，所以必须先切片再下发，两者天然一致。
+    const CAP = 300;
+    const matched = list.length;
+    const shown = matched > CAP ? list.slice(0, CAP) : list;
+    this.setData({ pickList: shown, pickMore: Math.max(0, matched - shown.length) });
   },
 
   _syncPoolFromWish() {

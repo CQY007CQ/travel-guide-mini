@@ -436,9 +436,15 @@ module.exports = {
   },
 
   _allCities() {
+    // v1.20.12：结果缓存。旧实现每次输入都重建 872 个对象（全量分配 + GC），
+    // 与「每敲一个字就 filter + setData 全量列表」叠加成三倍开销。
+    // 城市表是静态数据，缓存即可；只在拿到非空结果时缓存——冷启动数据未就绪时
+    // 先返回空数组，不能把空数组钉死成永久结果。
+    if (this._allCitiesCache) return this._allCitiesCache;
     const provs = T.provinces();
     const out = [];
     provs.forEach(p => T.citiesOf(p).forEach(c => out.push({ name: c.name, province: p, guide: !!c.guide, limited: !!c.limited })));
+    if (out.length) this._allCitiesCache = out;
     return out;
   },
 

@@ -359,6 +359,8 @@
   background: rgba(212, 169, 78, .12); border: 1rpx solid rgba(212, 169, 78, .35); }
 
 .ps-empty { text-align: center; color: var(--t4, #7d92ab); padding: 60rpx 0; font-size: calc(25rpx * var(--fs, 1)); }
+/* v1.20.12：城市选择器渲染窗口上限的提示行（列表被截断时显示，避免用户以为城市没了） */
+.ps-more { padding: 4rpx 28rpx 12rpx; color: var(--t5, #9aa9bd); font-size: calc(23rpx * var(--fs, 1)); }
 
 /* ===== 行程状态：出发倒计时 + 预约提醒 合并一卡（v1.19.59） ===== */
 .plan-status { padding: 6rpx 28rpx; overflow: hidden; }

@@ -151,11 +151,22 @@ module.exports = {
     wx.showToast({ title: v ? "已开启「只玩勾选」· 生成时优先安排" : "已关闭「只玩勾选」· 全自动推荐", icon: "none" });
   },
 
+  // v1.20.12：加 180ms 防抖，与文件下方 onPickKw2 同一套。
+  // 旧实现每敲一个字都要 ① 重建城市表（旧 _allCities 无缓存，872 个对象全量分配）
+  // ② 全量 filter ③ setData 全量列表 —— 低端机上连续输入会明显掉帧。
+  // 关键词仍然立即回显（打字手感不变），只把「过滤 + setData」推到停下来那一帧。
   onPickKw(e) {
     const kw = e.detail.value;
-    const src = this.data.pickMode === "from" ? this.data.fromList : this._allCities();
     this.setData({ pickKw: kw });
-    this._applyPickList(src);
+    if (this._pickKwTimer) clearTimeout(this._pickKwTimer);
+    this._pickKwTimer = setTimeout(() => {
+      this._pickKwTimer = null;
+      this._applyPickList(this._pickSrc());
+    }, 180);
+  },
+
+  _pickSrc() {
+    return this.data.pickMode === "from" ? this.data.fromList : this._allCities();
   },
 
   // v1.19.2：搜索无防抖 —— 池子动辄数百条，每敲一个字都全量 filter + setData 会明显卡顿。
@@ -169,7 +180,9 @@ module.exports = {
 
   onPickProv(e) {
     const p = e.currentTarget.dataset.p || "";
-    const src = this.data.pickMode === "from" ? this.data.fromList : this._allCities();
+    // 切省份时取消挂起的输入防抖，避免 180ms 后再用旧关键词覆盖一次
+    if (this._pickKwTimer) { clearTimeout(this._pickKwTimer); this._pickKwTimer = null; }
+    const src = this._pickSrc();
     this.setData({ pickProv: p, pickKw: "" });
     this._applyPickList(src);
   },
