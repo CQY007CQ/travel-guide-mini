@@ -227,7 +227,14 @@
   }
   function generatePlan(cityName, days) {
     var T = getT();
-    var city = T.findCity ? T.findCity(cityName) : null;
+    // v1.20.19：findCity 对任意非空串都返回 generic 模板城，"若未收录请换城市"这层守卫
+    // 原本恒不成立 → 编造城市（含残留的 %E5%90%89%E5%AE%89）会得到一份看似真实的假攻略。
+    var city = null;
+    try {
+      city = T.realCity ? T.realCity(cityName)
+        : (T.findCity ? T.findCity(T.decQuery ? T.decQuery(cityName) : cityName) : null);
+    } catch (e) {}
+    if (city && city.id === "generic") city = null;
     if (!city) return { ok: false, msg: "离线知识库里还没有「" + escapeHtml(cityName) + "」这座城市，换个已收录的城市试试（如成都、杭州、西安）。" };
     var n = Math.max(1, Math.min(14, parseInt(days, 10) || 3));
     var dep = localDate(new Date(Date.now() + 7 * 86400000));

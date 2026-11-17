@@ -22,6 +22,8 @@
       </view>
       <!-- 有限数据层：诚实提示内容收集中 -->
       <view class="limited-notice" wx:if="{{limitedNotice}}"><text class="ln-ic">✦</text><text>该城攻略采集中，先给你框架，补齐后自动更新</text></view>
+      <!-- v1.20.19：旧版「城市名未解码」生成的假城行程，升级后诚实提示 + 重生成入口（不删用户数据） -->
+      <view class="limited-notice" wx:if="{{staleCity}}" catchtap="goIndex"><text class="ln-ic">✦</text><text>这份旧行程的城市名未正确解码，内容可能不完整 · 点此重新生成</text></view>
       <view class="sum-ops">
         <view class="sop {{isFav ? 'sop-fav-on' : ''}}" wx:if="{{!segs.length && !isProv}}" catchtap="onFav">
           <image class="sop-ic" src="/images/icons/{{isFav ? 'heart-on' : 'heart'}}.png"/>

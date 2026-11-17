@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.18";
+const APP_VER = "1.20.19";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -163,6 +163,21 @@ function findCity(name, province) {
  if (_findCache.size > 400) _evictOldest(_findCache);   // 防多城切换后无限增长（逐出最旧，不全清）
  _findCache.set(ck, res);
  return res;
+}
+
+// v1.20.19：真实城市解析 —— 生成行程 / 穿衣 / 识物转生成等写操作一律用它取城市。
+// 为什么必须单独做：findCity 对**任意非空字符串**都返回一个 id:"generic" 的模板城
+// （"火星城xyz" 也有店名/街区/酒店），所以那些 `if (!city) return "未收录"` 的守卫
+// 全是死代码 —— 用户随口编的城市能拿到一份看起来很真的假攻略，违反零伪造红线。
+// 口径：先走 decQuery（防编码串变假城），再找城市，命中 generic 一律当未收录。
+function realCity(name) {
+  const v = decQuery(name);
+  const n = String(v == null ? "" : v).trim();
+  if (!n || n.length > 20) return null;
+  let hit = null;
+  try { hit = findCity(n); } catch (e) { return null; }
+  if (!hit || hit.id === "generic") return null;
+  return hit;
 }
 
 /* ---------- 生成 ---------- */
@@ -6657,7 +6672,7 @@ module.exports = {
  ready, planCheckup, swapSpotFor, askTrip,
  routeAdvicePlus, highlightOf, crowdTipOf, packExtra,
  badgesOf, yearReportNew, chinaLite, transportEstimate,
- provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, decQuery, provBrief, nearbyCityOf, D, P,
+ provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, decQuery, realCity, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
  spotTagOf, searchSpots, spotCover,
  customBudgetObj: function (amt, days, peopleN) { return P.customBudgetObj(amt, days, peopleN); }, budgetTotalObj,

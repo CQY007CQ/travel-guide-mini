@@ -185,6 +185,18 @@ ck("AI 生成行程入口对城市名做兜底解码（避免 generic 假城）"
   /let name = String\(cityName == null \? "" : cityName\);[\s\S]{0,200}T\.decQuery\(name\)/.test(
     code(read("subpkg/assistant/ab-write.js"))));
 
+// 已生成的旧脏档不会因代码修复自动变干净：app.js 打标 → 行程页提示重生成。
+// 行为由真机验证（注入 __staleCity 档进入行程页，断言 staleCity=true）；这里只守接线。
+ck("历史编码城市名的旧存档打标并给出重生成提示（不静默删用户数据）",
+  /%\[0-9A-Fa-f\]\{2\}/.test(read("app.js")) &&
+  /__staleCity/.test(read("app.js")) &&
+  /staleCity/.test(pageSrc("pages/plan/plan.js")) &&
+  /staleCity/.test(read("pages/plan/plan.wxml")));
+ck("字符串城市进入生成/气候链路前经 T.realCity 排除 generic 假城",
+  ["subpkg/assistant/ab-write.js", "subpkg/assistant/ab-runs.js", "subpkg/assistant/assistant.js",
+    "subpkg/lens/lens.js", "web/ai-assistant.js"]
+    .every((f) => /T\.realCity/.test(code(read(f)))));
+
 /* ---------- ⑤ 使用指南置顶 AI / 识物重点组 ---------- */
 // 用户明确要求指南重点强调 AI 与识图；防止后续改版把置顶组或直达按钮删掉。
 const guideJs = code(read("subpkg/guide/guide.js"));

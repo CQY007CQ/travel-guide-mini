@@ -489,7 +489,11 @@ Page(SafePage({
   _generateForCity(cityName, picks) {
     const self = this;
     let c = null;
-    try { if (T.findCity) c = T.findCity(cityName); } catch (e) {}
+    // v1.20.19：findCity 会给任意编造城市造 generic 模板城，旧守卫拦不住 → 假攻略。
+    try {
+      c = T.realCity ? T.realCity(cityName) : (T.findCity ? T.findCity(cityName) : null);
+      if (c && c.id === "generic") c = null;
+    } catch (e) {}
     if (!c) {
       const provs = T.provinces();
       for (let pi = 0; pi < (provs || []).length && !c; pi++) {

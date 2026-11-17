@@ -12,14 +12,18 @@ const localDate = CORE.localDate;
 /* 生成行程：真正 buildPlan + 写 globalData，再切到行程页（对齐网页版 generatePlan） */
 function generatePlan(cityName, days, opts) {
   opts = opts || {};
-  // v1.20.18 兜底：无论调用方给的是问题原文、模型输出还是 route 参数，先统一解码。
-  // 否则 findCity("%E5%90%89%E5%AE%89") 会造一座 generic 模板城，标题变乱码、内容近乎为空。
+  // v1.20.19 修同族真 bug：findCity 对任意非空串都返回 id:"generic" 的模板城，
+  // 原 `if (!city)` 守卫是死代码 —— 编造的城市也能拿到一份看似真实的假攻略。
+  // 统一走 T.realCity（解码 + 排除 generic），老测试沙箱里没有该方法时保留降级路径。
   let name = String(cityName == null ? "" : cityName);
   try { if (T.decQuery) name = T.decQuery(name); } catch (e) {}
   cityName = name;
   let city = null;
-  try { if (T.findCity) city = T.findCity(cityName); } catch (e) {}
-  if (!city) return { ok: false, msg: "离线知识库里还没有「" + (cityName || "") + "」这座城市，换个已收录的城市（如成都、杭州、西安）试试。" };
+  try {
+    city = T.realCity ? T.realCity(name) : (T.findCity ? T.findCity(name) : null);
+  } catch (e) {}
+  if (city && city.id === "generic") city = null;
+  if (!city) return { ok: false, msg: "离线知识库里还没有「" + name + "」这座城市，换个已收录的城市（如成都、杭州、西安）试试。" };
   const n = Math.max(1, Math.min(14, parseInt(days, 10) || 3));
   const depart = opts.depart || localDate(new Date(Date.now() + 7 * 86400000));
   let daysArr = null;

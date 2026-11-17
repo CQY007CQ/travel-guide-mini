@@ -165,6 +165,9 @@ module.exports = {
    isProv: !!plan.isProv,
    // 有限数据层城市（limited）：诚实提示内容收集中，已生成抵达/返程框架，真实景点待补充
    limitedNotice: !!(city && city.limited && !plan.isProv),
+   // v1.20.19：旧版本用未解码的城市名生成过 generic 假城行程，存档被 app.js 打标后
+   // 在这里给诚实提示（不静默删用户已有打卡/花费），并提供重生成入口。
+   staleCity: !!plan.__staleCity,
    gauge: T.budgetGauge(plan),
    foot: T.tripFoot(plan),
    // v1.17.10：省域行程用「省级速览」（按全省真实景点数算建议天数、必吃取具体菜名）；

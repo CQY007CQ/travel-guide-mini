@@ -268,7 +268,9 @@ Page(SafePage({
     const self = this;
     let c = null;
     try {
-      if (T.findCity) c = T.findCity(p.city);
+      // v1.20.19：findCity 会给编造的城市造 generic 模板城，旧 `if (!c)` 守卫永远不成立。
+      c = T.realCity ? T.realCity(p.city) : (T.findCity ? T.findCity(p.city) : null);
+      if (c && c.id === "generic") c = null;
       if (!c) {
         const provs = T.provinces();
         for (let pi = 0; pi < provs.length && !c; pi++) {

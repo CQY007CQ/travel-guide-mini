@@ -64,6 +64,16 @@ App({
     try {
       const saved = store.get("planV1");
       if (saved && saved.days && saved.days.length) {
+        // v1.20.19：历史脏档识别 —— 旧版本把 URL 编码串（%E5%90%89%E5%AE%89）当城市名，
+        // 生成了 id:"generic" 的假城行程。升级后仍会从 storage 恢复这份脏档。
+        // 不删用户数据（里面可能有打卡/记账），只打标，由行程页给诚实提示 + 重生成入口。
+        // 刻意用纯字符串判据：此刻 T.ready() 尚未完成，realCity 会因城市表未就绪而误判。
+        try {
+          const nm = String(saved.cityName || "");
+          if (!saved.isMulti && !saved.isProv && /%[0-9A-Fa-f]{2}/.test(nm)) saved.__staleCity = true;
+        } catch (e) {
+          if (typeof console !== "undefined" && console.warn) console.warn("[app] 旧行程脏档打标失败:", e && e.message);
+        }
         // 只恢复「尚未结束」的行程；已结束的自动归档到「我的行程」，避免过期数据幽灵
         const last = String(saved.days[saved.days.length - 1].date || "").slice(0, 10);
         const today = store.fmtLocalDate(new Date());

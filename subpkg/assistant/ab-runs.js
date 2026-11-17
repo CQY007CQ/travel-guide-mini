@@ -19,8 +19,13 @@ function runGenerate(text, city, ctx) {
   if (!c) {
     return { text: "先告诉我去哪个城市，比如「帮我生成成都 3 天行程」，我直接排好带你去。", actions: [act("pages/index/index", "打开生成攻略 →", {}, "tab")], intent: "generate" };
   }
+  // v1.20.19：findCity 对编造城市也返回 generic 模板城，旧判据 `if (T.findCity(c))`
+  // 恒真 → 这层「离线库里还没有」的拦截从未生效。改用 T.realCity（排除 generic）。
   let found = false;
-  try { if (T.findCity && T.findCity(c)) found = true; } catch (e) {}
+  try {
+    const hit = T.realCity ? T.realCity(c) : (T.findCity ? T.findCity(c) : null);
+    found = !!(hit && hit.id !== "generic");
+  } catch (e) {}
   if (!found) {
     return { text: "离线库里还没有「" + c + "」，换个已收录的城市，或先在生成页选。", actions: [act("pages/index/index", "去生成攻略 →", {}, "tab")], intent: "generate" };
   }
@@ -219,13 +224,20 @@ function runLandmarks(text, city) {
 function runDress(text, city, ctx) {
   const c = city || (ctx && ctx.plan && ctx.plan.cityName) || "";
   let d = null, brief = null;
-  try {
-    const obj = c && T.findCity ? T.findCity(c) : null;
-    if (obj && T.dressForMonth) d = T.dressForMonth(obj, (ctx && ctx.plan && ctx.plan.depart) || "");
-  } catch (e) {}
-  try { if (c && T.cityBrief) brief = T.cityBrief(c); } catch (e) {}
-  const lines = ["🧥 " + (c ? c + " " : "") + "穿衣与随身建议（离线气候库，非实时天气）"];
-  if (d) {
+  // v1.20.19：未收录城市从 findCity 拿到的是 generic（气候写死 temperate），
+  // 旧实现拿它调 dressForMonth / cityBrief，等于拿模板冒充离线气候库 —— 零伪造红线。
+  let real = null;
+  try { real = c ? (T.realCity ? T.realCity(c) : (T.findCity ? T.findCity(c) : null)) : null; }
+  catch (e) { real = null; }
+  if (real && real.id === "generic") real = null;
+  if (real) {
+    try { if (T.dressForMonth) d = T.dressForMonth(real, (ctx && ctx.plan && ctx.plan.depart) || ""); } catch (e) {}
+    try { if (T.cityBrief) brief = T.cityBrief(c); } catch (e) {}
+  }
+  const lines = ["🧥 " + (c ? c + " " : "") + "穿衣与随身建议" + (real ? "（离线气候库，非实时天气）" : "")];
+  if (!real) {
+    lines.push("· 离线气候库暂未收录「" + c + "」，说个具体城市（如「成都 11 月穿什么」）再给建议。");
+  } else if (d) {
     lines.push("· " + (d.season || "") + (d.weather ? "：" + d.weather : ""));
     (d.lines || []).slice(0, 3).forEach(x => { if (x) lines.push("· " + x); });
     if (d.acc) lines.push("· 配件：" + d.acc);

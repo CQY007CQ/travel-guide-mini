@@ -141,5 +141,28 @@ ok("对照组：明文「吉安」与编码串「%E5%90%89%E5%AE%89」生成同�
   JSON.stringify(capturedPlan && capturedPlan.days) === JSON.stringify(genEnc.plan && genEnc.plan.days));
 try { delete globalThis.getApp; } catch (e) {}
 
+/* ---------- 7. 假城市守卫（v1.20.19） ----------
+ * findCity 对任意非空串都返回 id:"generic" 的模板城（有店名/街区/酒店），
+ * 所以 `if (!city)` 这种守卫永远不成立 —— 编造的城市能拿到一份看似真实的假攻略。
+ * 这里真跑「编造城市 → 拒绝生成」和「真实城市 → 正常生成」两条路。 */
+// 第 6 节末尾删过垫片，这里重新装一个，专供 generatePlan 落盘断言。
+globalThis.getApp = () => ({ setPlan: (p) => { capturedPlan = p; } });
+ok("T.realCity 存在且拒绝编造城市", typeof TW.realCity === "function" && TW.realCity("火星城xyz") === null);
+ok("T.realCity 接受真实城市、并先解码再解析",
+  !!(TW.realCity("吉安") && TW.realCity("%E5%90%89%E5%AE%89") && TW.realCity("%E5%90%89%E5%AE%89").name === "吉安"));
+capturedPlan = null;
+const genFake = WRITE.generatePlan("火星城xyz", 3, {});
+ok("编造城市不再生成假攻略（ok=false 且不落盘）",
+  !!(genFake && genFake.ok === false && capturedPlan === null && /离线知识库里还没有/.test(genFake.msg || "")),
+  "ok=" + (genFake && genFake.ok) + " msg=" + (genFake && genFake.msg));
+const RUNS = req(path.join(ROOT, "subpkg/assistant/ab-runs.js"));
+const dressFake = RUNS.runDress("火星城xyz 11月穿什么", "火星城xyz", {});
+ok("穿衣建议不为编造城市伪造气候（明确说未收录）",
+  /离线气候库暂未收录/.test(dressFake.text || "") && !/秋季|温带|短袖/.test(dressFake.text || ""));
+const dressReal = RUNS.runDress("吉安 11月穿什么", "吉安", {});
+ok("穿衣建议对真实城市仍给离线气候内容（对照组）",
+  !/暂未收录/.test(dressReal.text || "") && /·/.test(dressReal.text || ""));
+try { delete globalThis.getApp; } catch (e) {}
+
 console.log("  全站 AI 上下文 / 双视角 / 动作单测: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);
