@@ -5,11 +5,32 @@ const S = require("./store.js");   // v1.20.4 #81：统一存储出口
 const KEY = "errlogV1";
 const CAP = 30;
 
-function _get() {
-  try { return S.getArr(KEY); } catch (e) { return []; }
+// 2026-11-17：内存兜底。
+//   原先 push() 每次都「从 storage 读出 → 追加 → 写回」，存储写不进去时这条痕迹直接消失。
+//   而存储写不进去（配额满）恰恰是最需要排查的时刻 —— 实测：模拟 setStorageSync 全失败后
+//   recent() 恒为 []，整个会话的降级痕迹一条都留不下来，日志本身被自己吞掉。
+//   现在 _mem 是会话内的权威副本：首次访问从磁盘水合一次，之后只写内存 + 尽力落盘。
+//   落盘成功与否不再影响「本次会话能不能看到痕迹」，跨会话持久化仍然保留。
+const _mem = [];
+let _hydrated = false;
+function _hydrate() {
+  if (_hydrated) return;
+  _hydrated = true;
+  try {
+    const disk = S.getArr(KEY);
+    for (let i = 0; i < disk.length && _mem.length < CAP; i++) _mem.push(disk[i]);
+  } catch (e) { /* 读不到就当空会话，不能因为读失败把整个日志功能干掉 */ }
 }
+function _get() { _hydrate(); return _mem.slice(); }
 function _set(v) {
-  try { S.set(KEY, v); } catch (e) { /* 痕迹写盘失败只能吞掉：在这里再留痕会自我递归，且存储已满时必然再失败 */ }
+  // 这里刻意直接调 wx.setStorageSync，而不走 S.set：
+  //   S.set 写失败时会反过来记一条 store 诊断，而诊断本身又要落到本键 → 自我递归
+  //   （实测会多出一条「写入失败: errlogV1」，且在更极端的场景下会反复自激）。
+  //   本函数已经是最底层，写不进就放弃，内存副本仍在，会话内照样能读。
+  try {
+    if (typeof wx === "undefined" || !wx || typeof wx.setStorageSync !== "function") return;
+    wx.setStorageSync(KEY, v);
+  } catch (e) { /* 见上：不做任何留痕，避免递归 */ }
 }
 
 function push(label, err) {
@@ -20,15 +41,17 @@ function push(label, err) {
     else msg = String(err);
   } catch (e) { msg = "unknown error"; }
   const item = { t: Date.now(), label: String(label || ""), msg: msg.slice(0, 600) };
-  const list = _get();
-  list.push(item);
-  while (list.length > CAP) list.shift();
-  _set(list);
+  _hydrate();
+  _mem.push(item);
+  while (_mem.length > CAP) _mem.shift();
+  _set(_mem.slice());
 }
 
 function recent() { return _get(); }
-function count() { try { return _get().length; } catch (e) { return 0; } }
-function clear() { _set([]); }
+function count() { try { _hydrate(); return _mem.length; } catch (e) { return 0; } }
+// 清空必须同时清内存与磁盘：只清磁盘时内存副本会让「清空」看起来没生效（more 页的日志面板）
+// 不套 try：_hydrate 内部的读写已经在自己的 try 里，外层再包一层只会多出一个空 catch。
+function clear() { _hydrate(); _mem.length = 0; _set([]); }
 
 /* ────────────────────────────────────────────────────────────────
  * v1.20.8（T1）：`note()` —— 降级痕迹统一出口

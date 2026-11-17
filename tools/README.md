@@ -31,7 +31,7 @@ tools/
 `check-deps`（相对引用可解析）·`check-secrets`（全仓无明文 Key）·`check-assets`（图片引用）·
 `check-wxml`（结构）·`check-handlers`（页面结构 + 事件配对）·`check-pkgsize`（分包 ≤2MB）·
 `check-preload`（预下载 ≤2MB）·`check-demo-quality`（Console 告警防回潮）·`check-health`（全盘体检单一出口）·
-`check-observability`（静默失败）·`check-doc-consistency` + `check-doc-numbers`（材料口径）·
+`check-observability`（静默失败）·`check-tap-target`（触达尺寸棘轮）·`check-doc-consistency` + `check-doc-numbers`（材料口径）·
 `check-ai-scenarios`/`check-ai-fallback`/`check-ai-reach`/`check-lens`（AI 与识物防回潮）·
 `check-qa-rails`（**数值/有效性**：对比度、金额口径一致性、测试有效性、主题变量对称性）·
 `check-v111`/`check-v112`/`check-new`/`check-more`/`check-boundary`（版本功能单测，历史包袱）

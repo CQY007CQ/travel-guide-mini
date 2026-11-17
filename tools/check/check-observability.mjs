@@ -80,7 +80,10 @@ const errlog = read("utils/errlog.js");
 ok("utils/errlog.js 提供 note()", /function note\(/.test(errlog) && /module\.exports\s*=\s*\{[^}]*\bnote\b/.test(errlog));
 ok("utils/errlog.js 提供 noteStats()", /function noteStats\(/.test(errlog) && /module\.exports\s*=\s*\{[^}]*noteStats/.test(errlog));
 ok("note() 带去重（同一 scope+消息只落一条）", /_seen\[key\]/.test(errlog) && /\.n\+\+/.test(errlog));
-ok("errlog 缓冲有上限（不会无界增长）", /const CAP\s*=\s*\d+/.test(errlog) && /while \(list\.length > CAP\)/.test(errlog));
+// 这里只断言「有上限常量」；真正的「写超了会被裁掉」改在 ⑤b 里真跑验证。
+// 原先还断言 /while \(list\.length > CAP\)/ —— 那是把内部变量名当契约，改个变量名就假红，
+// 而变量名对了也不代表裁剪真的生效（同类的「断言字面量而非行为」问题本轮已踩两次）。
+ok("errlog 缓冲有上限（不会无界增长）", /const CAP\s*=\s*\d+/.test(errlog));
 ok("note() 自身吞掉内部异常（不把降级变成崩溃）", /catch \(e3\) \{ return 0; \}/.test(errlog));
 ok("没有第二套痕迹模块（禁止 diag.js 这类重复实现）", !fs.existsSync(path.join(ROOT, "utils/diag.js")));
 
@@ -185,6 +188,47 @@ ok("传入 undefined / 循环引用对象都不抛错", (() => {
 })());
 ok("noteStats 三字段齐全", "total" in st && "kinds" in st && "byScope" in st);
 
+/* ───────── ⑤b 存储失败诊断：必须「带操作与键名」，且不被存储写失败反噬 ─────────
+ * 2026-11-17 实测到的真漏洞：store.js 的 _note 被调成 `_note("store", e, "写入失败: " + k)`，
+ * 三实参对两形参 → 多出的 "store" 被当成消息，落盘内容恒为 `store · Error: ...`，
+ * 真正的「操作类型 + 键名」被第三个实参吞掉；去重键退化成 `store|store`，
+ * 读/写/删/JSON 解析四类失败共用一桶，只有第一条能落盘。
+ *
+ * 本文件此前的 ③ 只断言「源码里存在 写入失败（可能配额已满） 这串字」——字符串在，
+ * 不代表消息到得了读者手里，于是这个漏洞一路绿灯。所以这里改成**真跑一遍**：
+ * 模拟 setStorageSync 全失败，断言 recent() 里能读出「哪个键、哪种操作」。
+ * 顺带覆盖同源第二个坑：存储写不进去时 errlog 自己也在写盘，没有内存兜底的话
+ * 最需要日志的时刻 recent() 恒为空（日志被自己吞掉）。
+ */
+console.log("【存储失败诊断（真跑）】");
+const { installWxShim } = await import(new URL("../test/_wx-shim.mjs", import.meta.url));
+installWxShim({ failOn: "set" });          // 任何 setStorageSync 都抛「配额满」
+const STORE_P = path.join(ROOT, "utils/store.js");
+const EL_P = path.join(ROOT, "utils/errlog.js");
+const _drop = (p) => { try { delete req.cache[req.resolve(p)]; } catch (e) { /* 未加载过则忽略 */ } };
+_drop(STORE_P); _drop(EL_P);               // 丢掉上面 ⑤ 用过的实例（_seen/_mem 是模块级状态）
+const S2 = req(STORE_P);
+const EL2 = req(EL_P);
+let setOkA = null, setOkB = null;
+try { setOkA = S2.set("diagKeyA", 1); setOkB = S2.set("diagKeyB", 2); } catch (e) { /* 下面断言会体现 */ }
+const diagLogs = EL2.recent();
+const diagText = diagLogs.map((x) => String(x && x.msg || "")).join("\n");
+ok("存储写失败仍如实返回 false（调用方可降级）", setOkA === false && setOkB === false);ok("诊断里带得上操作类型（写入失败）", /写入失败/.test(diagText), diagText.slice(0, 120));
+ok("诊断里带得上具体键名（A / B 各自留痕，不共用去重桶）",
+  /diagKeyA/.test(diagText) && /diagKeyB/.test(diagText), diagText.slice(0, 200));
+ok("存储满时日志自身仍可读（内存兜底，不被自己的写盘失败吞掉）", diagLogs.length >= 2, "条数 " + diagLogs.length);
+ok("两类键失败记为两种（去重未退化成 store|store）", EL2.noteStats().kinds >= 2, "kinds=" + EL2.noteStats().kinds);
+// 缓冲上限：真灌 40 条看会不会被裁到 CAP（原先是断言内部变量名，改个名字就假红、名字对了也不代表真裁）
+try { EL2.clear(); } catch (e) { /* ignore */ }
+for (let i = 0; i < 40; i++) EL2.push("flood", new Error("flood-" + i));
+const floodLen = EL2.recent().length;
+ok("缓冲上限真的生效（灌 40 条只留 " + floodLen + " 条，不无界增长）", floodLen > 0 && floodLen <= 30, "len=" + floodLen);
+ok("超上限时挤掉最旧的（保留最后一条）", /flood-39$/.test(String((EL2.recent().slice(-1)[0] || {}).msg || "")), "尾条 " + String((EL2.recent().slice(-1)[0] || {}).msg || ""));
+try { EL2.clear(); } catch (e) { /* ignore */ }
+ok("clear() 同时清内存与磁盘（否则日志面板清不掉）", EL2.count() === 0, "count=" + EL2.count());
+try { delete globalThis.wx; } catch (e) { /* ignore */ }
+_drop(STORE_P); _drop(EL_P);               // 不留垫片污染：后续段落一律在无 wx 的真实降级路径上跑
+
 /* ───────── ⑥ 断网降级契约：有提示 + 有痕迹 ───────── */
 console.log("【断网/失败降级契约】");
 const assistant = read("subpkg/assistant/assistant.js");
@@ -194,6 +238,20 @@ const lens = read("subpkg/lens/lens.js");
 ok("识物失败给真实地点对照清单（不是白屏/静默）", /_openLocalCompare/.test(lens));
 ok("识物不宣称离线识别（零伪造）", !/离线识别(?:无需联网|免联网)/.test(lens));
 
+/* ───────── ⑥b Promise 拒绝也必须留痕 ─────────
+ * 小程序的 Promise 拒绝不进 onError，只进 onUnhandledRejection。缺这个钩子时，
+ * 全仓 36 处 .then / 一批 async 函数的失败在线上**完全无声**（调试器里能看到，真机看不到）。
+ * 这里锁两件事：钩子在、且走统一出口（不是自己 console.warn 一套格式）。 */
+const appSrc = read("app.js");
+ok("App 声明了 onUnhandledRejection（Promise 拒绝不会进 onError）", /onUnhandledRejection\s*\(\s*res\s*\)/.test(appSrc));
+ok("onUnhandledRejection 走统一痕迹出口 errlog", /EL\.push\(\s*"app\.unhandledRejection"/.test(appSrc));
+ok("onUnhandledRejection 自身整体包了 try（兜底逻辑不许成为新崩溃源）",
+  (() => {
+    const i = appSrc.indexOf("onUnhandledRejection");
+    if (i < 0) return false;
+    const seg = appSrc.slice(i, i + 900);
+    return /try\s*\{/.test(seg) && /catch\s*\(/.test(seg);
+  })());
 console.log("");
 if (fail === 0) {
   console.log("可观测性门禁通过：" + pass + " 项（空 catch " + emptyCount + " / 基线 " + BASELINE + "）");

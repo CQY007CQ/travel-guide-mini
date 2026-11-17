@@ -120,6 +120,20 @@ App({
     try { EL.push("app.onError", err); } catch (e2) {}
     try { if (typeof console !== "undefined" && console.warn) console.warn("[app] onError:", err && (err.message || err)); } catch (e) {}
   },
+  // 2026-11-17：Promise 拒绝**不会**进 onError（这是小程序与浏览器一致的既定行为），
+  // 之前全仓 36 处 .then / 一批 async 函数的失败只会在调试器里冒泡，线上与审核环境完全沉底。
+  // 与「存储失败诊断」是同一类问题：功能还在，但失败无人知晓。统一进口 errlog（环形缓冲 + 去重）。
+  // 注意 reason 可能是字符串/对象而不是 Error，EL.push 内部已兜住；这里整体再包一层 try，
+  // 兜底逻辑本身抛错就会变成新的崩溃源（onUnhandledRejection 抛错无法再被捕获）。
+  onUnhandledRejection(res) {
+    let reason = "unknown";
+    try {
+      reason = (res && (res.reason || res.errMsg)) || "unknown";
+      if (reason && typeof reason === "object" && !reason.message && reason.errMsg) reason = reason.errMsg;
+    } catch (e) { reason = "unhandled-rejection"; }
+    try { EL.push("app.unhandledRejection", reason); } catch (e2) { /* 痕迹写不进也不能在这里再抛 */ }
+    try { if (typeof console !== "undefined" && console.warn) console.warn("[app] onUnhandledRejection:", reason && (reason.message || reason)); } catch (e) { /* 控制台不可用同样不抛 */ }
+  },
   // v1.19.60：未知页面兜底转回首页，避免「打不开」
   onPageNotFound(res) {
     try { wx.reLaunch({ url: "/pages/index/index" }); } catch (e) {}
