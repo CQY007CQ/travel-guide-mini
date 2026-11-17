@@ -4,7 +4,7 @@
     <view class="h3"><image lazy-load class="ic" src="/images/icons/search.png"/>全场景 AI 速达</view>
     <view class="scene-sub dim">点一下直接进对应页，AI 会带着当前城市继续帮你</view>
     <view class="scene-grid">
-      <view class="scene" wx:for="{{scenarios}}" wx:key="key" data-key="{{item.key}}" bindtap="onScenario">
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="scene" wx:for="{{scenarios}}" wx:key="key" data-key="{{item.key}}" bindtap="onScenario">
         <image lazy-load class="scene-ic" src="/images/icons/{{item.icon}}"/>
         <text class="scene-t">{{item.label}}</text>
       </view>
@@ -18,7 +18,7 @@
     <view class="search">
       <input class="inp" placeholder="例如：杭州4天情侣游 预算舒适" value="{{nlText}}" confirm-type="go"
              bindinput="onNLInput" bindconfirm="onNLRun"/>
-      <view class="btn {{nlBusy ? 'nl-busy' : ''}}" bindtap="onNLRun">{{nlBusy ? '生成中' : 'AI 生成'}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="btn {{nlBusy ? 'nl-busy' : ''}}" bindtap="onNLRun">{{nlBusy ? '生成中' : 'AI 生成'}}</view>
     </view>
     <view class="nl-result dim" wx:if="{{nlResult}}">{{nlResult}}</view>
   </view>
@@ -29,7 +29,7 @@
   </view>
 
   <!-- AI 识物入口：不依赖行程，有/无攻略都必须可见（曾嵌在 hasPlan 卡片里导致新用户找不到） -->
-  <view class="card lens-card" bindtap="goLens">
+  <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="card lens-card" bindtap="goLens">
     <view class="h2"><image lazy-load class="ic" src="/images/icons/camera.png"/>AI 识物 · 拍照识图</view>
     <view class="lens-entry">
       <text class="le-t">拍一张认植物 / 地标 / 招牌，AI 讲讲它的故事</text>
@@ -42,7 +42,7 @@
     <view class="em-ic"><image lazy-load class="em-img" src="/images/icons/search.png"/></view>
     <view class="em-t">先生成一份行程</view>
     <view class="em-s">下面所有速查卡片都需要先生成攻略，才能给出贴合「这座城 · 这几天 · 这种节奏」的答案。</view>
-    <view class="em-cta" bindtap="goIndex">去生成攻略</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="em-cta" bindtap="goIndex">去生成攻略</view>
   </view>
 
   <!-- 头部：上下文 + 一键查 + 自由查 -->
@@ -52,7 +52,7 @@
 
     <view class="h3">一键查</view>
     <view class="tiles">
-      <view class="tile" wx:for="{{tiles}}" wx:key="k" data-k="{{item.k}}" bindtap="onTile">
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="tile" wx:for="{{tiles}}" wx:key="k" data-k="{{item.k}}" bindtap="onTile">
         <image lazy-load class="tile-ic" src="/images/icons/{{item.ic}}"/>
         <text class="tile-t">{{item.t}}</text>
       </view>
@@ -62,16 +62,16 @@
     <view class="search">
       <input class="inp" placeholder="{{mode === 'spot' ? '输入景点名，如：故宫 / 外滩' : '输入关键词，如天气、美食、门票'}}" value="{{input}}" confirm-type="search"
              bindinput="onInput" bindconfirm="search"/>
-      <view class="btn" bindtap="search">查</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="btn" bindtap="search">查</view>
     </view>
     <view class="mode-tip" wx:if="{{mode === 'spot'}}">
       <text>📍 查景点模式：输入任意景点名，查看介绍 / 怎么玩 / 怎么去 / 门票 / 预约提示（纯本地）</text>
-      <view class="mode-exit" bindtap="exitSpot">退出</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="mode-exit" bindtap="exitSpot">退出</view>
     </view>
     <view class="pspots" wx:if="{{mode === 'spot' && planSpots.length}}">
       <view class="ps-title dim">你这趟要去：</view>
       <view class="ps-row">
-        <view class="ps-chip" wx:for="{{planSpots}}" wx:key="*this" data-name="{{item}}" bindtap="tapPlanSpot">{{item}}</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ps-chip" wx:for="{{planSpots}}" wx:key="*this" data-name="{{item}}" bindtap="tapPlanSpot">{{item}}</view>
       </view>
     </view>
   </view>
@@ -91,7 +91,7 @@
       <view class="spot-lab">预约提示</view><view class="spot-txt">{{spotResult.booking}}</view>
     </view>
     <view class="spot-empty" wx:if="{{!spotResult.intro && !spotResult.note && !(spotResult.ticket && spotResult.ticket.known) && !spotResult.booking}}">这个景点暂时没有更详细的本地资料，到当地后随走随问也很方便 ~</view>
-    <view class="spot-ai" bindtap="onSpotAI" wx:if="{{spotResult.found}}">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="spot-ai" bindtap="onSpotAI" wx:if="{{spotResult.found}}">
       <image lazy-load class="ic ic-sm" src="/images/icons/sparkle.png"/>
       <text class="spot-ai-t">AI 讲解这个景点</text>
       <text class="spot-ai-a">→</text>
@@ -105,27 +105,27 @@
     <!-- v1.20.6 双视角推理：复杂问题给一条独立审慎视角并列展示，不假装投票出唯一真理 -->
     <view class="dual" wx:if="{{aiSource && dualOn}}">
       <view class="dual-tabs">
-        <view class="dual-tab {{showingAlt ? '' : 'on'}}" bindtap="toggleAlt">主回答</view>
-        <view class="dual-tab {{showingAlt ? 'on' : ''}}" bindtap="toggleAlt">另一视角 · 审慎复核</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="dual-tab {{showingAlt ? '' : 'on'}}" bindtap="toggleAlt">主回答</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="dual-tab {{showingAlt ? 'on' : ''}}" bindtap="toggleAlt">另一视角 · 审慎复核</view>
       </view>
       <view class="dual-note">{{showingAlt ? '独立视角：重点看风险、前提与替代方案，请与主回答对照判断。' : '主回答：实用建议视角。'}}</view>
     </view>
     <view class="r-a" wx:if="{{!showingAlt || !dualOn}}">{{lastResult}}</view>
     <view class="r-a r-a-alt" wx:if="{{showingAlt && dualOn}}">{{altText}}</view>
-    <view class="spot-ai" bindtap="onReviewAI" wx:if="{{lastIntent === 'review'}}">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="spot-ai" bindtap="onReviewAI" wx:if="{{lastIntent === 'review'}}">
       <image lazy-load class="ic ic-sm" src="/images/icons/sparkle.png"/>
       <text class="spot-ai-t">AI 帮我写游记</text>
       <text class="spot-ai-a">→</text>
     </view>
-    <view class="ai-copy" wx:if="{{lastResult}}" bindtap="aiCopy">复制回答</view>
-    <view class="ai-copy" bindtap="aiClearChat">清空会话</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" wx:if="{{lastResult}}" bindtap="aiCopy">复制回答</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" bindtap="aiClearChat">清空会话</view>
     <!-- 增强意图附带的「直达对应页」按钮（对齐网页版 AI 全站导航） -->
     <view class="actions" wx:if="{{actions.length}}">
-      <view class="act-btn" wx:for="{{actions}}" wx:key="label" data-path="{{item.path}}" data-query="{{item.query}}" data-mode="{{item.mode}}" bindtap="onAction">{{item.label}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="act-btn" wx:for="{{actions}}" wx:key="label" data-path="{{item.path}}" data-query="{{item.query}}" data-mode="{{item.mode}}" bindtap="onAction">{{item.label}}</view>
     </view>
     <view class="keep-line">
-      <view class="keep-btn" bindtap="keepLast"><image lazy-load class="ic ic-sm" src="/images/icons/star.png"/>收藏（已收藏 {{keepN}}）</view>
-      <view class="keep-btn keep-btn-2" bindtap="toggleKeeps" wx:if="{{keeps.length}}">查看收藏（{{keeps.length}}）</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="keep-btn" bindtap="keepLast"><image lazy-load class="ic ic-sm" src="/images/icons/star.png"/>收藏（已收藏 {{keepN}}）</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="keep-btn keep-btn-2" bindtap="toggleKeeps" wx:if="{{keeps.length}}">查看收藏（{{keeps.length}}）</view>
     </view>
   </view>
 
@@ -133,6 +133,6 @@
   <view class="card keeps" wx:if="{{keepsOpen && keeps.length}}">
     <view class="h3"><image lazy-load class="ic" src="/images/icons/star.png"/>我的收藏（本地保存）</view>
     <view class="keep-it" wx:for="{{keeps}}" wx:key="*this">· {{item}}</view>
-    <view class="keep-clear" bindtap="clearKeeps">清空收藏</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="keep-clear" bindtap="clearKeeps">清空收藏</view>
   </view>
 </view>

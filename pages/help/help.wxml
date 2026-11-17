@@ -4,7 +4,7 @@
   <view class="eh-hero">
     <text class="eh-t">旅途受伤 / 突发不适</text>
     <text class="eh-s">急危重症请先拨打 120，说清位置与伤情；不要先查攻略，也不要自己开车</text>
-    <view class="eh-call" bindtap="onCall120">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="eh-call" bindtap="onCall120">
       <view class="eh-call-left">
         <text class="eh-call-l">急救电话</text>
         <text class="eh-num">120</text>
@@ -12,9 +12,9 @@
       <text class="eh-call-r">点击拨打 ›</text>
     </view>
     <view class="eh-others">
-      <view class="eh-o" bindtap="onCallNum" data-num="110"><text class="eh-o-n">110</text><text class="eh-o-l">报警</text></view>
-      <view class="eh-o" bindtap="onCallNum" data-num="119"><text class="eh-o-n">119</text><text class="eh-o-l">火警</text></view>
-      <view class="eh-o" bindtap="onCallNum" data-num="122"><text class="eh-o-n">122</text><text class="eh-o-l">交通事故</text></view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="eh-o" bindtap="onCallNum" data-num="110"><text class="eh-o-n">110</text><text class="eh-o-l">报警</text></view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="eh-o" bindtap="onCallNum" data-num="119"><text class="eh-o-n">119</text><text class="eh-o-l">火警</text></view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="eh-o" bindtap="onCallNum" data-num="122"><text class="eh-o-n">122</text><text class="eh-o-l">交通事故</text></view>
     </view>
   </view>
 
@@ -22,11 +22,11 @@
   <view class="card er-card">
     <view class="er-h">第一步 · 是什么情况</view>
     <view class="er-chips">
-      <view class="er-chip" wx:for="{{quick}}" wx:key="*this" data-t="{{item}}" bindtap="onQuick">{{item}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-chip" wx:for="{{quick}}" wx:key="*this" data-t="{{item}}" bindtap="onQuick">{{item}}</view>
     </view>
     <input class="er-input" value="{{text}}" placeholder="也可以直接描述：腿摔了站不起来 / 开水烫到手"
            confirm-type="search" bindinput="onInput" bindconfirm="onAsk"/>
-    <view class="er-go" bindtap="onAsk">看该挂什么科</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-go" bindtap="onAsk">看该挂什么科</view>
   </view>
 
   <!-- 结果：科室建议 -->
@@ -47,17 +47,17 @@
     <view class="er-disclaim" wx:if="{{tripHint}}">{{tripHint}}</view>
     <!-- 当天真实坐标景点：点一下按该景点重排医院；再点一次回城中心。复用 er-chips 样式省主包体积 -->
     <view class="er-chips" wx:if="{{daySpots.length}}">
-      <text class="er-chip" style="{{nearSpot === '' ? 'background:linear-gradient(135deg,#e6bb62,#c19337);color:#171107;font-weight:800' : ''}}" data-name="" catchtap="onNearSpot">城中心</text>
-      <text class="er-chip" style="{{nearSpot === item.name ? 'background:linear-gradient(135deg,#e6bb62,#c19337);color:#171107;font-weight:800' : ''}}" wx:for="{{daySpots}}" wx:key="name" data-name="{{item.name}}" catchtap="onNearSpot">{{item.name}}</text>
+      <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-chip" style="{{nearSpot === '' ? 'background:linear-gradient(135deg,#e6bb62,#c19337);color:#171107;font-weight:800' : ''}}" data-name="" catchtap="onNearSpot">城中心</text>
+      <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-chip" style="{{nearSpot === item.name ? 'background:linear-gradient(135deg,#e6bb62,#c19337);color:#171107;font-weight:800' : ''}}" wx:for="{{daySpots}}" wx:key="name" data-name="{{item.name}}" catchtap="onNearSpot">{{item.name}}</text>
     </view>
-    <view class="er-hrow" wx:for="{{hos}}" wx:key="n" data-i="{{index}}" bindtap="onNav">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-hrow" wx:for="{{hos}}" wx:key="n" data-i="{{index}}" bindtap="onNav">
       <view class="er-hl">
         <text class="er-hn">{{item.n}}</text>
         <text class="er-hm">{{item.lv}} · {{nearSpot ? '距' + nearSpot : '距城中心'}}约 {{nearSpot ? item.kms : item.kmc}} km</text>
       </view>
       <text class="er-nav">导航 ›</text>
     </view>
-    <view class="er-pick" bindtap="onPickCity">切换城市</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-pick" bindtap="onPickCity">切换城市</view>
   </view>
 
   <!-- 降级态：本城无已核验医院名单。不编造机构名，改为地图搜索 -->
@@ -65,23 +65,23 @@
     <text class="er-disclaim" wx:if="{{tripHint}}">{{tripHint}}</text>
     <text class="er-nt">{{city}} 暂无已核验的医院名单</text>
     <text class="er-ns">为避免给出并不存在的机构，这里不列具体医院名。请在地图中搜索「医院」或「急诊」，就近前往；急危重症直接拨打 120。</text>
-    <view class="er-mapbtn" wx:if="{{apLat}}" bindtap="onMapSearch">在地图中搜索附近医院</view>
-    <view class="er-pick" bindtap="onPickCity">切换城市</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-mapbtn" wx:if="{{apLat}}" bindtap="onMapSearch">在地图中搜索附近医院</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-pick" bindtap="onPickCity">切换城市</view>
   </view>
 
   <view class="card er-pick-only" wx:if="{{!city}}">
-    <view class="er-pick" bindtap="onPickCity">选择城市</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-pick" bindtap="onPickCity">选择城市</view>
   </view>
 
   <!-- 城市选择弹层：可搜索（451 城超出 showActionSheet 的 6 项上限） -->
-  <view class="pk-mask" wx:if="{{pickOpen}}" bindtap="onPickClose">
-    <view class="pk-panel" catchtap="noop">
+  <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="pk-mask" wx:if="{{pickOpen}}" bindtap="onPickClose">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="pk-panel" catchtap="noop">
       <view class="pk-top">
         <input class="pk-input" value="{{kw}}" placeholder="搜索城市名" focus="{{pickOpen}}" bindinput="onPickInput"/>
-        <text class="pk-x" bindtap="onPickClose">关闭</text>
+        <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="pk-x" bindtap="onPickClose">关闭</text>
       </view>
       <scroll-view class="pk-list" scroll-y>
-        <view class="pk-item" wx:for="{{cityList}}" wx:key="*this" data-c="{{item}}" bindtap="onPickTap">
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="pk-item" wx:for="{{cityList}}" wx:key="*this" data-c="{{item}}" bindtap="onPickTap">
           <text class="pk-n">{{item}}</text>
           <text class="pk-tag" wx:if="{{apSet[item]}}">仅位置</text>
         </view>
@@ -95,7 +95,7 @@
   </view>
 
   <!-- 数据规模是「了解本 App」的说明，不属急救场景；v1.20.6 迁到「使用指南」页，这里只留入口 -->
-  <view class="er-disclaim" data-url="/subpkg/guide/guide" catchtap="goGuide">
+  <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-disclaim" data-url="/subpkg/guide/guide" catchtap="goGuide">
     想看随包离线数据的真实规模（城市/景点/医院等）？到「使用指南 → 离线数据规模」查看 ›
   </view>
 
@@ -106,17 +106,17 @@
       <text class="ai-t">AI 应急问答</text>
       <text class="ai-badge" wx:if="{{aiPending && aiLoading}}">本地速答</text>
       <text class="ai-badge" wx:elif="{{aiSource}}">AI 生成</text>
-      <view class="ai-clear" bindtap="aiClear">清空</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-clear" bindtap="aiClear">清空</view>
     </view>
     <view class="ai-tip dim">带上当前行程上下文的多轮问答；不给诊疗结论，急症请拨 120。无网络时自动回落本地资料。</view>
     <view class="ai-row">
       <input class="ai-inp" placeholder="如：爬山崴脚了该先怎么处理？" value="{{aiQ}}"
              bindinput="onAIInput" bindconfirm="aiAsk" confirm-type="send"/>
-      <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiAsk">{{aiLoading ? '思考中…' : '问'}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="aiAsk">{{aiLoading ? '思考中…' : '问'}}</view>
     </view>
     <view class="ai-ans" wx:if="{{aiAnswer}}">{{aiAnswer}}</view>
     <view class="ai-tip" wx:if="{{aiPending && aiLoading}}">AI 正在生成更完整的版本…</view>
-    <view class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" wx:if="{{aiAnswer}}" bindtap="aiCopy">复制回答</view>
     <view class="ai-err" wx:if="{{aiErr}}">{{aiErr}}</view>
   </view>
   <!-- 全站 AI 入口：应急场景深链，自动带入具名医院 / 降级城真实口径 -->

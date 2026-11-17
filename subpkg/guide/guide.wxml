@@ -3,9 +3,9 @@
 
   <!-- 阅读字号调节（强光下走路看、老人使用都需要） -->
   <view class="fz-bar">
-    <text class="fz-btn {{fz === 1 ? 'on' : ''}}" bindtap="fzMinus">A⁻ 标准</text>
+    <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="fz-btn {{fz === 1 ? 'on' : ''}}" bindtap="fzMinus">A⁻ 标准</text>
     <view class="fz-nums"><text class="fz-dot {{fz >= 1 ? 'on' : ''}}"></text><text class="fz-dot {{fz >= 2 ? 'on' : ''}}"></text><text class="fz-dot {{fz >= 3 ? 'on' : ''}}"></text></view>
-    <text class="fz-btn {{fz === 3 ? 'on' : ''}}" bindtap="fzPlus">A⁺ 放大</text>
+    <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="fz-btn {{fz === 3 ? 'on' : ''}}" bindtap="fzPlus">A⁺ 放大</text>
   </view>
 
   <view class="g-hero card">
@@ -15,12 +15,12 @@
 
   <!-- AI 能力快捷入口：本页主推，两个大按钮直达，不用展开就能点 -->
   <view class="g-ai-quick">
-    <view class="g-ai-btn" data-url="/subpkg/assistant/assistant" catchtap="go">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="g-ai-btn" data-url="/subpkg/assistant/assistant" catchtap="go">
       <text class="g-ai-ic">✦</text>
       <view class="g-ai-tx"><text class="g-ai-t">AI 助手</text><text class="g-ai-d">随行问答 · 一句话生成</text></view>
       <text class="g-ai-ar">›</text>
     </view>
-    <view class="g-ai-btn" data-url="/subpkg/lens/lens" catchtap="go">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="g-ai-btn" data-url="/subpkg/lens/lens" catchtap="go">
       <text class="g-ai-ic">★</text>
       <view class="g-ai-tx"><text class="g-ai-t">拍照识物</text><text class="g-ai-d">拍植物地标 · 云端识别科普</text></view>
       <text class="g-ai-ar">›</text>
@@ -31,7 +31,7 @@
   <block wx:for="{{groups}}" wx:key="g" wx:for-item="grp" wx:for-index="gi">
     <view class="g-group-t">{{grp.g}}</view>
     <view class="g-list card">
-      <view class="g-row {{open === it.k ? 'on' : ''}}" wx:for="{{grp.items}}" wx:key="k" wx:for-item="it"
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="g-row {{open === it.k ? 'on' : ''}}" wx:for="{{grp.items}}" wx:key="k" wx:for-item="it"
             data-k="{{it.k}}" bindtap="onTopic">
         <view class="g-row-h">
           <text class="g-row-t">{{it.t}}</text>
@@ -39,7 +39,7 @@
         </view>
         <view class="g-row-d" wx:if="{{open === it.k}}">
           <text class="g-row-x">{{it.d}}</text>
-          <text class="g-row-go" wx:if="{{it.url}}" data-url="{{it.url}}" catchtap="go">去看看 ›</text>
+          <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="g-row-go" wx:if="{{it.url}}" data-url="{{it.url}}" catchtap="go">去看看 ›</text>
         </view>
       </view>
     </view>

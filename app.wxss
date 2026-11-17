@@ -397,3 +397,13 @@ page {
   color: var(--chip-tx, #d4a94e); border: 1rpx dashed rgba(212,169,78,.45);
   border-radius: 999rpx; padding: 6rpx 20rpx; }
 .ai-copy:active { background: rgba(212,169,78,.14); }
+
+/* ══ 全局按下反馈 tap-hover ══
+   真机实测：分包页 navigateTo 1100~1330ms 是「微信创建页面实例」的框架成本，原生层改不动；
+   我们自己 onLoad/onShow 的活只要 6~138ms（IDE 复测，框架段 160~402ms）。也就是说
+   用户感知到的「卡」几乎全在「按下 → 目标页出现」这段空白里，唯一能做的是把这段填上反馈。
+   此前全站 344 个可点 <view>/<text> 一个反馈都没有（grep hover-class 命中 0），
+   点了毫无响应、只能干等 → 统一由 hover-class="tap-hover" + hover-start-time="0" 给即时压感。
+   选 opacity 而非背景色：浅色/深色双主题下都不会撞配色；不改尺寸、不触发重排。
+   不写 transform：列表项大面积缩放会连带图片重绘，低端机上反而掉帧。 */
+.tap-hover { opacity: .78; }

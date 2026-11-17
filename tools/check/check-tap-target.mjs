@@ -77,7 +77,11 @@ for (const f of files.filter((x) => x.endsWith(".wxml"))) {
   for (const m of src.matchAll(/<([a-zA-Z-]+)([^>]*)>/g)) {
     const attrs = m[2];
     if (!/\b(?:bind|catch)(?:tap|longpress|longtap)\s*=/.test(attrs)) continue;
-    const cm = /\bclass\s*=\s*"([^"]*)"/.exec(attrs);
+    // 注意：不能用 /\bclass\s*=/ —— `\b` 在 `hover-class=` 的 `-c` 之间同样成立，
+    // 于是会把 hover-class 的值当成 class 读走（v1.20.23 加按下反馈时被这条踩到：
+    // tapClasses 从 200+ 骤降到 6，13 处已登记元素全部误报「class 已不存在」）。
+    // 判据自身造假红比漏判更费时间，这里显式排除前面是 `-` 或单词字符的情况。
+    const cm = /(?<![-\w])class\s*=\s*"([^"]*)"/.exec(attrs);
     if (!cm) continue;
     for (const c of cm[1].split(/\s+/)) {
       if (!c || c.includes("{{")) continue;   // 动态 class 无法静态判定，跳过（不假装覆盖）
@@ -153,6 +157,57 @@ ok("登记清单无过期项（改好了要删登记，否则清单会腐烂）"
 
 const worst = tooSmall.slice(0, 5).map((x) => "." + x.cls + "=" + x.eff + "rpx").join("、");
 ok("最小触达尺寸不低于 24rpx（低于此值等同不可点）", !tooSmall.length || tooSmall[0].eff >= 24, worst || "无");
+
+/* ③ 按下反馈覆盖率（v1.20.23 新增）
+ *
+ * 为什么和「触达尺寸」放同一条门禁：两者解决的是同一个症状——「点了没反应」。
+ * 尺寸不够是点不中；没有按下反馈是「点中了但看不见任何变化」。
+ *
+ * 实测背景：全站 344 个可点 <view>/<text> 此前 hover-class 命中 0。
+ * 而真机分包页 navigateTo 要 1100~1330ms（微信创建页面实例的框架成本，原生层改不动），
+ * 我们自己 onLoad/onShow 只要 6~138ms —— 用户感知的「卡」几乎全在这段空白里。
+ * 没有按下反馈 = 按下后 1 秒多毫无响应，这才是体感差的直接来源。
+ *
+ * 覆盖范围必须是**全部四个包**（pages/subpkg/subai/components）。只扫 pages 会漏掉
+ * subai 与共享组件——本仓已因「check-ai-reach 只 filter(/^pages\//)」漏掉 subai/deep
+ * 跨分包组件失效而踩过一次坑，这里不再重犯。
+ *
+ * <button> 不要求：微信内置 button-hover 已提供按下态。
+ */
+const PKG_DIRS = ["pages", "subpkg", "subai", "components"];
+const wxmlAll = [];
+for (const d of PKG_DIRS) {
+  const abs = path.join(ROOT, d);
+  if (fs.existsSync(abs)) wxmlAll.push(...walk(abs).filter((f) => f.endsWith(".wxml")));
+}
+const noHover = [];
+let tapTotal = 0;
+for (const f of wxmlAll) {
+  const src = fs.readFileSync(f, "utf8");
+  for (const m of src.matchAll(/<([a-zA-Z-]+)([^>]*)>/g)) {
+    const tag = m[1].toLowerCase();
+    const attrs = m[2];
+    // 只认 tap 类绑定：longpress 是长按，按下态不适用，不强制
+    if (!/\b(?:bindtap|catchtap)\s*=/.test(attrs)) continue;
+    if (tag === "button") continue;            // 内置 button-hover
+    tapTotal++;
+    if (/\bhover-class\s*=/.test(attrs)) continue;
+    noHover.push(path.relative(ROOT, f) + " <" + tag + ">");
+  }
+}
+ok("可点元素都带按下反馈（" + tapTotal + " 个，缺失 " + noHover.length + " 个）",
+  noHover.length === 0,
+  noHover.slice(0, 8).join(" / ") + (noHover.length > 8 ? " …" : ""));
+
+// 反馈样式必须真实存在，否则属性写了也只是空挂（断言「源码里有某串字」≠ 断言生效）
+const appCss = fs.readFileSync(path.join(ROOT, "app.wxss"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+ok("app.wxss 里确实定义了 .tap-hover（否则 hover-class 空挂）",
+  /\.tap-hover\s*\{[^}]*opacity\s*:/.test(appCss));
+
+// 反向护栏：新建页面若整体忘了写反馈，单看「缺失 0 个」会假绿（0 个可点元素也满足）
+ok("按下反馈扫描确实覆盖到四个包（防扫描范围塌缩成空集）",
+  PKG_DIRS.filter((d) => fs.existsSync(path.join(ROOT, d))).length >= 3 && tapTotal >= 300,
+  "扫描 " + wxmlAll.length + " 个 wxml / 可点 " + tapTotal + " 个");
 
 console.log("  建议档（" + HARD + "–" + RECO + "rpx，不判红）共 " + advisory.length + " 处：" +
   advisory.map((x) => "." + x.cls + "=" + x.eff).join("、"));

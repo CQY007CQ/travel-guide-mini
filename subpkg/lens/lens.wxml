@@ -11,9 +11,9 @@
     <view class="grid" wx:if="{{imgs.length}}">
       <view class="cell" wx:for="{{imgs}}" wx:key="*this">
         <image lazy-load class="cell-img" src="{{item}}" mode="aspectFill"/>
-        <view class="cell-x" catchtap="removeImg" data-i="{{index}}">✕</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="cell-x" catchtap="removeImg" data-i="{{index}}">✕</view>
       </view>
-      <view class="cell cell-add" wx:if="{{imgs.length < 3}}" bindtap="pickAlbum">
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="cell cell-add" wx:if="{{imgs.length < 3}}" bindtap="pickAlbum">
         <text class="add-t">＋ 再加一张</text>
       </view>
     </view>
@@ -22,9 +22,9 @@
       <text class="ph-t">还没有照片（最多 3 张不同角度）</text>
     </view>
     <view class="pick-ops">
-      <view class="op op-main" bindtap="takePhoto"><image lazy-load class="op-ic" src="/images/icons/camera.png"/>拍照</view>
-      <view class="op" bindtap="pickAlbum"><image lazy-load class="op-ic" src="/images/icons/search.png"/>相册</view>
-      <view class="op op-go {{imgs.length ? '' : 'op-dis'}}" bindtap="identify">识别</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="op op-main" bindtap="takePhoto"><image lazy-load class="op-ic" src="/images/icons/camera.png"/>拍照</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="op" bindtap="pickAlbum"><image lazy-load class="op-ic" src="/images/icons/search.png"/>相册</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="op op-go {{imgs.length ? '' : 'op-dis'}}" bindtap="identify">识别</view>
     </view>
   </view>
 
@@ -54,24 +54,24 @@
     <view class="warn-box" wx:if="{{voteInfo && !voteInfo.consensus}}">
       <text class="warn-t">多条独立判断未达成一致，以下是各自结论。请对照照片人工确认；此时不会自动加入行程。</text>
       <view class="alt-row">
-        <text class="alt" wx:for="{{voteInfo.alternatives}}" wx:key="name" data-name="{{item.name}}" bindtap="onPickCandidate">{{item.name}}（{{item.count}} 票）</text>
+        <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="alt" wx:for="{{voteInfo.alternatives}}" wx:key="name" data-name="{{item.name}}" bindtap="onPickCandidate">{{item.name}}（{{item.count}} 票）</text>
       </view>
       <text class="warn-t" wx:if="{{!voteInfo.alternatives.length}}">各条判断都没能给出可靠名称，建议换个角度重拍，或用文字问。</text>
     </view>
 
     <view class="raw-fold">
-      <text class="raw-t" bindtap="toggleRaw">{{rawOpen ? '收起完整回答 ▴' : '查看完整回答 ▾'}}</text>
+      <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="raw-t" bindtap="toggleRaw">{{rawOpen ? '收起完整回答 ▴' : '查看完整回答 ▾'}}</text>
       <text class="r-txt" wx:if="{{rawOpen}}">{{result}}</text>
     </view>
     <view class="r-ops">
-      <view class="ai-copy" bindtap="copyResult">复制</view>
-      <view class="ai-copy" bindtap="clearImgs">重选图片</view>
-      <view class="ai-copy" bindtap="toggleText">继续追问</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" bindtap="copyResult">复制</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" bindtap="clearImgs">重选图片</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" bindtap="toggleText">继续追问</view>
     </view>
     <!-- 识别联动：查这个景点 / 加入行程（仅在多链一致、解析出明确名称时显示） -->
     <view class="spot-ops" wx:if="{{spotName}}">
-      <view class="sp-btn" bindtap="onLookupSpot">查这个景点</view>
-      <view class="sp-btn sp-primary" bindtap="onAddToTrip">加入行程</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="sp-btn" bindtap="onLookupSpot">查这个景点</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="sp-btn sp-primary" bindtap="onAddToTrip">加入行程</view>
       <text class="sp-hint">识别为「{{spotName}}」</text>
     </view>
     <view class="spot-info" wx:if="{{spotInfo}}">
@@ -79,7 +79,7 @@
       <text class="si-txt" wx:if="{{spotInfo.intro}}">{{spotInfo.intro}}</text>
       <text class="si-txt" wx:if="{{spotInfo.how}}">怎么去：{{spotInfo.how}}</text>
       <text class="si-txt" wx:if="{{spotInfo.route}}">{{spotInfo.route}}</text>
-      <view class="si-close" bindtap="onCloseSpot">收起</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="si-close" bindtap="onCloseSpot">收起</view>
     </view>
     <view class="spot-err" wx:if="{{spotErr}}">{{spotErr}}</view>
   </view>
@@ -89,7 +89,7 @@
     <view class="h3">本机离线对照<text class="local-badge">非图像识别</text></view>
     <text class="local-note">{{localNote}}</text>
     <view class="cand-list">
-      <view class="cand" wx:for="{{candidates}}" wx:key="name" data-name="{{item.name}}" bindtap="onPickCandidate">
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="cand" wx:for="{{candidates}}" wx:key="name" data-name="{{item.name}}" bindtap="onPickCandidate">
         <view class="cand-h"><text class="cand-n">{{item.name}}</text><text class="cand-k">{{item.kind}}</text></view>
         <text class="cand-note" wx:if="{{item.note}}">{{item.note}}</text>
       </view>
@@ -101,28 +101,28 @@
 
   <!-- 识别历史 -->
   <view class="card hist" wx:if="{{history.length}}">
-    <view class="h3">最近识别<view class="ai-copy" catchtap="onClearHistory">清空</view></view>
+    <view class="h3">最近识别<view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" catchtap="onClearHistory">清空</view></view>
     <view class="hist-row">
-      <text class="hist-item" wx:for="{{history}}" wx:key="name" data-name="{{item.name}}" bindtap="onHistoryTap">{{item.name}}</text>
+      <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="hist-item" wx:for="{{history}}" wx:key="name" data-name="{{item.name}}" bindtap="onHistoryTap">{{item.name}}</text>
     </view>
   </view>
 
   <!-- 文字问 / 识别后继续追问（视觉不可用时的科普兜底） -->
   <view class="card textq">
-    <view class="tq-head" bindtap="toggleText">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="tq-head" bindtap="toggleText">
       <text class="h3">{{result ? '就这张照片继续追问' : '不想拍照？用文字问'}} {{textMode ? '▴' : '▾'}}</text>
     </view>
     <block wx:if="{{textMode}}">
       <view class="tq-row">
         <input class="tq-inp" placeholder="如：金银花能泡茶吗？这是什么树的叶子？" value="{{textInput}}" bindinput="onTextInput" bindconfirm="askText" confirm-type="send"/>
-        <view class="tq-btn" bindtap="askText">问</view>
-        <view class="ai-copy" bindtap="aiClearChat">清空会话</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="tq-btn" bindtap="askText">问</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" bindtap="aiClearChat">清空会话</view>
       </view>
     </block>
   </view>
 
   <view class="foot">
     <text class="foot-t">识别由云端多模态模型完成并经多条独立判断核验，仍可能存在误差；涉及食用、药用、有毒物种请以专业鉴定为准，切勿仅凭 AI 结论入口。离线状态下本机不做图像识别，只提供随包真实资料供对照。</text>
-    <view class="foot-a" bindtap="goAssistant">去 AI 助手 →</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="foot-a" bindtap="goAssistant">去 AI 助手 →</view>
   </view>
 </view>

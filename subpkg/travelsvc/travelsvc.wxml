@@ -7,7 +7,7 @@
         <view class="sh-t">{{tx.title}}</view>
         <view class="sh-s dim">{{tx.sub}}</view>
       </view>
-      <view class="lang-btn" bindtap="toggleLang">{{lang === 'zh' ? 'EN' : '中文'}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="lang-btn" bindtap="toggleLang">{{lang === 'zh' ? 'EN' : '中文'}}</view>
     </view>
   </view>
 
@@ -16,7 +16,7 @@
     <view class="group-title">① {{tx.s1}}</view>
     <view class="card">
       <view class="svc-p">{{tx.aiNote}}</view>
-      <view class="svc-cta" bindtap="goIndex">{{tx.goIndex}} →</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="svc-cta" bindtap="goIndex">{{tx.goIndex}} →</view>
     </view>
   </view>
 
@@ -58,12 +58,12 @@
         <text class="off-tag {{item.tagCls}}">{{item.badgeTx}}</text>
         <view class="off-txt"><view class="off-t">{{item.t}}</view><view class="off-d dim">{{item.d}}</view></view>
       </view>
-      <view class="svc-cta" bindtap="doBackup">{{tx.backup}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="svc-cta" bindtap="doBackup">{{tx.backup}}</view>
       <view class="svc-note dim">{{tx.backupTip}}</view>
       <view class="svc-h3 svc-gap">{{tx.memTitle}}</view>
       <view class="svc-note dim">{{tx.memStat}}：{{memScenes}} / {{memTurns}} / {{memChars}}</view>
       <view class="svc-note dim">{{aiEnabled ? 'AI 通道 · 云端已启用（成功 '+aiOk+' / 失败 '+aiFail+'）' : 'AI 通道 · 离线模式（本地引擎，未配云端）'}}</view>
-      <view class="ai-copy" bindtap="clearAllChats">{{tx.clearChats}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" bindtap="clearAllChats">{{tx.clearChats}}</view>
     </view>
   </view>
 
@@ -79,11 +79,11 @@
         </picker>
       </view>
       <view class="conv-res" wx:if="{{convResult}}">{{tx.result}}：{{convResult}} {{curKey}}</view>
-      <view class="rate-line" bindtap="toggleRate">汇率：1 ¥ = {{curRate}} {{curKey}} · 修改 ▾</view>
-      <view class="ai-copy" bindtap="resetRates">恢复默认汇率</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="rate-line" bindtap="toggleRate">汇率：1 ¥ = {{curRate}} {{curKey}} · 修改 ▾</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-copy" bindtap="resetRates">恢复默认汇率</view>
       <view class="conv-row" wx:if="{{rateOpen}}">
         <input class="conv-inp" type="digit" value="{{rateEdit}}" bindinput="onRateInput"/>
-        <view class="conv-btn" bindtap="saveRate">保存</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="conv-btn" bindtap="saveRate">保存</view>
       </view>
       <view class="svc-note dim">{{tx.rateTip}}</view>
 
@@ -102,7 +102,7 @@
       <view class="pv" wx:for="{{privacy}}" wx:key="t">
         <view class="pv-t">{{item.t}}</view><view class="pv-b dim">{{item.b}}</view>
       </view>
-      <view class="svc-cta" bindtap="goMore">{{tx.clear}} →</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="svc-cta" bindtap="goMore">{{tx.clear}} →</view>
       <view class="svc-note dim">{{tx.clearTip}}</view>
     </view>
   </view>

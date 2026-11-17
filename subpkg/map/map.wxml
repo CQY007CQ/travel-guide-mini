@@ -10,16 +10,16 @@
 
   <block wx:if="{{hasPlan}}">
     <view class="day-nav">
-      <view class="dn-btn" bindtap="onPrev">‹</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="dn-btn" bindtap="onPrev">‹</view>
       <view class="dn-txt">{{dayText}}</view>
-      <view class="dn-btn" bindtap="onNext">›</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="dn-btn" bindtap="onNext">›</view>
     </view>
 
     <!-- 图层切换 -->
     <view class="layer-bar">
-      <view class="layer-chip {{layer==='spots'?'on':''}}" data-layer="spots" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/pin.png"/> 景点</view>
-      <view class="layer-chip {{layer==='food'?'on':''}}" data-layer="food" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/food.png"/> 美食</view>
-      <view class="layer-chip {{layer==='stay'?'on':''}}" data-layer="stay" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/home.png"/> 住宿</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="layer-chip {{layer==='spots'?'on':''}}" data-layer="spots" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/pin.png"/> 景点</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="layer-chip {{layer==='food'?'on':''}}" data-layer="food" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/food.png"/> 美食</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="layer-chip {{layer==='stay'?'on':''}}" data-layer="stay" bindtap="onLayer"><image lazy-load class="ic ic-sm" src="/images/icons/home.png"/> 住宿</view>
     </view>
 
     <!-- v1.8.4 B11：动线顺路度评分 -->
@@ -49,10 +49,10 @@
     <view wx:if="{{layer==='spots'}}" class="card">
       <view class="h3">当天游玩点（点一下直接导航）</view>
       <view class="tag-bar" wx:if="{{tagList.length}}">
-        <view class="tag-chip {{tagFilter==='' ? 'on' : ''}}" data-tag="" bindtap="onTagFilter">全部</view>
-        <view class="tag-chip {{tagFilter===item ? 'on' : ''}}" wx:for="{{tagList}}" wx:key="*this" data-tag="{{item}}" bindtap="onTagFilter">{{item}}</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="tag-chip {{tagFilter==='' ? 'on' : ''}}" data-tag="" bindtap="onTagFilter">全部</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="tag-chip {{tagFilter===item ? 'on' : ''}}" wx:for="{{tagList}}" wx:key="*this" data-tag="{{item}}" bindtap="onTagFilter">{{item}}</view>
       </view>
-      <view class="spot" wx:for="{{list}}" wx:key="name" data-name="{{item.name}}" bindtap="goNav">
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="spot" wx:for="{{list}}" wx:key="name" data-name="{{item.name}}" bindtap="goNav">
         <text wx:if="{{item.seq}}" class="seq">{{item.seq}}</text>
         <text wx:else class="seq approx-seq">≈</text>
         <text class="p">{{item.period}}</text>
@@ -67,7 +67,7 @@
     <!-- 美食图层：名店列表 -->
     <view wx:if="{{layer==='food'}}" class="card">
       <view class="h3">当地名店（点击导航）</view>
-      <view class="food" wx:for="{{foodList}}" wx:key="id" data-i="{{index}}" bindtap="goFood">
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="food" wx:for="{{foodList}}" wx:key="id" data-i="{{index}}" bindtap="goFood">
         <text class="f-em">{{item.food}}</text>
         <text class="f-shop">{{item.shop}}</text>
         <text class="f-addr dim">{{item.addr}}</text>
@@ -80,14 +80,14 @@
     <!-- 住宿图层 -->
     <view wx:if="{{layer==='stay'}}" class="card">
       <view class="h3">建议住宿区（点击导航）</view>
-      <view class="hotel" wx:for="{{hotelAreas}}" wx:key="name" data-i="{{index}}" bindtap="goHotel">
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="hotel" wx:for="{{hotelAreas}}" wx:key="name" data-i="{{index}}" bindtap="goHotel">
         <text class="h-em">{{item.name}}</text>
         <text class="h-sub dim">{{item.note || '点击定位这片区域，可一键导航'}}</text>
         <text class="h-price" wx:if="{{item.price}}">{{item.price}}</text>
       </view>
       <view class="portal-t">去这些平台比价（点按复制搜索词）</view>
       <view class="portals">
-        <view class="portal" wx:for="{{hotelPortals}}" wx:key="platform" data-term="{{item.term}}" data-platform="{{item.platform}}" bindtap="copyPortal">{{item.platform}}</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="portal" wx:for="{{hotelPortals}}" wx:key="platform" data-term="{{item.term}}" data-platform="{{item.platform}}" bindtap="copyPortal">{{item.platform}}</view>
       </view>
       <view class="tip-inner dim" wx:if="{{!hotelAreas.length}}">本城暂无收录住宿区域，看上方建议</view>
     </view>

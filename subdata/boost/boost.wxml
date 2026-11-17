@@ -16,7 +16,7 @@
       </view>
     </view>
     <view wx:for="{{checkup.tips}}" wx:key="*this" class="tip">{{item}}</view>
-    <view wx:if="{{!hasPlan}}" class="empty">先在首页生成一份行程<text class="boost-go" bindtap="goIndex"> 去生成 →</text></view>
+    <view wx:if="{{!hasPlan}}" class="empty">先在首页生成一份行程<text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="boost-go" bindtap="goIndex"> 去生成 →</text></view>
   </view>
 
   <view class="card">

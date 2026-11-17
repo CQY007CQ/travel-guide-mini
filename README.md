@@ -12,7 +12,7 @@
 交通动线与步行量、能直接导航的真实坐标、预算拆解、打包清单、逐日天气（联网时才有，
 断网自动降级）。城市数据与坐标随分包下发，**装机后完全不需要网络**。
 
-- 版本：`1.20.22`
+- 版本：`1.20.23`
 - AppID：`wxa365d49bc3366f95`（个人主体）
 - 基础库：`3.8.12`
 - 页面：主包 7 页（含 4 个 tabBar）+ 分包 14 页（以 `app.json` 为准）
@@ -209,7 +209,7 @@ node tools/check/check-pkgsize.mjs    # 体积真值（主包/各分包/data-pac
 ## 六、发版
 
 ```bash
-cli upload --project "$(pwd)" --version 1.20.22 --desc "说明"
+cli upload --project "$(pwd)" --version 1.20.23 --desc "说明"
 ```
 
 - **不要传 `--info-output`**（本环境会触发 `二维码输出路径无效 code 17`）

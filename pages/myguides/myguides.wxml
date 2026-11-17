@@ -8,10 +8,10 @@
   </view>
 
   <block wx:if="{{!empty}}">
-    <view class="card mg-item" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="openPlan">
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="card mg-item" wx:for="{{list}}" wx:key="id" data-id="{{item.id}}" bindtap="openPlan">
       <view class="mg-top">
         <view class="mg-title">{{item.title}}</view>
-        <view class="mg-del" catchtap="delPlan" data-id="{{item.id}}">删除</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="mg-del" catchtap="delPlan" data-id="{{item.id}}">删除</view>
       </view>
       <view class="mg-meta dim">{{item.sub}} · 保存于 {{item.dateText}}</view>
       <view class="mg-go">打开行程 ›</view>

@@ -19,7 +19,7 @@
   <view class="card trip-bar" wx:if="{{tripOptions.length > 1}}">
     <scroll-view scroll-x class="trip-scroll" enhanced show-scrollbar="{{false}}">
       <view class="trip-row">
-        <view class="f-chip {{tripFilter===item.key?'on':''}}" wx:for="{{tripOptions}}" wx:key="key" data-k="{{item.key}}" bindtap="onTrip">{{item.label}}</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="f-chip {{tripFilter===item.key?'on':''}}" wx:for="{{tripOptions}}" wx:key="key" data-k="{{item.key}}" bindtap="onTrip">{{item.label}}</view>
       </view>
     </scroll-view>
     <view class="trip-hint dim" wx:if="{{tripFilter!=='__all'}}">当前只看 {{tripFilter==='__other' ? '旧账' : curLabel}} 的花销，切「全部账本」看完整</view>
@@ -41,29 +41,29 @@
     </view>
     <view class="qk-row">
       <input class="qk-inp" placeholder="输入项目和金额，如 打车 32" value="{{quick}}" bindinput="onQuickInput" bindconfirm="onQuickAdd"/>
-      <view class="qk-go" bindtap="onQuickAdd">记账</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="qk-go" bindtap="onQuickAdd">记账</view>
     </view>
     <view class="qk-tip" wx:if="{{quickParsed}}">
       识别为 <text class="gold">{{quickParsed.name}}</text> · <text class="gold">¥{{quickParsed.amt}}</text> · <text class="qk-cat-tx">{{quickParsed.cat}}</text>
     </view>
     <view class="qk-tip dim" wx:else>自动识别金额并判断分类，回车即可记账</view>
     <view class="qk-cats">
-      <view class="qk-cat {{cat === item ? 'on' : ''}}" wx:for="{{cats}}" wx:key="*this" data-c="{{item}}" bindtap="onCatPick">{{item}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="qk-cat {{cat === item ? 'on' : ''}}" wx:for="{{cats}}" wx:key="*this" data-c="{{item}}" bindtap="onCatPick">{{item}}</view>
     </view>
     <view class="qk-phr" wx:if="{{phrases.length}}">
-      <view class="phr-chip" wx:for="{{phrases}}" wx:key="*this" data-p="{{item}}" bindtap="onPhrase">{{item}}</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="phr-chip" wx:for="{{phrases}}" wx:key="*this" data-p="{{item}}" bindtap="onPhrase">{{item}}</view>
     </view>
   </view>
 
   <!-- ⑤ 过滤 -->
   <view class="card filter-bar">
-    <view class="f-chip {{dateFilter==='all'?'on':''}}" data-f="all" bindtap="onFilter">全部</view>
-    <view class="f-chip {{dateFilter==='today'?'on':''}}" data-f="today" bindtap="onFilter">今天</view>
-    <view class="f-chip {{dateFilter==='trip'?'on':''}}" data-f="trip" bindtap="onFilter" wx:if="{{tripStart}}">行程内</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="f-chip {{dateFilter==='all'?'on':''}}" data-f="all" bindtap="onFilter">全部</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="f-chip {{dateFilter==='today'?'on':''}}" data-f="today" bindtap="onFilter">今天</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="f-chip {{dateFilter==='trip'?'on':''}}" data-f="trip" bindtap="onFilter" wx:if="{{tripStart}}">行程内</view>
   </view>
   <view class="card filter-bar fbar2">
-    <view class="f-chip sm {{catFilter===''?'on':''}}" data-c="" bindtap="onCatFilter">全部分类</view>
-    <view class="f-chip sm {{catFilter===item?'on':''}}" wx:for="{{cats}}" wx:key="*this" data-c="{{item}}" bindtap="onCatFilter">{{item}}</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="f-chip sm {{catFilter===''?'on':''}}" data-c="" bindtap="onCatFilter">全部分类</view>
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="f-chip sm {{catFilter===item?'on':''}}" wx:for="{{cats}}" wx:key="*this" data-c="{{item}}" bindtap="onCatFilter">{{item}}</view>
   </view>
 
   <!-- ⑥ 账单明细 -->
@@ -71,19 +71,19 @@
     <view class="h3 row-between">
       <text>账单明细 <text class="dim u-fs20">（点 ✕ 删除，可撤销）</text></text>
       <view class="row">
-        <view class="btn-export vexp" wx:if="{{vouchN}}" bindtap="onVouchShow"><image lazy-load class="ic ic-sm" src="/images/icons/camera.png"/>凭证 {{vouchN}}</view>
-        <view class="btn-export" bindtap="onExportMenu">导出 ▾</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="btn-export vexp" wx:if="{{vouchN}}" bindtap="onVouchShow"><image lazy-load class="ic ic-sm" src="/images/icons/camera.png"/>凭证 {{vouchN}}</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="btn-export" bindtap="onExportMenu">导出 ▾</view>
       </view>
     </view>
     <view class="kw-row">
       <input class="kw-inp" placeholder="搜索项目或分类…" value="{{kw}}" bindinput="onKw" bindconfirm="onKw"/>
-      <text wx:if="{{kw}}" class="kw-x" bindtap="clearKw">✕</text>
+      <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" wx:if="{{kw}}" class="kw-x" bindtap="clearKw">✕</text>
     </view>
     <view class="kw-n" wx:if="{{kw || catFilter}}">筛出 {{filteredN}} / {{allN}} 笔</view>
     <view wx:if="{{!items.length}}" class="dim u-padc">还没有账单，记下第一笔吧</view>
     <view class="lg-row" wx:for="{{items}}" wx:key="_id">
-      <image lazy-load wx:if="{{item.img}}" class="lg-thumb" src="{{item.img}}" mode="aspectFill" data-i="{{index}}" catchtap="pickBillImg"/>
-      <view wx:else class="lg-cam" data-i="{{index}}" catchtap="pickBillImg"><image lazy-load class="ic ic-sm" src="/images/icons/camera.png"/></view>
+      <image hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" lazy-load wx:if="{{item.img}}" class="lg-thumb" src="{{item.img}}" mode="aspectFill" data-i="{{index}}" catchtap="pickBillImg"/>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" wx:else class="lg-cam" data-i="{{index}}" catchtap="pickBillImg"><image lazy-load class="ic ic-sm" src="/images/icons/camera.png"/></view>
       <view class="lg-main">
         <view class="lg-txt">{{item.name}} <text class="lg-cat">{{item.cat}}</text>
           <text wx:if="{{item.share>1}}" class="lg-aa">AA · {{item.share}}人 · 人均 ¥{{item.per}}</text>
@@ -91,12 +91,12 @@
         <view class="lg-date">{{item.date}} · {{item.payer || '我'}}</view>
       </view>
       <text class="lg-amt">¥{{item.amt}}</text>
-      <text class="lg-del" data-i="{{item.i}}" bindtap="del">✕</text>
+      <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="lg-del" data-i="{{item.i}}" bindtap="del">✕</text>
     </view>
   </view>
 
   <!-- ⑦ 折叠：详细记账（需指定日期 / 付款人 / AA 人数时才用） -->
-  <view class="card fold-hd" bindtap="toggleSec" data-s="detail">
+  <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="card fold-hd" bindtap="toggleSec" data-s="detail">
     <view class="h3 row-between">
       <view class="h3-l"><image lazy-load class="ic" src="/images/icons/calc.png"/>详细记账</view>
       <text class="dim u-fs20">{{secDetail ? '收起 ▴' : '指定日期 / 付款人 / AA ▾'}}</text>
@@ -120,18 +120,18 @@
       <view class="row mt">
         <text class="aa-lbl">AA 人数</text>
         <view class="stepper">
-          <text class="step-btn" bindtap="onShareMinus">－</text>
+          <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="step-btn" bindtap="onShareMinus">－</text>
           <text class="step-num">{{share}} 人</text>
-          <text class="step-btn" bindtap="onSharePlus">＋</text>
+          <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="step-btn" bindtap="onSharePlus">＋</text>
         </view>
         <text class="aa-hint">人均 ¥{{perHint}}</text>
       </view>
-      <view class="btn-primary u-mt20" bindtap="add">记一笔</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="btn-primary u-mt20" bindtap="add">记一笔</view>
     </view>
   </block>
 
   <!-- ⑧ 折叠：看数据（7 块分析，默认收起） -->
-  <view class="card fold-hd" bindtap="toggleSec" data-s="stats">
+  <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="card fold-hd" bindtap="toggleSec" data-s="stats">
     <view class="h3 row-between">
       <view class="h3-l"><image lazy-load class="ic" src="/images/icons/trend.png"/>看数据</view>
       <text class="dim u-fs20">{{secStats ? '收起 ▴' : '趋势 / 预测 / 分类 ▾'}}</text>
@@ -248,7 +248,7 @@
   </block>
 
   <!-- ⑨ 折叠：同行分账（AA / 人情 / 同行人） -->
-  <view class="card fold-hd" bindtap="toggleSec" data-s="social">
+  <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="card fold-hd" bindtap="toggleSec" data-s="social">
     <view class="h3 row-between">
       <view class="h3-l"><image lazy-load class="ic" src="/images/icons/people.png"/>同行分账</view>
       <text class="dim u-fs20">{{secSocial ? '收起 ▴' : 'AA / 垫付 / 同行人 ▾'}}</text>
@@ -259,7 +259,7 @@
     <view class="card settle-card" wx:if="{{settle && settle.people > 1}}">
       <view class="h3 row-between">
         <view class="h3-l"><image lazy-load class="ic" src="/images/icons/calc.png"/>AA 结算</view>
-        <text class="btn-export" bindtap="copySettle">复制方案</text>
+        <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="btn-export" bindtap="copySettle">复制方案</text>
       </view>
       <view class="st-sum">共 ¥{{settle.total}} · {{settle.people}} 人 · 人均 ¥{{settle.per}}</view>
       <view class="st-row" wx:for="{{settle.rows}}" wx:key="payer">
@@ -282,25 +282,25 @@
       </view>
       <view class="iou-add">
         <view class="iou-dir">
-          <view class="qk-cat {{iouDir==='lend'?'on':''}}" data-d="lend" bindtap="onIouDir">我借出</view>
-          <view class="qk-cat {{iouDir==='borrow'?'on':''}}" data-d="borrow" bindtap="onIouDir">我借入</view>
+          <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="qk-cat {{iouDir==='lend'?'on':''}}" data-d="lend" bindtap="onIouDir">我借出</view>
+          <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="qk-cat {{iouDir==='borrow'?'on':''}}" data-d="borrow" bindtap="onIouDir">我借入</view>
         </view>
         <input class="iou-inp" placeholder="谁（如 小明）" value="{{iouMate}}" bindinput="onIouMate"/>
         <input class="iou-inp" placeholder="因为什么（可选）" value="{{iouWhat}}" bindinput="onIouWhat"/>
         <view class="iou-row2">
           <input class="iou-inp" type="digit" placeholder="金额 ¥" value="{{iouAmt}}" bindinput="onIouAmt"/>
-          <view class="qk-go" bindtap="addIou">记一笔</view>
+          <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="qk-go" bindtap="addIou">记一笔</view>
         </view>
       </view>
       <view class="iou-list" wx:if="{{iou.length}}">
         <view class="iou-it {{item.done ? 'iou-done' : ''}}" wx:for="{{iou}}" wx:key="date">
-          <view class="iou-main" data-i="{{index}}" bindtap="onIouDone">
+          <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="iou-main" data-i="{{index}}" bindtap="onIouDone">
             <text class="iou-who">{{item.dir==='lend' ? '借出 →' : '← 借入'}} {{item.mate}}</text>
             <text class="iou-what dim">{{item.what || '垫付'}} · {{item.date}}</text>
           </view>
           <text class="iou-amt">{{item.dir==='lend' ? '借出 ' : '借入 '}}¥{{item.amt}}</text>
           <text class="iou-ok" wx:if="{{item.done}}">已清</text>
-          <text class="iou-del" data-i="{{index}}" catchtap="onIouDel">✕</text>
+          <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="iou-del" data-i="{{index}}" catchtap="onIouDel">✕</text>
         </view>
       </view>
       <view class="dim iou-none" wx:else>同行垫付记这里，回来对账</view>
@@ -313,20 +313,20 @@
         <text class="dim u-fs20">点一下设为当前付款人</text>
       </view>
       <view class="mate-chips">
-        <view class="mate {{payer === '我' ? 'on' : ''}}" data-n="我" bindtap="pickPayer">我</view>
-        <view class="mate {{payer === item ? 'on' : ''}}" wx:for="{{mates}}" wx:key="*this" data-n="{{item}}" bindtap="pickPayer">
-          {{item}}<text class="mate-x" data-i="{{index}}" catchtap="delMate">✕</text>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="mate {{payer === '我' ? 'on' : ''}}" data-n="我" bindtap="pickPayer">我</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="mate {{payer === item ? 'on' : ''}}" wx:for="{{mates}}" wx:key="*this" data-n="{{item}}" bindtap="pickPayer">
+          {{item}}<text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="mate-x" data-i="{{index}}" catchtap="delMate">✕</text>
         </view>
       </view>
       <view class="mate-add">
         <input class="mate-inp" placeholder="加个同行人，如 小明" value="{{mateInput}}" bindinput="onMateInput" bindconfirm="addMate"/>
-        <view class="mate-btn" bindtap="addMate">加入</view>
+        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="mate-btn" bindtap="addMate">加入</view>
       </view>
     </view>
   </block>
 
   <!-- 删除撤销浮条 -->
-  <view class="undo-tip" wx:if="{{undoRow}}" bindtap="undoDel">
+  <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="undo-tip" wx:if="{{undoRow}}" bindtap="undoDel">
     <text class="ut-tx">已删除「{{undoRow.name}} · ¥{{undoRow.amt}}」</text>
     <text class="ut-btn">撤销</text>
   </view>
