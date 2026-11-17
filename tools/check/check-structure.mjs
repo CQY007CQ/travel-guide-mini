@@ -162,9 +162,44 @@ console.log("【⑦ tools 根层】");
     stray.length ? "多出: " + stray.join(", ") : "");
 }
 
+/* ───────── ⑧ 源码必须是纯文本：不得含裸控制字节 ───────── */
+console.log("【⑧ 纯文本】");
+{
+  // 为什么需要：spotsearch.js 曾用「裸 NUL 字节」做去重分隔符 ——
+  //   本意完全正确（`city + NUL + name` 能避免 `a|bc` 与 `ab|c` 撞成同一个 key），
+  //   但源码里出现真实 0x00 会让 file(1) / grep 把整个文件判为 binary：
+  //   此后任何基于 grep 的排查对该文件**静默返回空**，看起来像「这段代码不存在」。
+  //   同类问题在 tools/data 也命中一处。工具链撒谎比代码出错更难发现。
+  // 判据：包内源码与 tools/ 脚本里，除 \t(9) \n(10) \r(13) 外不得出现 <0x20 的控制字节；
+  //   确实需要这类字符时一律写转义（"\u0000"），运行时字符串值完全相同（已验证 ===）。
+  const TEXT_EXT = /\.(js|mjs|cjs|json|wxml|wxss|md)$/;
+  const bad = [];
+  const checkFile = (abs) => {
+    let buf;
+    try { buf = fs.readFileSync(abs); } catch (e) { return; }
+    for (let i = 0; i < buf.length; i++) {
+      const c = buf[i];
+      if (c === 0 || c < 9 || (c > 13 && c < 32)) {
+        bad.push(rel(abs) + ":" + buf.slice(0, i).toString("utf8").split("\n").length + " (0x" + c.toString(16) + ")");
+        return;
+      }
+    }
+  };
+  for (const d of PKG_DIRS) for (const f of walk(path.join(ROOT, d))) if (TEXT_EXT.test(f)) checkFile(f);
+  for (const d of ["tools", "docs", "components"]) {
+    for (const f of walk(path.join(ROOT, d))) if (TEXT_EXT.test(f)) checkFile(f);
+  }
+  for (const f of ["app.js", "app.json", "app.wxss", "project.config.json", "README.md"]) {
+    const abs = path.join(ROOT, f);
+    if (fs.existsSync(abs)) checkFile(abs);
+  }
+  ok("源码无裸控制字节（否则 grep 判二进制 → 排查与文本断言静默失效）", bad.length === 0,
+    bad.length ? bad.slice(0, 5).join(" ; ") : "");
+}
+
 console.log("");
 if (fail === 0) {
-  console.log("结构契约门禁通过：" + pass + " 项（根白名单 / 包内纯净 / 无垃圾 / 无空目录 / 无孤儿 / docs 分层 / tools 分层）");
+  console.log("结构契约门禁通过：" + pass + " 项（根白名单 / 包内纯净 / 无垃圾 / 无空目录 / 无孤儿 / docs 分层 / tools 分层 / 纯文本）");
   process.exit(0);
 }
 console.log("结构契约门禁失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");

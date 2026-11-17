@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.13";
+const APP_VER = "1.20.14";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -139,6 +139,14 @@ function canonCityName(name) {
   return name;
 }
 // 同一行程里 findCity 会被反复调用（每日每项都查），结果缓存避免重复解析
+// v1.20.14：缓存超限从「整表 clear()」改为「逐出最旧一条」。
+//   原来是超过 N 条就一次清空所有条目 —— 下一次查找全部重算。在「全省游」这种一次要过
+//   几百城的场景里会反复触发全清，形成周期性抖动（前 400 次快、第 401 次集体变慢）。
+//   Map 保持插入顺序，删第一个 key 即最旧，成本与一次 delete 相同，且只丢一条。
+function _evictOldest(m) {
+  const it = m.keys().next();
+  if (!it.done) m.delete(it.value);
+}
 const _findCache = new Map();
 function findCity(name, province) {
  if (!name) return null;
@@ -152,7 +160,7 @@ function findCity(name, province) {
   if (full && full.experiences && full.experiences.length) res = full;
  } catch (e) {}
  if (!res) res = _cityIndex().get(canon) || null;
- if (_findCache.size > 400) _findCache.clear();   // 防多城切换后无限增长
+ if (_findCache.size > 400) _evictOldest(_findCache);   // 防多城切换后无限增长（逐出最旧，不全清）
  _findCache.set(ck, res);
  return res;
 }
@@ -570,7 +578,7 @@ function poolOfCity(city) {
  ((D.CITY_LANDMARKS && D.CITY_LANDMARKS[cn]) || []).forEach(push);
  const sc = (D.SPOT_COORDS && D.SPOT_COORDS[cn]) || [];
  sc.forEach(s => { if (s && s[0]) push(s[0]); });
- if (_poolCache.size > 600) _poolCache.clear();
+ if (_poolCache.size > 600) _evictOldest(_poolCache);
  _poolCache.set(key, names);
  return names;
 }
@@ -609,7 +617,7 @@ function nearbyCityOf(cityName) {
    }
   }
  } catch (e) { res = ""; }
- if (_nearbyCache.size > 400) _nearbyCache.clear();
+ if (_nearbyCache.size > 400) _evictOldest(_nearbyCache);
  _nearbyCache.set(nm, res);
  return res;
 }
