@@ -180,7 +180,11 @@ Page(SafePage({
         let on = false;
         try { on = _deepCands.some(function (c) { return A.hasDeep(c); }); } catch (e) {}
         if (on !== this.data.deepOn) { try { this.setData({ deepOn: on }); } catch (e) {} }
-      }).catch(function () {});
+      }).catch(function (err) {
+        // 分包下载失败（弱网 / 分包被平台回收）时深度入口保持隐藏，但不能一声不响：
+        // 静默 catch 会让「深度玩法」凭空消失且日志里查不到任何线索（测控 D-2）。
+        EL.note("more", err, "深度玩法分包加载失败，深度入口保持隐藏");
+      });
     } else if (this.data.deepOn) {
       try { this.setData({ deepOn: false }); } catch (e) {}
     }

@@ -399,15 +399,25 @@ module.exports = {
      let rects = (res && res[0]) || [];
      if (!Array.isArray(rects)) rects = [];
      rects = rects.filter(r => r && typeof r.top === "number");
-     if (rects.length !== day.items.length) return;   // 量不准就干脆不开始，避免错位
+     if (rects.length !== day.items.length) {
+      // 量不准就不开始拖动（避免错位），但不能什么反馈都不给：用户会判定「按住拖没反应」。
+      // 同一页 3 秒内只提示一次，手指反复按下不会刷屏。↑↓ 上移/下移是等价的可用路径。
+      const now = Date.now();
+      if (!this._dragHintAt || now - this._dragHintAt > 3000) {
+       this._dragHintAt = now;
+       try { wx.showToast({ title: "拖动暂不可用，点行展开用 ↑↓ 调序", icon: "none", duration: 2200 }); } catch (e) {}
+      }
+      EL.note("plan", "drag-measure", "拖拽量尺与行数不符 " + rects.length + "/" + day.items.length);
+      return;
+     }
      // 起点优先取 touchstart 的手指位置；拿不到就退化成「首次 move 时为 0」（差一帧，不影响）
      const y0 = (e.touches && e.touches[0] && typeof e.touches[0].clientY === "number") ? e.touches[0].clientY : 0;
      this._drag = { di, from: i, to: i, rects, started: !!y0, startY: y0, lastSh: "" };
      this.setData({ dragOn: true, dragDi: di, dragI: i, dragSh: rects.map(() => "") });
      try { wx.vibrateShort({ type: "light" }); } catch (_) {}
-    } catch (err) { this._drag = null; this.setData({ dragOn: false, dragDi: -1, dragI: -1, dragSh: [] }); }
-   });
-  } catch (err) { this._drag = null; }
+     } catch (err) { this._drag = null; this.setData({ dragOn: false, dragDi: -1, dragI: -1, dragSh: [] }); EL.note("plan", err, "拖拽启动失败（已复位拖动态）"); }
+    });
+   } catch (err) { this._drag = null; EL.note("plan", err, "拖拽事件处理失败"); }
  },
 
  onDragMove(e) {

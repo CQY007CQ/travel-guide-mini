@@ -41,6 +41,11 @@ tools/
 
 > 涉存储语义的测试**必须**装 wx 垫片，否则会在空存储上假通过（`check-qa-rails` C 组会判红）。
 
+> **删测试前先查谁在引用它**：`_test-v11977-drag.mjs`（行程页拖拽排序，30 断言）曾因 T4 拆分后
+> 仍读单文件 `plan.js` 截取方法体而失效，在「资源管理器轻量化」提交里被当坏文件删除；
+> 而 `_test-plan-handlers.mjs` 的注释还写着「拖拽已另有它覆盖」——**拖拽交互零覆盖却无人发现**。
+> 现已改为 `pageSrc()` + 逐方法抽取恢复并重新入链。同类「按单文件正则抽取」的测试一律走 `pageSrc()`。
+
 **构建 `build/`**：`build-min.mjs`（真源压缩）、`pack-data.mjs`（数据打包）、`_check-pack-idempotent.mjs`（产物幂等自证）、
 `_apply-safe.mjs`（安全写回）。
 

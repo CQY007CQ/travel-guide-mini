@@ -176,7 +176,7 @@ step "单测 分享过期日期边界 (v1.19.182)" "$NODE" tools/test/_test-clam
 # v1.19.182：美食富信息扩城（加载期增量合并，字段完整 / 同城幂等）
 step "单测 美食富信息扩城 (v1.19.182)" "$NODE" tools/test/_test-food-enrich.mjs
 step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/test/_test-v11988-sharecard.mjs
-step "单测 plan-handlers (行程页交互回归 v1.19.109)" "$NODE" tools/test/_test-plan-handlers.mjs
+step "单测 plan-handlers (行程页交互回归 v1.19.109)" bash -c '"$1" tools/test/_test-plan-handlers.mjs && "$1" tools/test/_test-v11977-drag.mjs' _ "$NODE"
 # v1.19.93：全页面启动冒烟——vm 模拟 17 个注册页「被打开」（Page 构造+onLoad+onShow）。
 # 抓上传工具链与静态扫描都查不到的运行时级问题（曾抓到 7 个分包页 require 路径层级错误→白屏）。
 step "全页面启动冒烟 (v1.19.93)" bash -c '"$1" tools/test/_test-v11993-bootsmoke.mjs && "$1" tools/test/_test-index-coldstart.mjs' _ "$NODE"
