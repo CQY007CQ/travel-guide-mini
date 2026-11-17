@@ -5513,10 +5513,18 @@ function nearbyCities(cityName, n) {
   const c0 = _cityCoord(cityName);
   const out = [];
   if (!c0) return out;
+  // 迭代 #12：库里「杭州/杭州市」「眉山/眉山市」同城双写法并存。旧实现用 c.name === cityName
+  // 排除自身，带后缀别名排不掉（「杭州附近」第一条竟是「杭州市 3km」），且眉山/眉山市各占一个
+  // 名额（6 条结果近半是重复城市）。改用 canonCityName 归一（收敛到有数据变体，已验证）做
+  // 自身判断 + 同城去重键；返回 name 仍用 c.name 原样，零下游影响。
+  const selfKey = canonCityName(cityName);
+  const seen = new Set(selfKey ? [selfKey] : []);
   (Array.isArray(D.CITIES) ? D.CITIES : []).forEach(c => {
-    if (c.name === cityName) return;
+    const key = canonCityName(c.name) || c.name;
+    if (seen.has(key)) return;
     const cc = _cityCoord(c.name);
     if (!cc) return;
+    seen.add(key);
     const km = _havKm(c0, cc);
     out.push({ name: c.name, province: c.province || (D.CITY2PROV && D.CITY2PROV[c.name]) || "", km: Math.round(km) });
   });

@@ -1,6 +1,6 @@
 {
-  "count": 11,
-  "runs": 11,
+  "count": 12,
+  "runs": 12,
   "log": [
     {
       "n": 1,
@@ -67,6 +67,12 @@
       "date": "2026-11-16",
       "ver": "1.20.8",
       "summary": "工程改善 T1-T5（空catch可观测化/9个apply*收敛内核/pack-data幂等/拆5个巨型文件到≤800行/文档数字脚本化）+ 网页端浮层键盘可达性与 <image binderror> 派发修复 + 东北第56轮数据合并"
+    },
+    {
+      "n": 12,
+      "date": "2026-11-17",
+      "ver": "1.20.20",
+      "summary": "fix(nearbyCities): 库里『杭州/杭州市』同城双写法并存，旧实现用 c.name===cityName 严格相等排除自身→带后缀别名排不掉（『杭州附近』首条竟是『杭州市 3km』），眉山/眉山市双写各占一名额；改用 canonCityName 归一做自身判断+同城去重，返回 name 保持原样零下游影响。新增 check-new block 54（10 断言）；单测 529/0，allcheck 全绿（EXIT=0，未升版、未碰 keys、不 push）"
     }
   ]
 }

@@ -1175,5 +1175,29 @@ assert("显式『打开深度玩法』仍导航（正向回归）", aiNavDeep &&
 const aiNavPit = AI.handle("成都避坑攻略", { city: "成都" });
 assert("『避坑』仍导航（正向回归）", aiNavPit && aiNavPit.intent === "nav");
 
+// ── 周边城市自身别名排除 + 同城去重（迭代 #12）──
+// 库里「杭州/杭州市」「成都/成都市」「眉山/眉山市」同城双写法并存。旧 nearbyCities 用
+// c.name === cityName 严格相等排除自身 → 带后缀别名排不掉，「附近城市」第一条是自身（3km），
+// 且眉山/眉山市双写各占一名额，6 条结果近半重复。改为 canonCityName 归一后去重。
+console.log("== 54. 周边城市自身排除与同城去重 ==");
+const nbHz = T.nearbyCities("杭州", 6);
+assert("杭州附近不含自身『杭州』", nbHz.every(x => x.name !== "杭州"), JSON.stringify(nbHz.map(x => x.name)));
+assert("杭州附近不含自身别名『杭州市』", nbHz.every(x => x.name !== "杭州市"), JSON.stringify(nbHz.map(x => x.name)));
+assert("杭州附近首条不再是自己(3km)", nbHz.length > 0 && nbHz[0].km > 3, nbHz[0] && nbHz[0].km);
+const nbCd = T.nearbyCities("成都", 6);
+assert("成都附近不含『成都/成都市』", nbCd.every(x => x.name !== "成都" && x.name !== "成都市"), JSON.stringify(nbCd.map(x => x.name)));
+const nbXa = T.nearbyCities("西安", 6);
+assert("西安附近不含『西安/西安市』", nbXa.every(x => x.name !== "西安" && x.name !== "西安市"), JSON.stringify(nbXa.map(x => x.name)));
+const nbNj = T.nearbyCities("南京市", 6);
+assert("输入带后缀『南京市』也排除自身两种写法", nbNj.every(x => x.name !== "南京" && x.name !== "南京市"), JSON.stringify(nbNj.map(x => x.name)));
+assert("同城双写法只留一条(结果内规范名唯一)", (() => {
+  const keys = nbCd.map(x => T.canonCityName(x.name));
+  return keys.length === new Set(keys).size;
+})(), JSON.stringify(nbCd.map(x => x.name)));
+assert("结果仍按距离升序", nbCd.every((x, i) => i === 0 || nbCd[i - 1].km <= x.km), JSON.stringify(nbCd.map(x => x.km)));
+assert("无自身空城仍返回空数组", T.nearbyCities("火星城xyz", 6).length === 0);
+const nearText = AI.handle("杭州附近还有哪好玩", { city: "北京" });
+assert("AI『附近』回答已剔除自身", nearText && nearText.intent === "near" && !/· 杭州市?（/.test(nearText.text || ""), nearText && (nearText.text || "").slice(0, 80));
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
