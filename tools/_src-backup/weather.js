@@ -194,7 +194,11 @@ function fetchPlanWeather(plan, cb) {
   //   多城行程只看最早一天：只要有一天落在窗口内就仍要请求，靠后的天自然缺数据、逐日跳过。
   //   （这一行原本就为窗口判断算好了 first，却一直没被使用 —— 死代码，正好用上。）
   const _dayDiff = Math.round((first.getTime() - today.getTime()) / 86400000);
-  if (_dayDiff >= 7) { cb([], { type: "window", msg: "行程超出天气预报范围（仅支持未来 7 天）" }); return; }
+  // v1.20.22：对称补上「出发日在过去」的预判。/v7/weather/7d 只覆盖今天起 7 天，
+  // 历史行程（从「我的行程」恢复、跨时区/改系统时间）同样必然拿不到天气：
+  // 原行为照发 15s 请求 → 200 但日期全不匹配 → 最后才报 window，白等一轮又白花配额。
+  // 文案与未来超窗分支完全一致，不新增口径。
+  if (_dayDiff >= 7 || _dayDiff < 0) { cb([], { type: "window", msg: "行程超出天气预报范围（仅支持未来 7 天）" }); return; }
 
   const byCity = {};
   let pending = 0, finished = false, aggErr = null;

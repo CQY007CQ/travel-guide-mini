@@ -141,6 +141,18 @@ log(missD.length === 0,
 log(/暂无数据/.test(allPrompt) && /≤400/.test(allPrompt),
   "提示词统一「暂无数据」口径与篇幅上限");
 
+// v1.20.22：旁路调用绕过主链路保护的防回潮
+//   ① 第二视角直连云端，熔断期仍发请求 → Promise.all 被 21s 拖住；
+//   ② 网页 send() 无 inflight → 连点重复请求/重复记忆（行为由 web/smoke 真跑覆盖）。
+log(/channelCooling\(\)/.test(readFileSync(resolve(ROOT, "subpkg/assistant/ai-reason.js"), "utf8")) &&
+  /channelCooling:/.test(AGENT_JS),
+  "第二视角与主回答共用熔断状态（熔断期不请求）");
+log(/function channelCooling\(\)\s*\{\s*return Date\.now\(\) < _breakUntil;\s*\}/.test(AGENT_JS),
+  "熔断只读出口只暴露状态、不改主链路判定");
+log(/_sendInflight\s*=\s*\{\s*q:\s*v,\s*p:\s*p\s*\}/.test(readFileSync(resolve(ROOT, "web/ai-assistant.js"), "utf8")) &&
+  /return sendQueued\(v\);/.test(readFileSync(resolve(ROOT, "web/ai-assistant.js"), "utf8")),
+  "网页 AI 发送走 Promise 复用 + 排队（不是 boolean 丢弃）");
+
 console.log(fail === 0
   ? "\n✓ 云端 AI fail-closed 覆盖守卫通过（每个调用点都有 .catch 且失败分支优雅降级）"
   : "\n✗ 存在缺兜底的云端 AI 调用点，请在 .then 失败分支补离线/云端感知回落，并确保 .catch 存在");

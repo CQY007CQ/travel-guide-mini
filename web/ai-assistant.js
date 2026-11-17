@@ -1398,36 +1398,52 @@
     else if (APP.go) APP.go(path);
   }
 
+  // v1.20.22：网页端 send() 原先无并发守卫，连点两下会把同一句话写两遍 history、
+  // 发两趟请求、回落时落两条记忆（顺序错乱）。与小程序端 AIAgent.ask 对齐：
+  // 同一句话复用同一趟结果；换了问题排队，等前一趟结束再发，顺序与用户输入一致。
+  // 用 Promise 队列而不是 boolean —— boolean 会让第二条不同问题被误判 inflight 丢弃。
+  var _sendInflight = null;   // { q, p }
   function send() {
     var v = (dom.input.value || "").trim();
     if (!v) return;
     if (v.length > 2000) { v = v.slice(0, 2000) + "…"; toast("已截断到 2000 字上限"); }
     dom.input.value = ""; dom.input.style.height = "auto";
-    pushUser(v);
-    var ctx = context();
-
-    if (cloudAIEnabled() || llmEnabled()) {
-      pushTyping();
-      callLLM(history, ctx, function (txt) {
-        clearTyping(); pushBot(escapeHtml(txt).replace(/\n/g, "<br/>"));
-      }, function (err) {
-        clearTyping();
-        // err=null 表示可选直连未配置/已失效，静默回落即可，不再弹技术警告刷屏
-        if (err) pushBot("⚠️ " + escapeHtml(err) + "\n已回退到内置离线助手：");
-        var r = replyAndRemember(v, ctx); pushBot(r.html, r.actions); applyAuto(r);
-      });
-      return;
+    if (_sendInflight) {
+      if (_sendInflight.q === v) return;   // 同问连点：不重复发/不重复落记忆
+      var prev = _sendInflight.p;
+      return prev.then(function () { return sendQueued(v); });  // 异问排队
     }
-
-    pushTyping();
-    whenReady(function () {
-      setTimeout(function () {
-        clearTyping();
-        var r = replyAndRemember(v, ctx);
-        pushBot(r.html, r.actions);
-        applyAuto(r);
-      }, 320);
+    return sendQueued(v);
+  }
+  function sendQueued(v) {
+    var ctx = context(), p = new Promise(function (resolve) {
+      pushUser(v);
+      if (cloudAIEnabled() || llmEnabled()) {
+        pushTyping();
+        callLLM(history, ctx, function (txt) {
+          clearTyping(); pushBot(escapeHtml(txt).replace(/\n/g, "<br/>")); resolve();
+        }, function (err) {
+          clearTyping();
+          // err=null 表示可选直连未配置/已失效，静默回落即可，不再弹技术警告刷屏
+          if (err) pushBot("⚠️ " + escapeHtml(err) + "\n已回退到内置离线助手：");
+          var r = replyAndRemember(v, ctx); pushBot(r.html, r.actions); applyAuto(r); resolve();
+        });
+        return;
+      }
+      pushTyping();
+      whenReady(function () {
+        setTimeout(function () {
+          clearTyping();
+          var r = replyAndRemember(v, ctx);
+          pushBot(r.html, r.actions);
+          applyAuto(r);
+          resolve();
+        }, 320);
+      });
     });
+    _sendInflight = { q: v, p: p };
+    p.then(function () { if (_sendInflight && _sendInflight.p === p) _sendInflight = null; });
+    return p;
   }
   function applyAuto(r) {
     if (!r || !r.auto) return;

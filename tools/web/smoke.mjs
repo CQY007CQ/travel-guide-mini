@@ -525,5 +525,60 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
     /images\/tab-light-index\.png/.test(fs.readFileSync(path.join(ROOT, "web/lib/modules.js"), "utf8")));
 }
 
+/* ── v1.20.22：网页 AI 连点守卫真跑 ──
+ * 小程序端 v1.20.15 已做「同问复用 Promise / 异问排队」，网页端 send() 一直没有，
+ * 连点会把同一问题写两遍 history、发两趟请求。用 vm 只跑 send/sendQueued 两个
+ * 方法体，注入可控 pushUser / callLLM / history，观测真实调用次数。 */
+{
+  const vm = await import("vm");
+  const aiSrc = fs.readFileSync(path.join(ROOT, "web/ai-assistant.js"), "utf8");
+  const grab = (name) => {
+    const re = new RegExp("function " + name + "\\(([^)]*)\\)\\s*\\{");
+    const m = re.exec(aiSrc);
+    if (!m) return null;
+    let i = m.index + m[0].length - 1, depth = 0;
+    for (let k = i; k < aiSrc.length; k++) {
+      if (aiSrc[k] === "{") depth++;
+      else if (aiSrc[k] === "}") { depth--; if (!depth) return aiSrc.slice(m.index, k + 1); }
+    }
+    return null;
+  };
+  const body = grab("send") + "\n" + grab("sendQueued");
+  const users = [], calls = [], bots = [];
+  const ctx = {
+    dom: { input: { value: "北京三天怎么玩", style: {} } },
+    _sendInflight: null,
+    Promise, setTimeout, clearTimeout, console,
+    toast: () => {},
+    pushUser: (v) => users.push(v),
+    pushBot: (t) => bots.push(t),
+    pushTyping: () => {}, clearTyping: () => {},
+    history: [],
+    context: () => ({ plan: null, title: "首页", path: "pages/index/index" }),
+    cloudAIEnabled: () => false, llmEnabled: () => true,
+    escapeHtml: (s) => String(s),
+    replyAndRemember: (v) => ({ html: "离线答:" + v, actions: [] }),
+    applyAuto: () => {}, whenReady: (fn) => fn(),
+    // 可控云端：把 onDone 挂起，模拟请求在途
+    callLLM: (h, c, onDone) => { calls.push(h[h.length - 1]); return { then: () => {} }; }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(body, ctx);
+  // 第一问发出后保持 in-flight；再连点同一句必须零新增请求
+  vm.runInContext("send()", ctx);
+  const afterFirst = calls.length;
+  ctx.dom.input.value = "北京三天怎么玩";
+  vm.runInContext("send()", ctx);
+  ok("网页 AI 同一问题连点只发一趟请求（不重复落记忆）",
+    calls.length === afterFirst && users.length === 1,
+    "calls=" + calls.length + " users=" + JSON.stringify(users));
+  // 异问排队：不应立刻发第二趟（要等前一趟 resolve）
+  ctx.dom.input.value = "成都美食推荐";
+  vm.runInContext("send()", ctx);
+  ok("网页 AI 换问题时排队而不是并发（按输入顺序）",
+    calls.length === afterFirst && users.length === 1,
+    "calls=" + calls.length + " users=" + JSON.stringify(users));
+}
+
 console.log("\n结果：" + pass + " 通过 / " + fail + " 失败");
 if (fail) process.exit(1);

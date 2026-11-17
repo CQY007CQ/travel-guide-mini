@@ -153,6 +153,22 @@ global.wx = {
 W.fetchPlanWeather({ cityName: "北京", days: [{ date: dNear, cityName: "北京" }] }, () => {});
 ok("窗口内行程照常发起请求（预判不是无差别拦截）", nearReq === 1);
 
+// ①b v1.20.22：对称补「出发日在过去」。从「我的行程」恢复的历史档同样拿不到 7d 预报，
+//     原行为仍发 15s 请求才兜底；这里真跑断言「零请求 + 同一句 window 文案」。
+const dPast = ymd(new Date(todayD.getTime() - 3 * 86400000));
+let pastReq = 0, pastErr = null, pastList = null;
+global.wx = {
+  request() { pastReq++; },
+  getStorageSync(k) { return k === "__app_keys__" ? K_INJ : null; },
+  setStorageSync() {}
+};
+W.fetchPlanWeather({ cityName: "北京", days: [{ date: dPast, cityName: "北京" }] }, (l, e) => { pastList = l; pastErr = e; });
+ok("历史行程（出发日在过去）→ 判定 window 且一次请求都不发",
+  pastReq === 0 && !!pastErr && pastErr.type === "window" && Array.isArray(pastList) && pastList.length === 0,
+  "req=" + pastReq + " err=" + JSON.stringify(pastErr));
+ok("历史行程沿用与未来超窗完全相同的文案（不新增 UI 口径）",
+  (pastErr && pastErr.msg) === (farErr && farErr.msg));
+
 // ③ 重试退避必须非零：原写法 400 * attempt，attempt=0 → 0ms「立刻重试」，
 //    弱网下刚失败的连接还没缓过来就再撞一次，重试形同虚设。
 //    这里替换 setTimeout 只记录「声明延时」，再以 0ms 真跑，避免测试白等 400ms。

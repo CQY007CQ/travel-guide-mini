@@ -14,6 +14,7 @@
 // secondOpinion 才走云通道，任何失败返回 null，绝不拖垮主回答。
 
 const Cloud = require("../../utils/cloud.js");
+const AIAgent = require("../../utils/ai-agent.js");
 const T = require("../../utils/travel.js");
 const D = require("../../utils/data.js");
 
@@ -35,6 +36,13 @@ const ALT_SYS =
 
 function secondOpinion(q, ctx) {
   if (!Cloud.cloudEnabled()) return Promise.resolve(null);
+  // v1.20.22：熔断期内直接不请求。第二视角与主回答共用同一云通道，
+  // 主回答已连续 2 次传输失败时，再发一条只会让 Promise.all 白等 21s，
+  // 最终仍是离线答案 —— 这里快速返回 null，把「通道熔断」真正落实到整页。
+  // 没有第二视角就不是「双视角」，但本来它也只在云端可用时出现，语义一致。
+  // 读状态失败时按「未熔断」继续，本趟最多白等一次；下一趟仍由主链路正常判定。
+  try { if (AIAgent.channelCooling && AIAgent.channelCooling()) return Promise.resolve(null); }
+  catch (e) { /* 熔断状态是可选优化，读不到不影响第二视角原有行为 */ }
   return Cloud.aiChat({
     prompt: String(q || "").trim(),
     system: ALT_SYS,

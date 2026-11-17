@@ -50,6 +50,11 @@ const _BREAK_AFTER = 2;
 const _BREAK_MS = 60 * 1000;
 let _netFail = 0;
 let _breakUntil = 0;
+// v1.20.22：熔断状态只读出口。第二视角 / 网页 AI 等「旁路云端调用」也走同一个通道，
+// 但原先它们各自直连 Cloud.aiChat，绕过主回答的熔断：弱网下主回答 1ms 回落离线，
+// 页面却仍被 Promise.all 里的第二视角拖 21s（客户端 AI_TEXT_TIMEOUT_MS）——熔断形同虚设。
+// 这里只暴露状态、不改判定：业务错误仍不熔断，60s 到期自动恢复，口径全在主链路这一处。
+function channelCooling() { return Date.now() < _breakUntil; }
 
 // 时间戳为什么要落盘：_sceneTs 早期是纯内存，小程序被后台回收后它归零 →
 // 他页取到 0 → now-0 恒大于 10 分钟 TTL → 跨页提示「永不注入」。
@@ -333,5 +338,6 @@ module.exports = {
   clearHistory: clearHistory,
   memoryStats: memoryStats,
   parsePlanIntent: parsePlanIntent,
-  resolveCity: resolveCity
+  resolveCity: resolveCity,
+  channelCooling: channelCooling
 };

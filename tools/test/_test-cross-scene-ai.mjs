@@ -12,7 +12,7 @@
  */
 import { createRequire } from "module";
 import { readFileSync } from "fs";
-import { resolve } from "path";
+import { resolve, join as pathJoin } from "path";
 import vm from "vm";
 
 const require = createRequire(import.meta.url);
@@ -205,6 +205,55 @@ function loadAgent(opts) {
   await m.api.ask("food", "e2", "c");
   const re = await m.api.ask("food", "e3", "c");
   ok("业务错误不触发熔断（照常发第 3 次）", m.calls.length === 3 && re.err !== "cooldown");
+
+  // ⑮ v1.20.22：第二视角曾绕过熔断——主回答 1ms 回落，Promise.all 却仍被拖 21s。
+  //    真跑：用真实 ai-agent 把通道打断，再用真实 ai-reason 调 secondOpinion，
+  //    断言零请求 + 立即返回 null（不是等超时）。
+  {
+    const AGENT = pathJoin(ROOT, "utils/ai-agent.js");
+    const REASON = pathJoin(ROOT, "subpkg/assistant/ai-reason.js");
+    const agentSb = {
+      module: { exports: {} }, exports: {}, console, Date,
+      require(name) {
+        if (name === "./cloud.js") return {
+          cloudEnabled: () => true,
+          aiChat: () => Promise.resolve({ ok: false, err: "timeout", transport: true })
+        };
+        if (name === "./store.js") return { get: () => null, set: () => {} };
+        if (name === "./data.js") return { CITIES: [] };
+        if (name === "./errlog.js") return { note: () => 1 };
+        throw new Error("unexpected require " + name);
+      }
+    };
+    agentSb.exports = agentSb.module.exports;
+    vm.runInNewContext(readFileSync(AGENT, "utf8"), agentSb, { filename: "ai-agent.js" });
+    const agentApi = agentSb.module.exports;
+    await agentApi.ask("food", "b1", "c");
+    await agentApi.ask("food", "b2", "c");
+    ok("主链路连续失败后进入熔断", !!(agentApi.channelCooling && agentApi.channelCooling()));
+
+    const calls = [];
+    const reasonSb = {
+      module: { exports: {} }, exports: {}, console, Date, JSON, Math, RegExp, Object, Array, String,
+      require(name) {
+        if (name === "../../utils/cloud.js") return {
+          cloudEnabled: () => true,
+          aiChat: (p) => { calls.push(p); return Promise.resolve({ ok: false, err: "timeout", transport: true }); }
+        };
+        if (name === "../../utils/ai-agent.js") return agentApi;
+        if (name === "../../utils/travel.js") return { findCity: () => null };
+        if (name === "../../utils/data.js") return { CITIES: [] };
+        throw new Error("unexpected require " + name);
+      }
+    };
+    reasonSb.exports = reasonSb.module.exports;
+    vm.runInNewContext(readFileSync(REASON, "utf8"), reasonSb, { filename: "ai-reason.js" });
+    const t0 = Date.now();
+    const alt = await reasonSb.module.exports.secondOpinion("三家酒店怎么选才不踩坑对比一下", "ctx");
+    ok("熔断期内第二视角零请求（Promise.all 不再被 21s 拖住）",
+      alt === null && calls.length === 0, "calls=" + calls.length + " alt=" + JSON.stringify(alt));
+    ok("第二视角快速返回而不是等超时（<50ms）", Date.now() - t0 < 50, (Date.now() - t0) + "ms");
+  }
 
   console.log("\n" + pass + " 通过 / " + fail + " 失败");
   process.exit(fail === 0 ? 0 : 1);
