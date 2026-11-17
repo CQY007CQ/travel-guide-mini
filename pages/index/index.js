@@ -100,16 +100,11 @@ Page(SafePage(Object.assign({
   },
   onLoad(options) {
     this.__boot = T.ready().catch(() => null);
+    this.__opts = options || null;
+    // 与城市数据无关的字段先落地：日期选择器、历史/收藏、引导标记都不依赖分包数据。
     let provs = [];
     try { provs = T.provinces() || []; } catch (e) { provs = []; }
-    let last = null;
-    try { last = S.get("fromV1", null) || app.globalData.from || null; } catch (e) { last = (app.globalData && app.globalData.from) || null; }
-    let provIdx = 0;
-    if (last && provs.includes(last.province)) provIdx = provs.indexOf(last.province);
-    // v1.19.2：首页是冷启动唯一入口，_initFrom/_fillProv 里任一环（省表/城市表/存储）解析失败
-    // 都会直接抛出 → 用户看到白屏。这里整体兜底并降级为「仅日期可用」的最小状态。
     try {
-      this._initFrom();
       this.setData({
         // 2026-11-09：默认出发日从 +7 改为 +3 —— 和风免费档只有未来 7 天(today..+6)，
         // 默认 +7 会让「按默认日期生成」的行程整段落在预报窗口外，天气卡永远显示不可用。
@@ -121,25 +116,45 @@ Page(SafePage(Object.assign({
         pickOnly: T.getWish() && this._pickOnlyStored(),
         guideSeen: !!(S.get("miniGuideSeenV1", 0))
       });
+    } catch (e) {
+      // 存储不可用（配额满 / 隐私限制）时不该拖垮整页：日期仍要给，历史/收藏降级为空。
+      // note() 自身不抛错，故不再套一层 try/catch（多一层空 catch 反而增加静默面）。
+      require("../../utils/errlog.js").note("index", e, "首页基础字段初始化降级");
+    }
+    // v1.20.10：冷启动时分包还在解包，此处 provs 必为空。旧实现在这里把「依赖城市数据的一整段」
+    // 也跑了一遍（建出发地表 → 填省城 → 高级设置 → 假期提示），随后 boot 完成又被
+    // _ensureForm() 从头重做 —— 白干一轮，正是 Page.onLoad 实测 1676ms 的主要来源之一。
+    // 更糟的是：依赖城市表的「分享链接带 city」与「跨会话偏好城市」在那一刻必然找不到城市，
+    // 于是冷启动下静默失效（只有第二次进入才对，且 _applyPrefs 只在 onLoad 调用，
+    // 意味着冷启动根本不会恢复偏好城市）。现在挂起，由 _ensureForm() 在数据就绪后衔接。
+    if (provs.length) { this._initIndexData(); return; }
+    this.__needIndexInit = true;
+  },
+
+  // 依赖城市数据的一轮初始化（v1.20.10 从 onLoad 原样搬出，逐句未改）。
+  // 调用时机只有两个：onLoad 时数据已就绪；或 _ensureForm() 在 boot 完成后补跑。
+  _initIndexData() {
+    const options = this.__opts || null;
+    let provs = [];
+    try { provs = T.provinces() || []; } catch (e) { provs = []; }
+    let last = null;
+    try { last = S.get("fromV1", null) || app.globalData.from || null; } catch (e) { last = (app.globalData && app.globalData.from) || null; }
+    let provIdx = 0;
+    if (last && provs.includes(last.province)) provIdx = provs.indexOf(last.province);
+    // v1.19.2：首页是冷启动唯一入口，_initFrom/_fillProv 里任一环（省表/城市表/存储）解析失败
+    // 都会直接抛出 → 用户看到白屏。这里整体兜底并降级为「仅日期可用」的最小状态。
+    try {
+      this._initFrom();
       this._fillProv(provIdx, last && last.city && last.province === (provs[provIdx] || "") ? last.city : "");
       this._syncAdv();
       this._syncHoli();
+      // 深链/偏好放在最后：两者都可能改写 provIdx/cityIdx，放前面会被 _fillProv 盖回默认值。
       this._applyDeepLink(options);
       this._applyPrefs(options);
     } catch (e) {
-      try {
-        this.setData({
-          // 2026-11-09：默认出发日从 +7 改为 +3 —— 和风免费档只有未来 7 天(today..+6)，
-        // 默认 +7 会让「按默认日期生成」的行程整段落在预报窗口外，天气卡永远显示不可用。
-        depart: iso(new Date(new Date().getTime() + 3 * 86400000)),
-          departMin: iso(new Date()),
-          provinces: provs
-        });
-        wx.showToast({ title: "初始化降级，仍可使用", icon: "none" });
-        // v1.20.8（T1）：界面已提示，但「哪一步降级了」此前完全无痕 —— 用户报「首页少了东西」时查不到原因。
-        // note() 自身保证不抛错，故不再套一层 try/catch（多一层空 catch 反而增加静默面）。
-        require("../../utils/errlog.js").note("index", e, "首页初始化降级");
-      } catch (_) {}
+      try { this.setData({ provinces: provs }); } catch (_) { /* 降级态仍要能渲染省表 */ }
+      wx.showToast({ title: "初始化降级，仍可使用", icon: "none" });
+      require("../../utils/errlog.js").note("index", e, "首页初始化降级");
     }
   },
   /* ---- 目的地省 / 市 ---- */

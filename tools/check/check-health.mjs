@@ -107,6 +107,26 @@ ck("新增优化守卫与体检单测都已接入回归链",
   /_test-optimizations\.mjs/.test(read("allcheck.sh")) && /check-health\.mjs/.test(read("allcheck.sh")));
 ck("构建幂等依赖内容 hash（不是固定戳）",
   /内容 hash|content hash/.test(read("tools/web/build.mjs")));
+// v1.20.10：Node 侧 wx 垫片的「假绿」陷阱 —— utils/data.js 的 b64ToBytes() 会优先走
+// wx.base64ToArrayBuffer；Proxy 兜底空函数返回 undefined → pako 抛 "buffer error" → 数据整块为空。
+// 表现极具欺骗性：页面在空数据上不会崩，冒烟一路 ✓，但它从未验证过「数据依赖导致的页面异常」。
+// 全页面启动冒烟就因此假绿了很久（实测补上真解码后才第一次加载真实数据，21 个页面仍全通过）。
+const wxHarness = (fn) => {
+  const s = read(fn);
+  if (!/globalThis\.wx\s*=|global\.wx\s*=/.test(s)) return null;      // 没装垫片
+  // 真的会去加载数据/页面（而不是只在文本里出现 "utils/data.js" 这个扫描目标）
+  const loadsData = /createRequire\(jsFile\)|nodeRequire\(|require\([^)\n]{0,140}utils\/data\.js/.test(s);
+  return loadsData ? s : null;
+};
+const harnessFiles = readdirSync("tools/test").filter((f) => f.endsWith(".mjs")).map((f) => "tools/test/" + f)
+  .concat(readdirSync("tools/audit").filter((f) => f.endsWith(".mjs")).map((f) => "tools/audit/" + f));
+let badHarness = [];
+for (const f of harnessFiles) {
+  const s = wxHarness(f);
+  if (s && !/base64ToArrayBuffer/.test(s)) badHarness.push(f.replace("tools/", ""));
+}
+ck("装 wx 垫片且加载数据的测试都提供真 base64 解码（防 data 整块为空假绿）",
+  badHarness.length === 0, badHarness.join("、"));
 // 历史高发点：_test-food-render.mjs 用 vm 只跑「方法体」，不执行顶层 require；
 // 一旦页面把函数抽成模块依赖而没同步注入 ctx，就会抛 ReferenceError → 假空态。
 ck("vm 沙箱单测已注入坐标模块依赖（防作用域回归）",

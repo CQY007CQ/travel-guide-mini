@@ -191,6 +191,14 @@ module.exports = {
     let provs = [];
     try { provs = T.provinces() || []; } catch (e) { provs = []; }
     if (!provs.length) { this.setData({ dataFailed: true }); return; }
+    // v1.20.10：冷启动时数据未就绪，onLoad 里「依赖城市数据那一轮」被挂起，这里是唯一重入点。
+    // 顺序关键：先补跑（内部可能改写 provIdx/cityIdx，例如深链/偏好指定的城市），
+    // 再按「当前」provIdx/cityIdx 重算选择器 —— 反过来会把深链选中的城市盖回默认值。
+    // 数据仍未就绪时不消费标记，留给「重试加载」后的下一次 _ensureForm。
+    if (this.__needIndexInit) {
+      this.__needIndexInit = false;
+      this._initIndexData();
+    }
     this.setData({ dataFailed: false });
     let provIdx = this.data.provIdx || 0;
     if (provIdx < 0 || provIdx >= provs.length) provIdx = 0;

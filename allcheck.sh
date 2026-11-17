@@ -179,7 +179,7 @@ step "单测 sharecard (转发卡片 v1.19.88)" "$NODE" tools/test/_test-v11988-
 step "单测 plan-handlers (行程页交互回归 v1.19.109)" "$NODE" tools/test/_test-plan-handlers.mjs
 # v1.19.93：全页面启动冒烟——vm 模拟 17 个注册页「被打开」（Page 构造+onLoad+onShow）。
 # 抓上传工具链与静态扫描都查不到的运行时级问题（曾抓到 7 个分包页 require 路径层级错误→白屏）。
-step "全页面启动冒烟 (v1.19.93)" "$NODE" tools/test/_test-v11993-bootsmoke.mjs
+step "全页面启动冒烟 (v1.19.93)" bash -c '"$1" tools/test/_test-v11993-bootsmoke.mjs && "$1" tools/test/_test-index-coldstart.mjs' _ "$NODE"
 step "文案质量 泛化/雷同扫描 (v1.15)" "$NODE" tools/test/scan-generic.mjs
 step "行政区覆盖审计 (v1.15)" bash -c '
   out=$('"$NODE"' tools/dev/cities-census.mjs 2>&1)

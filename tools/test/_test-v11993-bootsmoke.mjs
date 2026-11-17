@@ -27,6 +27,16 @@ const chainQ = { in() { return this; }, select() { return this; }, fields() { re
 const mkToast = () => ({ success() {}, fail() {}, complete() {} });
 const wxMock = new Proxy({}, {
   get(t, k) {
+    // v1.20.10 修复（假绿）：缺这一条时 utils/data.js 的 b64ToBytes() 会走
+    // `wx.base64ToArrayBuffer` → 拿到本 Proxy 的兜底空函数 → 返回 undefined →
+    // new Uint8Array(undefined) → pako 抛 "buffer error" → 数据整块为空。
+    // 症状是「每个页面都 ✓，因为它们在空数据上没崩」—— 这道门禁其实从未加载过真实数据，
+    // 也就抓不到「数据依赖导致的页面白屏」。补上真解码后才有意义。
+    if (k === "base64ToArrayBuffer") return (b64) => {
+      const buf = Buffer.from(String(b64 || ""), "base64");
+      return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    };
+    if (k === "arrayBufferToBase64") return (ab) => Buffer.from(ab).toString("base64");
     if (k === "createSelectorQuery") return () => chainQ;
     if (k === "getSystemInfo" || k === "getSystemInfoSync") return (cb) => { const r = { pixelRatio: 2, windowWidth: 375, windowHeight: 667, statusBarHeight: 20, platform: "devtools" }; if (cb) cb(r); return r; };
     if (k === "getMenuButtonBoundingClientRect") return () => ({ top: 20, right: 303, bottom: 64, left: 240, width: 63, height: 44 });
