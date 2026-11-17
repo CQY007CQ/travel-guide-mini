@@ -136,6 +136,14 @@ const POINTS = [
   ["地图上下文创建失败（定位/视野联动失效）", "subpkg/map/map.js", /地图上下文创建失败/],
   ["相机/选图打不开", "subpkg/lens/lens.js", /相机\/选图打开失败/],
   ["首页初始化降级", "pages/index/index.js", /首页初始化降级/],
+  // v1.20.13：AI 记忆/上下文链路的静默失败补留痕（原先只剩 1 条余量，等于逼着后来者继续吞）
+  ["AI 会话记忆读取失败（多轮上下文按空继续）", "utils/ai-agent.js", /会话记忆读取失败/],
+  ["AI 会话记忆落盘失败（冷启动后跨页衔接失效）", "utils/ai-agent.js", /记忆\/时效基准落盘失败/],
+  ["AI 记入会话失败（本轮回答不写回上下文）", "utils/ai-agent.js", /记入会话记忆失败/],
+  ["AI 清空会话失败（用户以为已清）", "utils/ai-agent.js", /清空会话失败/],
+  ["离线大脑会话快照读取失败", "subpkg/assistant/ai-brain.js", /会话快照读取失败/],
+  ["离线大脑会话快照落盘失败", "subpkg/assistant/ai-brain.js", /会话快照落盘失败/],
+  ["AI grounding 取名失败（易诱发泛话/臆造）", "subpkg/assistant/ai-context.js", /取真实店名\/景点名失败/],
 ];
 const lost = POINTS.filter(([, file, re]) => !re.test(read(file))).map(([n]) => n);
 ok(POINTS.length + " 个关键降级点全部留痕", lost.length === 0, lost.slice(0, 5).join(" ; "));
@@ -144,7 +152,8 @@ ok(POINTS.length + " 个关键降级点全部留痕", lost.length === 0, lost.sl
 console.log("【静默失败棘轮】");
 // 基线 = v1.20.8 完成 T1 插桩后的实测值（同口径：滤注释、只统计体为空的 catch）。
 // 只能往下改；新增静默吞失败会立即超过基线而判红。
-const BASELINE = 396;
+// v1.20.13：把 AI 记忆/上下文链路 7 处静默吞失败改成 errlog 留痕，实测 395 → 388，基线随之下调。
+const BASELINE = 388;
 const SKIP = new Set(["node_modules", ".git", "web", "tools", "docs", "shots", ".qr", ".cloudbase"]);
 const SKIP_FILE = /data-packed|team-food3|modules\.js|tpl\.js/;
 function walk(dir, out = []) {

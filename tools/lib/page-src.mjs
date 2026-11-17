@@ -14,8 +14,11 @@
 import fs from "fs";
 import path from "path";
 
-/** 页面同目录里由拆分产生的模块（约定：p-*.js / m-*.js / 页面名-ctx.js） */
-const SIBLING = /^(?:(?:p|m)-[A-Za-z0-9_-]+|(?:plan|index)-ctx)\.js$/;
+/** 页面同目录里由拆分产生的模块（约定：p-*.js / m-*.js / ab-*.js / 页面名-ctx.js）
+ *  ab-* 是 subpkg/assistant/ai-brain.js 的拆分模块（ab-core/ab-write/ab-runs）：
+ *  该文件曾 784 行逼近 800 硬线，按职责拆成单向依赖的四个文件；
+ *  凡按源码文本断言 ai-brain 的门禁必须经 pageSrc 读合并源码，否则断言会静默失效（假绿）。 */
+const SIBLING = /^(?:(?:p|m|ab)-[A-Za-z0-9_-]+|(?:plan|index)-ctx)\.js$/;
 
 /**
  * @param {string} rel 相对仓库根的页面 JS，如 "pages/plan/plan.js"

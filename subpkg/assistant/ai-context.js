@@ -12,6 +12,7 @@
 
 const T = require("../../utils/travel.js");
 const D = require("../../utils/data.js");
+const EL = require("../../utils/errlog.js");   // 取名失败要留痕：grounding 少了真实店名/景点名，模型更易凭空编
 const S = require("../../utils/store.js");
 const C = require("../../utils/corpus.js");
 
@@ -52,7 +53,7 @@ function namesOf(city, kind, limit) {
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { EL.note("ai-ctx", e, "取真实店名/景点名失败 → 本次 grounding 缺该维度（模型可能改说泛话）"); }
   return out;
 }
 

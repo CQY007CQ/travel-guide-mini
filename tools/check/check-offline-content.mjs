@@ -9,6 +9,7 @@
 import { createRequire } from "module";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { resolve, join } from "path";
+import { pageSrc } from "../lib/page-src.mjs";
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve("utils/..");
@@ -57,9 +58,13 @@ log(remoteHits === 0, "主包 pages/ 首屏无远程图片 src（" + pageWxml.le
    已连续两轮发现此类错误：识物「离线识别无需联网」（实走云端）、指南「天气已内置免配置」（需本人 Key）。
    这些是用户直接可见的能力承诺，与实现相反会误导预期，故做成 fail-fast。仅扫用户可见数据，不扫注释。 */
 const code = (p) => readFileSync(resolve(ROOT, p), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "").replace(/<!--[\s\S]*?-->/g, "");
+// ai-brain 已按职责拆成 ab-core/ab-write/ab-runs（原 784 行逼近 800 硬线）。
+// 这里必须读 pageSrc 合并源码：只读 ai-brain.js 会让「不得宣称离线识别」这类断言
+// 在文案搬进 ab-runs 后静默失效（假绿）。合并后扫描面只增不减，断言强度不降。
+const stripCode = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 const guideSrc = code("subpkg/guide/guide.js");
 const moreSrc = code("pages/more/more.js");
-const aiBrainSrc = code("subpkg/assistant/ai-brain.js");
+const aiBrainSrc = stripCode(pageSrc("subpkg/assistant/ai-brain.js", ROOT));
 const lensSrc = code("subpkg/lens/lens.wxml");
 const mapSrc = code("subpkg/map/map.js");
 log(!/天气已内置|免配置/.test(guideSrc), "使用指南不宣称天气「已内置/免配置」（实需本人和风 Key + 联网）");

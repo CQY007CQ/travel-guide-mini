@@ -13,6 +13,7 @@
 const Cloud = require("./cloud.js");
 const DATA = require("./data.js");
 const S = require("./store.js");
+const EL = require("./errlog.js");   // 记忆落盘失败必须留痕：静默吞掉会表现为「AI 突然不记得上一句」
 
 // 主包内置「压缩版」强模型纪律协议：仅通用作战协议（零伪造 / 思维链 / 多链投票 / 不越界 / 安全），约 0.7KB，守主包红线。
 // 完整 10 套场景提示词置于 subpkg/assistant/ai-prompts.js（不占主包）；assistant 自由聊天经 ask() 第 4 参注入完整版。
@@ -47,7 +48,7 @@ function _load() {
         if (Array.isArray(v[k])) _mem[k] = v[k].slice(-MAX_TURNS * 2);
       });
     }
-    // 复用同一个 try：不新增 catch（空 catch 有可观测性基线约束，见 check-observability）。
+    // 复用同一个 try（不新增 catch，避免抬高空 catch 基线）；失败留痕后按空记忆继续。
     const tv = S.get(TS_KEY, null);
     if (tv && typeof tv === "object" && !Array.isArray(tv)) {
       Object.keys(tv).forEach(function (k) {
@@ -55,7 +56,7 @@ function _load() {
         if (t > 0 && t > (_sceneTs[k] || 0)) _sceneTs[k] = t; // 内存为准，取较大值
       });
     }
-  } catch (e) {}
+  } catch (e) { EL.note("ai-mem", e, "会话记忆读取失败 → 按空记忆继续（多轮上下文会丢）"); }
   return _mem;
 }
 function _save() {
@@ -72,7 +73,7 @@ function _save() {
     const ts = {};
     Object.keys(out).forEach(function (k) { if (_sceneTs[k]) ts[k] = _sceneTs[k]; });
     S.set(TS_KEY, ts);
-  } catch (e) {}
+  } catch (e) { EL.note("ai-mem", e, "会话记忆/时效基准落盘失败 → 冷启动后跨页衔接失效"); }
 }
 
 function historyOf(scene) {
@@ -90,7 +91,7 @@ function remember(scene, role, text) {
     // 键顺序即淘汰顺序：把刚用过的场景挪到末尾（详见 check-ai-fallback 断言）。
     const cur = m[k]; delete m[k]; m[k] = cur;
     _save();
-  } catch (e) {}
+  } catch (e) { EL.note("ai-mem", e, "记入会话记忆失败 → 本轮回答不写回上下文"); }
 }
 function clearHistory(scene) {
   try {
@@ -99,7 +100,7 @@ function clearHistory(scene) {
     else { Object.keys(m).forEach(k => delete m[k]); Object.keys(_sceneTs).forEach(k => delete _sceneTs[k]); }
     _crossTs = 0; // 清空会话后跨页缓存立即失效，不吐 30 秒内的旧问题
     _save();
-  } catch (e) {}
+  } catch (e) { EL.note("ai-mem", e, "清空会话失败 → 旧记忆可能仍在（用户以为已清）"); }
 }
 
 // 跨页衔接：把「其它场景最近 2 条用户提问」附进本次 context，让「那换成室内的呢」

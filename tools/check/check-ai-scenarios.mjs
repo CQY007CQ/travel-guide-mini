@@ -276,5 +276,35 @@ log(/fontScale\(\)/.test(mapSrc) && !/fontSize: 16[,}]/.test(mapSrc) && !/fontSi
 const appCss = readFileSync(resolve(ROOT, "app.wxss"), "utf8");
 log(/\.dim \{ color: var\(--dim/.test(appCss), "深色主题 .dim 用专用 --dim 变量（对比度 ≥4.5:1）");
 
+// 16) ai-brain 拆分防假绿：ai-brain.js 曾 784 行（离 800 硬线只剩 16 行），已按职责拆成
+//     ab-core / ab-write / ab-runs，依赖严格单向。两个契约必须锁住，否则会各自静默失效：
+//     ① 凡按源码文本断言 ai-brain 的门禁（如「不得宣称离线识别」）必须经 pageSrc 读到合并源码 ——
+//        只读 ai-brain.js 会在文案搬进 ab-runs 后变成假绿；
+//     ② 依赖不得成环 —— require 环在 Node/微信任一侧都可能拿到半初始化的 exports，
+//        表现是「某个意图突然答非所问且不报错」（拆分当天实测过一次同类静默失败）。
+const AB_DIR = resolve(ROOT, "subpkg/assistant");
+const abRead = (f) => { try { return readFileSync(resolve(AB_DIR, f), "utf8"); } catch (e) { return ""; } };
+const abParts = ["ab-core.js", "ab-write.js", "ab-runs.js"];
+let abCombined = "";
+try { abCombined = pageSrc("subpkg/assistant/ai-brain.js", ROOT); } catch (e) {}
+const abMissing = abParts.filter((f) => {
+  const s = abRead(f);
+  return !s || !abCombined.includes(s.trim().slice(0, 200));
+});
+log(abMissing.length === 0,
+  "ai-brain 拆分模块全部进入 pageSrc 合并源码（" + abParts.length + " 个）" +
+  (abMissing.length ? "（未覆盖：" + abMissing.join(",") + "）" : ""));
+const AB_CYCLES = [["ab-core.js", ["ab-write", "ab-runs", "ai-brain"]],
+  ["ab-write.js", ["ab-runs", "ai-brain"]],
+  ["ab-runs.js", ["ai-brain"]]];
+const abCycBad = [];
+for (const [f, forbidden] of AB_CYCLES) {
+  const s = abRead(f);
+  for (const t of forbidden) if (new RegExp("require\\(\\s*[\"']\\./" + t).test(s)) abCycBad.push(f + "→" + t);
+}
+log(abCycBad.length === 0,
+  "ab-* 依赖严格单向 ab-core→ab-write→ab-runs→ai-brain（无 require 环）" +
+  (abCycBad.length ? "（成环：" + abCycBad.join(",") + "）" : ""));
+
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);

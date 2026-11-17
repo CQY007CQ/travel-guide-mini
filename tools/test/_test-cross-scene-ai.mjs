@@ -28,6 +28,7 @@ function loadAgent(opts) {
   // 不传则每个实例一份独立 storage（同一次运行内）。
   const store = o.store || new Map();
   const calls = [];
+  const notes = [];
   const sandbox = {
     module: { exports: {} }, exports: {},
     require(name) {
@@ -39,6 +40,12 @@ function loadAgent(opts) {
         get: (k) => store.get(k), set: (k, v) => store.set(k, v)
       };
       if (name === "./data.js") return { CITIES: [] };
+      // v1.20.13：ai-agent 记忆/上下文链路补了 errlog 留痕（静默失败改为可观测），
+      // 沙箱里的 require 白名单必须同步，否则会以 "unexpected require" 崩掉
+      // ——这类崩溃是「实现了依赖改动、测试替身没跟上」，不是被测逻辑坏了。
+      if (name === "./errlog.js") return {
+        note: (scope, err, extra) => { notes.push({ scope, err, extra }); return 1; }
+      };
       throw new Error("unexpected require " + name);
     },
     Date: { now: () => clock },
@@ -48,7 +55,7 @@ function loadAgent(opts) {
   vm.runInNewContext(src, sandbox, { filename: "ai-agent.js" });
   return {
     api: sandbox.module.exports,
-    calls, store,
+    calls, store, notes,
     now() { return clock; },
     tick(ms) { clock += ms; }
   };
@@ -126,6 +133,16 @@ function loadAgent(opts) {
     Object.keys(saved).length === SCENES.length);
   ok("时间戳键集与记忆键集对齐（不会无限增长）",
     Object.keys(g.store.get("aiAgentTsV1") || {}).length === Object.keys(saved).length);
+
+  // ⑩ 存储坏掉时：不抛错、按空记忆继续，且必须留下痕迹（v1.20.13 把这里的裸空 catch 改成 errlog）。
+  //    没有这条断言时，「静默吞掉 → AI 突然不记得上一句」只能靠用户投诉发现。
+  const broken = { get() { throw new Error("boom-read"); }, set() { throw new Error("boom-write"); } };
+  const h = loadAgent({ store: broken });
+  let threw = null;
+  try { h.api.remember("today", "user", "存不进去的问题"); } catch (err) { threw = err; }
+  ok("存储读写异常不抛给调用方（AI 主流程不断）", threw === null);
+  ok("存储异常留下痕迹（不再静默吞掉）",
+    h.notes.some(n => String(n.extra || "").indexOf("会话记忆读取失败") >= 0));
 
   console.log("\n" + pass + " 通过 / " + fail + " 失败");
   process.exit(fail === 0 ? 0 : 1);
