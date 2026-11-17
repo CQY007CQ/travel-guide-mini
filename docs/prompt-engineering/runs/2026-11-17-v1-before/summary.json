@@ -1,0 +1,166 @@
+{
+  "at": "2026-11-17T02:56:34.803Z",
+  "ultimate": {
+    "id": "ULTIMATE",
+    "chars": 799,
+    "base": "V05",
+    "baseScore": 94
+  },
+  "input": "下周三从太原带爸妈去丽江玩 4 天，预算 5000，怕下雨，帮我排一下，顺便说下感冒了吃什么药",
+  "pipeline": {
+    "rounds": 10,
+    "uniqSig": [
+      "25c9d405cd4c557e"
+    ],
+    "topAllSame": true,
+    "top": "V05@94"
+  },
+  "embedded": [
+    {
+      "label": "主包 utils/ai-agent.js",
+      "ok": true,
+      "total": 11,
+      "hit": 11,
+      "chars": 351,
+      "miss": []
+    },
+    {
+      "label": "分包 subpkg/assistant/ai-prompts.js",
+      "ok": true,
+      "total": 11,
+      "hit": 11,
+      "chars": 475,
+      "miss": []
+    },
+    {
+      "label": "云函数 tools/cloud/llmProxy/index.js",
+      "ok": true,
+      "total": 6,
+      "hit": 6,
+      "chars": 338,
+      "miss": []
+    }
+  ],
+  "mode": "cloud",
+  "runs": [
+    {
+      "i": 1,
+      "ok": true,
+      "ms": 12413,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 669,
+      "err": ""
+    },
+    {
+      "i": 2,
+      "ok": true,
+      "ms": 12748,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 606,
+      "err": ""
+    },
+    {
+      "i": 3,
+      "ok": true,
+      "ms": 15599,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 819,
+      "err": ""
+    },
+    {
+      "i": 4,
+      "ok": true,
+      "ms": 12031,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 637,
+      "err": ""
+    },
+    {
+      "i": 5,
+      "ok": true,
+      "ms": 13987,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 791,
+      "err": ""
+    },
+    {
+      "i": 6,
+      "ok": true,
+      "ms": 12772,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 660,
+      "err": ""
+    },
+    {
+      "i": 7,
+      "ok": true,
+      "ms": 15610,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 852,
+      "err": ""
+    },
+    {
+      "i": 8,
+      "ok": true,
+      "ms": 10767,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 630,
+      "err": ""
+    },
+    {
+      "i": 9,
+      "ok": true,
+      "ms": 12818,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 718,
+      "err": ""
+    },
+    {
+      "i": 10,
+      "ok": true,
+      "ms": 13823,
+      "model": "qwen-plus",
+      "source": "qwen",
+      "len": 646,
+      "err": ""
+    }
+  ],
+  "metrics": {
+    "success": "10/10",
+    "latency_ms": {
+      "avg": 13256.8,
+      "min": 10767,
+      "max": 15610
+    },
+    "chars": {
+      "avg": 702.8,
+      "min": 606,
+      "max": 852
+    },
+    "fourSectionRate": "0%",
+    "within400Rate": "0%",
+    "has2025Rate": "100%",
+    "forbidHitsTotal": 0,
+    "medicalEscalateRate": "100%",
+    "entityStability": {
+      "丽江": "100%",
+      "4 天": "100%",
+      "太原": "100%",
+      "雨天": "100%"
+    },
+    "pairwiseJaccard": {
+      "mean": 0.132,
+      "min": 0.053,
+      "max": 0.396
+    }
+  }
+}
