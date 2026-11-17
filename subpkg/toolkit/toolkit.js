@@ -56,7 +56,7 @@ Page(SafePage({
  refresh() {
   const p = app.globalData.plan;
   const hasPlan = !!(p && p.days && p.days.length);
-  const planCity = hasPlan ? (p.cityName || "") : "";
+  const planCity = hasPlan ? T.planCityName(p) : "";   // v1.20.21：脏档解码后再找城市资料
   const fallback = T.findCity(planCity || this.lastCity());
   const city = fallback && fallback.experiences ? fallback : T.findCity("北京");
   this._city = city;

@@ -56,7 +56,8 @@ Page(SafePage({
     const st = T.todayState(plan);
     if (!st) { this.setData({ hasPlan: false }); return; }
     // 多站行程显示「今天所在站」，而不是整串「北京 → 西安」
-    const cityName = T.activeCityOf(plan) || plan.cityName;
+    // v1.20.21：旧脏档城市名含 %XX，展示与城市资料查询统一走解码名（存档不动）
+    const cityName = T.activeCityOf(plan) || T.planCityName(plan);
     const out = { cityName, phase: st.phase, hasPlan: true };
     // v1.8.4 A2：穿衣指数卡（按行程对应月份的当地气候给参考，而非「现在」的月份）
     try {

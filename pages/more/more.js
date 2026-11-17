@@ -623,8 +623,14 @@ Page(SafePage({
       confirmColor: "#cc3d3d",
       success: (r) => {
         if (!r.confirm) return;
-        try { wx.clearStorageSync(); } catch (e) {}
-        try { app.clearPlan(); } catch (e) {}
+        // v1.20.21：原实现无论清没清干净都 toast「已清空」——存储写失败（配额满/隐私模式）
+        // 时用户以为删掉了，其实数据还在。失败必须留痕并把真结果告诉用户。
+        let cleared = true;
+        try { wx.clearStorageSync(); }
+        catch (e) { cleared = false; EL.note("more.clearAllData", e, "清空本地数据失败（数据可能仍在）"); }
+        try { app.clearPlan(); }
+        catch (e) { cleared = false; EL.note("more.clearPlan", e, "清空当前行程失败"); }
+        if (!cleared) { wx.showToast({ title: "清空失败，数据可能仍在", icon: "none" }); return; }
         wx.showToast({ title: "已清空，回到初始状态", icon: "none" });
         setTimeout(() => { try { wx.reLaunch({ url: "/pages/index/index" }); } catch (_) {} }, 700);
       }

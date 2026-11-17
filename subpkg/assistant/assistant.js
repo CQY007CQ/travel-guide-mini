@@ -518,11 +518,16 @@ Page(SafePage({
     } catch (e) { wx.showToast({ title: "复制失败", icon: "none" }); }
   },
   aiClearChat() {
-    try { AIAgent.clearHistory("assistant"); } catch (e) {}
-    try { AI.resetSession(); } catch (e) {}   // 离线多轮上下文（城市/意图/最近景点）一并清空，避免刷新后串城
+    // v1.20.21：与 more 页「清空全部数据」同类真 bug —— 原实现记忆清没清掉都 toast
+    // 「会话已清空」，用户以为翻篇了，下一轮却串回上一话题。失败要留痕 + 如实告知。
+    let cleared = true;
+    try { AIAgent.clearHistory("assistant"); }
+    catch (e) { cleared = false; EL.note("assistant.clearHistory", e, "AI 会话记忆清空失败"); }
+    try { AI.resetSession(); }
+    catch (e) { cleared = false; EL.note("assistant.resetSession", e, "离线会话上下文清空失败"); }
     this.setData({ aiText: "", aiAnswer: "", lastResult: "", result: "", out: null,
       aiSource: "", source: "", aiQ: "", aiInput: "", aiErr: "" });
-    wx.showToast({ title: "会话已清空", icon: "none" });
+    wx.showToast({ title: cleared ? "会话已清空" : "清空失败，会话可能仍在", icon: "none" });
   },
 
   // 景点结果卡上的「AI 讲解这个景点」：云端启用时把本机真实资料作 grounding 交给强模型延伸讲解；

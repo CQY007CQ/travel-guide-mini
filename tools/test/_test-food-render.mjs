@@ -101,6 +101,9 @@ async function main() {
       T: {
         citiesOf: () => [{ name: "太原" }, { name: "大同" }],
         activeCityOf: () => "太原",
+        // v1.20.21：food.js 的 _renderShow 改走 T.planCityName（脏档展示名统一出口）。
+        // vm 沙箱不跑顶层 require，新增依赖必须显式注入替身，否则这里会静默 fail。
+        planCityName: (p) => (p && p.cityName) || "",
         themeMode: () => "light",
         fontScale: () => 1,
         applyNav: () => {}

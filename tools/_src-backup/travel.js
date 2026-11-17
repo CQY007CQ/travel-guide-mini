@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.20";
+const APP_VER = "1.20.21";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -163,6 +163,14 @@ function findCity(name, province) {
  if (_findCache.size > 400) _evictOldest(_findCache);   // 防多城切换后无限增长（逐出最旧，不全清）
  _findCache.set(ck, res);
  return res;
+}
+
+// v1.20.21：脏档展示名统一出口 —— 只改显示，不改存档（打卡/账本是用户数据）。
+// 旧版本把 URL 编码串当城市名存进 planV1，升级后计划页已在渲染层解码；这里把同一口径
+// 收成一个函数，供 today / food / map / toolkit 等页用，避免每页各写一遍 decQuery。
+function planCityName(plan) {
+  const raw = (plan && plan.cityName) || "";
+  return plan && plan.__staleCity ? decQuery(raw) : raw;
 }
 
 // v1.20.19：真实城市解析 —— 生成行程 / 穿衣 / 识物转生成等写操作一律用它取城市。
@@ -6680,7 +6688,7 @@ module.exports = {
  ready, planCheckup, swapSpotFor, askTrip,
  routeAdvicePlus, highlightOf, crowdTipOf, packExtra,
  badgesOf, yearReportNew, chinaLite, transportEstimate,
- provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, decQuery, realCity, provBrief, nearbyCityOf, D, P,
+ provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, decQuery, realCity, planCityName, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
  spotTagOf, searchSpots, spotCover,
  customBudgetObj: function (amt, days, peopleN) { return P.customBudgetObj(amt, days, peopleN); }, budgetTotalObj,

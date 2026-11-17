@@ -144,6 +144,11 @@ const POINTS = [
   ["离线大脑会话快照读取失败", "subpkg/assistant/ai-brain.js", /会话快照读取失败/],
   ["离线大脑会话快照落盘失败", "subpkg/assistant/ai-brain.js", /会话快照落盘失败/],
   ["AI grounding 取名失败（易诱发泛话/臆造）", "components/ai-entry/ai-context.js", /取真实店名\/景点名失败/],
+  // v1.20.21：两个「用户以为删干净了、其实没删」的静默失败点
+  ["清空全部本地数据失败（仍提示已清空）", "pages/more/more.js", /清空本地数据失败（数据可能仍在）/],
+  ["清空当前行程失败（仍提示已清空）", "pages/more/more.js", /清空当前行程失败/],
+  ["AI 会话记忆清空失败（仍提示已清空）", "subpkg/assistant/assistant.js", /AI 会话记忆清空失败/],
+  ["离线会话上下文清空失败（仍提示已清空）", "subpkg/assistant/assistant.js", /离线会话上下文清空失败/],
 ];
 const lost = POINTS.filter(([, file, re]) => !re.test(read(file))).map(([n]) => n);
 ok(POINTS.length + " 个关键降级点全部留痕", lost.length === 0, lost.slice(0, 5).join(" ; "));
@@ -153,7 +158,8 @@ console.log("【静默失败棘轮】");
 // 基线 = v1.20.8 完成 T1 插桩后的实测值（同口径：滤注释、只统计体为空的 catch）。
 // 只能往下改；新增静默吞失败会立即超过基线而判红。
 // v1.20.13：把 AI 记忆/上下文链路 7 处静默吞失败改成 errlog 留痕，实测 395 → 388，基线随之下调。
-const BASELINE = 388;
+// v1.20.21：清空调的两个静默失败点各 2 处改为留痕（388 → 384），基线随之下调。
+const BASELINE = 384;
 const SKIP = new Set(["node_modules", ".git", "web", "tools", "docs", "shots", ".qr", ".cloudbase"]);
 const SKIP_FILE = /data-packed|team-food3|modules\.js|tpl\.js/;
 function walk(dir, out = []) {
@@ -261,6 +267,58 @@ ok("onUnhandledRejection 自身整体包了 try（兜底逻辑不许成为新崩
     const seg = appSrc.slice(i, i + 900);
     return /try\s*\{/.test(seg) && /catch\s*\(/.test(seg);
   })());
+/* ───────── ⑦ 清空失败真跑（v1.20.21） ─────────
+ * 老实现两个「清空」都先吞掉异常再 toast 成功（more.clearAllData / assistant.aiClearChat）。
+ * 断言源码里有 errlog.note 这串字**不够** —— 必须真跑一遍失败分支，确认 toast 文案
+ * 不再是「已清空」。这里用 vm 只跑方法体，装必然失败的 wx/app 垫片。 */
+{
+  const vm = await import("vm");
+  const moreSrc = read("pages/more/more.js");
+  const asstSrc = read("subpkg/assistant/assistant.js");
+  const grab = (src, name) => {
+    const re = new RegExp(name + "\\(([^)]*)\\)\\s*\\{");
+    const m = re.exec(src);
+    if (!m) return null;
+    const j = src.indexOf("\n  },", m.index);
+    return j < 0 ? null : src.slice(m.index, j + 4).replace(re, "function(" + m[1] + "){");
+  };
+  const runClear = (src, name, extraCtx) => {
+    const fn = grab(src, name);
+    if (!fn) return null;
+    const toasts = [], notes = [];
+    const ctx = Object.assign({
+      wx: {
+        showModal: (o) => o.success({ confirm: true }),
+        showToast: (o) => toasts.push(String(o && o.title || "")),
+        clearStorageSync: () => { throw new Error("quota exceeded"); },
+        reLaunch: () => {}
+      },
+      app: { clearPlan: () => { throw new Error("still broken"); } },
+      EL: { note: (...a) => notes.push(a.join("|")) },
+      setTimeout: () => {}, console
+    }, extraCtx || {});
+    vm.createContext(ctx);
+    // 方法体用 this.setData / this.data；用宿主 this 传入桩，不能靠 sandbox 全局
+    const self = { setData: () => {}, data: {} };
+    try { vm.runInContext("(" + fn + ").call(__self)", Object.assign(ctx, { __self: self })); }
+    catch (e) { return { err: e.message }; }
+    return { toasts, notes };
+  };
+  const moreR = runClear(moreSrc, "clearAllData", null);
+  ok("清空全部数据：失败时不报「已清空」且留痕",
+    !!(moreR && moreR.toasts && moreR.toasts.length === 1 &&
+       /清空失败/.test(moreR.toasts[0]) && moreR.notes.length >= 2),
+    JSON.stringify(moreR));
+  const asstR = runClear(asstSrc, "aiClearChat", {
+    AIAgent: { clearHistory: () => { throw new Error("memory write failed"); } },
+    AI: { resetSession: () => { throw new Error("reset failed"); } }
+  });
+  ok("清空 AI 会话：失败时不报「会话已清空」且留痕",
+    !!(asstR && asstR.toasts && asstR.toasts.length === 1 &&
+       /清空失败/.test(asstR.toasts[0]) && asstR.notes.length >= 2),
+    JSON.stringify(asstR));
+}
+
 console.log("");
 if (fail === 0) {
   console.log("可观测性门禁通过：" + pass + " 项（空 catch " + emptyCount + " / 基线 " + BASELINE + "）");

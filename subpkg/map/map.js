@@ -116,7 +116,7 @@ Page(SafePage({
     try { fscale = (T && typeof T.fontScale === "function") ? (T.fontScale() || 1) : 1; } catch (e) {}
     const day = plan.days[di];
     // 多站行程：每天属于哪一段就用哪座城市的坐标/美食/住宿库；单城直接用 plan.cityName
-    let cityName = plan.cityName;
+    let cityName = T.planCityName(plan);   // v1.20.21：脏档展示名解码（存档不动）
     const segs = Array.isArray(plan.segments) ? plan.segments : null;
     if (segs && segs.length) {
       if (segs.length === 1) cityName = segs[0].cityName || cityName;

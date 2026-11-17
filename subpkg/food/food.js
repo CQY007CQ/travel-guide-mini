@@ -63,7 +63,7 @@ Page(SafePage({
         } catch (e) {}
       }
       this.setData({ hasPlan: true, segs, fIdx });
-      const fallbackCity = isProv ? (provCities[0] || plan.province) : plan.cityName;
+      const fallbackCity = isProv ? (provCities[0] || plan.province) : T.planCityName(plan);
       this._renderCity(segs.length ? segs[fIdx].name : fallbackCity, plan.budget || "mid");
     } catch (e) {
       // v1.19.200：旧版把所有渲染异常都吞掉并 setData({hasPlan:false})，
