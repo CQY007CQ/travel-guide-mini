@@ -1,0 +1,127 @@
+[
+  {
+    "file": "docs/prompt-engineering/ULTIMATE-RUN-v1211.md",
+    "chars": 4275,
+    "G1": {
+      "total": 35,
+      "facts": 29,
+      "cited": 6,
+      "unbacked": 0,
+      "rate": 1,
+      "unbackedList": []
+    },
+    "G2": {
+      "hit": [
+        "字段清单",
+        "投票/多链",
+        "编号步骤",
+        "表格"
+      ],
+      "score": 67
+    },
+    "G3": {
+      "hit": [
+        "错别字",
+        "逻辑漏洞",
+        "代码bug",
+        "数据准确性",
+        "复跑"
+      ],
+      "score": 100
+    },
+    "G4": {
+      "total": 17,
+      "withPath": 14
+    }
+  },
+  {
+    "file": "tools/prompt/lab/runs-v1211/C05-output.md",
+    "chars": 2609,
+    "G1": {
+      "total": 40,
+      "facts": 25,
+      "cited": 15,
+      "unbacked": 0,
+      "rate": 1,
+      "unbackedList": []
+    },
+    "G2": {
+      "hit": [
+        "字段清单",
+        "复述段"
+      ],
+      "score": 33
+    },
+    "G3": {
+      "hit": [
+        "复跑"
+      ],
+      "score": 20
+    },
+    "G4": {
+      "total": 12,
+      "withPath": 11
+    }
+  },
+  {
+    "file": "tools/prompt/lab/runs-v1211/C13-output.md",
+    "chars": 1396,
+    "G1": {
+      "total": 34,
+      "facts": 26,
+      "cited": 8,
+      "unbacked": 0,
+      "rate": 1,
+      "unbackedList": []
+    },
+    "G2": {
+      "hit": [
+        "字段清单"
+      ],
+      "score": 17
+    },
+    "G3": {
+      "hit": [
+        "复跑"
+      ],
+      "score": 20
+    },
+    "G4": {
+      "total": 12,
+      "withPath": 9
+    }
+  },
+  {
+    "file": "tools/prompt/lab/runs-v1211/C15-output.md",
+    "chars": 6536,
+    "G1": {
+      "total": 60,
+      "facts": 41,
+      "cited": 17,
+      "unbacked": 2,
+      "rate": 0.9667,
+      "unbackedList": [
+        "205家",
+        "38项"
+      ]
+    },
+    "G2": {
+      "hit": [
+        "字段清单",
+        "复述段",
+        "投票/多链"
+      ],
+      "score": 50
+    },
+    "G3": {
+      "hit": [
+        "复跑"
+      ],
+      "score": 20
+    },
+    "G4": {
+      "total": 19,
+      "withPath": 18
+    }
+  }
+]
