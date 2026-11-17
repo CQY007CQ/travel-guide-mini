@@ -93,4 +93,7 @@ out("");
 out("美食店/美食条目 <5 的城: " + foodShort.length + " 城");
 out("  明细: " + foodShort.join("、"));
 
-fs.writeFileSync(path.join(process.cwd(), "tools", "cities-census-report.txt"), lines.join("\n"), "utf8");
+// 2026-11-17：报告落 tools 根层会让根目录越堆越乱，统一收到 tools/data/reports/。
+const _outDir = path.join(process.cwd(), "tools", "data", "reports");
+fs.mkdirSync(_outDir, { recursive: true });
+fs.writeFileSync(path.join(_outDir, "cities-census-report.txt"), lines.join("\n"), "utf8");

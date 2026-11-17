@@ -974,7 +974,7 @@
 
 **第 126 条**
 - 类型：安全 / 工程闭环（本轮整改记录，2026-11-09）
-- 位置：web/ai-assistant.js · web/ai-assistant.css · docs/code-audit-2026-11-09.md
+- 位置：web/ai-assistant.js · web/ai-assistant.css · docs/audit/code-audit-2026-11-09.md
 - 问题描述：承接用户「你还能优化什么，直接做」指令，对网页版 AI 助手做安全与性能加固，闭环审计 #109/#110/#111/#113/#118/#119 六条。
 - 严重程度：低（加固项）
 - 优化建议（已落地，留痕）：

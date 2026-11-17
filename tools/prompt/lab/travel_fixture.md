@@ -1,6 +1,6 @@
 # 旅行助手 · 统一评测台（所有候选提示词共用同一输入，保证可比）
 
-> 本 fixture 对应 `docs/prompt-engineering-travel-assistant.md`（P01–P14 + 终极提示词）。
+> 本 fixture 对应 `docs/prompt-engineering/prompt-engineering-travel-assistant.md`（P01–P14 + 终极提示词）。
 > 任务是「基于离线知识库回答国内旅行问题」，核心考察：是否真用检索上下文、是否对未覆盖城市显式声明「暂无数据」、是否处理口径冲突/时效/无关项、是否编造。
 
 ## 一、任务与槽位替换值

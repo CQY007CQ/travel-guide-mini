@@ -1,6 +1,6 @@
 # 旅行助手候选提示词（P01–P14 + 终极版，可逐条执行全文）
 
-> 本文件把 `docs/prompt-engineering-travel-assistant.md` 中的 14 个候选 + 终极提示词整理为**可直接作为 system 指令执行的完整文本**。
+> 本文件把 `docs/prompt-engineering/prompt-engineering-travel-assistant.md` 中的 14 个候选 + 终极提示词整理为**可直接作为 system 指令执行的完整文本**。
 > 执行时配合 `travel_fixture.md`：把其中的 `{{TASK_GOAL}}` / `{{KNOWLEDGE_BASE}}`（S01–S05）/ 各 Policy 槽位代入，按提示词规定格式作答，输出写入 `runs/<ID>.md`。
 > 〔L=推理深度, 篇幅, 格式, 情感, 术语〕
 

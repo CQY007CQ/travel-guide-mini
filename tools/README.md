@@ -31,7 +31,7 @@ tools/
 `check-deps`（相对引用可解析）·`check-secrets`（全仓无明文 Key）·`check-assets`（图片引用）·
 `check-wxml`（结构）·`check-handlers`（页面结构 + 事件配对）·`check-pkgsize`（分包 ≤2MB）·
 `check-preload`（预下载 ≤2MB）·`check-demo-quality`（Console 告警防回潮）·`check-health`（全盘体检单一出口）·
-`check-observability`（静默失败）·`check-tap-target`（触达尺寸棘轮）·`check-doc-consistency` + `check-doc-numbers`（材料口径）·
+`check-observability`（静默失败）·`check-structure`（目录结构契约）·`check-tap-target`（触达尺寸棘轮）·`check-doc-consistency` + `check-doc-numbers`（材料口径）·
 `check-ai-scenarios`/`check-ai-fallback`/`check-ai-reach`/`check-lens`（AI 与识物防回潮）·
 `check-qa-rails`（**数值/有效性**：对比度、金额口径一致性、测试有效性、主题变量对称性）·
 `check-v111`/`check-v112`/`check-new`/`check-more`/`check-boundary`（版本功能单测，历史包袱）
@@ -130,6 +130,23 @@ NODE_PATH=~/wxauto/node_modules node tools/prompt/run10.mjs --n=10   # 真机跑
 
 ## 七、留根不迁移的资产
 
-`_src-backup/`（逻辑真源）·`_archive/`（38 个历史脚本）·`_bak-*/`（备份快照）·
+`_src-backup/`（逻辑真源）·`_archive/`（历史脚本）·`_bak/`（备份快照，按时间分目录，全目录 gitignore）·
 `geocode.key` / `geocode.keys`（外借实名账号，未进 git）·`_hospital-batch4/5/6.json`（1572 条模板名，**禁用负数样本**）·
-`_iter_state.json`（自迭代状态）·`cities-census-report.txt`（生成物，.txt 不被打包）。
+`_iter_state.json`（自迭代状态）。
+
+**生成物不落根层**：普查 / 体检一类的 `.txt` `.json` 报告统一写 `tools/data/reports/`
+（`dev/cities-census.mjs` 已改路径）。`tools/` 根层只允许上面这些共用资产 + 6 个工具子目录，
+由 `check/check-structure.mjs` 断言（2026-11-17 整理时加）。
+
+## 八、结构契约（`check-structure` 守着的 7 条）
+
+整理做过两轮，但人工清理总会反弹 —— 现在把「整理后的样子」写成断言，只能保持不能退化：
+
+1. 根目录白名单：只放运行入口与配置（历史上堆过 35 个文档 + `prompt-lab/`）。
+2. 包内目录（pages/subpkg/subdata1..3/subai/utils/images）只允许源码与资源 —— `.md/.log/.bak`
+   会被打进包（包体预算 1536KB，用户可下载）。
+3. 全仓无 `.DS_Store` / `._*` / `*.bak` —— 这些被 gitignore，CI 永远看不见，只能门禁兜。
+4. 包内无空目录 —— 空目录是「删了但引用还在」的信号（`components/` 曾空置两个月）。
+5. `utils/*.js` 无孤儿 —— 死模块会诱导后来者改错文件（24 个模块当前全部被引用）。
+6. `docs/` 根层只放索引，文档必须落到 7 个子目录。
+7. `tools/` 根层只放共用资产，报告/脚本进子目录。

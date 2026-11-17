@@ -25,7 +25,10 @@ const SCAN_DIRS = ["tools", "pages", "subpkg", "utils", "subai"];
 // 备份/真源目录不扫：_src-backup 里的 require.async 是给 utils/ 运行时用的路径，
 // 相对基准与本目录不同，扫了必然误报；_bak-* 只是历史备份，不参与运行；
 // _archive 为清理仓库时归档的死代码（git mv 保留历史），其相对引用基准已随搬移失效，同样不参与运行。
-const SKIP_PATH = /(^|\/)(_src-backup|_bak-[^/]+|_archive)(\/|$)/;
+// 2026-11-17：备份统一收到 tools/_bak/<时间>-<commit>/ 后，原 `_bak-[^/]+` 匹配不到 `_bak/`，
+// 于是把 6MB 历史 data.js 快照也扫了进来（它 require ./pako-inflate.js，本就不存在）→ 误报死链。
+// 这里改成 `_bak` 与 `_bak-*` 都排除：备份目录不参与运行，也不参与构建。
+const SKIP_PATH = /(^|\/)(_src-backup|_bak|_bak-[^/]+|_archive)(\/|$)/;
 const SCAN_ROOT = ["app.js"];
 
 function walk(dir, out) {
