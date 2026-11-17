@@ -13,7 +13,7 @@ import { createRequire } from "module";
 const req = createRequire(process.cwd() + "/");
 
 // v1.20.7：打包期只取「基数据」，不烘焙任何来自主包 enrich 表的增量。
-// 涉及三处：团队美食（subdata3/data/team-food3.js）、酒店片区 + 逐店酒店（utils/hotel-areas.js）。
+// 涉及三处：团队美食（subdata3/data/team-food3.js）、酒店片区 + 逐店酒店（subdata3/data/hotel-areas3.js）。
 // 理由两条硬约束：① 烘焙进去＝同一事实在「基数据」和「主包」各存一份，改一处另一处会陈旧；
 // ② subdata 包 raw 已逼近 2048KB 红线（实测烘焙后 data-packed 1956KB，顶破 1950KB 预算门禁）。
 // 运行期 applyPacked() 之后的合并会把这三样补齐，最终数据与烘焙版逐字节一致（已用 DATA 指纹校验）。

@@ -148,7 +148,9 @@ step "单测 foodmap (菜名→店铺)" "$NODE" tools/test/_test-foodmap.mjs
 # 美食菜单/口碑试点（10 热门城市）：每城每家 menu(1-3)/rep/note 完整，经分块真实加载校验
 step "单测 food-menu (菜单·口碑·点评 试点)" "$NODE" tools/test/_test-food-menu.mjs
 # 酒店住宿多片区推荐 + 平台门户（v1.19.145）：精选城/退化/地图多点/门户搜索词
-step "单测 hotel (多片区·门户 v1.19.145)" "$NODE" tools/test/_test-hotel.mjs
+# v1.20.9：住宿数据搬进 subdata3 后，「分包晚到必须补跑 phase-2 合并」成了静默丢数据的高发点，
+# 与 hotel 单测同一步内串跑（不改 61 步口径），用 vm 沙箱覆盖 早到/晚到/失败 三种时序。
+step "单测 hotel (多片区·门户 v1.19.145)" bash -c '"$1" tools/test/_test-hotel.mjs && "$1" tools/test/_test-late-chunk.mjs' _ "$NODE"
 # plan 页 summary 卡精简（v1.19.146）：stats 去重 + 倒计时 label/tip
 step "单测 plan146 (summary 精简)" "$NODE" tools/test/_test-plan146.mjs
 # 天气多城按各天所在城市预报（v1.19.151）：mergeWeatherByDay 对齐 + rainyDaySpots 形态/室内命中

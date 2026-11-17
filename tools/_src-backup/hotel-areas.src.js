@@ -1,4 +1,4 @@
-// utils/hotel-areas.js —— 扩展酒店住宿区域（v1.19.171）
+// subdata3/data/hotel-areas3.js —— 扩展酒店住宿区域（v1.19.171；v1.20.9 从 utils/hotel-areas.js 迁入 subdata3）
 //
 // 背景：v1.19.145 只给 46 城精选了 {name,note} 住宿片区，其余城走通用三片区。本文件在加载时由
 // utils/data.js 的 applyPacked 末尾 applyHotelAreasExtra() 按城市名并入 CITIES[].areas（按片区名去重），

@@ -4,9 +4,29 @@
 // 由 travel.js 惰性 require（数据就绪后才加载），避免拿到空数据。
 const pako = require("./pako-inflate.js");
 // v1.19.171 扩展酒店住宿区域：额外的「城市级住哪儿区域指引」静态数据，加载时并入 CITIES[].areas。
-// 与 data.js 同目录（utils/），不被 build-min 压缩；try/catch 保证缺失时不影响数据加载。
-let HA = {};
-try { HA = require("./hotel-areas.js"); } catch (e) { HA = {}; }
+// v1.20.9 主包瘦身：本表 274KB（原 utils/hotel-areas.js，主包单项第二大文件）已搬到
+//   subdata3/data/hotel-areas3.js，由 initData() 作为第 4 个分块异步加载，本文件只留合并逻辑。
+//   ⚠️ 晚到必须补跑：applyPacked 里的 phase-2 表合并早在它之前就跑完了，若不补跑，
+//   住宿片区 / 逐酒店会静默全空（页面上只是「住哪儿」卡片不出现，不报错）。
+//   Node / 网页端没有 require.async，走 _ha() 里的同包同步 require；文件缺失只少住宿片区。
+const _HA_EMPTY = {};
+let HA = null;
+function _ha() {
+  if (HA) return HA;
+  // 微信端：跨分包同步 require 会被开发者工具判为不安全并可能在生产丢数据，
+  // 故此处返回空表，等 initData() 的 require.async 到达后由 _applyHotelAreas() 赋值。
+  if (typeof require.async === "function") return _HA_EMPTY;
+  try { HA = require("../subdata3/data/hotel-areas3.js"); } catch (e) { HA = _HA_EMPTY; }
+  return HA;
+}
+// subdata3 分块到达后调用（幂等：晚到、重复调用都安全；早于 packed 到达也不丢 —— 那时无城市可挂，
+// 随后 applyPacked 的 phase-2 会读到已就位的 HA 再合一次）。
+function _applyHotelAreas(mod) {
+  const m = (mod && mod.default) || mod;
+  HA = (m && typeof m === "object") ? m : _HA_EMPTY;
+  applyStaticTables(2);   // 住宿片区 / 逐酒店 + 房型（children 型按名去重，重复调用幂等）
+  return HA;
+}
 
 // v1.20.4：正式版(release)小程序屏蔽数据自检日志；开发版/体验版/Node 工具链仍可见
 const __dataLog = (function () {
@@ -213,7 +233,7 @@ function _staticTables() {
     { id: "hotelAreas", phase: 2, mount: "children", field: "areas", label: "扩展酒店住宿区域并入", unit: "条",
       skipInPack: true, eachCity: true,
       rows: () => {
-        const EX = (HA && HA.HOTEL_AREAS_EXTRA) || {};
+        const EX = _ha().HOTEL_AREAS_EXTRA || {};
         const out = [];
         for (const cn in EX) {
           const ex = EX[cn];
@@ -229,7 +249,8 @@ function _staticTables() {
     { id: "hotelList", phase: 2, mount: "children", field: "hotelList", label: "逐酒店+房型并入", unit: "家",
       skipInPack: true,
       rows: () => {
-        const maps = [(HA && HA.HOTEL_LIST_EXTRA) || {}, (HA && HA.TEAM_HOTEL_LIST_ENRICH) || {}];
+        const _h = _ha();
+        const maps = [_h.HOTEL_LIST_EXTRA || {}, _h.TEAM_HOTEL_LIST_ENRICH || {}];
         const out = [];
         for (const map of maps) {
           if (!map || typeof map !== "object") continue;
@@ -632,7 +653,9 @@ function initData() {
         require.async("../subdata/data/data-packed.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; }),
         require.async("../subdata2/data/data-packed2.js").then((m) => { applyPacked((m && m.default) || m); }).catch((e) => { lastErr = e; }),
         // v1.20.7：团队美食数据独立成分块（主包瘦身 226KB），不是 packed 块，故直接交给合并函数。
-        require.async("../subdata3/data/team-food3.js").then(_applyTeamFood3).catch((e) => { lastErr = e; })
+        require.async("../subdata3/data/team-food3.js").then(_applyTeamFood3).catch((e) => { lastErr = e; }),
+        // v1.20.9：住宿片区 / 逐酒店（主包瘦身 274KB）。晚到边由 _applyHotelAreas 内部补跑 phase 2。
+        require.async("../subdata3/data/hotel-areas3.js").then(_applyHotelAreas).catch((e) => { lastErr = e; })
       ];
       await Promise.race([Promise.all(_jobs), _sleep(9000)]);
     } else if (typeof window !== "undefined") {
@@ -677,6 +700,10 @@ if (typeof require.async !== "function" && typeof window === "undefined") {
   }
   // v1.20.7：团队美食数据（subdata3 普通模块）。路径用变量，避免微信端把跨分包同步 require 打成告警。
   try { _applyTeamFood3(require("../subdata3/data/team-food3.js")); } catch (e) { /* 缺失则不合并 */ }
+  // v1.20.9：住宿片区 / 逐酒店（同上，subdata3 普通模块）。必须在上面分块循环之后 ——
+  // _ha() 的同步 require 是惰性的，而 applyPacked 里的 phase-2 合并需要它已就位；
+  // 由 _applyHotelAreas 再补跑一次 phase 2，node 侧口径才与线上（异步到达后补跑）一致。
+  try { _applyHotelAreas(_ha()); } catch (e) { /* 缺失则不合并 */ }
   DATA.__dataReady = true;
 }
 

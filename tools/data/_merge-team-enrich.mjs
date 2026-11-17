@@ -161,26 +161,30 @@ const baseRaw = mainRawKB();
 let budget = baseRaw == null ? Infinity : Math.max(0, (MAIN_LIMIT_KB - baseRaw) * 1024);
 console.log("\n主包预算：raw=" + (baseRaw == null ? "未测" : baseRaw + "KB") + " / 上限 " + MAIN_LIMIT_KB +
   "KB，可用 " + (budget === Infinity ? "未测" : (budget / 1024).toFixed(0) + "KB"));
-// 美食注入 tools/_src-backup/data.js 后由末尾 cp 到 utils/data.js，主包只增长一份，故按一份计。
+// v1.20.7：美食块已移出主包，注入目标改为 subdata3 分包（主包瘦身 226KB，预算闸门不再拦它）。
+// v1.20.9：住宿片区 + 逐店酒店同样移到 subdata3/data/hotel-areas3.js，一并脱离主包预算。
 const JOBS = [
-  // v1.20.7：美食块已移出主包，注入目标改为 subdata3 分包（主包瘦身 226KB，预算闸门不再拦它）。
   ["美食", "subdata3/data/team-food3.js", "TEAM_FOOD_START", "TEAM_FOOD_END", "TEAM_FOOD_ENRICH", agg.food],
   ["具名医院", "utils/emergency-data.js", "TEAM_HOSP_START", "TEAM_HOSP_END", "TEAM_HOSP_ENRICH", agg.hospitals],
-  ["逐店酒店", "utils/hotel-areas.js", "TEAM_HOTEL_LIST_START", "TEAM_HOTEL_LIST_END", "TEAM_HOTEL_LIST_ENRICH", agg.hotelList],
-  ["住宿片区", "utils/hotel-areas.js", "TEAM_HOTEL_START", "TEAM_HOTEL_END", "TEAM_HOTEL_ENRICH", agg.hotels]
+  ["逐店酒店", "subdata3/data/hotel-areas3.js", "TEAM_HOTEL_LIST_START", "TEAM_HOTEL_LIST_END", "TEAM_HOTEL_LIST_ENRICH", agg.hotelList],
+  ["住宿片区", "subdata3/data/hotel-areas3.js", "TEAM_HOTEL_START", "TEAM_HOTEL_END", "TEAM_HOTEL_ENRICH", agg.hotels]
 ];
+// v1.20.9：目标在分包里的作业不占主包预算 —— 不进这个判断就会出现「明明放得下，
+// 却被主包余量拦下、只留一行 ⏸ 日志」的静默丢数据（历史踩过）。
+const SUB_TARGET = /^subdata\d*\//;
 console.log("\n注入标记块：");
 const held = [];
 for (const [label, file, start, end, name, obj] of JOBS) {
   const delta = Buffer.byteLength(JSON.stringify(obj)) - Buffer.byteLength(blockJson(file, start, end));
-  if (delta > budget) {
+  const inSub = SUB_TARGET.test(file);
+  if (!inSub && delta > budget) {
     held.push(label + "(+" + (delta / 1024).toFixed(0) + "KB)");
     W(`${label} 需 +${(delta / 1024).toFixed(0)}KB > 主包剩余 ${(budget / 1024).toFixed(0)}KB：` +
       `保留 ${file} 原有 ${name} 块不注入（原始数据完整保留在 tools/team/*.json）`);
     continue;
   }
   inject(file, start, end, name, obj);
-  budget -= delta;
+  if (!inSub) budget -= delta;
 }
 if (held.length) console.log("  ⏸ 本轮受主包预算约束暂缓：" + held.join("、"));
 
