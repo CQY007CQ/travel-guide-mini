@@ -159,6 +159,9 @@ module.exports = {
 
  // 2026-11-09（#482）：示例行程 → 回「出发」页生成自己的
  onLeaveSample() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) {} },
+ // 2026-11-17：空态 CTA（无行程时页面不再自动弹回首页，改由用户点这里）。
+ // 用 switchTab 而不是 reLaunch —— 保留 tab 栈，用户回来时页面还在，不会"进去又被打回"。
+ goIndex() { try { wx.switchTab({ url: "/pages/index/index" }); } catch (e) {} },
 
  _save() {
   const plan = app.globalData.plan;

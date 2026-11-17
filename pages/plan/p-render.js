@@ -201,11 +201,12 @@ module.exports = {
    try {
     const plan = app.globalData && app.globalData.plan;
     if (!plan || !plan.days || !plan.days.length) {
-     // v1.19.2：原实现「toast + reLaunch」把用户直接踢回首页且无解释，新手会以为页面坏了。
-     // 现在说清原因、用 switchTab 正常切到出发页（保留 tab 栈，不再销毁页面）。
+     // 2026-11-17：改成「空态卡片 + CTA」，不再 toast + 1.2 秒后自动 switchTab。
+     // 原实现（v1.19.2 起）虽然写了原因，但用户先看到的是 1.2 秒空壳页面
+     // （hasPlan 当时只控制底部保存条，summary/chips/日卡照样用空数据渲染），
+     // 深色底上就是「黑屏」，接着又被弹走 —— 观感像页面坏了。
+     // 现在与 today / map 两页统一：留下可读的空态，跳不跳由用户点。
      this.setData({ hasPlan: false });
-     wx.showToast({ title: "还没有行程，先去「出发」选个城市", icon: "none", duration: 2000 });
-     setTimeout(() => { try { wx.switchTab({ url: "/pages/index/index" }); } catch (_) {} }, 1200);
      return;
     }
     if (!this.data.hasPlan) this.setData({ hasPlan: true });

@@ -56,6 +56,20 @@ const appMock = { globalData: { plan: null }, setPlan(p) { this.globalData.plan 
 globalThis.getApp = () => appMock;
 globalThis.wx = wxMock;
 
+/* 2026-11-17：先真实加载数据再逐页进入。
+ * 原实现只跑「不抛异常」，而它是**在数据未就绪时**跑的（onLoad 里 T.ready() 是异步，
+ * 紧接着同步调 onShow）——于是「页面结构在、但没有任何内容可渲染」这种空屏
+ * 完全测不出来：不抛错就 ✓。深色底上空白渲染，用户看到的就是「黑屏」。
+ * 现在加载真实数据后再进页面，并按下面的契约断言「要么有内容、要么有明确空态」。 */
+const travelReq = createRequire(ROOT + "/utils/travel.js");
+let dataReady = false;
+try {
+  const T = travelReq(ROOT + "/utils/travel.js");
+  await T.ready();
+  dataReady = (T.provinces() || []).length > 0;
+} catch (e) { dataReady = false; }
+ok("真实数据已加载（否则后面的空屏断言没有意义）", dataReady, dataReady ? "" : "城市表仍为空");
+
 for (const p of pagePaths) {
   const jsFile = ROOT + "/" + p + ".js";
   const name = p.replace(/\//g, "·");
@@ -90,6 +104,41 @@ for (const p of pagePaths) {
     if (typeof config.onShow === "function") config.onShow.call(page);
   } catch (e) { onErr = e; }
   ok(name + " 进入时序无异常（onLoad+onShow）", !onErr, onErr ? (onErr.message || String(onErr)) : "");
+  if (onErr) continue;
+  await new Promise((r) => setTimeout(r, 20));   // 让异步分支（require.async / Promise.then）跑完
+
+  /* ---- 空屏断言：进入页面后必须有可渲染内容，或有明确的空态/失败态标志 ----
+   * 判据：至少一个非空数组，或明确的状态位（hasPlan=false 空态 / dataFailed 重试卡 /
+   * empty 空清单）。三者都没有 = 页面渲染出来基本是空的，深色底上就是「黑屏」。
+   * 白名单只放「本来就没有列表内容」的页面，每条都要写清理由（不许拿白名单当垃圾桶）。 */
+  const d = page.data || {};
+  const nonEmptyArr = Object.entries(d).filter(([, v]) => Array.isArray(v) && v.length > 0);
+  const stateFlag = d.hasPlan === false || d.dataFailed === true || d.empty === true;
+  const NO_CONTENT_OK = {
+    "pages/splash/splash": "开屏页，只做跳转，本就不渲染内容",
+    "subpkg/lens/lens": "识物页主界面是相机/选图入口，无列表数据（cloudOn 之类是能力位不是内容）",
+    "subdata/boost/boost": "数据容器页，无 UI",
+    "subdata2/keep/keep": "数据容器页，无 UI",
+    "subdata3/keep/keep": "数据容器页，无 UI",
+  };
+  const exempt = NO_CONTENT_OK[p];
+  const detail = exempt ? "豁免：" + exempt
+    : (nonEmptyArr.length ? "数组 " + nonEmptyArr.slice(0, 3).map(([k, v]) => k + "=" + v.length).join(",")
+      : (stateFlag ? "空态/失败态标志（hasPlan=" + d.hasPlan + " / dataFailed=" + d.dataFailed + " / empty=" + d.empty + "）"
+        : "无空数组且无空态标志"));
+  ok(name + " 进入后有内容可渲染（或明确空态）",
+    exempt ? true : (nonEmptyArr.length > 0 || stateFlag), detail);
+
+  /* ---- 无行程时必须落到「空态」，而不是把页面框架用空数据渲染一遍 ----
+   * 2026-11-17 实测过的真缺陷：plan 页原先 hasPlan=false 只隐藏了底部保存条，
+   * summary / chips / 日卡照样渲染空值 —— 深色底上就是一片黑屏，1.2 秒后还被弹回首页。
+   * 这三页是「行程依赖页」，没有行程时必须是空态（wxml 里有 !hasPlan 分支 + CTA）。 */
+  const PLAN_DEPENDENT = ["pages/plan/plan", "pages/today/today", "subpkg/map/map"];
+  if (PLAN_DEPENDENT.includes(p)) {
+    ok(name + " 无行程时 hasPlan=false（走空态，不渲染空壳）", d.hasPlan === false, "hasPlan=" + d.hasPlan);
+    const wx = readFileSync(ROOT + "/" + p + ".wxml", "utf8");
+    ok(name + " wxml 有 !hasPlan 空态分支", /\{\{\s*!\s*hasPlan\s*\}\}/.test(wx));
+  }
 }
 
 console.log(fail ? "\n❌ " + fail + " 个页面启动异常" : "\n✅ 全部 " + pagePaths.length + " 个页面启动冒烟通过");
