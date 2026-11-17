@@ -1080,7 +1080,17 @@
       }
       current = createInstance(pagePath);
       if (typeof current.onLoad === "function") {
-        try { current.onLoad({ scene: 1001, query: lastQuery }); } catch (e) { console.error("[web] onLoad 异常", e); }
+        // v1.20.18 修的真 bug：旧版只传 { scene, query }，而小程序页面的 onLoad(options)
+        // 是把 query 字段**摊平**在 options 上的（options.city / options.di / options.q …）。
+        // 于是网页端所有深链参数全部消失：分享链接的 city/days/auto 复现、地图 ?di=2、
+        // 识物页 ?q=、AI 助手的 ?topic=&city= 在网页版一律拿不到值（且不报错、静默降级）。
+        // 现在摊平 query（官方语义）+ 保留 query 键（兼容既有读法）+ scene 字段。
+        var opts = { scene: 1001 };
+        for (var qk in (lastQuery || {})) {
+          if (Object.prototype.hasOwnProperty.call(lastQuery, qk)) opts[qk] = lastQuery[qk];
+        }
+        opts.query = lastQuery;
+        try { current.onLoad(opts); } catch (e) { console.error("[web] onLoad 异常", e); }
       }
       if (typeof current.onShow === "function") {
         try { current.onShow(); } catch (e) { console.error("[web] onShow 异常", e); }

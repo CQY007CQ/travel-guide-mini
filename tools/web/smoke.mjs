@@ -177,8 +177,13 @@ console.log("== 7. 浏览器降级能力（静态护栏） ==");
   const aiSrc = fs.readFileSync(path.join(ROOT, "web/ai-assistant.js"), "utf8");
   ok("网页端 getApp() 具备 app.setPlan（首页生成 / AI 生成行程的前提）",
     /APP\s*=\s*Object\.assign\(\{\},\s*appConfig/.test(rt));
-  ok("路由 query 透传到 onLoad",
-    rt.includes("__mountPage = function (pagePath, query)") && rt.includes("query: lastQuery"));
+  // v1.20.18：旧断言写的是 `query: lastQuery` —— 那正是 bug 本身（小程序 onLoad(options) 是把
+  // query **摊平**在 options 上的，只给 {scene, query} 会让网页端所有深链参数静默失效：
+  // 分享复现的 city/days/auto、地图 ?di=2、识物 ?q=、助手 ?topic=&city= 全都拿不到）。
+  // 门禁把 bug 当契约的例子，改成断言真正的契约：摊平 + 保留 query 键 + scene 字段。
+  ok("路由 query 摊平进 onLoad options（含 query 兼容键）",
+    rt.includes("__mountPage = function (pagePath, query)") &&
+    rt.includes("opts[qk] = lastQuery[qk]") && rt.includes("opts.query = lastQuery"));
   ok("wx.request GET 参数拼 URL",
     rt.includes('url.indexOf("?") >= 0') && rt.includes("encodeURIComponent(k)"));
   ok("fields({node:true}) 返回真实 DOM 节点", rt.includes("if (t.opts && t.opts.node) out.node = node"));

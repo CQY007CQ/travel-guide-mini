@@ -12,6 +12,11 @@ const localDate = CORE.localDate;
 /* 生成行程：真正 buildPlan + 写 globalData，再切到行程页（对齐网页版 generatePlan） */
 function generatePlan(cityName, days, opts) {
   opts = opts || {};
+  // v1.20.18 兜底：无论调用方给的是问题原文、模型输出还是 route 参数，先统一解码。
+  // 否则 findCity("%E5%90%89%E5%AE%89") 会造一座 generic 模板城，标题变乱码、内容近乎为空。
+  let name = String(cityName == null ? "" : cityName);
+  try { if (T.decQuery) name = T.decQuery(name); } catch (e) {}
+  cityName = name;
   let city = null;
   try { if (T.findCity) city = T.findCity(cityName); } catch (e) {}
   if (!city) return { ok: false, msg: "离线知识库里还没有「" + (cityName || "") + "」这座城市，换个已收录的城市（如成都、杭州、西安）试试。" };

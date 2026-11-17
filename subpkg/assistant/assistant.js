@@ -85,10 +85,19 @@ Page(SafePage({
   onLoad(options) {
     this.__boot = T.ready().catch(() => null);
     // 深链：其它页带 ?topic=&city=&from= 进入，自动给出该场景的 AI 建议卡
+    // v1.20.18 修的真 bug：微信**不会**解码路由参数，而 ai-entry 用 encodeURIComponent 拼 city，
+    // 于是 _deep.city 拿到 "%E5%90%89%E5%AE%89" 直接进了 AI 请求与生成流程 ——
+    // findCity 会为它造一座 generic 模板城，最终行程标题显示「%E5%90%89%E5%AE%89 · 3天2晚」、
+    // 内容几乎为空（用户截图即此）。统一走 T.decQuery（幂等、容忍二次编码、非法序列不抛错）。
+    const _o = (options && typeof options === "object") ? options : {};
+    const _dec = (v) => {
+      const s = String(v == null ? "" : v);
+      try { return T.decQuery ? T.decQuery(s) : s; } catch (e) { return s; }
+    };
     this._deep = {
-      topic: (options && options.topic) || "",
-      city: (options && options.city) || "",
-      from: (options && options.from) || "",
+      topic: _dec(_o.topic),
+      city: _dec(_o.city),
+      from: _dec(_o.from),
       done: false
     };
     // v1.20.6：读取 ai-entry 在跳转前存入的「来源页真实数据快照」。

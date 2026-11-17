@@ -165,6 +165,26 @@ ck("每个入口 topic 都在场景表内",
     return true;
   })());
 
+/* ---------- ⑥ 路由参数解码（v1.20.18 抓的真 bug） ----------
+ * 微信**不会**解码页面路由参数，而我们的入口一律用 encodeURIComponent 拼 city / q：
+ * 谁忘了解码，谁就把「%E5%90%89%E5%AE%89」当城市名用下去 —— findCity 会为它造一座
+ * generic 模板城（名字就是这串编码），于是行程标题显示乱码、内容几乎为空。
+ * 同一类 bug 已在 deep 页（2026-11-09）、首页各修过一次，assistant/spotsearch 漏到现在。
+ *
+ * 为什么这里只做「接线断言」而不做行为断言：行为（解码正确性、生成行程城市名不带编码）
+ * 由 tools/test/_test-ai-reach.mjs 真跑覆盖；这里只保证「入口确实接了那个解码函数」。
+ * 刻意**不**写「扫描 options.city 同一行是否含 decode」那种正则：它既会误红（参数先存
+ * 局部变量再解码是正常写法），也会假绿（`_o.city` 改个名就绕过）——正是「断言源码里有
+ * 某串字 ≠ 断言行为」的老坑。 */
+ck("助手页深链参数（topic/city/from）经 T.decQuery 解码",
+  /_dec = \(v\)[\s\S]{0,160}T\.decQuery/.test(asst) &&
+  /city: _dec\(_o\.city\)/.test(asst));
+ck("景点搜索页深链参数（q/city）经 T.decQuery 解码",
+  /T\.decQuery\(String\(options\.(q|city)\)\)/.test(code(read("subpkg/spotsearch/spotsearch.js"))));
+ck("AI 生成行程入口对城市名做兜底解码（避免 generic 假城）",
+  /let name = String\(cityName == null \? "" : cityName\);[\s\S]{0,200}T\.decQuery\(name\)/.test(
+    code(read("subpkg/assistant/ab-write.js"))));
+
 /* ---------- ⑤ 使用指南置顶 AI / 识物重点组 ---------- */
 // 用户明确要求指南重点强调 AI 与识图；防止后续改版把置顶组或直达按钮删掉。
 const guideJs = code(read("subpkg/guide/guide.js"));

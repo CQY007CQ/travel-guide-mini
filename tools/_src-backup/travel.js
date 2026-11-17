@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.17";
+const APP_VER = "1.20.18";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -485,6 +485,25 @@ function buildProvPlan(opts) {
 // v1.19.182：分享深链出发日边界处理 —— 过期（早于今天）的出发日顺延到今天，
 // 保证 auto=1 一键复现的是「今天起」的有效行程（而非一份已经过去的行程）。
 // 非过期（含今天及以后）原样返回；非法日期返回 null 交由调用方兜底。
+// v1.20.18：URL query 参数解码（微信**不会**自动解码页面路由参数）。
+// 背景：分享深链 / 小程序码 / AI 入口都用 encodeURIComponent 拼 city、q、topic 等，
+// 而 onLoad(options) 拿到的是原始未解码串。谁忘了解码，谁就把「%E5%90%89%E5%AE%89」
+// 当成城市名用下去 —— findCity 会为它造一座 generic 模板城（名字就是这串编码），
+// 于是行程标题显示乱码、内容几乎为空。这类 bug 已在 deep 页、首页各修过一次，
+// 现在收敛到这一个函数，新入口一律走它，别再各处手写 decodeURIComponent。
+// 语义：最多解码 2 次（容忍调用方二次编码），稳定后停止；非法序列原样返回（绝不抛错）。
+function decQuery(s) {
+  let v = String(s == null ? "" : s);
+  if (v.indexOf("%") < 0) return v;
+  for (let i = 0; i < 2; i++) {
+    let n = v;
+    try { n = decodeURIComponent(v); } catch (e) { break; }
+    if (n === v) break;
+    v = n;
+  }
+  return v;
+}
+
 function clampDepart(dp) {
   if (!dp || typeof dp !== "string") return null;
   const s = String(dp).slice(0, 10);
@@ -6638,7 +6657,7 @@ module.exports = {
  ready, planCheckup, swapSpotFor, askTrip,
  routeAdvicePlus, highlightOf, crowdTipOf, packExtra,
  badgesOf, yearReportNew, chinaLite, transportEstimate,
- provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, provBrief, nearbyCityOf, D, P,
+ provinces, citiesOf, findCity, canonCityName, buildPlan, buildMultiPlan, buildProvPlan, evaluatePlan, learnPrefs, getPrefs, applyLearned, provinceDayCap, provinceSuggestedDays, cityDayCap, clampDepart, decQuery, provBrief, nearbyCityOf, D, P,
  poolOfCity, wishPicksFor, foodSpotsFor, hotelPointFor, hotelAreasFor, hotelAreaPins, hotelPortals,
  spotTagOf, searchSpots, spotCover,
  customBudgetObj: function (amt, days, peopleN) { return P.customBudgetObj(amt, days, peopleN); }, budgetTotalObj,

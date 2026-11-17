@@ -106,5 +106,40 @@ ok("除 AI 能力页自身外，全部交互页都有统一 AI 入口",
 ok("入口覆盖率 ≥ 15/17", (real.length - noEntry.length) >= 15,
   (real.length - noEntry.length) + "/" + real.length);
 
+/* ---------- 6. 路由参数解码（v1.20.18 真机复现的 bug） ----------
+ * 用户在「城市深度玩法」等页点 AI 胶囊 → ai-entry 用 encodeURIComponent 拼 city →
+ * 助手页 onLoad 拿到的是**未解码**串（微信不解码路由参数）→ 直接进生成流程 →
+ * findCity("%E5%90%89%E5%AE%89") 造出一座 generic 模板城 → 行程标题显示
+ * 「%E5%90%89%E5%AE%89 · 3天2晚」、内容几乎为空（用户截图即此）。
+ * 这里真跑，不用查字面量。 */
+const TW = req(path.join(ROOT, "utils/travel.js"));
+ok("解码函数存在", typeof TW.decQuery === "function");
+ok("单次编码解回中文", TW.decQuery("%E5%90%89%E5%AE%89") === "吉安");
+ok("二次编码也解回中文（容忍调用方重复编码）", TW.decQuery("%25E5%2590%2589%25E5%25AE%2589") === "吉安");
+ok("明文城市名原样返回", TW.decQuery("吉安") === "吉安");
+ok("非法百分号序列不抛错、原样返回", TW.decQuery("%zz%") === "%zz%" && TW.decQuery("%") === "%");
+ok("空值返回空串（不返回 null/undefined）",
+  TW.decQuery("") === "" && TW.decQuery(null) === "" && TW.decQuery(undefined) === "");
+ok("幂等：解两次与解一次结果相同",
+  TW.decQuery(TW.decQuery("%E5%90%89%E5%AE%89")) === "吉安");
+
+// 生成行程的兜底解码：即便调用方把编码串喂进来，也不能造出「名字是编码串」的假城
+const WRITE = req(path.join(ROOT, "subpkg/assistant/ab-write.js"));
+let capturedPlan = null;
+globalThis.getApp = () => ({ setPlan: (p) => { capturedPlan = p; } });
+const genEnc = WRITE.generatePlan("%E5%90%89%E5%AE%89", 3, {});
+ok("生成行程：传入编码城市名 → 行程城市名是「吉安」而不是编码串",
+  !!(genEnc && genEnc.ok && capturedPlan && capturedPlan.cityName === "吉安"),
+  "planCity=" + (capturedPlan && capturedPlan.cityName) + " msg=" + (genEnc && genEnc.msg));
+const encItems = (capturedPlan && capturedPlan.days || []).reduce((a, d) => a + ((d.items || []).length), 0);
+ok("生成行程：编码串修复后拿到真城市的真实内容（条目数 ≥ 6，而不是空壳）", encItems >= 6, "items=" + encItems);
+// 对照组：真正的明文城市名，结果必须**逐字段一致**，否则说明解码改动动到了正常路径
+capturedPlan = null;
+const genPlain = WRITE.generatePlan("吉安", 3, {});
+ok("对照组：明文「吉安」与编码串「%E5%90%89%E5%AE%89」生成同一份行程",
+  !!(genPlain && genPlain.ok) && !!(genEnc && genEnc.ok) &&
+  JSON.stringify(capturedPlan && capturedPlan.days) === JSON.stringify(genEnc.plan && genEnc.plan.days));
+try { delete globalThis.getApp; } catch (e) {}
+
 console.log("  全站 AI 上下文 / 双视角 / 动作单测: " + (n - fail) + "/" + n + " 通过");
 if (fail) process.exit(1);

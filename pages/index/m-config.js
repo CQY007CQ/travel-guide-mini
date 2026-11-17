@@ -8,7 +8,7 @@ module.exports = {
   // v1.19.76：分享/搜索深链 —— 带 city/days 参数时，自动把出发页预填好对应城市与天数
   _applyDeepLink(options) {
     if (!options || !options.city) return;
-    const cn = String(decodeURIComponent(options.city)).trim();
+    const cn = String(T.decQuery(options.city)).trim();
     if (!cn) return;
     try {
       const provs = T.provinces();
@@ -44,7 +44,7 @@ module.exports = {
         // v1.19.193：自定义预算的分享方带上了总预算金额（amt），这里回填 customAmt，
         // 否则 budgetIdx=custom 但 customAmt 为空，generate() 会因金额缺失而卡住、复现失败。
         if (options.amt) {
-          const amt = parseFloat(String(decodeURIComponent(options.amt)));
+          const amt = parseFloat(String(T.decQuery(options.amt)));
           if (amt > 0) patch.customAmt = String(amt);
         }
         if (options.mode && Array.isArray(this.data.travelModeVals)) {
@@ -53,7 +53,7 @@ module.exports = {
         }
         // 出发日：过期（早于今天）顺延今天，保证 auto=1 复现的是「今天起」的有效行程（v1.19.182）
         if (options.depart) {
-          const clamped = T.clampDepart(String(decodeURIComponent(options.depart)));
+          const clamped = T.clampDepart(String(T.decQuery(options.depart)));
           if (clamped) patch.depart = clamped;
         }
       } catch (e) {}

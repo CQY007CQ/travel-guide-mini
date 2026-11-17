@@ -45,8 +45,10 @@ Page(SafePage({
     this.__boot = T.ready().catch(() => null);
     this._buildDimGroups();
     // v1.20.7：识物页「查这个景点」深链预填（按名称搜索，零伪造）
-    this._deepQ = (options && options.q) ? String(options.q) : "";
-    this._deepCity = (options && options.city) ? String(options.city) : "";
+    // v1.20.18：参数必须解码 —— 微信不解码路由参数，识物页传的是 encodeURIComponent(name)，
+    // 不解码就会拿 "%E5%85%AB%E8%BE%BE%E5%B2%AD" 去搜索，必然 0 结果。
+    this._deepQ = (options && options.q) ? T.decQuery(String(options.q)) : "";
+    this._deepCity = (options && options.city) ? T.decQuery(String(options.city)) : "";
   },
 
   onShow() {

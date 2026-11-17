@@ -69,8 +69,12 @@ Page({
   onLoad(q) {
     // 2026-11-09：路由参数可能是 URL 编码的（plan 页用 encodeURIComponent 传入，微信不会自动解码），
     // 之前会把 %E5%8C%97%E4%BA%AC 当成城市名显示成「未收录」。这里统一解码（失败保留原值）。
+    // v1.20.18 注：等价逻辑已在 utils/travel.js 收敛为 T.decQuery；本页刻意不引 travel.js
+    // （页面已有 vm 沙箱单测，加 require 要同步改替身），保持本地双解码实现，行为一致。
     let want = (q && q.city) ? String(q.city) : "";
-    try { want = decodeURIComponent(want); } catch (e) {}
+    for (let i = 0; i < 2 && want.indexOf("%") >= 0; i++) {
+      try { const n = decodeURIComponent(want); if (n === want) break; want = n; } catch (e) { break; }
+    }
     A.initDeep().then(() => {
       const cities = A.deepCities();
       if (!cities.length) { this.setData({ ready: true, cities: [], curName: "", msg: "内容暂未就绪" }); return; }
