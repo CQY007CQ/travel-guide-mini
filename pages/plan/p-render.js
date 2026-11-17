@@ -56,15 +56,19 @@ module.exports = {
   }));
   let spots = 0;
   try { spots = T.P.countPlanStats(plan.days).spots; } catch (e) {}
+  // v1.20.20：历史脏档的城市名是 URL 编码串（%E5%90%89%E5%AE%89）。渲染层用解码后的名字
+  // 做展示与真实数据查询，但**不改存档**（里面的打卡/花费是用户数据，一个字都不能动）。
+  // 只影响标题/城市速览/季节徽章；收藏、想玩、打卡等按原键匹配，避免误改用户状态。
+  const dispCity = plan.__staleCity ? T.decQuery(plan.cityName) : plan.cityName;
   const city = plan.isProv
    ? (T.P.buildProvinceCity ? T.P.buildProvinceCity(plan.cityName) : null) // 全省游：以省为对象的伪城市（气候/美食/住宿取省会基调）
-   : (T.findCity(plan.cityName) || null);
+   : (T.findCity(dispCity) || null);
   let clothText = "", stayText = "", goText = "";
   if (city) {
     // 2026-10-29 去重：clothAdvice 里混进了「适宜时节」和天气整句，
   // 而这两项在顶部 chips 与下方「城市速览」已经各说一次（共三处重复）。
   // 这里只保留「怎么穿」，气候与最佳季节交给城市速览。
-  const _bf = (T.cityBrief ? T.cityBrief(plan.cityName) : null) || {};
+  const _bf = (T.cityBrief ? T.cityBrief(dispCity) : null) || {};
   const _dupLines = [String(_bf.climateTxt || "").trim(), String(_bf.best || "").trim()].filter(Boolean);
   clothText = String(T.clothAdvice(city, plan.depart ? +String(plan.depart).slice(5, 7) : 0) || "")
     .split("\n")
@@ -112,7 +116,7 @@ module.exports = {
   const miss = wish.filter(x => !arranged.has(x.name)).map(x => x.name);
 
   const summaryText = segs ? segs.map(s => s.cityName).join(" → ") + " · " + plan.days.length + "天" + (plan.days.length - 1) + "晚"
-   : (plan.cityName + " · " + plan.days.length + "天" + (plan.days.length - 1) + "晚" + (plan.isProv ? " · 全省精华游" : ""));
+   : (dispCity + " · " + plan.days.length + "天" + (plan.days.length - 1) + "晚" + (plan.isProv ? " · 全省精华游" : ""));
   // v1.9：构成统计文案（山水×N · 人文×N …）
   let mixTxt = "";
   try {
@@ -122,7 +126,7 @@ module.exports = {
   // v1.9：最佳季节徽章
   if (!segs && !plan.isProv && plan.depart) {
    try {
-    const sh = T.bestSeasonHit(plan.cityName, String(plan.depart));
+    const sh = T.bestSeasonHit(dispCity, String(plan.depart));
     if (sh && sh.hit) chips.push("正值" + (String(plan.depart).slice(5, 7) | 0) + "月最佳季");
    } catch (e) {}
   }
@@ -172,7 +176,7 @@ module.exports = {
    foot: T.tripFoot(plan),
    // v1.17.10：省域行程用「省级速览」（按全省真实景点数算建议天数、必吃取具体菜名）；
    // 旧实现一律 cityBrief(plan.cityName)，而省名会被 findCity 兜成 generic 城 → 建议 2 天 + 泛化必吃
-   brief: segs ? null : (plan.isProv ? T.provBrief(plan.province) : T.cityBrief(plan.cityName)),
+   brief: segs ? null : (plan.isProv ? T.provBrief(plan.province) : T.cityBrief(dispCity)),
    // v1.19.145：酒店门户（单城行程才有具体城市的比价搜索词；多城/全省不展示）
    hotelPortals: (!segs && !plan.isProv && plan.cityName) ? T.hotelPortals(plan.cityName, plan) : [],
    countdown: T.tripCountdown(plan),

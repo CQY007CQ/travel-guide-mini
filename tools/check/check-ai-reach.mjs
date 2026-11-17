@@ -191,6 +191,7 @@ ck("历史编码城市名的旧存档打标并给出重生成提示（不静默�
   /%\[0-9A-Fa-f\]\{2\}/.test(read("app.js")) &&
   /__staleCity/.test(read("app.js")) &&
   /staleCity/.test(pageSrc("pages/plan/plan.js")) &&
+  /dispCity/.test(pageSrc("pages/plan/plan.js")) &&   // 标题用解码名，存档原键不动
   /staleCity/.test(read("pages/plan/plan.wxml")));
 ck("字符串城市进入生成/气候链路前经 T.realCity 排除 generic 假城",
   ["subpkg/assistant/ab-write.js", "subpkg/assistant/ab-runs.js", "subpkg/assistant/assistant.js",
