@@ -75,8 +75,15 @@ const c429 = W.classifyApiError({ code: "429" });
 ok("429 → quota（额度/频次）", c429.type === "quota" && /额度|频次/.test(c429.msg));
 const c403 = W.classifyApiError({ code: "403", status: "permission denied" });
 ok("403 → auth", c403.type === "auth");
+// v1.20.15：404 在和风语义是「查询的地区不存在」，不是「参数写错了」；
+// 204 是「请求成功但该地区暂无数据」（台站未覆盖的远郊很常见）。
+// 两者都归到可辨识的 nodata，且页面不给重试按钮 —— 原先一律当「服务异常」让人白点。
 const c404 = W.classifyApiError({ code: "404" });
-ok("404 → param", c404.type === "param");
+ok("404 → nodata（地区无数据，不是参数错）", c404.type === "nodata" && /暂无天气数据/.test(c404.msg));
+const c204 = W.classifyApiError({ code: "204" });
+ok("204 → nodata（该地区暂无数据）", c204.type === "nodata" && /暂无天气数据/.test(c204.msg));
+const c400 = W.classifyApiError({ code: "400" });
+ok("400 → param（参数错误仍归 param）", c400.type === "param");
 const c500 = W.classifyApiError({ code: "500" });
 ok("未知码 → api（兜底）", c500.type === "api");
 const cStatus = W.classifyApiError({ status: "INVALID KEY" });
@@ -112,6 +119,88 @@ let builtSrc = "";
 try { builtSrc = readFileSync(process.cwd() + "/utils/weather.js", "utf8"); } catch (e) {}
 const hasTimeout = /timeout\s*:\s*(\d{3,}|[0-9]+e[0-9]+)/.test(builtSrc);
 ok("构建产物 wx.request 携带 timeout（弱网不永久卡死）", hasTimeout);
+
+// ── v1.20.15 新增：下面几组都靠「注入和风 Key + 桩 wx」真跑 fetchPlanWeather，
+//    不写「源码里有某个判断」这种对旧 bug 一样是绿的假断言。──
+const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const todayD = new Date(); todayD.setHours(0, 0, 0, 0);
+const dNear = ymd(todayD);
+const dFar = ymd(new Date(todayD.getTime() + 30 * 86400000));
+const K_INJ = { qweatherKey: "kw-test-abcdef012345", qweatherHost: "https://devapi.qweather.com" };
+
+// ① 窗口预判：出发日在 30 天后，/v7/weather/7d 必然拿不到，必须「发请求之前」判掉。
+//    原行为：照发 → 等 15s 超时或 200 但日期全不匹配 → 白花一次配额还白等一轮。
+const savedWx2 = global.wx;
+let farReq = 0, farErr = null, farList = null;
+global.wx = {
+  request() { farReq++; },
+  getStorageSync(k) { return k === "__app_keys__" ? K_INJ : null; },
+  setStorageSync() {}
+};
+W.fetchPlanWeather({ cityName: "北京", days: [{ date: dFar, cityName: "北京" }] }, (l, e) => { farList = l; farErr = e; });
+ok("行程超出 7 天窗口 → 判定 window 且一次请求都不发（不白花配额）",
+  farReq === 0 && !!farErr && farErr.type === "window" && Array.isArray(farList) && farList.length === 0);
+ok("超窗口提示文案是原兜底那句（与既有 UI 文案一致，不新增口径）",
+  /仅支持未来 7 天/.test((farErr && farErr.msg) || ""));
+
+// ② 对照组：窗口内的行程必须照常发请求 —— 否则①可能只是「永远不发请求」的假绿
+let nearReq = 0;
+global.wx = {
+  request() { nearReq++; },
+  getStorageSync(k) { return k === "__app_keys__" ? K_INJ : null; },
+  setStorageSync() {}
+};
+W.fetchPlanWeather({ cityName: "北京", days: [{ date: dNear, cityName: "北京" }] }, () => {});
+ok("窗口内行程照常发起请求（预判不是无差别拦截）", nearReq === 1);
+
+// ③ 重试退避必须非零：原写法 400 * attempt，attempt=0 → 0ms「立刻重试」，
+//    弱网下刚失败的连接还没缓过来就再撞一次，重试形同虚设。
+//    这里替换 setTimeout 只记录「声明延时」，再以 0ms 真跑，避免测试白等 400ms。
+const delays = [];
+const savedST = global.setTimeout;
+global.setTimeout = (fn, ms) => { delays.push(ms); return savedST(fn, 0); };
+let failReq = 0;
+global.wx = {
+  request(o) { failReq++; if (o && typeof o.fail === "function") o.fail({ errMsg: "request:fail timeout" }); },
+  getStorageSync(k) { return k === "__app_keys__" ? K_INJ : null; },
+  setStorageSync() {}
+};
+let retryErr = null;
+W.fetchPlanWeather({ cityName: "北京", days: [{ date: dNear, cityName: "北京" }] }, (l, e) => { retryErr = e; });
+await new Promise((r) => savedST(r, 30));
+global.setTimeout = savedST;
+global.wx = savedWx2;
+ok("失败后确实重试了（共 2 次请求）", failReq === 2);
+ok("重试退避非零（≥400ms，不再「立刻重试」）", delays.length > 0 && delays[0] >= 400);
+ok("重试用尽后回落 net 错误（页面给重试按钮）", !!retryErr && retryErr.type === "net");
+
+// ④ 盘上缓存必须带上原始落盘时刻：盘数据 10.5 分钟前落盘 → 内存 TTL(10min) 已过、盘 TTL(30min) 未过。
+//    修好后：第二次调用内存已过期，必须回盘确认（读盘 2 次）。
+//    修之前：回填时用 Date.now() 重新打戳当「刚取的」，第二次直接命中内存（读盘 1 次），
+//    最坏把 29 分钟前的预报再续 10 分钟 —— 用户看到「天气有，但一直是半小时前的」，且全程不报错。
+const staleT = Date.now() - Math.round(10.5 * 60 * 1000);
+let diskReads = 0;
+global.wx = {
+  request() { /* 永不回调：本用例只看缓存命中路径，不能有网络结果盖掉它 */ },
+  getStorageSync(k) {
+    if (k === "__app_keys__") return K_INJ;
+    if (String(k).indexOf("wxcacheV1.") === 0) {
+      diskReads++;
+      return { t: staleT, v: { [dNear]: { date: dNear, code: 0, icon: "sun", desc: "晴", tmax: 20, tmin: 8, isRain: false, isSnow: false, isThunder: false } } };
+    }
+    return null;
+  },
+  setStorageSync() {}
+};
+const pNear = { cityName: "北京", days: [{ date: dNear, cityName: "北京" }] };
+let c1 = null, c2 = null;
+W.fetchPlanWeather(pNear, (l) => { c1 = l; });
+W.fetchPlanWeather(pNear, (l) => { c2 = l; });
+global.wx = savedWx2;
+ok("盘上 10.5 分钟的预报两次都能出（不因修时间戳而丢天气）",
+  Array.isArray(c1) && c1.length === 1 && Array.isArray(c2) && c2.length === 1);
+ok("盘上缓存回填不再冒充「刚取的」（第二次仍回盘确认，不是靠 Date.now() 续命）",
+  diskReads === 2);
 
 console.log(fail ? ("\n✗ weather151 单测失败 " + fail + " 项") : "\n✓ weather151 单测全部通过");
 process.exit(fail ? 1 : 0);

@@ -5,6 +5,9 @@
  *       ⑦ 进程被回收（冷启动）后时效基准仍在 —— 时间戳落盘前这条恒失败
  *       ⑧ 冷启动但已超 TTL 依旧不串台（落盘不放宽时效）
  *       ⑨ 11 个场景全量落盘（MAX_SCENES 不足会静默淘汰他页记忆）
+ *       ⑩ 存储坏掉不抛给调用方且留痕
+ *       ⑪ 同一场景连点同一句话复用同一趟请求 ⑫ 换问题串行不并发
+ *       ⑬ 连续传输失败后熔断并自动恢复 ⑭ 业务错误不熔断
  * 用法：node tools/test/_test-cross-scene-ai.mjs
  */
 import { createRequire } from "module";
@@ -34,7 +37,9 @@ function loadAgent(opts) {
     require(name) {
       if (name === "./cloud.js") return {
         cloudEnabled: () => o.cloud !== false,
-        aiChat: (p) => { calls.push(p); return Promise.resolve({ ok: true, text: "答" }); }
+        // v1.20.15：aiChat 可注入 —— 并发去重 / 熔断这类行为必须真跑才测得出来，
+        // 「源码里有 _inflight[k]」这种断言对旧 bug 一样是绿的。
+        aiChat: (p) => { calls.push(p); return o.aiChat ? o.aiChat(p, calls.length) : Promise.resolve({ ok: true, text: "答" }); }
       };
       if (name === "./store.js") return {
         get: (k) => store.get(k), set: (k, v) => store.set(k, v)
@@ -143,6 +148,63 @@ function loadAgent(opts) {
   ok("存储读写异常不抛给调用方（AI 主流程不断）", threw === null);
   ok("存储异常留下痕迹（不再静默吞掉）",
     h.notes.some(n => String(n.extra || "").indexOf("会话记忆读取失败") >= 0));
+
+  // ⑪ 同一场景连点同一句话：必须复用同一趟请求。
+  //    旧实现存 true 并直接回 {err:"inflight"}，而 11 处调用点对「非 ok」一律降级离线 →
+  //    用户连点两下看到的是「AI 变笨了」，云端那一趟随后才回来却被丢弃。这是可观察行为，必须真跑。
+  let openFirst;
+  const gated = new Promise((res) => { openFirst = res; });
+  const i = loadAgent({ aiChat: () => gated });
+  const pa = i.api.ask("food", "同一句话", "c");
+  const pb = i.api.ask("food", "同一句话", "c");
+  ok("连点同一句话只发一趟云端请求", i.calls.length === 1);
+  openFirst({ ok: true, text: "真答案" });
+  const [ra, rb] = await Promise.all([pa, pb]);
+  ok("连点两次都拿到真实答案（不再返回 inflight 失败/降级离线）",
+    ra.ok === true && rb.ok === true && ra.text === "真答案" && rb.text === "真答案");
+  ok("连点不会重复写记忆（只落一轮问答）",
+    (i.api.historyOf("food") || []).length === 2);
+
+  // ⑫ 同一场景「换了问题」：排队而不是并发，也不是判失败。
+  //    并发会让 user/assistant 落记忆的顺序错乱（回答先落、问题后落），多轮上下文直接串台。
+  let openGate;
+  const gate = new Promise((res) => { openGate = res; });
+  const j = loadAgent({ aiChat: () => (j.calls.length === 1 ? gate : Promise.resolve({ ok: true, text: "第二答" })) });
+  const q1 = j.api.ask("food", "问题一", "c");
+  const q2 = j.api.ask("food", "问题二", "c");
+  ok("换问题时不并发第二趟（同场景串行）", j.calls.length === 1);
+  openGate({ ok: true, text: "第一答" });
+  const [r1, r2] = await Promise.all([q1, q2]);
+  ok("排队的问题仍拿到真实答案（不被判 inflight 降级）", r1.text === "第一答" && r2.ok === true && r2.text === "第二答");
+  ok("第二趟带上了第一轮问答（记忆顺序正确、多轮不断）",
+    !!j.calls[1] && JSON.stringify(j.calls[1].messages).indexOf("问题一") >= 0);
+
+  // ⑬ 熔断：连续两次传输层失败后短期不再发请求（弱网下每进一页白等 21s 是主要体感问题）
+  let mode = "fail";
+  const k2 = loadAgent({
+    aiChat: () => (mode === "fail"
+      ? Promise.resolve({ ok: false, err: "timeout", transport: true })
+      : Promise.resolve({ ok: true, text: "恢复" }))
+  });
+  await k2.api.ask("food", "q1", "c");
+  await k2.api.ask("food", "q2", "c");
+  const rc = await k2.api.ask("food", "q3", "c");
+  ok("连续 2 次传输失败后熔断，第三次不再发请求",
+    k2.calls.length === 2 && rc.ok === false && rc.err === "cooldown");
+  ok("熔断留下痕迹（否则只能靠用户投诉发现「AI 一直离线」）",
+    k2.notes.some(n => n.err === "cooldown"));
+  k2.tick(61 * 1000);
+  mode = "ok";
+  const rd = await k2.api.ask("food", "q4", "c");
+  ok("熔断到期后自动恢复（不需要重启小程序）", rd.ok === true && rd.text === "恢复" && k2.calls.length === 3);
+
+  // ⑭ 业务错误不熔断：模型偶尔空输出 / 云端答了但内容不可用，不是通道不通，
+  //    一次就静音一分钟会把本来能出结果的下一问也判掉。
+  const m = loadAgent({ aiChat: () => Promise.resolve({ ok: false, err: "llm-empty", transport: false }) });
+  await m.api.ask("food", "e1", "c");
+  await m.api.ask("food", "e2", "c");
+  const re = await m.api.ask("food", "e3", "c");
+  ok("业务错误不触发熔断（照常发第 3 次）", m.calls.length === 3 && re.err !== "cooldown");
 
   console.log("\n" + pass + " 通过 / " + fail + " 失败");
   process.exit(fail === 0 ? 0 : 1);

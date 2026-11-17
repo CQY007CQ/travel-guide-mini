@@ -79,13 +79,17 @@ const _WX_TTL = 10 * 60 * 1000;
 // 全程 try/catch：存储不可用（Node 测试 / 隐私限制）时静默退回纯内存，不影响主流程。
 const _PK = "wxcacheV1.";
 const _WX_TTL_DISK = 30 * 60 * 1000;
+// v1.20.15：返回 {v, t} 而非只返回值 —— 调用方要用「落盘时刻」打戳，不能用 Date.now()。
+//   原 bug：盘上回填时写成 {t: Date.now(), v: disk}，把 29 分钟前的数据当成了「刚取的」，
+//   于是内存 TTL 再续 10 分钟，最坏情况把盘上旧预报持到 39 分钟（跨过一次和风 30min 更新周期）。
+//   症状是「天气看着有、但一直是半小时前的」，且因为不报错，极难和缓存策略联系起来。
 function _diskGet(k) {
   try {
     if (typeof wx === "undefined" || !wx.getStorageSync) return null;
     const r = wx.getStorageSync(_PK + k);
     if (!r || !r.t || !r.v) return null;
     if (Date.now() - r.t > _WX_TTL_DISK) return null;
-    return r.v;
+    return { v: r.v, t: r.t };
   } catch (e) { return null; }
 }
 function _diskSet(k, v) {
@@ -148,13 +152,19 @@ function mergeWeatherByDay(plan, byCity) {
 }
 
 // 和风错误码 → 可辨识的错误类型/文案（让用户看到「为什么没天气」，而非一律「暂不可用」）
+// v1.20.15：补齐 204 / 404 的真实语义 —— 两者都不是「服务异常」，重试也不会好：
+//   204「请求成功但该地区暂时没有你需要的数据」在台站未覆盖的远郊/新开发区很常见；
+//   404 是「查询的地区不存在」（坐标落在无站点区域或海里）。
+//   原先把它们一律归到 {api, "天气服务暂时异常"} 并给出重试按钮，用户点几次都没用，还误以为是网络问题。
 function classifyApiError(d) {
   const code = d && d.code;
   const status = (d && d.status) ? String(d.status).toLowerCase() : "";
+  if (code === "204") return { type: "nodata", msg: "该地区暂无天气数据（和风未覆盖此站点）" };
   if (code === "401" || /invalid key|unauthorized/.test(status)) return { type: "auth", msg: "天气服务未授权（Key 无效）" };
   if (code === "402" || code === "429" || /quota|too many requests|frequency|exceeded/.test(status)) return { type: "quota", msg: "天气接口受限（免费额度或频次）" };
   if (code === "403" || /permission denied|forbidden/.test(status)) return { type: "auth", msg: "天气服务未授权" };
-  if (code === "404" || /invalid parameter/.test(status)) return { type: "param", msg: "天气请求参数有误" };
+  if (code === "404") return { type: "nodata", msg: "该地区暂无天气数据（坐标附近无观测站点）" };
+  if (code === "400" || /invalid parameter/.test(status)) return { type: "param", msg: "天气请求参数有误" };
   return { type: "api", msg: "天气服务暂时异常" };
 }
 
@@ -177,6 +187,14 @@ function fetchPlanWeather(plan, cb) {
   const todayYMD = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
   const first = new Date(String(plan.days[0].date).slice(0, 10).replace(/-/g, "/"));
   first.setHours(0, 0, 0, 0);
+  // v1.20.15：行程整体落在预报窗口之外时，直接判掉，不发请求。
+  //   /v7/weather/7d 只覆盖「今天 + 之后 6 天」，更远的出发日必然拿不到数据。
+  //   原行为：照发请求 → 等 15s 超时、或拿到 200 但 byDate 里日期全不匹配 → 最后才报「超出范围」，
+  //   既白花一次配额，又让用户白等一两轮。这里提前返回同一句提示（文案与兜底分支完全一致）。
+  //   多城行程只看最早一天：只要有一天落在窗口内就仍要请求，靠后的天自然缺数据、逐日跳过。
+  //   （这一行原本就为窗口判断算好了 first，却一直没被使用 —— 死代码，正好用上。）
+  const _dayDiff = Math.round((first.getTime() - today.getTime()) / 86400000);
+  if (_dayDiff >= 7) { cb([], { type: "window", msg: "行程超出天气预报范围（仅支持未来 7 天）" }); return; }
 
   const byCity = {};
   let pending = 0, finished = false, aggErr = null;
@@ -238,7 +256,9 @@ function fetchPlanWeather(plan, cb) {
       fail() {
         if (attempt < MAX_RETRY) {
           // 仅对传输层失败（超时/网络抖动）重试；API 错误码（auth/quota/param）不重试
-          setTimeout(function () { loadCity(city, c, wkey, attempt + 1); }, 400 * attempt);
+          // v1.20.15：退避窗口写成 400 * attempt 时，attempt=0 → 0ms，等于「立刻重试」，
+          // 弱网下刚失败的连接还没来得及恢复就再撞一次，重试形同虚设。改为 400*(attempt+1)。
+          setTimeout(function () { loadCity(city, c, wkey, attempt + 1); }, 400 * (attempt + 1));
           return;
         }
         EL.note("weather", "net", "重试 " + MAX_RETRY + " 次后仍失败: " + city);
@@ -257,8 +277,9 @@ function fetchPlanWeather(plan, cb) {
     // v1.19.180：内存未命中先看盘（冷启动/切页场景），命中即先出天气，不阻塞首屏
     const disk = _diskGet(wkey);
     if (disk) {
-      _WX_CACHE[wkey] = { t: Date.now(), v: disk };
-      byCity[city] = { byDate: disk, city: city };
+      // 用盘上原始落盘时刻打戳：提前过期就重新拉，而不是把旧数据再续一轮 10 分钟
+      _WX_CACHE[wkey] = { t: disk.t, v: disk.v };
+      byCity[city] = { byDate: disk.v, city: city };
       return;
     }
     pending++;

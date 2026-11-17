@@ -30,9 +30,26 @@ const TS_KEY = "aiAgentTsV1";        // 场景 -> 最近一次用户提问时间
 const MAX_SCENES = 11;               // 全站实有 11 个 scene；storage 10MB 非瓶颈，不足会静默淘汰他页记忆
                                      // 场景清单由 ask() 字面量跨行正则数出（含 today-proactive），勿用单行 grep
 const SAVE_CHARS = 600;              // 落盘单条上限（内存里仍 1200）
-const _inflight = Object.create(null); // scene -> true，防止同场景重复点击并发请求
+// scene -> { q, p }：同一场景同一时刻只跑一趟云端请求（防并发污染会话记忆）。
+// v1.20.15：原来存的是 true，第二次调用直接回 {ok:false,err:"inflight"}；
+//   但 11 处调用点对「非 ok」一律降级到离线答案 → 用户连点两下就看到「AI 变笨了」，
+//   而云端那一趟其实还在路上、答案随后被丢弃。现在改成存 Promise：
+//   同一句话 → 复用同一趟请求（零额外 token，两人拿到同一个答案）；
+//   换了问题 → 排队等前一趟收尾再发（并发会让 user/assistant 落记忆的顺序错乱）。
+const _inflight = Object.create(null);
 const _sceneTs = Object.create(null);  // scene -> 最近一次用户提问时间（内存态；首次 _load 时从 TS_KEY 恢复）
 let _mem = null;                     // scene -> [{role, content}]，首次访问时懒加载
+
+// ── 通道熔断：连续传输层失败（超时/网络/云函数未就绪）时短期不再发起请求 ──
+// 为什么需要：弱网下每进一次页面就陪云端干等 21s（AI_TEXT_TIMEOUT_MS），拿到的仍是同一份离线答案。
+// 为什么是「连续 2 次」而不是 1 次：单次超时可能只是模型这次慢（21s 没答完），立刻熔断会把
+//   本来能出结果的下一问也判掉。连续两次 = 已经白等了 42s，通道确实不通，此时熔断只赚不亏。
+// 只认 transport 标记（cloud.js 在 withTimeout 超时/调用被 reject 时置位），
+//   云端返回的业务错误（如模型空输出）不算通道不通，不熔断。
+const _BREAK_AFTER = 2;
+const _BREAK_MS = 60 * 1000;
+let _netFail = 0;
+let _breakUntil = 0;
 
 // 时间戳为什么要落盘：_sceneTs 早期是纯内存，小程序被后台回收后它归零 →
 // 他页取到 0 → now-0 恒大于 10 分钟 TTL → 跨页提示「永不注入」。
@@ -137,24 +154,48 @@ function ask(scene, question, context, systemOverride) {
   // 云未开：直接回落（调用方已做离线兜底），不白费算力拼 system / 不触发云通道
   if (!Cloud.cloudEnabled()) return Promise.resolve({ ok: false, err: "cloud-disabled" });
   const k = scene || "default";
-  if (_inflight[k]) return Promise.resolve({ ok: false, err: "inflight" });
-  _inflight[k] = true;
+  // 先看并发：已经有一趟在跑时不能被熔断抢先判掉（那趟还有机会成功）
+  const busy = _inflight[k];
+  if (busy) {
+    // 同一句话连点：复用同一趟请求，答案与首问完全一致（不额外烧 token）
+    if (busy.q === q) return busy.p;
+    // 换了问题：排队。等前一趟结算完（记忆已落）再重新走 ask，顺序与用户输入一致。
+    return busy.p.then(function () { return ask(scene, question, context, systemOverride); });
+  }
+  if (Date.now() < _breakUntil) return Promise.resolve({ ok: false, err: "cooldown" });
+  return _run(k, scene, q, context, systemOverride);
+}
+
+// 真正发起一趟请求。抽出来只为一件事：把「这一趟的 Promise」放进 _inflight，
+// 让并发调用能拿到同一个对象去复用 / 排队，而不是各自再发一次。
+function _run(k, scene, q, context, systemOverride) {
   const msgs = historyOf(scene).concat([{ role: "user", content: q }]);
   const sys = aiSystemOf(k, systemOverride);
   const hint = crossSceneHints(k);
   const fullCtx = hint ? (String(context || "") + "\n\n【跨页上下文 · 仅供理解指代，勿当成该页事实】\n" + hint) : context;
-  return Cloud.aiChat({ messages: msgs, context: fullCtx || null, system: sys }).then(function (r) {
+  const p = Cloud.aiChat({ messages: msgs, context: fullCtx || null, system: sys }).then(function (r) {
     if (r && r.ok && r.text) {
+      _netFail = 0; _breakUntil = 0;   // 通道恢复：清掉熔断计数，下一次照常走云端
       remember(scene, "user", q);
       remember(scene, "assistant", r.text);
+    } else if (r && r.transport) {
+      // 只有传输层失败才计入熔断（cloud.js 置 transport 标记）
+      _netFail++;
+      if (_netFail >= _BREAK_AFTER && Date.now() >= _breakUntil) {
+        _breakUntil = Date.now() + _BREAK_MS;
+        EL.note("ai", "cooldown", "云端通道连续 " + _netFail + " 次超时/断网 → 暂停 " + (_BREAK_MS / 1000) + "s 直接回落离线，避免每次进页白等");
+      }
     }
     return r;
   }).catch(function (e) {
     return { ok: false, err: String((e && e.message) || e) };
   }).then(function (r) {
-    delete _inflight[k];
+    // 只清自己这一条：排队路径可能在等待期间已置入新的 in-flight
+    if (_inflight[k] && _inflight[k].p === p) delete _inflight[k];
     return r;
   });
+  _inflight[k] = { q: q, p: p };
+  return p;
 }
 
 // 记忆占用（供设置页展示 / 全局清空），返回 { scenes, turns, chars }

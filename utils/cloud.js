@@ -243,13 +243,15 @@ function aiContextOf(plan, page) {
 
 // 云端调用超时保护：云函数冷启动 / 网络挂起时，超时即返回 { ok:false } 让调用方回落离线，
 // 避免页面 showLoading 无限转。返回 Promise 永远 resolve，绝不 reject。
+// transport:true 表示「通道没走通」（超时 / 调用被 reject），而不是云端答了但内容不可用。
+//   上层 ai-agent 只据此做熔断：连续传输失败才短期停发请求，业务错误不熔断。
 function withTimeout(p, ms) {
   return new Promise(function (resolve) {
     let done = false;
     const timer = setTimeout(function () {
       if (done) return;
       done = true;
-      resolve({ ok: false, err: "timeout" });
+      resolve({ ok: false, err: "timeout", transport: true });
     }, ms);
     const finish = function (v) {
       if (done) return;
@@ -257,7 +259,13 @@ function withTimeout(p, ms) {
       try { clearTimeout(timer); } catch (e) { /* 定时器已触发或环境无定时器，清理失败无副作用 */ }
       resolve(v);
     };
-    p.then(finish).catch(function (e) { finish({ ok: false, err: String((e && e.message) || e) }); });
+    p.then(finish).catch(function (e) {
+      // wx.cloud 的 fail 回调给的是 {errMsg:"cloud.callFunction:fail ..."}，没有 message 字段。
+      // 原写法 String(e.message || e) 会把它变成 "[object Object]" 写进 errlog ——
+      // 于是每次云端失败在日志里都是同一句废话，根本分不清是超时、域名没配还是权限不足。
+      const why = (e && (e.errMsg || e.message)) || String(e);
+      finish({ ok: false, err: String(why), transport: true });
+    });
   });
 }
 
@@ -296,8 +304,9 @@ function aiChat(opts) {
       else {
         _aiFail++;
         const _why = (r && r.err) || "ai-failed";
-        EL.note("ai", _why, "云端回答不可用，已回落离线引擎");
-        resolve({ ok: false, err: _why, raw: r });
+        EL.note("ai", _why, (r && r.transport) ? "云端通道未走通（超时/网络），已回落离线引擎" : "云端回答不可用，已回落离线引擎");
+        // transport 透传给上层做熔断判据；业务错误（模型空输出等）不置位
+        resolve({ ok: false, err: _why, transport: !!(r && r.transport), raw: r });
       }
     });
   });

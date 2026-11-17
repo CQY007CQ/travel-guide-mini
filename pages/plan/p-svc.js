@@ -18,7 +18,7 @@ module.exports = {
   // v1.19.153：回调改为 cb(list, err)；失败时按 err.type 给出可辨识文案，不再一律「天气暂不可用」
   W.fetchPlanWeather(plan, (list, err) => {
    if (err) {
-     // type ∈ empty/env/no_key/nocity/quota/auth/param/api/net/window
+     // type ∈ empty/env/no_key/nocity/nodata/quota/auth/param/api/net/window
      let msg = err.msg || "";
      if (!msg) {
        if (err.type === "empty") msg = "暂无行程，先生成一份攻略";
