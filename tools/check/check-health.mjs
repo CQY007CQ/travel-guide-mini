@@ -59,6 +59,25 @@ if (mainKB != null && HEADROOM_LIMIT - mainKB < 16) {
     "KB：新增静态数据请落 subdata3 槽位，新增能力请优先放分包");
 }
 
+// ── 预算型阻塞登记（v1.20.11 治理项）──
+// 防的是这个失效模式：「因为主包放不下，所以先不做」这句话一旦写进记忆/文档，就再没人回头看。
+// 真实案例：跨页 AI 衔接被「差 400 字节主包空间」搁置了一整轮，实际它早已交付（ad31c28）。
+// 规则：① 阻塞必须登记且带数字（禁「装不下」这种无数量的说法）；② 余量一旦达标即判红，必须重判或销号；
+// ③ 销号必须写提交号，可追溯。active 表为空是期望状态。
+const BUDGET_BLOCKERS = [
+  // { id, needKB, reason, resolvedBy } —— resolvedBy 非空 = 已销号
+  { id: "cross-scene-hints", needKB: 4, reason: "跨页 AI 衔接曾因「差 400 字节」被搁置，实际已交付", resolvedBy: "ad31c28" },
+];
+{
+  const headroomKB = mainKB == null ? 0 : HEADROOM_LIMIT - mainKB;
+  const stale = BUDGET_BLOCKERS.filter((b) => !b.resolvedBy && headroomKB >= b.needKB);
+  ck("预算型阻塞无过期项（余量已达标就必须重判或销号）", stale.length === 0,
+    stale.map((b) => b.id + "(需 " + b.needKB + "KB / 现有 " + headroomKB + "KB)").join(","));
+  ck("预算型阻塞登记均带数字与销号依据（禁「装不下」这类无数量的理由）",
+    BUDGET_BLOCKERS.every((b) => typeof b.needKB === "number" && b.needKB > 0 &&
+      (!b.resolvedBy || /^[0-9a-f]{7,40}$/.test(b.resolvedBy))));
+}
+
 /* ───────── ② 数据规模（只报真实值，不写死期望） ───────── */
 const C = req(path.join(ROOT, "utils/corpus.js"));
 const CS = (() => { try { return C.corpusStats(); } catch (e) { return null; } })();

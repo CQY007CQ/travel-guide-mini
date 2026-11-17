@@ -25,12 +25,18 @@ function aiSystemOf(scene, override) {
 
 const MAX_TURNS = 6;                 // 每场景保留最近 6 轮（12 条消息）
 const MEM_KEY = "aiAgentMemV1";
-const MAX_SCENES = 8;                // 全站实有 11 个 scene；8 个约 112KB，storage 10MB 非瓶颈
+const TS_KEY = "aiAgentTsV1";        // 场景 -> 最近一次用户提问时间戳（跨页衔接时效基准，必须落盘）
+const MAX_SCENES = 11;               // 全站实有 11 个 scene；storage 10MB 非瓶颈，不足会静默淘汰他页记忆
+                                     // 场景清单由 ask() 字面量跨行正则数出（含 today-proactive），勿用单行 grep
 const SAVE_CHARS = 600;              // 落盘单条上限（内存里仍 1200）
 const _inflight = Object.create(null); // scene -> true，防止同场景重复点击并发请求
-const _sceneTs = Object.create(null);  // scene -> 最近一次用户提问时间（纯内存，跨页衔接时效用）
+const _sceneTs = Object.create(null);  // scene -> 最近一次用户提问时间（内存态；首次 _load 时从 TS_KEY 恢复）
 let _mem = null;                     // scene -> [{role, content}]，首次访问时懒加载
 
+// 时间戳为什么要落盘：_sceneTs 早期是纯内存，小程序被后台回收后它归零 →
+// 他页取到 0 → now-0 恒大于 10 分钟 TTL → 跨页提示「永不注入」。
+// 症状是「隔天/被回收后再问就接不上」，而 TTL 与注入逻辑本身都是好的，极难定位。
+// 落盘只恢复时效基准，TTL 口径不变（隔天的问题依旧不串台）。
 function _load() {
   if (_mem) return _mem;
   _mem = Object.create(null);
@@ -39,6 +45,14 @@ function _load() {
     if (v && typeof v === "object" && !Array.isArray(v)) {
       Object.keys(v).slice(-MAX_SCENES).forEach(function (k) {
         if (Array.isArray(v[k])) _mem[k] = v[k].slice(-MAX_TURNS * 2);
+      });
+    }
+    // 复用同一个 try：不新增 catch（空 catch 有可观测性基线约束，见 check-observability）。
+    const tv = S.get(TS_KEY, null);
+    if (tv && typeof tv === "object" && !Array.isArray(tv)) {
+      Object.keys(tv).forEach(function (k) {
+        const t = Number(tv[k]);
+        if (t > 0 && t > (_sceneTs[k] || 0)) _sceneTs[k] = t; // 内存为准，取较大值
       });
     }
   } catch (e) {}
@@ -54,6 +68,10 @@ function _save() {
       });
     });
     S.set(MEM_KEY, out);
+    // 时间戳随记忆一起落盘，键集与 out 对齐（天然受 MAX_SCENES 约束，不会无限增长）
+    const ts = {};
+    Object.keys(out).forEach(function (k) { if (_sceneTs[k]) ts[k] = _sceneTs[k]; });
+    S.set(TS_KEY, ts);
   } catch (e) {}
 }
 
@@ -87,7 +105,8 @@ function clearHistory(scene) {
 // 跨页衔接：把「其它场景最近 2 条用户提问」附进本次 context，让「那换成室内的呢」
 // 在 food 页也能接上 today 页的上下文。只注入、不写回记忆、不进 messages。
 // 时效 10 分钟 + 只取 user 问题（不取回答，避免长文本串台与 token 浪费）。
-// 纯内存快照，无落盘、无新增存储键；失败时返回空串，绝不阻断主流程。
+// 时效基准 _sceneTs 随记忆落盘（TS_KEY），否则进程被回收后跨页提示恒不注入；
+// 缓存本身仍是纯内存快照（30s），失败返回空串，绝不阻断主流程。
 const CROSS_SCENE_TTL = 10 * 60 * 1000;
 let _crossTs = 0, _crossCache = "";
 function crossSceneHints(current) {

@@ -88,9 +88,22 @@ log(intentTmo > 0 && intentTmo < cloudTextWait,
 // 否则被淘汰的是「最早创建」的场景——常用页反而先失忆。
 log(/delete m\[k\];\s*m\[k\] = cur;/.test(AGENT_JS),
   "场景记忆淘汰最久未用（把刚用过的场景挪到末尾），不是最早创建");
-// 全站实有 11 个 scene；落盘只留 MAX_SCENES 个，太少会让「跨页面问过几次」就丢早期记忆。
+// 全站实有 scene 数：**从 ask() 字面量数出来，不采信代码注释**。
+// 旧注释写「全站实有 11 个 scene」，实测 10 个；而断言只要求 >=8，等于把已知不足判绿。
+// 对照实验里三份提示词真跑都因抄注释而把场景数写错（11/12/11），这也是不许抄注释的由来。
+const sceneSet = new Set();
+for (const f of files) {
+  let src = "";
+  try { src = readFileSync(f, "utf8"); } catch (e) { continue; }
+  for (const hit of src.match(/AIAgent\.ask\s*\(\s*["'][A-Za-z][\w-]*["']/g) || []) {
+    sceneSet.add((hit.match(/["']([A-Za-z][\w-]*)["']/) || [])[1]);
+  }
+}
+const sceneCount = sceneSet.size;
 const maxScenes = Number((AGENT_JS.match(/const MAX_SCENES = (\d+);/) || [])[1] || 0);
-log(maxScenes >= 8, "落盘场景数(" + maxScenes + ") 覆盖全站 11 个 scene 的多数（storage 远非瓶颈）");
+log(sceneCount >= 8, "实有 scene 数由 ask() 字面量数出 = " + sceneCount + "（不采信注释）");
+log(maxScenes >= sceneCount,
+  "落盘场景上限(" + maxScenes + ") 覆盖实有 scene(" + sceneCount + ")：不足会静默淘汰他页记忆");
 
 // ── 云函数滥用防护（v1.20.8 安全完善）──
 // 真实威胁：llmProxy 是唯一部署的云函数、网页端匿名可调用，若无防护会被刷大模型额度。

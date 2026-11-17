@@ -2,6 +2,9 @@
  * _test-cross-scene-ai.mjs —— 跨页 AI 衔接单测（零依赖、不联网）
  * 验证：① 其他页最近问题注入 context ② 只注入不写回 ③ 10 分钟时效
  *       ④ 清空会话立即失效 ⑤ 不重复当前场景 ⑥ 云未开不拼装
+ *       ⑦ 进程被回收（冷启动）后时效基准仍在 —— 时间戳落盘前这条恒失败
+ *       ⑧ 冷启动但已超 TTL 依旧不串台（落盘不放宽时效）
+ *       ⑨ 11 个场景全量落盘（MAX_SCENES 不足会静默淘汰他页记忆）
  * 用法：node tools/test/_test-cross-scene-ai.mjs
  */
 import { createRequire } from "module";
@@ -21,7 +24,9 @@ const src = readFileSync(resolve(ROOT, "utils/ai-agent.js"), "utf8");
 function loadAgent(opts) {
   const o = opts || {};
   let clock = o.clock || 1000000;
-  const store = new Map();
+  // o.store：传入同一个 Map 可模拟「进程被回收但 storage 还在」（冷启动）；
+  // 不传则每个实例一份独立 storage（同一次运行内）。
+  const store = o.store || new Map();
   const calls = [];
   const sandbox = {
     module: { exports: {} }, exports: {},
@@ -44,6 +49,7 @@ function loadAgent(opts) {
   return {
     api: sandbox.module.exports,
     calls, store,
+    now() { return clock; },
     tick(ms) { clock += ms; }
   };
 }
@@ -91,6 +97,35 @@ function loadAgent(opts) {
   e.api.remember("today", "user", "不该被拼装");
   const r = await e.api.ask("food", "q", "c");
   ok("云未开直接回落（不拼装、不调用）", r.ok === false && e.calls.length === 0);
+
+  // ⑦ 冷启动：同一份 storage、全新实例（_sceneTs 归零），10 分钟后仍应注入。
+  // 这正是「隔天/被系统回收后再问就接不上」的真实场景；时间戳不落盘时这条恒失败。
+  const shared = new Map();
+  const f1 = loadAgent({ store: shared });
+  f1.api.remember("today", "user", "进程被杀前问过的问题");
+  const f2 = loadAgent({ store: shared, clock: f1.now() + 2 * 60 * 1000 });
+  await f2.api.ask("food", "那推荐室内吃的", "c");
+  ok("冷启动后时效基准仍在（跨页提示照常注入）",
+    (f2.calls[0].context || "").indexOf("进程被杀前问过的问题") >= 0);
+  ok("时间戳已落盘（aiAgentTsV1 有 today）",
+    String(f2.store.get("aiAgentTsV1") && f2.store.get("aiAgentTsV1").today || "").length > 0);
+
+  // ⑧ 冷启动但已超 TTL：不能因为「落了盘」就把隔天的问题也串进来
+  const f3 = loadAgent({ store: shared, clock: f1.now() + 11 * 60 * 1000 });
+  await f3.api.ask("food", "q", "c");
+  ok("冷启动且超 10 分钟不串台（落盘不放宽时效）",
+    (f3.calls[0].context || "").indexOf("进程被杀前问过的问题") < 0);
+
+  // ⑨ 全站场景全量落盘：MAX_SCENES 若小于实有 scene 数，会静默淘汰他页记忆
+  const g = loadAgent();
+  // 真实 11 个 scene（由 ask() 字面量跨行正则数出，含 today-proactive；单行 grep 会漏掉它）
+  const SCENES = ["assistant", "food", "help", "lens", "plan", "prep", "review", "spot", "today", "today-proactive", "toolkit"];
+  SCENES.forEach((s) => g.api.remember(s, "user", "q-" + s));
+  const saved = g.store.get("aiAgentMemV1") || {};
+  ok("实有 " + SCENES.length + " 个场景全量落盘（不被 MAX_SCENES 截断）",
+    Object.keys(saved).length === SCENES.length);
+  ok("时间戳键集与记忆键集对齐（不会无限增长）",
+    Object.keys(g.store.get("aiAgentTsV1") || {}).length === Object.keys(saved).length);
 
   console.log("\n" + pass + " 通过 / " + fail + " 失败");
   process.exit(fail === 0 ? 0 : 1);
