@@ -215,9 +215,11 @@ Page(SafePage({
     if (!q) { wx.showToast({ title: "先输入问题", icon: "none" }); return; }
     const self = this;
     if (!Cloud.cloudEnabled()) { self._aiOffline(q); return; }
-    self.setData({ aiLoading: true, aiErr: "" });
+    // v1.20.16：先落本地规则引擎答案，云端 12s 后升级（徽标 = aiPending && aiLoading，任一路径结束即消隐）
+    self._aiOffline(q);
+    self.setData({ aiLoading: true, aiPending: true, aiErr: "" });
     AIAgent.ask("prep", q, self._aiCtx()).then((r) => {
-      if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiSource: r.source || "ai", aiLoading: false });
+      if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiSource: r.source || "ai", aiLoading: false, aiPending: false });
       else self._aiOffline(q);
     }).catch(() => { self._aiOffline(q); });
   },

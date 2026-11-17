@@ -149,15 +149,19 @@
 </block>
 
     <!-- AI 主动建议：打开即基于真实行程状态推一条（强模型优先 · 离线回落规则提示）；新增「换一条」可手动刷新 -->
-    <view class="card ai-today" wx:if="{{proactiveTip}}">
+    <!-- v1.20.16：先渲染本地建议，云端答案到达后原地升级；proactivePending 明示「AI 还在补充」，
+         不是把本地文案冒充 AI 产出，也不是让用户对着空白等十几秒。 -->
+    <view class="card ai-today" wx:if="{{proactiveTip || proactiveLoading}}">
       <view class="ai-h">
         <image class="ic" src="/images/icons/sparkle.png"/>
         <text class="ai-t">AI 主动建议</text>
-        <text class="ai-badge" wx:if="{{proactiveOffline}}">离线</text>
+        <text class="ai-badge" wx:if="{{proactivePending}}">本地速答</text>
+        <text class="ai-badge" wx:elif="{{proactiveOffline}}">离线</text>
         <text class="ai-badge" wx:else>智能</text>
         <view class="ai-btn {{proactiveLoading ? 'ai-busy' : ''}}" bindtap="proactiveRefresh">{{proactiveLoading ? '刷新中…' : '换一条'}}</view>
       </view>
-      <view class="ai-body">{{proactiveTip}}</view>
+      <view class="ai-body" wx:if="{{proactiveTip}}">{{proactiveTip}}</view>
+      <view class="ai-tip" wx:if="{{proactivePending}}">AI 正在生成更贴合你这趟行程的版本…</view>
     </view>
 
     <!-- AI 今日建议（云端强模型优先 · 离线兜底） -->
@@ -165,12 +169,14 @@
       <view class="ai-h">
         <image class="ic" src="/images/icons/sparkle.png"/>
         <text class="ai-t">AI 今日建议</text>
-        <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+        <text class="ai-badge" wx:if="{{aiPending}}">本地速答</text>
+        <text class="ai-badge" wx:elif="{{aiSource}}">AI 生成</text>
         <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askTodayAI">{{aiLoading ? '思考中…' : (aiText ? '再问一次' : '生成')}}</view>
       </view>
       <block wx:if="{{aiText}}">
         <view class="ai-body">{{aiText}}</view>
-        <view class="ai-copy" bindtap="aiCopy">复制回答</view>
+        <view class="ai-tip" wx:if="{{aiPending}}">AI 正在生成更完整的版本…</view>
+        <view class="ai-copy" bindtap="aiCopy" wx:if="{{!aiPending}}">复制回答</view>
       </block>
       <view class="ai-tip" wx:else>基于本趟行程的真实数据给 3 条可执行建议（动线/穿搭/预算）；无网络时自动回落离线规则库。</view>
       <view class="ai-copy" bindtap="aiClearChat">清空会话</view>

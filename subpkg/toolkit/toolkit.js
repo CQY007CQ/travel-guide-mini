@@ -324,11 +324,14 @@ Page(SafePage({
   };
   self.setData({ aiLoading: true });
   if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { local(); return; }
+  // v1.20.16：云端一次回答实测 11.4~12.6s，先落本地规则引擎答案，云端到了再升级
+  local();
+  self.setData({ aiLoading: true, aiPending: true });
   let ctx = "";
   try { ctx = Cloud.aiContextOf(plan, "旅行百宝箱") + "\n当前城市：" + (this.data.cityName || "未知") + "。"; } catch (e) { ctx = ""; }
   AIAgent.ask("toolkit", q, ctx)
    .then((r) => {
-    if (r && r.ok && r.text) self.setData({ out: { k: "ai", txt: r.text }, outAddable: false, aiLoading: false });
+    if (r && r.ok && r.text) self.setData({ out: { k: "ai", txt: r.text }, outAddable: false, aiLoading: false, aiPending: false });
     else local();
    })
    .catch(() => { local(); });

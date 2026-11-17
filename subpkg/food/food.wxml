@@ -68,11 +68,13 @@
       <view class="ai-h">
         <image lazy-load class="ic" src="/images/icons/sparkle.png"/>
         <text class="ai-t">AI 吃什么</text>
-        <text class="ai-badge" wx:if="{{aiSource}}">AI 生成</text>
+        <text class="ai-badge" wx:if="{{aiPending && aiLoading}}">本地速答</text>
+        <text class="ai-badge" wx:elif="{{aiSource}}">AI 生成</text>
         <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askFoodAI">{{aiLoading ? '思考中…' : (aiText ? '再问一次' : '生成')}}</view>
       </view>
       <block wx:if="{{aiText}}">
         <view class="ai-body">{{aiText}}</view>
+        <view class="ai-tip" wx:if="{{aiPending && aiLoading}}">AI 正在生成更完整的版本…</view>
         <view class="ai-copy" bindtap="aiCopy">复制回答</view>
       </block>
       <view class="ai-tip" wx:else>基于本地收录的真实必吃清单与名店给 3 条点餐建议；不编造店名和价格，无网络时自动回落离线规则库。</view>

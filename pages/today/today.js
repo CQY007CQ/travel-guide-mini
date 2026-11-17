@@ -29,8 +29,11 @@ Page(SafePage({
     // v1.8.5 C9：每日一句（无行程时陪伴文案）
     quote: null,
     // AI 今日建议（云端强模型优先 · 离线规则库兜底）
-    aiText: "", aiSource: "", aiLoading: false, aiErr: "",
-    proactiveTip: "", proactiveLoading: false, proactiveOffline: false
+    // v1.20.16：aiPending / proactivePending 表示「本地速答已在屏上，云端答案还在生成」。
+    // 实测云端一次回答 11.4~12.6s（qwen 生成约 600 字），用户点完只能盯着「思考中…」等十几秒；
+    // 现在点完立刻把本地规则库的真实建议落屏（≤1ms），云端回来再升级，感知延迟从 12s 降到一瞬。
+    aiText: "", aiSource: "", aiLoading: false, aiErr: "", aiPending: false,
+    proactiveTip: "", proactiveLoading: false, proactiveOffline: false, proactivePending: false
   },
 
     _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
@@ -207,12 +210,24 @@ Page(SafePage({
     try { ctx = Cloud.aiContextOf(plan, "今天页") + "\n" + detail.join("\n"); } catch (e) { ctx = detail.join("\n"); }
     self.setData({ aiLoading: true, aiErr: "" });
     if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { self._aiTodayOffline(plan); return; }
+    // v1.20.16：先把本地规则库答案落屏（真实数据算的，不是占位文案），云端到了再升级。
+    // 否则用户点完按钮只能看「思考中…」空转十几秒（实测 11.4~12.6s）。
+    self._aiLocalQuick(plan);
     AIAgent.ask("today", q, ctx)
       .then((r) => {
-        if (r && r.ok && r.text) self.setData({ aiText: r.text, aiSource: r.source || "ai", aiLoading: false, aiErr: "" });
-        else self._aiTodayOffline(plan);
+        if (r && r.ok && r.text) self.setData({ aiText: r.text, aiSource: r.source || "ai", aiLoading: false, aiErr: "", aiPending: false });
+        else self.setData({ aiLoading: false, aiPending: false }); // 云端没成：保留已在屏的本地答案，徽标回落「离线」
       })
-      .catch(() => { self._aiTodayOffline(plan); });
+      .catch(() => { self.setData({ aiLoading: false, aiPending: false }); });
+  },
+
+  // 云端等待期间先出本地规则库答案：不动 aiLoading（按钮继续显示「思考中…」），
+  // 只把「本地速答、AI 仍在生成」这层信息明确告诉用户，避免被当成最终答案。
+  _aiLocalQuick(plan) {
+    let r;
+    try { r = T.askAssistant("今天安排", plan); } catch (e) { r = { text: "" }; }
+    const txt = (r && r.text) || "离线模式：按行程顺序走，留意体力与预算节奏；详情看「行程」页。";
+    this.setData({ aiText: txt, aiSource: "", aiPending: true, aiErr: "" });
   },
 
   _aiTodayOffline(plan) {
@@ -257,17 +272,22 @@ Page(SafePage({
       self.setData({ proactiveTip: t, proactiveOffline: true, proactiveLoading: false });
       return;
     }
-    self.setData({ proactiveLoading: true });
+    // v1.20.16：卡片不能等云端回来才出现。原先 wxml 是 wx:if="{{proactiveTip}}"，tip 为空时
+    // 整张卡（含「刷新中…」按钮）都不渲染 —— 进页面后这块空白十几秒再凭空弹出，
+    // 这正是「换页很慢」的主要体感来源之一，而真正耗时的云端调用其实在后台。
+    // 现在立刻落屏本地规则建议（真实 planCheckup 产出，非占位文案），云端回来再升级。
+    self.setData({ proactiveTip: offlineTip(), proactiveOffline: true, proactiveLoading: true, proactivePending: true });
     AIAgent.ask("today-proactive", q, ctx)
       .then((r) => {
-        const tip = (r && r.ok && r.text) ? r.text : offlineTip();
-        _proactiveCache = { key: key, ts: now, tip: tip, offline: !(r && r.ok) };
-        self.setData({ proactiveTip: tip, proactiveOffline: !(r && r.ok), proactiveLoading: false });
+        const okc = !!(r && r.ok && r.text);
+        const tip = okc ? r.text : offlineTip();
+        _proactiveCache = { key: key, ts: now, tip: tip, offline: !okc };
+        self.setData({ proactiveTip: tip, proactiveOffline: !okc, proactiveLoading: false, proactivePending: false });
       })
       .catch(() => {
         const t = offlineTip();
         _proactiveCache = { key: key, ts: now, tip: t, offline: true };
-        self.setData({ proactiveTip: t, proactiveOffline: true, proactiveLoading: false });
+        self.setData({ proactiveTip: t, proactiveOffline: true, proactiveLoading: false, proactivePending: false });
       });
   },
 

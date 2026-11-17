@@ -9,7 +9,8 @@
   <!-- AI 自由问答（云端强模型优先 · 离线兜底 · 结果复用下方「生成结果」区） -->
   <view class="card ai-tk">
     <view class="ai-h"><image lazy-load class="ic" src="/images/icons/sparkle.png"/><text class="ai-t">AI 自由问答</text>
-      <text class="ai-badge" wx:if="{{out && out.k === 'ai'}}">AI 生成</text></view>
+      <text class="ai-badge" wx:if="{{aiPending && aiLoading}}">本地速答</text>
+      <text class="ai-badge" wx:elif="{{out && out.k === 'ai'}}">AI 生成</text></view>
     <view class="ai-row">
       <input class="ai-inp" placeholder="随便问：这城玩几天合适？带老人怎么排？" value="{{aiQ}}" bindinput="onAIInput" bindconfirm="askAI" confirm-type="send"/>
       <view class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askAI">{{aiLoading ? '思考中…' : '问'}}</view>

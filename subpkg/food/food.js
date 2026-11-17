@@ -221,9 +221,13 @@ Page(SafePage({
     try { ctx = Cloud.aiContextOf(plan, "美食页") + "\n" + lines.join("\n"); } catch (e) { ctx = lines.join("\n"); }
     self.setData({ aiLoading: true, aiErr: "" });
     if (typeof Cloud.cloudEnabled !== "function" || !Cloud.cloudEnabled()) { self._aiFoodOffline(plan); return; }
+    // v1.20.16：云端一次回答实测 11.4~12.6s，先把本地美食建议落屏（同步、≤1ms），云端到了再升级。
+    // 顺序不能反：_aiFoodOffline 会把 aiLoading 置回 false，所以要在它之后再置回 loading+pending。
+    self._aiFoodOffline(plan);
+    self.setData({ aiLoading: true, aiPending: true, aiErr: "" });
     AIAgent.ask("food", q, ctx)
       .then((r) => {
-        if (r && r.ok && r.text) self.setData({ aiText: r.text, aiSource: r.source || "ai", aiLoading: false, aiErr: "" });
+        if (r && r.ok && r.text) self.setData({ aiText: r.text, aiSource: r.source || "ai", aiLoading: false, aiErr: "", aiPending: false });
         else self._aiFoodOffline(plan);
       })
       .catch(() => { self._aiFoodOffline(plan); });

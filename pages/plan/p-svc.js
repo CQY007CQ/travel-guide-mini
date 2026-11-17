@@ -165,10 +165,15 @@ module.exports = {
    setTimeout(() => { self._aiOffline(q); }, 0);
    return;
   }
-  self.setData({ aiLoading: true, aiErr: "" });
+  // v1.20.16：云端一次回答实测 11.4~12.6s（qwen 生成约 600 字），用户只能对着「AI 思考中…」干等。
+  // 顺序很重要：先调 _aiOffline 把本地规则引擎答案落屏（它是同步的、≤1ms），再置回 loading+pending。
+  // 徽标判定用「aiPending && aiLoading」，因此成功/失败任一分支把 aiLoading 置 false 后徽标自动消隐，
+  // 不需要在每个 catch 里再清一次（少改一处就少一处会漏的地方）。
+  self._aiOffline(q);
+  self.setData({ aiLoading: true, aiPending: true, aiErr: "" });
   AIAgent.ask("plan", q, self._aiCtx())
    .then((r) => {
-    if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiLoading: false, aiSource: r.source || "ai", aiErr: "" });
+    if (r && r.ok && r.text) self.setData({ aiAnswer: r.text, aiLoading: false, aiSource: r.source || "ai", aiErr: "", aiPending: false });
     else self._aiOffline(q);
    })
    .catch(() => { self._aiOffline(q); });

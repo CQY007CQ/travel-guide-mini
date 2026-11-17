@@ -275,6 +275,14 @@ function aiChannelStats() {
   return { enabled: cloudEnabled(), calls: _aiCalls, ok: _aiOk, fail: _aiFail };
 }
 
+// 文本回答的输出上限（调用方未指定时）。
+// 为什么要有这个默认值：云端 llmProxy 的 DEFAULTS.maxTokens 是 1200，而主包/分包的
+// system 协议只要求「总字数 ≤400 字」。问过之后云端从不传 max_tokens → 上限形同摆设，
+// 实测一次回答生成 619 字（远超 400 口径），**生成时间与输出长度成正比**：
+// 现场实测 619 字耗时 11.4s，用户体感就是「点完要等十几秒」。
+// 1000 tokens ≈ 660 汉字，既容得下模型超一点（不中途截断），又比 1200 省约 1/6 生成时间。
+// 调用方可显式覆盖（如意图解析传 300）。
+const AI_TEXT_MAX_TOKENS = 1000;
 // 客户端等待上限必须 > 云端内部等待（llmProxy postJSON 18000ms）：否则模型慢时云端已答完、
 // 客户端已超时回落，白等白花 token 还拿更差的离线答案。取舍见 check-ai-fallback.mjs 时序断言。
 const AI_TEXT_TIMEOUT_MS = 21000;
@@ -296,7 +304,7 @@ function aiChat(opts) {
       context: (typeof opts.context === "string" && opts.context.trim()) ? opts.context.trim() : null,
       model: (typeof opts.model === "string" && opts.model.trim()) ? opts.model.trim() : null,
       temperature: (typeof opts.temperature === "number") ? opts.temperature : null,
-      max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : null
+      max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : AI_TEXT_MAX_TOKENS
     };
     const tmo = (typeof opts.timeoutMs === "number" && opts.timeoutMs > 0) ? opts.timeoutMs : AI_TEXT_TIMEOUT_MS;
     withTimeout(callFunction("llmProxy", payload), tmo).then(function (r) {
