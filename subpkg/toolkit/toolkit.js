@@ -105,10 +105,10 @@ Page(SafePage({
   switch (k) {
    case "brief": {
     const per = T.periodOf(plan), cityT = T.spanCityOf(plan).text;
-    txt = "📅 " + per.label + "\n📍 " + cityT +
-     "\n🏷 " + (T.themeTagsOf(plan).top.join(" / ") || "自由探索") +
-     "\n⚡ " + T.effortTagOf(plan).tag + "（日均 " + T.effortTagOf(plan).avg.toFixed(1) + " 个安排）" +
-     "\n⭐ " + T.tripScoreOf(plan).score + " 分：" + T.tripScoreOf(plan).comment;
+    txt = per.label + "\n" + cityT +
+     "\n" + (T.themeTagsOf(plan).top.join(" / ") || "自由探索") +
+     "\n" + T.effortTagOf(plan).tag + "（日均 " + T.effortTagOf(plan).avg.toFixed(1) + " 个安排）" +
+     "\n" + T.tripScoreOf(plan).score + " 分：" + T.tripScoreOf(plan).comment;
     break;
    }
    case "theme": txt = lines(T.themeTagsOf(plan).top); break;
@@ -132,7 +132,7 @@ Page(SafePage({
    case "photo": {
     const sr = T.sunriseDiList(plan), ss = T.sunsetDiList(plan);
     const one = a => a.map(x => "第" + x.di + "天 " + x.names.slice(0, 2).join("、")).join("\n");
-    txt = (sr.length ? "🌅 日出/早市：\n" + one(sr) : "🌅 无日出早市安排") + "\n" + (ss.length ? "🌇 日落/夜景：\n" + one(ss) : "🌇 无夜景安排");
+    txt = (sr.length ? "日出/早市：\n" + one(sr) : "无日出早市安排") + "\n" + (ss.length ? "日落/夜景：\n" + one(ss) : "无夜景安排");
     break;
    }
    case "risk": txt = lines(T.riskCard(plan, city)); break;
@@ -167,7 +167,7 @@ Page(SafePage({
    case "cost": {
     const c = T.costBreakdown(plan);
     txt = (c.rows.length ? c.rows.map(r => r.cat + " ¥" + r.amount + "（" + r.pct + "%）").join("\n") : "还没有记账")
-      + (c.warns.length ? "\n⚠ " + c.warns.join("\n⚠ ") : "");
+      + (c.warns.length ? "\n" + c.warns.join("\n") : "");
     break;
    }
    case "highlight": {
@@ -211,14 +211,14 @@ Page(SafePage({
     txt = w ? "春：" + w.春 + "\n夏：" + w.夏 + "\n秋：" + w.秋 + "\n冬：" + w.冬 : "暂无气候数据";
     break;
    }
-   case "rain": { const r = T.rainLikely(city); txt = (r.high ? "🌧 " : "") + r.txt; break; }
-   case "typhoon": { const t = T.typhoonHint(city); txt = (t.risk ? "⚠ " : "") + t.txt; break; }
+   case "rain": { const r = T.rainLikely(city); txt = (r.high ? "" : "") + r.txt; break; }
+   case "typhoon": { const t = T.typhoonHint(city); txt = (t.risk ? "" : "") + t.txt; break; }
    case "altitude": {
     const a = T.altitudeRisk(city);
     txt = a.txt + (a.tips ? "\n" + a.tips.map(x => "· " + x).join("\n") : "");
     break;
    }
-   case "sun": { const s = T.sunBlockHint(city); txt = (s.strong ? "☀ " : "") + s.txt; break; }
+   case "sun": { const s = T.sunBlockHint(city); txt = (s.strong ? "" : "") + s.txt; break; }
    case "med": txt = lines(T.medKitList(city).map((x, i) => (i + 1) + ". " + x)); break;
    case "scam": txt = lines(T.scamAlertOf(city).map(x => "· " + x)); break;
    case "taboo": txt = lines(T.localTabooOf(city).map(x => "· " + x)); break;

@@ -9,6 +9,8 @@
   border: 1rpx solid rgba(255, 255, 255, .25);
 }
 .ai-fab:active { opacity: .85; }
+/* FAB 底色是金色渐变、文字是深色，图标必须同色（金色线条压在金色底上会看不见） */
+.ai-fab-ic { width: 28rpx; height: 28rpx; flex: none; margin-right: 6rpx; }
 .ai-fab-t { line-height: 1; white-space: nowrap; }
 
 /* v1.20.7：inline 形态 —— 内嵌胶囊/横条，金色描边，与首页 .head-guide 同语言，不悬浮不压 tabBar */
@@ -23,6 +25,8 @@
   box-shadow: 0 4rpx 14rpx rgba(212,169,78,.18);
 }
 .ai-inline:active { background: rgba(212,169,78,.26); }
-.ai-inline-ic { font-size: calc(28rpx * var(--fs, 1)); line-height: 1; }
+/* inline 胶囊底色是 rgba(226,182,92,.16) 淡金、文字是金棕 #8f6a1f → 图标必须同色系，
+   用金色线条会糊在底上（v1.20.25 截图复核发现） */
+.ai-inline-ic { width: 28rpx; height: 28rpx; flex: none; }
 .ai-inline-t { white-space: nowrap; }
 .ai-inline-ar { margin-left: 2rpx; opacity: .7; font-weight: 900; }

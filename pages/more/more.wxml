@@ -6,7 +6,7 @@
   <!-- v1.20.7：分组折叠总开关 -->
   <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="collapse-all" bindtap="toggleAll">
     <text class="ca-t">{{allCollapsed ? '展开全部' : '收起全部'}}</text>
-    <text class="ca-ch">{{allCollapsed ? '▶' : '▼'}}</text>
+    <view class="ca-ch {{allCollapsed ? 'ca-ch-closed' : ''}}"></view>
   </view>
 
   <!-- 分组菜单（减法：顶部行程卡与底部「今天」tab 重复，已移除；行程身份看下方「旅行小结」） -->
@@ -346,7 +346,7 @@
         </view>
       </view>
       <view class="ach-hd" wx:if="{{ach.hiddenGot}}">
-        <text class="ach-hd-t">🔒 隐藏成就（已解锁 {{ach.hiddenGot}} / {{ach.hiddenTotal}}）</text>
+        <text class="ach-hd-t"><image class="ach-lock" src="/images/icons/lock.png"/>隐藏成就（已解锁 {{ach.hiddenGot}} / {{ach.hiddenTotal}}）</text>
         <text class="ach-hd-sub">达成即自动授予，未达成前不公开</text>
       </view>
       <view class="ach-grid ach-grid-hide" wx:if="{{ach.hiddenGot}}">
@@ -363,7 +363,7 @@
   <!-- v1.20.6：隐藏成就解锁弹窗（自动授予） -->
   <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ach-mask" wx:if="{{achModal.show}}" bindtap="closeAchModal">
     <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ach-pop" catchtap="noop">
-      <view class="ach-pop-h">🎉 解锁新成就</view>
+      <view class="ach-pop-h"><image class="ach-pop-ic" src="/images/icons/sparkle.png"/><text>解锁新成就</text></view>
       <view class="ach-pop-sub" wx:if="{{achModal.more > 0}}">本次共解锁 {{achModal.list.length}} 枚，另有 {{achModal.more}} 枚已记入隐藏成就</view>
       <view class="ach-pop-list">
         <view class="ach-pop-it" wx:for="{{achModal.list}}" wx:key="id">

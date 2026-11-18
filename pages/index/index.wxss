@@ -316,6 +316,9 @@
 
 .ps-head { display: flex; align-items: center; justify-content: space-between; margin: 6rpx 0 18rpx; }
 
+.ps-hl { display: flex; align-items: center; gap: 8rpx; }
+.ps-dice { width: 30rpx; height: 30rpx; flex: none; }
+
 .ps-title { font-size: calc(30rpx * var(--fs, 1)); font-weight: 800; color: var(--t1, #18233a); }
 
 .ps-close { width: 52rpx; height: 52rpx; border-radius: 50%; background: rgba(var(--ln-rgb, 19, 29, 49), .06);

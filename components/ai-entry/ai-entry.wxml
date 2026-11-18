@@ -1,9 +1,9 @@
 <!-- v1.20.7：inline 形态（内嵌胶囊/横条，用于 tabBar 主包页，不压 tabBar）；fab 形态维持分包内容页悬浮入口 -->
 <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" wx:if="{{inline}}" class="ai-inline" bindtap="onTap">
-  <text class="ai-inline-ic">🤖</text>
+  <image class="ai-inline-ic" src="/images/icons/robot-brown.png"/>
   <text class="ai-inline-t">{{label}}</text>
   <text class="ai-inline-ar">›</text>
 </view>
 <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" wx:else class="ai-fab" bindtap="onTap">
-  <text class="ai-fab-t">🤖 {{label}}</text>
+  <image class="ai-fab-ic" src="/images/icons/robot-dark.png"/><text class="ai-fab-t">{{label}}</text>
 </view>

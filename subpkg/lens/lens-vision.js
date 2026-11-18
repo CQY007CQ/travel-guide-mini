@@ -217,7 +217,7 @@ function matchLocalName(name, city) {
   }
   // ① 完全一致
   for (var a = 0; a < uniq.length; a++) if (normalizeName(uniq[a]) === key) return uniq[a];
-  // ② 去掉通用后缀后一致（「故宫博物院」↔「故宫」这类）
+  // ② 去掉通用后缀后一致（「故宫博物院」对应「故宫」这类）
   var keyShort = key.replace(GENERIC_SUFFIX, "");
   if (keyShort && keyShort !== key) {
     for (var b = 0; b < uniq.length; b++) {

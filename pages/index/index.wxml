@@ -407,7 +407,10 @@
   <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" wx:if="{{blindOpen}}" class="mask" bindtap="closeBlind">
     <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="picker-sheet blind-sheet" catchtap="noop">
       <view class="ps-head">
-        <text class="ps-title">🎲 这次去哪儿？随机挑三座</text>
+        <view class="ps-hl">
+          <image class="ps-dice" src="/images/icons/dice.png"/>
+          <text class="ps-title">这次去哪儿？随机挑三座</text>
+        </view>
         <image hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ps-close" src="/images/icons/close.png" bindtap="closeBlind"/>
       </view>
       <view class="blind-note">3 个随机目的地，选一个生成</view>

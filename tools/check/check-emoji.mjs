@@ -1,0 +1,100 @@
+#!/usr/bin/env node
+/**
+ * tools/check/check-emoji.mjs —— 随包 UI 层不得出现 emoji（v1.20.25）
+ *
+ * 为什么有这条门禁：
+ *   emoji 的**字形由系统字体决定**，iOS / Android / 各厂商 ROM 画出来完全不同 ——
+ *   同一个 🤖 在 iPhone 是立体机器人、在部分安卓机上会退化成黑白方块或豆腐块。
+ *   本项目要求「高级感 + 品牌一致」，emoji 混在自绘线性图标中间必然出戏（彩色立体图形
+ *   夹在单色线条里），且一旦系统缺字形就是空白，属于**静默的视觉缺陷**：不报错、不白屏，
+ *   只是难看或消失，靠人眼逐个页面翻才能发现。
+ *
+ *   因此统一改为自绘图标：`images/icons/*.png`，32×32 单色 #DAAE50 线条，
+ *   与既有 54 个图标同一套语言。新增的 9 个（lock / robot / warn / tag / sunrise /
+ *   sunset / medical / coat / robot-dark）由 /tmp/draw_icons.py 那套画法生成：
+ *   4x 超采样（128→32 LANCZOS）抗锯齿、7px 线宽。
+ *
+ *   纯文本输出（AI 回答、复制到剪贴板的行程）里放不了图片，那部分直接去掉 emoji 前缀、
+ *   保留文字（如「🍜 吉安 必吃」→「吉安 必吃」），不用符号代替 —— 半角符号同样依赖字体。
+ *
+ * 白名单只有法务符号：© ® ™。它们有明确法律含义，不是装饰图案，且各平台字形稳定。
+ *
+ * 不新增 allcheck 步数：串在既有「审计整改 + AI 全场景守卫」step 里。
+ */
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const PKG_DIRS = ["pages", "subpkg", "subai", "components"];
+const ROOT_FILES = ["app.js", "app.wxss"];
+const EXT = /\.(wxml|js|wxss|json)$/;
+// 法务符号：保留（不是装饰图案，字形跨平台稳定）
+const ALLOW = new Set(["\u00A9", "\u00AE", "\u2122"]);
+const EMOJI = /\p{Extended_Pictographic}/gu;
+
+function walk(d, out = []) {
+  if (!fs.existsSync(d)) return out;
+  for (const f of fs.readdirSync(d)) {
+    if (f === "node_modules" || f.startsWith(".")) continue;
+    const p = path.join(d, f);
+    const st = fs.statSync(p);
+    if (st.isDirectory()) walk(p, out);
+    else if (EXT.test(p)) out.push(p);
+  }
+  return out;
+}
+
+const files = [];
+for (const d of PKG_DIRS) files.push(...walk(path.join(ROOT, d)));
+for (const f of ROOT_FILES) if (fs.existsSync(path.join(ROOT, f))) files.push(path.join(ROOT, f));
+
+let pass = 0, fail = 0;
+function ok(cond, name, detail) {
+  if (cond) { pass++; console.log("  ✓ " + name); }
+  else { fail++; console.log("  ✗ FAIL: " + name + (detail ? "  → " + detail : "")); }
+}
+
+console.log("【emoji 清零】");
+
+const hits = [];
+let chars = 0;
+for (const f of files) {
+  const src = fs.readFileSync(f, "utf8");
+  chars += src.length;
+  src.split("\n").forEach((line, i) => {
+    for (const m of line.matchAll(EMOJI)) {
+      if (ALLOW.has(m[0])) continue;
+      hits.push(path.relative(ROOT, f) + ":" + (i + 1) + " 「" + m[0] + "」 " + line.trim().slice(0, 60));
+    }
+  });
+}
+
+ok(hits.length === 0, "随包目录（" + files.length + " 个文件）零 emoji 残留",
+  hits.slice(0, 8).join(" / ") + (hits.length > 8 ? " …共 " + hits.length + " 处" : ""));
+
+// 反向护栏：扫描范围塌缩成空集时上一条会假绿（0 个文件 → 0 处 emoji）
+ok(files.length > 100 && chars > 200000, "扫描范围未塌缩（防 0 文件假绿）",
+  files.length + " 个文件 / " + Math.round(chars / 1024) + "KB");
+
+// 自绘图标必须真的在包里：wxml 引用了但文件缺失 → 图片静默不显示
+// 含 {{ }} 的动态拼接路径静态无法判定（如 {{d.riskIcon}}.png），跳过 —— 不假装覆盖，
+// 这与 check-tap-target 对动态 class 的处理口径一致。
+const iconRefs = new Set();
+for (const f of files.filter((x) => x.endsWith(".wxml"))) {
+  for (const m of fs.readFileSync(f, "utf8").matchAll(/src\s*=\s*"(\/images\/icons\/[^"]+)"/g)) {
+    if (m[1].includes("{{")) continue;
+    iconRefs.add(m[1]);
+  }
+}
+const missing = [...iconRefs].filter((r) => !fs.existsSync(path.join(ROOT, r.replace(/^\//, "").split("?")[0])));
+ok(missing.length === 0, "wxml 引用的自绘图标全部存在（" + iconRefs.size + " 个引用）", missing.join(" / "));
+
+console.log("");
+if (fail === 0) {
+  console.log("emoji 门禁通过：" + pass + " 项（emoji 清零 · 图标引用完整 · 扫描范围有效）");
+  process.exit(0);
+}
+console.log("emoji 门禁失败：" + fail + " 项 / 共 " + (pass + fail) + " 项");
+console.log("提示：界面图标改用 images/icons/*.png 自绘图标；纯文本输出去掉 emoji 前缀、保留文字。");
+process.exit(1);

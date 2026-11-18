@@ -65,7 +65,7 @@
       <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="btn" bindtap="search">查</view>
     </view>
     <view class="mode-tip" wx:if="{{mode === 'spot'}}">
-      <text>📍 查景点模式：输入任意景点名，查看介绍 / 怎么玩 / 怎么去 / 门票 / 预约提示（纯本地）</text>
+      <image class="mt-ic" src="/images/icons/pin.png"/><text>查景点模式：输入任意景点名，查看介绍 / 怎么玩 / 怎么去 / 门票 / 预约提示（纯本地）</text>
       <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="mode-exit" bindtap="exitSpot">退出</view>
     </view>
     <view class="pspots" wx:if="{{mode === 'spot' && planSpots.length}}">
