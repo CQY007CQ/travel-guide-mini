@@ -47,7 +47,7 @@
     <view class="rs-stat">{{stat}}</view>
     <view class="rs-card" wx:for="{{results}}" wx:for-item="rs" wx:key="name">
       <view class="rs-cover" style="background:{{rs.coverBg}}">
-        <text class="rs-cover-glyph">{{rs.coverGlyph}}</text>
+        <image class="rs-cover-glyph" src="/images/icons/{{rs.coverIcon}}.png"/>
         <view class="rs-cover-badge" wx:if="{{rs.coverBadge}}">{{rs.coverBadge}}</view>
       </view>
       <view class="rs-body">

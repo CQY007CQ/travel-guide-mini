@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.26";
+const APP_VER = "1.20.27";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -708,10 +708,13 @@ function spotTagOf(name, cityName) {
 // 给「没有真实照片」的景点一张确定性封面：按 城市|名称 哈希得到稳定渐变 + 类别图标 + 景点名；
 // 用户真实照（it.img，本地相册）优先级最高。这是诚实的「示意图」占位，不是假照片 ——
 // 渲染层必须标注「示意图」，不得伪装成实拍。
-const COVER_GLYPH = {
-  "历史古迹": "🏯", "博物馆": "🏛️", "宗教": "⛩️", "古镇": "🏘️",
-  "自然风光": "🏞️", "亲子": "🧸", "乐园": "🎡", "美食": "🍜",
-  "海滨": "🏖️", "徒步": "🥾", "其他": "📍"
+// v1.20.27：这里原本是 emoji（🏯🏛️🏘️🏞️🧸🎡…）。emoji 字形由系统字体决定（安卓可能变方块），
+// 且彩色立体 emoji 与旁边的单色线条图标打架 —— 与 v1.20.25 界面去 emoji 的结论一致。
+// 改为 images/icons/ 下的自绘单色线条图标（白色，配按城市哈希出来的彩色渐变封面）。
+const COVER_ICON = {
+  "历史古迹": "pagoda", "博物馆": "museum", "宗教": "temple", "古镇": "town",
+  "自然风光": "mountain", "亲子": "people", "乐园": "ferris", "美食": "food",
+  "海滨": "umbrella", "徒步": "foot", "其他": "pin"
 };
 function hslHex(h, s, l) {
   s /= 100; l /= 100;
@@ -727,11 +730,11 @@ function spotCover(city, name, img) {
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
   const hue = h % 360, hue2 = (hue + 34) % 360;
   const bg = 'linear-gradient(135deg,' + hslHex(hue, 56, 62) + ',' + hslHex(hue2, 64, 44) + ')';
-  let glyph = '🏞️';
-  if (typeof isFrameName === 'function' && isFrameName(nm)) glyph = '🍜';
-  else if (/酒店|民宿|客栈|住宿|青旅|宾馆|旅舍|度假村/.test(nm)) glyph = '🏨';
-  else if (/站|机场|码头|汽车|高铁|港口|枢纽|地铁|轻轨/.test(nm)) glyph = '🚌';
-  else { const tg = spotTagOf(nm, city); const cat = (tg && tg[0]) ? tg[0] : '其他'; glyph = COVER_GLYPH[cat] || '🏞️'; }
+  let icon = 'mountain';
+  if (typeof isFrameName === 'function' && isFrameName(nm)) icon = 'food';
+  else if (/酒店|民宿|客栈|住宿|青旅|宾馆|旅舍|度假村/.test(nm)) icon = 'home';
+  else if (/站|机场|码头|汽车|高铁|港口|枢纽|地铁|轻轨/.test(nm)) icon = 'bus';
+  else { const tg = spotTagOf(nm, city); const cat = (tg && tg[0]) ? tg[0] : '其他'; icon = COVER_ICON[cat] || 'mountain'; }
   let cat = '其他';
   try { const tg = spotTagOf(nm, city); cat = (tg && tg[0]) ? tg[0] : '其他'; } catch (e) {}
   // 真实照片：优先数据自带的 img，其次查 CC 图映射（cloud:// fileID）。映射默认关闭 → 行为零变化。
@@ -744,7 +747,7 @@ function spotCover(city, name, img) {
   const isReal = !!effectiveImg;
   return {
     bg: bg,
-    glyph: glyph,
+    icon: icon,
     cat: cat,
     label: (typeof cleanSpotName === 'function') ? (cleanSpotName(nm) || nm) : nm,
     img: effectiveImg,
@@ -3946,7 +3949,7 @@ function ticketRemind(plan) {
  need.sort((a, b) => (a.left < 0 ? 1 : b.left < 0 ? -1 : a.left - b.left));
  const top = need[0];
  return { n: need.length, top: top, txt: top.hasDate
-  ? (top.left > 7 ? "还有 " + top.left + " 天：" + top.name + " 记得预约" : top.left >= 0 ? "⚠️ " + top.name + (top.left === 0 ? " 今天就该约了" : " " + top.left + " 天后开放预约") : top.name + " 预约日期已过，看看是否补约")
+  ? (top.left > 7 ? "还有 " + top.left + " 天：" + top.name + " 记得预约" : top.left >= 0 ? "注意：" + top.name + (top.left === 0 ? " 今天就该约了" : " " + top.left + " 天后开放预约") : top.name + " 预约日期已过，看看是否补约")
   : top.name + " 需要提前预约" + (top.where ? "（" + top.where + "）" : "") + "，记得订票" };
 }
 

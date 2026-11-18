@@ -369,7 +369,7 @@
             <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" wx:if="{{it.img && it.photoCredit}}" class="tl-credit" catchtap="onPhotoCredit"
                   data-credit="{{it.photoCredit}}" data-license="{{it.photoLicense}}">©</view>
             <view wx:else class="tl-thumb gen" style="background:{{it.thumbBg}}">
-              <text class="tl-thumb-emoji">{{it.thumbEmoji}}</text>
+              <image class="tl-thumb-glyph" src="/images/icons/{{it.thumbIcon}}.png"/>
               <view class="tl-thumb-name">{{it.coverLabel}}</view>
               <view class="tl-thumb-badge" wx:if="{{it.coverBadge}}">{{it.coverBadge}}</view>
             </view>
@@ -397,6 +397,9 @@
               <view class="sd-tags" wx:if="{{detailTags.length}}">
                 <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="sd-tag" wx:for="{{detailTags}}" wx:key="*this" data-di="{{di}}" data-ix="{{it.ix}}" data-tag="{{item}}" catchtap="onTagSwap">{{item}} · 换同类</text>
               </view>
+              <!-- v1.20.27：缩略图角上那颗 30rpx 的 © 太小、点不中（它压在图片上，扩热区会抢走整行的展开点击）。
+                   这里给一份等价的、能读全的来源与许可，点不中徽标也能看到署名。 -->
+              <view class="sd-credit" wx:if="{{it.img && it.photoCredit}}">图片来源：{{it.photoCredit}} · 许可 {{it.photoLicense || 'CC'}} · Wikimedia Commons</view>
               <view class="sd-timing" wx:if="{{timing}}">
                 <image class="ic ic-sm" src="/images/icons/clock.png"/>
                 <text class="sd-tm-b">最佳 {{timing.best}}</text>

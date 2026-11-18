@@ -628,7 +628,7 @@
   /* ① 旅途应急：急症第一句必须拨 120；具名医院只从离线库取，绝不编造 */
   function sceneEmergency(text, ctx, place) {
     var E = getE();
-    var lines = ["🚑 <b>旅途应急</b>",
+    var lines = ["<b>旅途应急</b>",
       "如遇急症、意识不清、呼吸困难或大出血，请<b>立即拨打 120</b> 并就地呼救。以下仅为分诊指引，不替代医生诊断。"];
     var tr = [];
     try { if (E && typeof E.triage === "function") tr = E.triage(text) || []; } catch (e) {}
@@ -675,7 +675,7 @@
       };
     }
     var tagged = res.prefs && res.prefs.tags && res.prefs.tags.length;
-    var lines = ["🌟 <b>离线推荐</b>" + (tagged ? "（已按你说的偏好加权）" : "") + "："];
+    var lines = ["<b>离线推荐</b>" + (tagged ? "（已按你说的偏好加权）" : "") + "："];
     res.list.slice(0, 5).forEach(function (x, i) {
       lines.push("<div class='ai-row'>" + (i + 1) + ". " + escapeHtml((x && x.name) || "") +
         ((x && x.province) ? "（" + escapeHtml(x.province) + "）" : "") + " · " +
@@ -716,7 +716,7 @@
         }
       }
     } catch (e) {}
-    var lines = ["📓 <b>行程复盘 · " + escapeHtml(plan.cityName || "") + " " + plan.days.length + " 天</b>"];
+    var lines = ["<b>行程复盘 · " + escapeHtml(plan.cityName || "") + " " + plan.days.length + " 天</b>"];
     if (spots.length) lines.push("<div class='ai-row'>去过的点：" + escapeHtml(spots.slice(0, 12).join("、")) + (spots.length > 12 ? " 等" : "") + "</div>");
     if (notes.length) {
       var last = notes[notes.length - 1] || {};
@@ -826,7 +826,7 @@
     // ④ 问候 / 帮助：带当前页面上下文
     if (intent === "greeting")
       return {
-        html: "你好～我是旅行攻略生成器的内置助手 🧭\n我现在在 <b>" + escapeHtml(ctx.title) +
+        html: "你好～我是旅行攻略生成器的内置助手。\n我现在在 <b>" + escapeHtml(ctx.title) +
           "</b> 页，能读到你当前的行程、账本、行李清单和足迹（都在本机，不上传）。\n" + siteSummary(ctx) +
           "\n可以问「成都吃什么」「行程体检」「今天花了多少」，也能说「帮我生成成都 3 天行程」。",
         actions: pageActions(ctx, "general"),
@@ -882,7 +882,7 @@
       }
       if (intent === "attraction") {
         var lh = landmarkHtml(city);
-        if (lh) return { html: lh + "\n\n想排进行程、看顺路度和导航，点下面直达 👇", actions: pageActions(ctx, "attraction") };
+        if (lh) return { html: lh + "\n\n想排进行程、看顺路度和导航，点下面直达。", actions: pageActions(ctx, "attraction") };
         return {
           html: "<b>" + escapeHtml(city) + "</b> 的地标还在补全，可以先生成一份行程，会自动挑出当天顺路的景点～",
           actions: [actPlan(city), act("subpkg/spotsearch/spotsearch", "按标签找景点 →")],
@@ -1004,7 +1004,7 @@
       };
     }
     return {
-      html: "我是旅行攻略生成器的内置助手 🧭 当前在 <b>" + escapeHtml(ctx.title) + "</b> 页。\n" +
+      html: "我是旅行攻略生成器的内置助手，当前在 <b>" + escapeHtml(ctx.title) + "</b> 页。\n" +
         "试试「成都吃什么」「帮我生成杭州 3 天行程」「行程体检」，或点下面的快捷提问～",
       actions: pageActions(ctx, "general"),
     };
@@ -1085,6 +1085,67 @@
   function cloudAIEnabled() {
     try { var c = getCloud(); return !!(c && typeof c.cloudEnabled === "function" && c.cloudEnabled()); } catch (e) { return false; }
   }
+  /* ── v1.20.27：网页端答案缓存 ──
+   * 小程序端 utils/ai-agent.js 早就有（v1.20.24），网页端一直缺：同一句话 10 分钟内
+   * 再问一次（等不及先刷新回来、或反复确认同一件事）仍要重等 8~12 秒，等于白白烧一趟 token。
+   * 命中条件是「三条全等」：场景（由问题唯一推导，故并入问题项）+ 问题归一化串 + **上下文整串**。
+   * 只比问题会把吉安的答案给北京 —— 城市与行程就在上下文里，必须整串参与比较。
+   * 实时类问题（天气/票价/人流…）既不读也不写：10 分钟内吐出过期的「实时」信息比慢更糟。
+   * 只存内存、不落盘（刷新即失效）；容量 LRU 40 条。 */
+  var _aiCache = Object.create(null);        // key(归一化问题) -> { ctx, text, ts, used }
+  var AI_CACHE_TTL = 10 * 60 * 1000;
+  var AI_CACHE_MAX = 40;
+  // 保守判据：沾一点「答案会随时间变」的边就不缓存（宁可多问一次）
+  var AI_CACHE_LIVE = /(天气|气温|温度|下雨|雨|雪|风|空气|雾霾|实时|现在|今天|明天|后天|人流|排队|拥挤|开门|营业|闭馆|票价|余票|堵车|路况|航班|延误)/;
+  /* 归一化只裁空白与标点、英文转小写，**不动数字**（「3 天」「2 人」是语义的一部分）。
+   * 归一化后为空（用户只发了一串标点）则回退原串，避免所有纯标点问题撞同一条缓存。 */
+  function _normQ(q) {
+    var raw = String(q == null ? "" : q);
+    var n = raw
+      .replace(/[\s\u3000]+/g, "")
+      .replace(/[。，、；：？！…—－·「」『』（）《》〈〉“”‘’"'?!.,;:()\[\]{}<>~`@#$%^&*_+=|\\\/\-]+/g, "")
+      .toLowerCase();
+    return n || raw.trim();
+  }
+  /** 上下文整串：与 callLLM 送给模型的「本机上下文」**同一份口径**（同一函数产出），
+   *  这样「缓存命中」严格等价于「模型看到的东西没变」。换城市/换行程/改天数都会变串。 */
+  function aiCtxKey(ctx) {
+    if (ctx && ctx.plan) {
+      try {
+        var C = getCloud();
+        if (C && typeof C.aiContextOf === "function")
+          return C.aiContextOf(ctx.plan, (ctx.title || "") + "（" + (ctx.path || "") + "）");
+      } catch (e) {}
+      // cloud 模块不可用时退化为自拼：口径保守，宁可不命中也不串城
+      var pd = (ctx.plan.days || []).length;
+      return "当前页面：" + (ctx.title || "") + "（" + (ctx.path || "") + "）· 行程 " +
+        (ctx.plan.cityName || "") + pd + " 天";
+    }
+    return "当前页面：" + ((ctx && ctx.title) || "未知") + "（旅行攻略生成器网页版）。";
+  }
+  function _cacheGet(q, ctxStr) {
+    var k = _normQ(q), e = _aiCache[k];
+    if (!e) return null;
+    if (Date.now() - e.ts > AI_CACHE_TTL) { delete _aiCache[k]; return null; }
+    if (String(e.ctx) !== String(ctxStr || "")) return null;   // 换城市 / 换行程 → 不命中
+    e.used = Date.now();
+    return e.text;
+  }
+  function _cachePut(q, ctxStr, text) {
+    if (!text || typeof text !== "string") return;
+    var k = _normQ(q);
+    _aiCache[k] = { ctx: String(ctxStr || ""), text: text, ts: Date.now(), used: Date.now() };
+    var keys = Object.keys(_aiCache);
+    if (keys.length <= AI_CACHE_MAX) return;
+    var oldest = keys[0];
+    for (var i = 1; i < keys.length; i++)
+      if ((_aiCache[keys[i]].used || 0) < (_aiCache[oldest].used || 0)) oldest = keys[i];
+    delete _aiCache[oldest];
+  }
+  // 清空会话必须连带清缓存：否则用户以为「清空了」，再问同一句却立刻弹回旧答案
+  function _cacheClear() { Object.keys(_aiCache).forEach(function (k) { delete _aiCache[k]; }); }
+  function _cacheStats() { return { size: Object.keys(_aiCache).length, ttl: AI_CACHE_TTL, max: AI_CACHE_MAX }; }
+
   /** 用户自有 Key 直连（可选，默认关）；仅在云端网关不可用或失败时作为兜底。 */
   function callLLMDirect(history, ctx, onDone, onErr) {
     var c = llmCfg();
@@ -1133,9 +1194,8 @@
   function callLLM(history, ctx, onDone, onErr) {
     if (cloudAIEnabled()) {
       var Cloud = getCloud();
-      var ctxStr = (ctx && ctx.plan)
-        ? Cloud.aiContextOf(ctx.plan, (ctx.title || "") + "（" + (ctx.path || "") + "）")
-        : "当前页面：" + ((ctx && ctx.title) || "未知") + "（旅行攻略生成器网页版）。";
+      // 与答案缓存用同一个 aiCtxKey：模型看到的上下文与缓存键必须同源，否则会命中错城
+      var ctxStr = aiCtxKey(ctx);
       var msgs = (history || []).map(function (m) { return { role: m.user ? "user" : "assistant", content: m.text }; });
       Cloud.aiChat({ messages: msgs, context: ctxStr,
         system: WEB_MASTER + "\n\n" + sceneSystemOf(lastQuestion(history)) }).then(function (r) {
@@ -1156,7 +1216,7 @@
     return e;
   }
   function buildUI() {
-    var fab = el("button", "ai-fab", "🧭");
+    var fab = el("button", "ai-fab", "<img class=\"ai-fab-ic\" src=\"images/icons/compass.png\" alt=\"\"/>");
     fab.setAttribute("aria-label", "打开 AI 助手");
     fab.id = "aiFab";
     fab.appendChild(el("span", "ai-fab-dot"));
@@ -1168,11 +1228,11 @@
     panel.id = "aiPanel";
     panel.innerHTML =
       "<div class='ai-head'>" +
-        "<div class='ai-avatar'>🧭</div>" +
+        "<div class='ai-avatar'><img class=\"ai-av-ic\" src=\"images/icons/compass.png\" alt=\"\"/></div>" +
         "<div style='flex:1'><div class='ai-title'>旅行 AI 助手</div>" +
         "<div class='ai-sub' id='aiCtx'>离线知识库 · 内置</div></div>" +
         "<button class='ai-clear' id='aiClear' title='清空对话与上下文'>清空</button>" +
-        "<button class='ai-gear' id='aiGear' title='设置'>⚙</button>" +
+        "<button class='ai-gear' id='aiGear' title='设置' aria-label='设置'><img class=\"ai-gear-ic\" src=\"images/icons/gear.png\" alt=\"\"/></button>" +
         "<button class='ai-x' id='aiClose' title='关闭'>×</button>" +
       "</div>" +
       "<div class='ai-msgs' id='aiMsgs'></div>" +
@@ -1244,7 +1304,7 @@
         nc.enabled = false;
       }
       llmSave(nc);
-      pushBot(nc.enabled && nc.apiKey && nc.baseURL ? "已启用大模型接入 ✅ 现在可以像聊天一样自由对话。" : "已保存。未填 Key 或取消勾选时，仍使用内置离线助手。");
+      pushBot(nc.enabled && nc.apiKey && nc.baseURL ? "已启用大模型接入，现在可以像聊天一样自由对话。" : "已保存。未填 Key 或取消勾选时，仍使用内置离线助手。");
       dom.settings.classList.remove("show");
     });
 
@@ -1313,6 +1373,7 @@
   function clearConversation() {
     history = [];
     lastCity = null; lastIntent = null; lastPlan = null; lastSpots = []; lastShops = [];
+    _cacheClear();   // 答案缓存同理：否则「清空」后同一句立刻弹回旧答案，等于没清
     try { localStorage.removeItem(MEM_KEY); } catch (e) {}   // 落盘的记忆也要一起清，避免刷新后又"串城"
     dom.msgs.innerHTML = "";
     dom._welcomed = true;
@@ -1336,7 +1397,7 @@
       dom._welcomed = true;
       whenReady(function () {
         var ctx = context();
-        pushBot("你好，我是旅行攻略生成器的内置助手 🧭 现在在 <b>" + escapeHtml(ctx.title) +
+        pushBot("你好，我是旅行攻略生成器的内置助手，现在在 <b>" + escapeHtml(ctx.title) +
           "</b> 页。\n" + siteSummary(ctx) +
           "\n我能查离线美食/景点、读你的账本与行程状态，也能直接生成行程并带你过去。");
       });
@@ -1416,16 +1477,34 @@
     return sendQueued(v);
   }
   function sendQueued(v) {
-    var ctx = context(), p = new Promise(function (resolve) {
+    var ctx = context();
+    var online = cloudAIEnabled() || llmEnabled();
+    // 只有走大模型才需要上下文整串（离线回答不缓存、也不算这份开销）
+    var ctxStr = online ? aiCtxKey(ctx) : null;
+    var p = new Promise(function (resolve) {
+      // 答案缓存：同一页面/行程上下文 + 同一句话，10 分钟内直接复现（0ms、零 token）
+      if (online && !AI_CACHE_LIVE.test(v)) {
+        var hit = _cacheGet(v, ctxStr);
+        if (hit) {
+          pushUser(v);
+          // 命中也要落屏并写回 history：否则下一问缺这一轮，用户问「那还有别的吗」会失去指代
+          pushBot(escapeHtml(hit).replace(/\n/g, "<br/>"));
+          resolve();
+          return;
+        }
+      }
       pushUser(v);
-      if (cloudAIEnabled() || llmEnabled()) {
+      if (online) {
         pushTyping();
         callLLM(history, ctx, function (txt) {
-          clearTyping(); pushBot(escapeHtml(txt).replace(/\n/g, "<br/>")); resolve();
+          clearTyping(); pushBot(escapeHtml(txt).replace(/\n/g, "<br/>"));
+          // 实时类问题不写缓存（下次仍要走网关拿最新答案）
+          if (!AI_CACHE_LIVE.test(v)) _cachePut(v, ctxStr, txt);
+          resolve();
         }, function (err) {
           clearTyping();
           // err=null 表示可选直连未配置/已失效，静默回落即可，不再弹技术警告刷屏
-          if (err) pushBot("⚠️ " + escapeHtml(err) + "\n已回退到内置离线助手：");
+          if (err) pushBot("<img class=\"ai-inline-ic\" src=\"images/icons/warn.png\" alt=\"\"/> " + escapeHtml(err) + "\n已回退到内置离线助手：");
           var r = replyAndRemember(v, ctx); pushBot(r.html, r.actions); applyAuto(r); resolve();
         });
         return;
@@ -1452,7 +1531,8 @@
 
   /* ───────── 10. 对外 API + 启动 ───────── */
   APP.__webAI = {
-    ask: function (text) { openPanel(); dom.input.value = String(text || ""); send(); },
+    // 返回这一趟的 Promise：外壳与冒烟脚本要能等到真正落屏（缓存命中也是 Promise）
+    ask: function (text) { openPanel(); dom.input.value = String(text || ""); return send(); },
     // reply 只算不渲染：网页其它模块（以及 tools/web/smoke.mjs）可直接复用同一套离线问答
     reply: function (text, ctx) { return replyAndRemember(text, ctx || context()); },
     go: goTo,
@@ -1461,6 +1541,9 @@
     open: openPanel,
     close: closePanel,
     reset: clearConversation,
+    // 只读出口（测试/门禁断言用，不参与业务）：答案缓存规模与容量
+    cacheStats: _cacheStats,
+    cacheClear: _cacheClear,
     // 只读的多轮上下文快照，便于外壳/测试确认 AI 记住了什么
     state: function () {
       return {

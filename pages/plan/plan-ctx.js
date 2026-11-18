@@ -42,7 +42,7 @@ function thumbFor(name, img, city) {
   const cv = T.spotCover(city || "", name, img);
   return {
     thumbBg: cv.bg,
-    thumbEmoji: cv.glyph,
+    thumbIcon: cv.icon,
     img: cv.img || "",            // 数据自带真图 / CC 图映射的 cloud:// fileID
     photoCredit: cv.photoCredit || "",
     photoLicense: cv.photoLicense || "",

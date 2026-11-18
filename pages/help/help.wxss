@@ -119,6 +119,7 @@
   color: var(--tx, #18233a);
 }
 .er-go {
+  position: relative;
   margin-top: 16rpx;
   height: 76rpx;
   border-radius: 16rpx;
@@ -131,6 +132,9 @@
   font-size: calc(25rpx * var(--fs, 1));
   font-weight: 800;
 }
+/* 触达热区 76→88rpx（可见尺寸一个 rpx 不动，纯透明伪元素外扩）：
+   上方是 .er-input（间距 16rpx），下方是卡片内边距，上下各 6rpx 都落在空白里 */
+.er-go::after { content: ""; position: absolute; left: 0; right: 0; top: -6rpx; height: 88rpx; }
 .er-go:active { background: rgba(212, 169, 78, .3); }
 
 /* ── 科室结果 ── */
@@ -223,6 +227,7 @@
 
 /* ── 降级态：地图搜索按钮（不列具名医院，给可执行动作） ── */
 .er-mapbtn {
+  position: relative;
   margin-top: 20rpx;
   height: 84rpx;
   line-height: 84rpx;
@@ -235,6 +240,8 @@
   border: 1rpx solid var(--gold-line, rgba(201, 162, 74, .42));
 }
 .er-mapbtn:active { opacity: .86; }
+/* 触达热区 84→88rpx（视觉零变化）：上方 20rpx 间距、下方 .er-pick 自带 18rpx margin-top，各扩 2rpx */
+.er-mapbtn::after { content: ""; position: absolute; left: 0; right: 0; top: -2rpx; height: 88rpx; }
 
 /* ── 城市选择弹层 ── */
 .pk-mask {

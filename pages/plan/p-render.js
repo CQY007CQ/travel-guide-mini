@@ -50,7 +50,7 @@ module.exports = {
     effortTx: ["轻走", "徒步", "费腿"][T.P.spotEffort ? T.P.spotEffort(it.name) : 0] || "轻走",
     hour: T.P.spotHours ? T.P.spotHours(it.name) || "" : "",
     // v1.20.8：缩略图（生成配图 / 真实照片字段透传）
-    thumbBg: _th.thumbBg, thumbEmoji: _th.thumbEmoji, img: _th.img, coverLabel: _th.coverLabel, coverBadge: _th.coverBadge, coverCat: _th.coverCat
+    thumbBg: _th.thumbBg, thumbIcon: _th.thumbIcon, img: _th.img, coverLabel: _th.coverLabel, coverBadge: _th.coverBadge, coverCat: _th.coverCat
    };
   })
   }));

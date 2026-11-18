@@ -64,7 +64,7 @@
 .tl-thumb-wrap { width: 96rpx; height: 96rpx; margin-right: 16rpx; flex-shrink: 0; border-radius: 14rpx; overflow: hidden; box-shadow: 0 2rpx 8rpx rgba(20,30,50,.16); background: #e8eef7; }
 .tl-thumb { width: 96rpx; height: 96rpx; display: block; }
 .tl-thumb.gen { display: flex; align-items: center; justify-content: center; position: relative; }
-.tl-thumb-emoji { font-size: 48rpx; line-height: 1; filter: drop-shadow(0 1rpx 2rpx rgba(0,0,0,.25)); }
+.tl-thumb-glyph { width: 48rpx; height: 48rpx; filter: drop-shadow(0 1rpx 2rpx rgba(0,0,0,.28)); }
 .tl-thumb-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 4rpx 6rpx; font-size: 18rpx; line-height: 1.2; color: #fff; text-align: center; background: linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0)); text-shadow: 0 1rpx 2rpx rgba(0,0,0,.4); }
 .tl-thumb-badge { position: absolute; top: 4rpx; right: 4rpx; padding: 2rpx 8rpx; font-size: 16rpx; line-height: 1; color: #fff; background: rgba(0,0,0,.42); border-radius: 999rpx; }
 
@@ -127,12 +127,17 @@
 .sd-how-tx { flex: 1; font-size: calc(21rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); line-height: 1.6; }
 
 /* 行尾操作组（竖排轻量钮） */
-.tl-ops { display: flex; flex-direction: column; gap: 6rpx; margin-left: 14rpx; flex-shrink: 0; align-items: center; padding-top: 2rpx; }
+/* v1.20.27：行尾操作列 gap 6→16rpx、拖动把手 56→44rpx（与三颗按钮同高，视觉更齐）。
+   这样按钮中心间距正好 60rpx，60rpx 的热区彼此「相接但不重叠」——既点得中，
+   又不会把「移除」误触给相邻那颗。整列高度 224rpx，比原来的 206rpx 只高 18rpx。 */
+.tl-ops { display: flex; flex-direction: column; gap: 16rpx; margin-left: 14rpx; flex-shrink: 0; align-items: center; padding-top: 2rpx; }
 
-.op { font-size: calc(22rpx * var(--fs, 1)); width: 44rpx; height: 44rpx; display: flex; align-items: center; justify-content: center;
+.op { position: relative; font-size: calc(22rpx * var(--fs, 1)); width: 44rpx; height: 44rpx; display: flex; align-items: center; justify-content: center;
   background: rgba(var(--ln-rgb, 148,163,184),.04); border-radius: 12rpx; color: var(--t3, #8fa3bc); }
 
 .op:active { background: rgba(212,169,78,.18); color: var(--chip-tx, #d4a94e); }
+/* 触达热区 44→60rpx（视觉零变化）。靠 .tl-ops 的 16rpx gap 让相邻热区恰好相接不重叠。 */
+.op::after { content: ""; position: absolute; left: -8rpx; top: -8rpx; width: 60rpx; height: 60rpx; }
 
 .op.del { color: var(--t4, #5b6b82); }
 
@@ -443,7 +448,7 @@
 .op-ic { width: 26rpx; height: 26rpx; }
 
 /* ═══ v1.19.77 · 拖动排序手柄 + 拖动态 ═══ */
-.op.grip { flex-direction: row; align-items: center; justify-content: center; gap: 0; height: 56rpx; background: transparent; }
+.op.grip { flex-direction: row; align-items: center; justify-content: center; gap: 0; height: 44rpx; background: transparent; }
 .grip-col { display: flex; flex-direction: column; gap: 4rpx; }
 .grip-col + .grip-col { margin-left: 5rpx; }
 .gd { width: 5rpx; height: 5rpx; border-radius: 50%; background: currentColor; opacity: .8; }
@@ -674,6 +679,9 @@
 .rt-tip { font-size: calc(19rpx * var(--fs, 1)); margin-top: 4rpx; }
 
 /* ===== v1.7 · 详情：最佳时段 ===== */
+/* v1.20.27：展开面板里的图片来源（缩略图那颗 30rpx 的 © 点不中时的等价入口，纯文本不可点） */
+.sd-credit { margin-top: 10rpx; font-size: calc(19rpx * var(--fs, 1)); line-height: 1.45; color: var(--t4, #7d92ab); word-break: break-all; }
+
 .sd-timing {
   display: flex; align-items: center; gap: 12rpx;
   margin: 4rpx 0 8rpx;

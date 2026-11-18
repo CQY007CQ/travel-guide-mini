@@ -19,6 +19,14 @@
  *
  * 白名单只有法务符号：© ® ™。它们有明确法律含义，不是装饰图案，且各平台字形稳定。
  *
+ * v1.20.27 补漏：首版只扫 `pages/subpkg/subai/components` 四个包，于是
+ *   · `utils/travel.js` 封面占位用的 COVER_GLYPH（🏯🏛🏘🏞🧸🎡…）漏了 —— 它**真的会渲染**
+ *     进行程页封面（`.tl-thumb-emoji`），21 页检查却全绿；
+ *   · `utils/ai-intent.js` 的 3 处回答前缀漏了；
+ *   · 整个 `web/` 版（公开演示链接）漏了，FAB 还是 🧭。
+ * 这正是「扫描范围塌缩 → 假绿」的典型：门禁绿不代表覆盖全。现在把 utils/ 与 web/ 一起扫，
+ * 并断言扫描文件数下限（低于下限视为范围又缩了）。
+ *
  * 不新增 allcheck 步数：串在既有「审计整改 + AI 全场景守卫」step 里。
  */
 import fs from "fs";
@@ -26,7 +34,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const PKG_DIRS = ["pages", "subpkg", "subai", "components"];
+// utils/ 也随包发布，且是 AI 回答、封面图标的来源 —— 必须一起扫（v1.20.27 补漏）
+const PKG_DIRS = ["pages", "subpkg", "subai", "components", "utils"];
+// web/ 是公开演示链接，与小程序同源同 UI。排除构建产物（由源文件保证干净）：
+//   web/lib/modules.js 由 tools/web/build.mjs 从上面这些源文件生成；
+//   web/index.html 是壳模板产物。
+const WEB_SKIP = [/^web\/lib\/modules\.js$/, /^web\/index\.html$/];
 const ROOT_FILES = ["app.js", "app.wxss"];
 const EXT = /\.(wxml|js|wxss|json)$/;
 // 法务符号：保留（不是装饰图案，字形跨平台稳定）
@@ -48,6 +61,12 @@ function walk(d, out = []) {
 const files = [];
 for (const d of PKG_DIRS) files.push(...walk(path.join(ROOT, d)));
 for (const f of ROOT_FILES) if (fs.existsSync(path.join(ROOT, f))) files.push(path.join(ROOT, f));
+for (const f of walk(path.join(ROOT, "web"))) {
+  if (!/\.(js|css|html)$/.test(f)) continue;
+  const rel = path.relative(ROOT, f).split(path.sep).join("/");
+  if (WEB_SKIP.some((re) => re.test(rel))) continue;
+  files.push(f);
+}
 
 let pass = 0, fail = 0;
 function ok(cond, name, detail) {
@@ -70,12 +89,17 @@ for (const f of files) {
   });
 }
 
-ok(hits.length === 0, "随包目录（" + files.length + " 个文件）零 emoji 残留",
+ok(hits.length === 0, "随包 + 网页版（" + files.length + " 个文件）零 emoji 残留",
   hits.slice(0, 8).join(" / ") + (hits.length > 8 ? " …共 " + hits.length + " 处" : ""));
 
 // 反向护栏：扫描范围塌缩成空集时上一条会假绿（0 个文件 → 0 处 emoji）
-ok(files.length > 100 && chars > 200000, "扫描范围未塌缩（防 0 文件假绿）",
+ok(files.length > 150 && chars > 400000, "扫描范围未塌缩（防 0 文件假绿）",
   files.length + " 个文件 / " + Math.round(chars / 1024) + "KB");
+// 分区断言：utils/ 与 web/ 必须真的被扫到（任一为空集就说明白名单被改窄了）
+const hasUtils = files.some((f) => path.relative(ROOT, f).startsWith("utils" + path.sep));
+const hasWeb = files.some((f) => path.relative(ROOT, f).startsWith("web" + path.sep));
+ok(hasUtils && hasWeb, "utils/ 与 web/ 都在扫描范围内（这两处曾漏扫导致假绿）",
+  "utils=" + hasUtils + " web=" + hasWeb);
 
 // 自绘图标必须真的在包里：wxml 引用了但文件缺失 → 图片静默不显示
 // 含 {{ }} 的动态拼接路径静态无法判定（如 {{d.riskIcon}}.png），跳过 —— 不假装覆盖，

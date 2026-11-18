@@ -120,7 +120,7 @@ function handlePhoto(city) {
       intent: "photo"
     };
   }
-  const lines = ["📷 " + city + " 适合出片 / 拍照的地方（离线库整理）："];
+  const lines = [city + " 适合出片 / 拍照的地方（离线库整理）："];
   arr.slice(0, 6).forEach(s => {
     const name = (s && typeof s === "string") ? s : (s && s.name) || "";
     const tip = (s && typeof s === "object" && (s.tip || s.desc)) || "";
@@ -135,7 +135,7 @@ function handleNear(city) {
   if (!arr.length) {
     return { text: "「" + city + "」附近暂无可推荐城市。", actions: [act("pages/plan/plan", "去生成行程 →", {}, "tab")], intent: "near" };
   }
-  const lines = ["🧭 " + city + " 附近值得顺路逛的城市（按直线距离）："];
+  const lines = [city + " 附近值得顺路逛的城市（按直线距离）："];
   arr.forEach(x => {
     const name = (x && (x.name || x)) || "";
     const prov = (x && x.province) || "";
@@ -152,7 +152,7 @@ function handleCityInfo(city) {
     return { text: "关于「" + city + "」，离线库里没有更详细的城市名片；我可以先生成一份行程。", actions: [act("pages/plan/plan", "去生成行程 →", {}, "tab")], intent: "cityinfo" };
   }
   const lines = [];
-  lines.push("🏙 " + (cb.name || city) + " · 建议玩 " + (cb.days || "?") + " 天 · " + (cb.climateTxt || "") + " · " + (cb.costTxt || ""));
+  lines.push((cb.name || city) + " · 建议玩 " + (cb.days || "?") + " 天 · " + (cb.climateTxt || "") + " · " + (cb.costTxt || ""));
   lines.push("最佳出行：" + (cb.best || "四季皆宜"));
   if (cb.foods && cb.foods.length) lines.push("招牌：" + cb.foods.slice(0, 6).join("、"));
   if (cb.areas && cb.areas.length) lines.push("热门住宿区：" + cb.areas.slice(0, 3).map(a => (a && a.name) || a).join("、"));

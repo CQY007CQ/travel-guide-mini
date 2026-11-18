@@ -253,15 +253,22 @@
 /* 快捷 chips（收藏 / 最近共用） */
 .recent-wrap { display: flex; flex-wrap: wrap; gap: 14rpx; }
 
-.recent-chip { display: flex; align-items: center; gap: 10rpx; padding: 10rpx 8rpx 10rpx 20rpx;
+.recent-chip { display: flex; align-items: center; gap: 10rpx; padding: 0 8rpx 0 0;
   background: rgba(var(--ln-rgb, 19, 29, 49), .06); border: 1rpx solid rgba(var(--ln-rgb, 19, 29, 49), .10); border-radius: 99rpx; }
+/* 正文段承载「应用城市」的点击：把原来落在 chip 内边距上的可点范围用自身 padding 还原，
+   这样拆分后「能点应用」的区域没有缩水。 */
+.rc-body { display: flex; align-items: center; padding: 10rpx 0 10rpx 20rpx; }
 
 .recent-chip:active { background: rgba(212, 169, 78, .16); }
 
 .rc-main { font-size: calc(23rpx * var(--fs, 1)); color: var(--t2, #5b6b82); }
 
-.rc-x { width: 36rpx; height: 36rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+.rc-x { position: relative; width: 36rpx; height: 36rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: rgba(var(--ln-rgb, 19, 29, 49), .06); color: var(--t4, #7d92ab); font-size: calc(20rpx * var(--fs, 1)); }
+/* 触达热区 36→60rpx（视觉零变化）。**只向右扩**：左边界与按钮重合，所以左侧「点一下应用城市」
+   的区域一 rpx 都没被吃掉；右侧扩出 24rpx = chip 的 8rpx padding + 14rpx 间距里的一部分，
+   与相邻 chip 仍留 4rpx 净空（.recent-wrap gap 14rpx）。竖向各扩 12rpx，间距 14rpx 也够。 */
+.rc-x::after { content: ""; position: absolute; left: 0; top: -12rpx; width: 60rpx; height: 60rpx; }
 
 .rc-x:active { background: rgba(229, 106, 106, .25); color: var(--red, #cc3d3d); }
 

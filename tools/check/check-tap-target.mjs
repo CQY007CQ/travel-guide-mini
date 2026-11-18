@@ -16,13 +16,11 @@
  *
  * 为什么本门禁只登记不自动修：
  *   扩热区的常规做法（min-height / padding / ::after 透明热区）在**相邻可点元素**上会互相
- *   抢占——后来的元素盖住先前的，点击落到错的按钮上。v1.20.26 逐条核对相邻关系后，13 处里
- *   10 处用「可见尺寸不变 + 透明 ::after 扩到 60rpx」修好（视觉零变化）；剩下 3 处是真的没有
- *   安全扩法，理由写在 REGISTRY 里：
- *     · .tl-credit 在 96rpx 缩略图内、整行绑 onToggle → 扩了就把「展开」变「看版权」
- *     · .rc-x      父级绑 applyFav，chip 内 gap 10rpx → 左扩吃「应用」、右扩吃邻 chip
- *     · .op        三颗按钮竖向排列 gap 仅 6rpx 且含破坏性「移除」→ 必然重叠
- *   这三处的正解都是重排/改交互，必须有视觉验证，因此固化为「不许变多」的棘轮 + 逐条登记原因。
+ *   抢占——后来的元素盖住先前的，点击落到错的按钮上。v1.20.26/27 两轮把 13 处里 12 处修掉：
+ *   10 处「可见尺寸不变 + 透明 ::after 扩到 60rpx」（视觉零变化）；
+ *   2 处靠**重排**解决——.rc-x 把删除按钮从可点父级里拆出来，.op 拉开 6→16rpx 间距；
+ *   只剩 .tl-credit 一处登记在案（缩略图上的版权标注，可见性优先，不该为热区让路，
+ *   已在展开面板补等价入口）。因此这里固化为「不许变多」的棘轮 + 逐条登记原因。
  *
  * 不新增 allcheck 步数：串在既有 step 里跑（加减步会触发考核材料校验失败）。
  */
@@ -38,13 +36,26 @@ const RECO = 88;      // 通用建议下限（只统计）
 /* 已登记的「触达尺寸 < 60rpx 的可点元素」。cls → 原因（为什么不能直接放大）。
  * 修好一处就删一条 —— 门禁会检查登记是否过期（不再小于硬线 / class 已消失）并判红。
  *
- * v1.20.26：13 处里 10 处已用「可见尺寸不变 + 透明 ::after 扩热区」修好并从本表删除
- * （.mc-x .mr-x .cell-x .tk-dot .wx-close .w-del .ps-del .ps-close .step-btn .sop）。
- * 剩下 3 处是**物理上没有安全扩法**的，理由按实际相邻关系重写过，不再是「大概会抢点击」。 */
+ * v1.20.26：13 处里 10 处用「可见尺寸不变 + 透明 ::after 扩热区」修好。
+ * v1.20.27：剩下 3 处里又有 2 处靠**重排**修好，不是硬扩：
+ *   · .rc-x  把 chip 拆成「可点正文 .rc-body + 独立 ✕」两段，父级不再绑 applyFav，
+ *            ✕ 只向右扩 24rpx（左边界与自己重合），「应用城市」的可点范围一 rpx 没少
+ *   · .op    行尾操作列 gap 6→16rpx、拖动把手 56→44rpx，按钮中心间距正好 60rpx，
+ *            60rpx 热区彼此相接不重叠；整列只高 18rpx
+ * 现在只剩 1 处，且它**不该扩**（见下）。 */
+/* 建议档（60–88rpx）里**刻意不扩**的几处，连同实测净空一起记在输出里。
+ * 为什么需要这张表：建议档不判红，只有一行 class=数字，后来者看到就会想「顺手扩到 88」，
+ * 而这个仓库已经因为「凭想象估间距」写错过一次登记理由（.mr-x 原写「左侧紧邻＋，扩了会抢步进」，
+ * 实测有 14rpx gap 完全能扩）——猜出来的理由会把可修项钉死在白名单，也会把不可修项改成误触。
+ * 存量 60rpx 的一律不列：它们就是按硬线做的，60 已是刻意取值。 */
+const ADVISORY_WHY = {
+  "rb-go": "右侧紧邻 .rb-input（输入框）：横向扩会抢输入框点击；只纵向扩不改变 min(宽,高) 的判定口径",
+  "pk-item": "城市选择列表的相邻行都是可点项（每行选不同城市），纵向扩 2rpx 会侵入邻行、把「选这个城市」变成「选上一个」；改行高又会动列表密度",
+  "lg-thumb": "<image> 内置组件上伪元素是否渲染不可靠（可能门禁绿、真机没扩）；同一动作的 .lg-cam 是 <view>，已扩到 88rpx",
+};
+
 const REGISTRY = {
-  "tl-credit": "图片来源 © 标注（30rpx），位于 96rpx 缩略图内、且整行 .tl-item 绑 onToggle；扩到 60rpx 会占掉缩略图 39% 并把「展开行程」误触成「看版权」。正解是把来源信息移进展开面板，属布局改版",
-  "rc-x":      "父级 .recent-chip 绑 bindtap=applyFav（应用该城市），chip 内 gap 仅 10rpx、右侧 padding 8rpx；左扩吃「应用」、右扩越过 chip 边界吃相邻 chip，任何单方面扩都会把「应用」变成「删除」。正解是 ✕ 外置或改长按删除",
-  "op":        "「想玩 / 导航 / 移除」三颗 44rpx 按钮在 .tl-ops 里**竖向排列、gap 仅 6rpx**，扩到 60rpx 必然与上下相邻按钮重叠，而其中一颗是破坏性「移除」。正解是把 .tl-ops 改横向排列并重排行尾，需真机视觉确认",
+  "tl-credit": "图片来源 © 标注（30rpx），位于 96rpx 缩略图内、整行 .tl-item 绑 onToggle。扩到 60rpx 会占满缩略图右上角并把「展开行程」误触成「看版权」——这是**可见性优先**的合规标注，不该为热区让路。已在展开面板补等价入口（完整来源 + 许可），点不中也能读到",
 };
 
 function walk(d, out = []) {
@@ -215,6 +226,19 @@ ok("按下反馈扫描确实覆盖到四个包（防扫描范围塌缩成空集�
 
 console.log("  建议档（" + HARD + "–" + RECO + "rpx，不判红）共 " + advisory.length + " 处：" +
   advisory.map((x) => "." + x.cls + "=" + x.eff).join("、"));
+// 说明表会随代码腐烂：某处后来扩到 88rpx 或 class 被改名，说明就成了假的决策记录 → 判红要求同步删除
+{
+  const advSet = new Set(advisory.map((x) => x.cls));
+  const whyStale = Object.keys(ADVISORY_WHY).filter((c) => !advSet.has(c));
+  ok("建议档说明表未腐烂（" + Object.keys(ADVISORY_WHY).length + " 处仍在该档）",
+    whyStale.length === 0,
+    whyStale.join("、") + " 已 ≥" + RECO + "rpx 或 class 已不存在，请从 ADVISORY_WHY 删除该条");
+  for (const c of Object.keys(ADVISORY_WHY)) {
+    if (!advSet.has(c)) continue;
+    const a = advisory.find((x) => x.cls === c);
+    console.log("    · ." + c + "=" + (a ? a.eff : "?") + "rpx 不扩：" + ADVISORY_WHY[c]);
+  }
+}
 console.log("  硬线以下已登记 " + Math.min(tooSmall.length, Object.keys(REGISTRY).length) + " 处：" + worst);
 
 console.log("");

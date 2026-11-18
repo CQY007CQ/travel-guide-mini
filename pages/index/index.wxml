@@ -334,20 +334,25 @@
     <view wx:if="{{favs.length}}" class="q-sec">
       <view class="q-lab"><image class="ic ic-sm" src="/images/icons/heart.png"/>我的收藏</view>
       <view class="recent-wrap">
-        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="recent-chip" wx:for="{{favs}}" wx:key="*this"
-              data-i="{{index}}" bindtap="applyFav">
-          <text class="rc-main">{{item}}</text>
-          <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="rc-x" data-i="{{index}}" catchtap="delFav">✕</text>
+        <!-- v1.20.27：chip 拆成「可点正文 + 独立 ✕」两段。原来整块绑 applyFav，✕ 只能压在
+             30rpx 内不敢扩热区，扩了就把「应用城市」误触成「删除」。现在父级不再绑事件，
+             ✕ 有了自己的 60rpx 热区，正文的点击范围用 .rc-body 的 padding 还原，视觉不变。 -->
+        <view class="recent-chip" hover-class="tap-hover" hover-start-time="0" hover-stay-time="80"
+              wx:for="{{favs}}" wx:key="*this">
+          <view class="rc-body" hover-class="tap-hover" hover-start-time="0" hover-stay-time="80"
+                data-i="{{index}}" bindtap="applyFav"><text class="rc-main">{{item}}</text></view>
+          <text class="rc-x" hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" data-i="{{index}}" catchtap="delFav">✕</text>
         </view>
       </view>
     </view>
     <view wx:if="{{recents.length}}" class="q-sec">
       <view class="q-lab"><image class="ic ic-sm" src="/images/icons/clock.png"/>最近查过</view>
       <view class="recent-wrap">
-        <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="recent-chip" wx:for="{{recents}}" wx:key="city"
-              data-i="{{index}}" bindtap="fillRecent">
-          <text class="rc-main">{{item.city}} · {{item.days}}天</text>
-          <text hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="rc-x" data-i="{{index}}" catchtap="delRecent">✕</text>
+        <view class="recent-chip" hover-class="tap-hover" hover-start-time="0" hover-stay-time="80"
+              wx:for="{{recents}}" wx:key="city">
+          <view class="rc-body" hover-class="tap-hover" hover-start-time="0" hover-stay-time="80"
+                data-i="{{index}}" bindtap="fillRecent"><text class="rc-main">{{item.city}} · {{item.days}}天</text></view>
+          <text class="rc-x" hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" data-i="{{index}}" catchtap="delRecent">✕</text>
         </view>
       </view>
     </view>

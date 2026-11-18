@@ -69,7 +69,7 @@
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 2rpx 8rpx rgba(20,30,50,.16);
 }
-.rs-cover-glyph { font-size: 60rpx; line-height: 1; filter: drop-shadow(0 1rpx 2rpx rgba(0,0,0,.25)); }
+.rs-cover-glyph { width: 60rpx; height: 60rpx; filter: drop-shadow(0 1rpx 2rpx rgba(0,0,0,.28)); }
 .rs-cover-badge { position: absolute; top: 4rpx; right: 4rpx; padding: 2rpx 8rpx; font-size: 16rpx; line-height: 1; color: #fff; background: rgba(0,0,0,.42); border-radius: 999rpx; }
 .rs-body { flex: 1; min-width: 0; }
 .rs-top { display: flex; align-items: baseline; justify-content: space-between; }

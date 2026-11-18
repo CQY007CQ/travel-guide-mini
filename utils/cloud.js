@@ -17,7 +17,7 @@ let _uid = null;
 const UID_KEY = "__uid__";
 const OPENID_KEY = "__openid__";
 
-// 配对同步码：跨端（小程序 ↔ 网页版）共享同一 uid 的机制。
+// 配对同步码：跨端（小程序与网页版）共享同一 uid 的机制。
 // 用户在一端点「复制同步码」，另一端「输入同步码」粘贴，即把本地 uid 锁定为同一串，
 // 从而在云端同一集合下共享行程 —— 无需登录体系，零合规风险。
 const PAIRED_KEY = "__paired_uid__";

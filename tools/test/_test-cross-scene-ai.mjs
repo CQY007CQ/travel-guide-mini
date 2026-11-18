@@ -301,6 +301,22 @@ function loadAgent(opts) {
     for (let i = 0; i < 45; i++) await i3.api.ask("food", "问题" + i, "c");
     ok("缓存容量守住上限 40（内存不膨胀）", i3.api.cacheStats().size <= 40,
       "size=" + i3.api.cacheStats().size);
+
+    /* v1.20.27：缓存键归一化 —— 多一个问号/空格不该各打一次云端 */
+    const j3 = loadAgent();
+    await j3.api.ask("food", "北京有什么好玩的", "北京·3天");
+    const jc = j3.calls.length;
+    const j2 = await j3.api.ask("food", "北京有什么好玩的？", "北京·3天");
+    ok("只差一个标点（问号）应命中缓存，不再发请求", jc === 1 && j3.calls.length === 1 && j2.cached === true,
+      "calls=" + j3.calls.length);
+    const j3r = await j3.api.ask("food", " 北京 有什么好玩的 ", "北京·3天");
+    ok("只差空白应命中缓存", j3.calls.length === 1 && j3r.cached === true, "calls=" + j3.calls.length);
+    // 归一化不能过头：数字是语义的一部分，不能被抹掉
+    const k3 = loadAgent();
+    await k3.api.ask("food", "推荐3天路线", "c");
+    await k3.api.ask("food", "推荐5天路线", "c");
+    ok("归一化不得抹掉数字（3 天与 5 天是不同问题，不能互相命中）", k3.calls.length === 2,
+      "calls=" + k3.calls.length);
   }
 
   console.log("\n" + pass + " 通过 / " + fail + " 失败");

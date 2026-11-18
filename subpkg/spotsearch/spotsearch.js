@@ -164,7 +164,7 @@ Page(SafePage({
       const cv = T.spotCover(x.city || "", x.name, "");
       return Object.assign({}, x, {
         wished: T.isWished(x.name),
-        coverBg: cv.bg, coverGlyph: cv.glyph, coverLabel: cv.label, coverBadge: cv.badge, coverCat: cv.cat
+        coverBg: cv.bg, coverIcon: cv.icon, coverLabel: cv.label, coverBadge: cv.badge, coverCat: cv.cat
       });
     });
     this.setData({

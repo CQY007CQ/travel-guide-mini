@@ -76,7 +76,20 @@ const CACHE_TTL = 10 * 60 * 1000;
 const CACHE_MAX = 40;
 // 保守判据：只要沾一点"答案会随时间变"的边就不缓存（宁可多问一次）
 const CACHE_LIVE = /(天气|气温|温度|下雨|雨|雪|风|空气|雾霾|实时|现在|今天|明天|后天|人流|排队|拥挤|开门|营业|闭馆|票价|余票|堵车|路况|航班|延误)/;
-function _cacheKey(scene, q) { return String(scene || "default") + "\u0001" + q; }
+/* v1.20.27：缓存键做「不影响语义」的归一化。原来只做原串比较，于是
+ *   「北京有什么好玩的」「北京有什么好玩的？」「北京 有什么好玩的」
+ * 被当成三个不同问题，各占一条缓存、各打一次云端 —— 用户感觉「刚问过怎么又要等」。
+ * 这里只裁掉空白与标点、英文转小写，**不做同义改写、不去数字**（数字常是语义的一部分：
+ * 「3 天」「2 人」）。归一化后为空（用户只发了标点）则回退原串，避免所有纯标点问题撞一条。 */
+function _normQ(q) {
+  const raw = String(q == null ? "" : q);
+  const n = raw
+    .replace(/[\s\u3000]+/g, "")
+    .replace(/[。，、；：？！…—－·「」『』（）《》〈〉“”‘’"'?!.,;:()\[\]{}<>~`@#$%^&*_+=|\\\/\-]+/g, "")
+    .toLowerCase();
+  return n || raw.trim();
+}
+function _cacheKey(scene, q) { return String(scene || "default") + "\u0001" + _normQ(q); }
 function _cacheGet(scene, q, ctx) {
   const e = _cache[_cacheKey(scene, q)];
   if (!e) return null;

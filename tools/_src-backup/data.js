@@ -6,7 +6,7 @@ const pako = require("./pako-inflate.js");
 // v1.19.171 扩展酒店住宿区域：额外的「城市级住哪儿区域指引」静态数据，加载时并入 CITIES[].areas。
 // v1.20.9 主包瘦身：本表 274KB（原 utils/hotel-areas.js，主包单项第二大文件）已搬到
 //   subdata3/data/hotel-areas3.js，由 initData() 作为第 4 个分块异步加载，本文件只留合并逻辑。
-//   ⚠️ 晚到必须补跑：applyPacked 里的 phase-2 表合并早在它之前就跑完了，若不补跑，
+//   注意：晚到必须补跑：applyPacked 里的 phase-2 表合并早在它之前就跑完了，若不补跑，
 //   住宿片区 / 逐酒店会静默全空（页面上只是「住哪儿」卡片不出现，不报错）。
 //   Node / 网页端没有 require.async，走 _ha() 里的同包同步 require；文件缺失只少住宿片区。
 const _HA_EMPTY = {};
@@ -666,7 +666,7 @@ function resolveChunkPaths() {
 }
 const CHUNK_PATHS = resolveChunkPaths();
 
-// ⚠️✖️ 微信「分包异步化」硬约束（= 线上首页白屏 / 「无法加载完整数据内容」的真根因）：
+// 禁止：微信「分包异步化」硬约束（= 线上首页白屏 / 「无法加载完整数据内容」的真根因）：
 //   require.async() 的实参必须是「唯一的静态字符串字面量」，**不能是变量**！
 //   传变量时微信无法在编译/运行期解析目标分包 → 数据块永远不加载 →
 //   首页拿不到城市数据 → 白屏（审核实测复现）。

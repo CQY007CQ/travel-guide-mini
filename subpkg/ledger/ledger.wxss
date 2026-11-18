@@ -324,11 +324,16 @@
 }
 
 .lg-cam {
+  position: relative;
   width: 68rpx; height: 68rpx; border-radius: 12rpx; flex-shrink: 0; margin-right: 14rpx;
   display: flex; align-items: center; justify-content: center;
   background: rgba(var(--ln-rgb, 148, 163, 184), .08);
   border: 1rpx dashed rgba(var(--ln-rgb, 148, 163, 184), .28);
 }
+/* 触达热区 68→88rpx（视觉零变化）。净空实测：右邻 .lg-main 间距 14rpx（扩 10 尚余 4）、
+   左侧是 .lg-row 的 6rpx padding 与卡片内边距、纵向 .lg-row 上下各 20rpx padding（扩 10 后与本行上下的图标仍隔 20rpx）。
+   .lg-thumb 是 <image> 内置组件，伪元素是否渲染不可靠 → 不为它加 ::after，宁可留一条建议档也不做假扩。 */
+.lg-cam::after { content: ""; position: absolute; left: -10rpx; top: -10rpx; width: 88rpx; height: 88rpx; }
 
 /* ===== v1.8.3 · AA 人数 stepper（此前缺定义，按钮裸奔） ===== */
 .stepper { display: flex; align-items: center; gap: 22rpx; }

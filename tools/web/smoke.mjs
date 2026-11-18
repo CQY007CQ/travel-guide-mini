@@ -453,6 +453,47 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
     ok("多轮上下文落盘（刷新后可恢复城市/意图，不存聊天正文）",
       !!savedObj && savedObj.city === "成都" && !("history" in savedObj),
       String(saved).slice(0, 160));
+
+    /* ── v1.20.27：网页端答案缓存真跑（小程序端 v1.20.24 已有，网页端一直缺） ──
+     * 只把「云端网关」换成本机假实现，其余走真实 send() / callLLM / 缓存链路：
+     * 同问复问必须 0 次网关调用；换了行程后同一句话必须重新问（不能把旧城的答案给新行程）。 */
+    {
+      const CL = g.__require("__entry__", "./utils/cloud.js");
+      const oldCloudEnabled = CL.cloudEnabled, oldAiChat = CL.aiChat;
+      let chatCalls = 0, lastCtx = "";
+      CL.cloudEnabled = () => true;
+      CL.aiChat = (o) => {
+        chatCalls++; lastCtx = String((o && o.context) || "");
+        return new Promise((r) => setTimeout(() => r({ ok: true, text: "假云端答案 #" + chatCalls }), 120));
+      };
+      appStub.globalData.plan = null;
+      AI.reset();
+      await AI.ask("杭州有哪些必去");
+      const n1 = chatCalls, t0 = Date.now();
+      await AI.ask("杭州有哪些必去？");            // 只差一个问号 → 归一化后同一句
+      const hitMs = Date.now() - t0;
+      ok("网页 AI 同问复问命中答案缓存（不再打网关）", n1 === 1 && chatCalls === 1, "calls=" + chatCalls);
+      ok("缓存命中原地落屏（不再白等一趟网关）", hitMs < 60, hitMs + "ms");
+      ok("cacheStats 可观测（规模/TTL/容量）",
+        AI.cacheStats().size === 1 && AI.cacheStats().max >= 20, JSON.stringify(AI.cacheStats()));
+
+      // 上下文整串参与比较：换成另一座城市的行程后，同一句话必须重新问
+      appStub.globalData.plan = { cityName: "西安", days: [{ items: [{ name: "兵马俑" }] }], depart: "2026-12-01" };
+      await AI.ask("杭州有哪些必去？");
+      ok("换行程后同一句话不再命中（不把旧城的答案给新行程）", chatCalls === 2, "calls=" + chatCalls);
+      ok("送给模型的上下文确实换了城市（缓存键与提示词同源）", /西安/.test(lastCtx), lastCtx.slice(0, 70));
+
+      // 实时类问题既不读也不写：问两遍必须问两遍
+      await AI.ask("成都今天天气怎么样");
+      await AI.ask("成都今天天气怎么样");
+      ok("实时类问题（天气）不进缓存，每次都问最新", chatCalls === 4, "calls=" + chatCalls);
+
+      AI.reset();
+      ok("清空会话连带清空答案缓存（不会立刻弹回旧答案）",
+        AI.cacheStats().size === 0, JSON.stringify(AI.cacheStats()));
+      CL.cloudEnabled = oldCloudEnabled; CL.aiChat = oldAiChat;
+      appStub.globalData.plan = null;
+    }
   }
   g.document = oldDoc;
   g.wx = oldWx;
@@ -559,6 +600,10 @@ console.log("== 8. 内置 AI 全站智能体（真实离线数据） ==");
     escapeHtml: (s) => String(s),
     replyAndRemember: (v) => ({ html: "离线答:" + v, actions: [] }),
     applyAuto: () => {}, whenReady: (fn) => fn(),
+    // v1.20.27 答案缓存：本组只验「并发/排队」语义，缓存本身由上面第 8 组真跑覆盖。
+    // 给空实现 + 永不判实时的正则，避免两组断言互相耦合（缓存若真命中会让本组变哑）。
+    aiCtxKey: () => "CTX", AI_CACHE_LIVE: /$^/,
+    _cacheGet: () => null, _cachePut: () => {},
     // 可控云端：把 onDone 挂起，模拟请求在途
     callLLM: (h, c, onDone) => { calls.push(h[h.length - 1]); return { then: () => {} }; }
   };

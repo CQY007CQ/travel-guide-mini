@@ -962,7 +962,7 @@ function spotDetailCore(name, cityName){
   if (Array.isArray(d.route) && d.route.length) {
     html += `\n   <div class="sd-sec">推荐游览线路</div><div class="sd-route">${d.route.map((r,i)=>`<span class="sd-node">${i+1}. ${r}</span>${i<d.route.length-1?'<span class="sd-arrow">→</span>':''}`).join("")}</div>`;
   }
-  html += `\n   <div class="sd-sec">⏱ 游玩时长</div><div class="sd-how">预计 ${spotHours(name)} 小时${spotHours(name)>=8 ? "（大景点，建议独占一天深度游览）" : ""}${open ? " · " + open : ""}；具体以当日人流与个人节奏为准。</div>`;
+  html += `\n   <div class="sd-sec">游玩时长</div><div class="sd-how">预计 ${spotHours(name)} 小时${spotHours(name)>=8 ? "（大景点，建议独占一天深度游览）" : ""}${open ? " · " + open : ""}；具体以当日人流与个人节奏为准。</div>`;
   return html + spotDetailExtras(name, cityName);
  }
  // v1.15：无真实 SPOT_DETAILS 时不输出模板拼凑介绍（避免“以峰林/峡谷见长”“门票10元内”这类虚构/雷同文案），
@@ -1698,7 +1698,7 @@ function spotOpenNote(name, cityName, fromDetail){
 function spotDetailExtras(name, cityName){
  try{
   const parts = [];
-  parts.push(`<div class="sd-sec">⏰ 错峰建议</div><div class="sd-how">${spotOffpeak(name)}</div>`);
+  parts.push(`<div class="sd-sec">错峰建议</div><div class="sd-how">${spotOffpeak(name)}</div>`);
   const hd = spotHidden(name);
   if(hd) parts.push(`<div class="sd-sec">冷知识</div><div class="sd-how">${hd}</div>`);
   parts.push(`<div class="sd-sec">出片</div><div class="sd-how">${photoTip(name)}</div>`);
@@ -1789,7 +1789,7 @@ function spotDetailFallback(name, cityName){
   <div class="sd-sec">怎么去</div><div class="sd-how">${howTxt}</div>
   <div class="sd-sec">推荐游览线路</div>
   <div class="sd-route">${tpl.route.map((r,i)=>`<span class="sd-node">${i+1}. ${r}</span>${i<tpl.route.length-1?'<span class="sd-arrow">→</span>':''}`).join("")}</div>
-  <div class="sd-sec">⏱ 游玩时长</div><div class="sd-how">预计 ${h} 小时${h>=8 ? "（大景点，建议独占一天深度游览）" : ""}；具体以当日人流与个人节奏为准。</div>` + spotDetailExtras(name, cityName);
+  <div class="sd-sec">游玩时长</div><div class="sd-how">预计 ${h} 小时${h>=8 ? "（大景点，建议独占一天深度游览）" : ""}；具体以当日人流与个人节奏为准。</div>` + spotDetailExtras(name, cityName);
 }
 
 // v1.11：fuzz 抓到 list 非数组 / item 无 kw / name 非字符串 时整函数抛错 → 全部守卫

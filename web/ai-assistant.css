@@ -254,3 +254,10 @@ body.has-tabbar .ai-panel { bottom: calc(64px + env(safe-area-inset-bottom)); }
   body.has-tabbar .ai-panel { bottom: calc(56px + env(safe-area-inset-bottom)); }
   .ai-fab { width: 46px; height: 46px; }
 }
+
+/* v1.20.27：网页版去 emoji —— FAB / 头像 / 行内提示改用 images/icons 下的自绘单色图标，
+   与小程序端同一套（emoji 字形由系统字体决定，Windows 上常显示成彩色方块）。 */
+.ai-fab .ai-fab-ic { width: 28px; height: 28px; display: block; margin: 0 auto; }
+.ai-head .ai-avatar .ai-av-ic { width: 20px; height: 20px; display: block; }
+.ai-inline-ic { width: 14px; height: 14px; vertical-align: -2px; }
+.ai-gear .ai-gear-ic { width: 16px; height: 16px; display: block; margin: 0 auto; }
