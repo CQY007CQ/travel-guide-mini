@@ -265,7 +265,8 @@ function heatOf(city) {
   const expN = Math.min(1, Math.log10(1 + n) / Math.log10(1 + 400)); // 400 景点≈满
   const ratedN = Math.min(1, q.rated / 15);
   const avgN = Math.max(0, Math.min(1, (q.avg - 4.0) / 1.0));        // 4.0→0, 5.0→1
-  const val = safeCall(function () { return T.valueScoreOf(city.name); }, 60);
+  // 传入已持有的 city 对象：全表打分时不再按名字回查 findCity（profile 省约 66%）
+  const val = safeCall(function () { return T.valueScoreOf(city.name, city); }, 60);
   const valN = Math.max(0, Math.min(1, (val - 50) / 40));            // 50→0, 90→1
   return Math.max(0, Math.min(1, 0.40 * expN + 0.25 * ratedN + 0.20 * avgN + 0.15 * valN));
 }
@@ -555,7 +556,8 @@ function scoreCity(city, prefs, month) {
   }
 
   /* ⑤ 性价比：复用既有 valueScoreOf（0-100） */
-  const val = safeCall(function () { return T.valueScoreOf(city.name); }, 60);
+  // 传入已持有的 city 对象：全表打分时不再按名字回查 findCity（profile 省约 66%）
+  const val = safeCall(function () { return T.valueScoreOf(city.name, city); }, 60);
   const vd = Math.round((val - 60) / W.valueDiv);
   if (vd) { raw += vd; if (Math.abs(vd) >= 4) push("性价比", vd, "综合 " + val + "/100"); }
 

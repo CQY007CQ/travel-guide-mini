@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.35";
+const APP_VER = "1.20.36";
 
 // 随包离线数据的整理截止月份（YYYY-MM）。
 // 为什么单独抽一个常量：此前「数据说明与免责声明」里是硬编码字面量「更新至 2026 年 11 月」，
@@ -6276,8 +6276,12 @@ function splurgeTipOf(cityName) {
   return "选一家本地口碑老字号，好好吃一顿招牌";
 }
 // 61) 性价比评分（0-100，物价低+景点多 → 分高）
-function valueScoreOf(cityName) {
-  const c = findCity(cityName);
+// cityObj 可选：调用方若已持有城市对象（推荐引擎全表打分），直接复用，不再按名字回查。
+// v1.20.35 profile：recommend() 10.39ms/次里约 6.9ms 耗在 751 城逐城 findCity(city.name)；
+// findCity 的 LRU 只有 400 槽 < 城市池 751，全表扫描时反复淘汰、命中率不足 53%。
+// 公式仍只有这一份，不复制、不加缓存（避免数据晚到后 stale）。
+function valueScoreOf(cityName, cityObj) {
+  const c = cityObj || findCity(cityName);
   if (!c) return 0;
   const cost = (c && c.cost) || "mid";
   const n = (Array.isArray(c.experiences) ? c.experiences : []).length;

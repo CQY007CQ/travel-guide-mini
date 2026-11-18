@@ -1,6 +1,10 @@
 // 高强度压测（v1.17.4）：模拟真实旅行用户的各种操作与边界，找出真实 bug
 // 用法: node tools/test/stress-test.mjs
 import { createRequire } from "module";
+import { installWxShim } from "./_wx-shim.mjs";
+// 原先没装垫片：1083 用例虽全过，但日志混入 3 条 `[diag][store] ReferenceError: wx is not defined`，
+// 读日志的人会误判存储链路坏了。装真 base64ToArrayBuffer 的垫片，保证「绿」是真的绿。
+installWxShim();
 const req = createRequire(process.cwd() + "/");
 const T = req("./utils/travel.js");
 const D = req("./utils/data.js");
