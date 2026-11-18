@@ -80,7 +80,10 @@
 
 .wish-item:active { background: rgba(var(--ln-rgb, 138,165,192),.05); }
 
-.w-del { width: 48rpx; height: 48rpx; border-radius: 50%; background: rgba(var(--ln-rgb, 148,163,184),.06); color: var(--t4, #9aa7ba); font-size: calc(22rpx * var(--fs, 1)); display: flex; align-items: center; justify-content: center; }
+.w-del { position: relative; width: 48rpx; height: 48rpx; border-radius: 50%; background: rgba(var(--ln-rgb, 148,163,184),.06); color: var(--t4, #9aa7ba); font-size: calc(22rpx * var(--fs, 1)); display: flex; align-items: center; justify-content: center; }
+/* 触达热区 48→60rpx（视觉零变化）。左侧是 .w-tags（纯文本标签、不可点）且带 8rpx margin-right，
+   各扩 6rpx 仍留 2rpx 净空；竖向 60rpx 小于行高 88rpx（48 内容 + 20×2 padding）。 */
+.w-del::after { content: ""; position: absolute; left: -6rpx; top: -6rpx; width: 60rpx; height: 60rpx; }
 
 .w-del:active { background: rgba(229,106,106,.3); color: var(--red, #e56a6a); }
 
@@ -111,8 +114,11 @@
 
 .ps-restore:active { background: rgba(212,169,78,.3); }
 
-.ps-del { flex-shrink: 0; width: 48rpx; height: 48rpx; display: flex; align-items: center; justify-content: center;
+.ps-del { position: relative; flex-shrink: 0; width: 48rpx; height: 48rpx; display: flex; align-items: center; justify-content: center;
   color: var(--red, #cc3d3d); font-size: calc(24rpx * var(--fs, 1)); border-radius: 12rpx; background: rgba(204,61,61,.08); }
+/* 触达热区 48→60rpx（视觉零变化）。左侧紧邻可点的「恢复」，**只向右扩**（右扩 12rpx 落在
+   26rpx 行内边距里），左边界与按钮重合，绝不与「恢复」抢点击。 */
+.ps-del::after { content: ""; position: absolute; left: 0; top: -6rpx; width: 60rpx; height: 60rpx; }
 
 .ps-del:active { background: rgba(204,61,61,.2); }
 

@@ -9,9 +9,12 @@
 .tk-item:active { background: rgba(var(--ln-rgb, 138,165,192),.04); }
 .tk-item:last-child { border-bottom: none; }
 .tk-row { display: flex; align-items: flex-start; }
-.tk-dot { width: 42rpx; height: 42rpx; border-radius: 50%; border: 2rpx solid rgba(var(--ln-rgb, 148,163,184),.5); box-sizing: border-box;
+.tk-dot { position: relative; width: 42rpx; height: 42rpx; border-radius: 50%; border: 2rpx solid rgba(var(--ln-rgb, 148,163,184),.5); box-sizing: border-box;
   display: flex; align-items: center; justify-content: center; margin: 2rpx 18rpx 0 0; flex-shrink: 0;
   color: #0b0f14; font-size: calc(24rpx * var(--fs, 1)); font-weight: 800; transition: all .15s; }
+/* 触达热区 42→60rpx（视觉零变化）。右侧 margin 18rpx，各扩 9rpx 不与 .tk-main 的文案相抵；
+   勾选是纯开关，扩热区只会让「点得中」，不会误触别处。 */
+.tk-dot::after { content: ""; position: absolute; left: -9rpx; top: -9rpx; width: 60rpx; height: 60rpx; }
 .tk-dot.on { background: linear-gradient(135deg, #37c285, #2aa374); border-color: #37c285;
   box-shadow: 0 6rpx 16rpx rgba(55,194,133,.35); }
 .tk-main { flex: 1; min-width: 0; }

@@ -31,6 +31,9 @@
 .cell { position: relative; width: calc((100% - 24rpx) / 3); aspect-ratio: 1 / 1; border-radius: 16rpx; overflow: hidden; background: var(--panel, #18233a); border: 1rpx solid rgba(var(--ln-rgb, 148, 163, 184), .16); }
 .cell-img { width: 100%; height: 100%; display: block; }
 .cell-x { position: absolute; right: 8rpx; top: 8rpx; width: 40rpx; height: 40rpx; line-height: 40rpx; text-align: center; font-size: calc(24rpx * var(--fs, 1)); color: #fff; background: rgba(0, 0, 0, .52); border-radius: 999rpx; }
+/* 触达热区 40→60rpx（视觉零变化）。父级 .cell 有 overflow:hidden，热区必须留在 cell 内：
+   右/上各留 2rpx 净空（right/top 各 -6rpx 而非 -10rpx），向左下扩出 14rpx。 */
+.cell-x::after { content: ""; position: absolute; right: -6rpx; top: -6rpx; width: 60rpx; height: 60rpx; }
 .cell-add { display: flex; align-items: center; justify-content: center; border: 1rpx dashed rgba(var(--chip-rgb, 212, 169, 78), .5); background: rgba(212, 169, 78, .08); }
 .cell-add .add-t { font-size: calc(23rpx * var(--fs, 1)); color: var(--chip-tx, #d4a94e); text-align: center; }
 

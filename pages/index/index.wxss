@@ -235,8 +235,11 @@
 /* 人数 stepper */
 .stepper { display: flex; align-items: center; gap: 22rpx; }
 
-.step-btn { width: 56rpx; height: 56rpx; border-radius: 14rpx; display: flex; align-items: center; justify-content: center;
+.step-btn { position: relative; width: 56rpx; height: 56rpx; border-radius: 14rpx; display: flex; align-items: center; justify-content: center;
   background: rgba(var(--ln-rgb, 19, 29, 49), .05); border: 1rpx solid rgba(var(--ln-rgb, 19, 29, 49), .12); color: var(--t2, #5b6b82); font-size: calc(30rpx * var(--fs, 1)); }
+/* 触达热区 56→60rpx（视觉零变化）。－ 与 ＋ 之间隔着 .step-num / .days-num 文本，
+   各扩 2rpx 既不影响间距也不会串点。 */
+.step-btn::after { content: ""; position: absolute; left: -2rpx; top: -2rpx; width: 60rpx; height: 60rpx; }
 
 .step-btn:active { background: rgba(212, 169, 78, .2); }
 
@@ -290,8 +293,11 @@
 
 .days-num { min-width: 72rpx; text-align: center; font-size: calc(22rpx * var(--fs, 1)); color: var(--t2, #5b6b82); }
 
-.mr-x { width: 38rpx; height: 38rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+.mr-x { position: relative; width: 38rpx; height: 38rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: rgba(229, 106, 106, .14); color: var(--red, #cc3d3d); font-size: calc(22rpx * var(--fs, 1)); flex-shrink: 0; }
+/* 触达热区 38→60rpx（视觉零变化）。相邻核对：与「＋」步进之间是 .multi-row 的 14rpx gap，
+   左右各扩 11rpx 仍留 3rpx 净空；竖向 60rpx 小于行高 80rpx（52 内容 + 14×2 padding），不越界。 */
+.mr-x::after { content: ""; position: absolute; left: -11rpx; top: -11rpx; width: 60rpx; height: 60rpx; }
 
 .mr-x:active { background: rgba(229, 106, 106, .35); }
 
@@ -321,8 +327,11 @@
 
 .ps-title { font-size: calc(30rpx * var(--fs, 1)); font-weight: 800; color: var(--t1, #18233a); }
 
-.ps-close { width: 52rpx; height: 52rpx; border-radius: 50%; background: rgba(var(--ln-rgb, 19, 29, 49), .06);
+.ps-close { position: relative; width: 52rpx; height: 52rpx; border-radius: 50%; background: rgba(var(--ln-rgb, 19, 29, 49), .06);
   display: flex; align-items: center; justify-content: center; color: var(--t3, #64748b); }
+/* 触达热区 52→60rpx（视觉零变化）。.ps-item 是 space-between + 26rpx 竖向 padding，
+   ✕ 与站名之间净空充足，各扩 4rpx 不会抢行内点击。 */
+.ps-close::after { content: ""; position: absolute; left: -4rpx; top: -4rpx; width: 60rpx; height: 60rpx; }
 
 .ps-provs { display: flex; gap: 10rpx; margin: 0 0 16rpx; white-space: nowrap; padding: 2rpx 2rpx 4rpx; }
 

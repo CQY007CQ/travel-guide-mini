@@ -145,8 +145,10 @@
 
 .sum-ops { display: flex; gap: 10rpx; flex-shrink: 0; margin-left: 14rpx; }
 
-.sop { min-width: 66rpx; height: 58rpx; border-radius: 14rpx; display: flex; flex-direction: column; align-items: center; justify-content: center;
+.sop { position: relative; min-width: 66rpx; height: 58rpx; border-radius: 14rpx; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: rgba(var(--ln-rgb, 148,163,184),.06); border: 1rpx solid rgba(var(--ln-rgb, 148,163,184),.18); padding: 0 10rpx; }
+/* 触达热区 58→60rpx（视觉零变化）。只扩 1rpx，相邻 .sop 之间的间距不受影响。 */
+.sop::after { content: ""; position: absolute; left: -1rpx; top: -1rpx; width: 68rpx; height: 60rpx; }
 
 .sop:active { background: rgba(212,169,78,.2); }
 
@@ -219,10 +221,14 @@
 
 .miss-chip { display: flex; align-items: center; gap: 8rpx; font-size: calc(21rpx * var(--fs, 1)); color: var(--t1, #e8edf4);
   background: rgba(var(--ln-rgb, 148,163,184),.05); border: 1rpx solid rgba(var(--ln-rgb, 148,163,184),.2);
-  border-radius: 99rpx; padding: 7rpx 8rpx 7rpx 18rpx; }
+  border-radius: 99rpx; padding: 13rpx 8rpx 13rpx 18rpx; }
 
-.mc-x { width: 34rpx; height: 34rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+.mc-x { position: relative; width: 34rpx; height: 34rpx; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: rgba(229,106,106,.18); color: var(--red, #e56a6a); font-size: calc(20rpx * var(--fs, 1)); }
+/* 触达热区：可见 34rpx 不变，透明 ::after 扩到 60rpx（视觉零变化）。
+   相邻核对：chip 内左侧 .mc-n 是纯文本不可点、相邻 chip 由 10rpx 间距 + 自身 padding 隔开；
+   .miss-chip 竖向 padding 同步 7→13rpx，使 chip 恰好 60rpx 高，热区不越出 chip 边界。 */
+.mc-x::after { content: ""; position: absolute; left: -13rpx; top: -13rpx; width: 60rpx; height: 60rpx; }
 
 .mc-x:active { background: rgba(229,106,106,.4); }
 
@@ -302,9 +308,11 @@
 
 .wx-off-d { font-size: calc(20rpx * var(--fs, 1)); margin-top: 4rpx; line-height: 1.5; }
 
-.wx-close { width: 44rpx; height: 44rpx; border-radius: 50%; flex-shrink: 0; color: var(--t4, #9aa7ba);
+.wx-close { position: relative; width: 44rpx; height: 44rpx; border-radius: 50%; flex-shrink: 0; color: var(--t4, #9aa7ba);
   font-size: calc(22rpx * var(--fs, 1)); display: flex; align-items: center; justify-content: center;
   background: rgba(var(--ln-rgb, 148,163,184), .10); }
+/* 触达热区 44→60rpx（视觉零变化）。相邻是纯文案不可点，扩 8rpx 不会抢点击。 */
+.wx-close::after { content: ""; position: absolute; left: -8rpx; top: -8rpx; width: 60rpx; height: 60rpx; }
 
 .wx-close:active { background: rgba(var(--ln-rgb, 148,163,184), .22); }
 

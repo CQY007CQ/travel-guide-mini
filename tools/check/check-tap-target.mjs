@@ -16,12 +16,13 @@
  *
  * 为什么本门禁只登记不自动修：
  *   扩热区的常规做法（min-height / padding / ::after 透明热区）在**相邻可点元素**上会互相
- *   抢占——后来的元素盖住先前的，点击落到错的按钮上。本仓已确认 3 处属于这种：
- *     · .rc-x   父级 .recent-chip 绑 bindtap="applyFav" → 扩热区会把「应用」误触成「删除」
- *     · .mr-x   左侧紧邻「＋」天数步进按钮
- *     · .op     「想玩 / 导航 / 移除」四个相邻且含破坏性操作
- *   安全改法需要重排（拉开间距或改成滑动/长按），必须有视觉验证。因此这里固化为
- *   「不许变多」的棘轮 + 逐条登记原因，等有人能看真机时再按清单重排。
+ *   抢占——后来的元素盖住先前的，点击落到错的按钮上。v1.20.26 逐条核对相邻关系后，13 处里
+ *   10 处用「可见尺寸不变 + 透明 ::after 扩到 60rpx」修好（视觉零变化）；剩下 3 处是真的没有
+ *   安全扩法，理由写在 REGISTRY 里：
+ *     · .tl-credit 在 96rpx 缩略图内、整行绑 onToggle → 扩了就把「展开」变「看版权」
+ *     · .rc-x      父级绑 applyFav，chip 内 gap 10rpx → 左扩吃「应用」、右扩吃邻 chip
+ *     · .op        三颗按钮竖向排列 gap 仅 6rpx 且含破坏性「移除」→ 必然重叠
+ *   这三处的正解都是重排/改交互，必须有视觉验证，因此固化为「不许变多」的棘轮 + 逐条登记原因。
  *
  * 不新增 allcheck 步数：串在既有 step 里跑（加减步会触发考核材料校验失败）。
  */
@@ -34,22 +35,16 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const HARD = 60;      // 低于此值必须登记
 const RECO = 88;      // 通用建议下限（只统计）
 
-/* 已登记的「固定高度 < 60rpx 的可点元素」。cls → 原因（为什么不能直接放大）。
- * 修好一处就删一条 —— 门禁会检查登记是否过期（不再小于硬线 / class 已消失）并判红。 */
+/* 已登记的「触达尺寸 < 60rpx 的可点元素」。cls → 原因（为什么不能直接放大）。
+ * 修好一处就删一条 —— 门禁会检查登记是否过期（不再小于硬线 / class 已消失）并判红。
+ *
+ * v1.20.26：13 处里 10 处已用「可见尺寸不变 + 透明 ::after 扩热区」修好并从本表删除
+ * （.mc-x .mr-x .cell-x .tk-dot .wx-close .w-del .ps-del .ps-close .step-btn .sop）。
+ * 剩下 3 处是**物理上没有安全扩法**的，理由按实际相邻关系重写过，不再是「大概会抢点击」。 */
 const REGISTRY = {
-  "tl-credit": "图片角落的来源标注（30rpx），非功能区；扩热区会在卡片角上形成吞点击的死区",
-  "mc-x":      "想玩缺口的移除 ✕（34rpx），与名称文字同处一个 chip，左扩会抢占名称区域导致误删 → 需重排",
-  "rc-x":      "父级 .recent-chip 绑 bindtap=applyFav，扩热区会把「应用」误触成「删除」→ 绝不可单方面扩",
-  "mr-x":      "左侧紧邻「＋」天数步进按钮，扩热区会抢步进点击",
-  "cell-x":    "缩略图右上角删除 ✕（40rpx），热区与图片本体重叠",
-  "tk-dot":    "装备步骤指示点（42rpx），横向密集排列且同时承担跳转",
-  "op":        "「想玩 / 导航 / 移除」四个相邻按钮（44rpx）且含破坏性操作，扩热区互相抢占 → 需重排",
-  "wx-close":  "天气卡关闭 ✕（44rpx），行内与文案紧邻",
-  "w-del":     "想玩删除（48rpx），与同排 .op-btn 间距 16rpx，扩到 ≥64rpx 即与本行按钮重叠",
-  "ps-del":    "多站列表删除（48rpx），同上：与相邻按钮的间距不足以再扩",
-  "ps-close":  "站点卡关闭（52rpx），行内与站点名相邻",
-  "step-btn":  "出行天数步进按钮（56rpx），紧邻天数数字",
-  "sop":       "行程条操作按钮（58rpx），与条目文案同一行",
+  "tl-credit": "图片来源 © 标注（30rpx），位于 96rpx 缩略图内、且整行 .tl-item 绑 onToggle；扩到 60rpx 会占掉缩略图 39% 并把「展开行程」误触成「看版权」。正解是把来源信息移进展开面板，属布局改版",
+  "rc-x":      "父级 .recent-chip 绑 bindtap=applyFav（应用该城市），chip 内 gap 仅 10rpx、右侧 padding 8rpx；左扩吃「应用」、右扩越过 chip 边界吃相邻 chip，任何单方面扩都会把「应用」变成「删除」。正解是 ✕ 外置或改长按删除",
+  "op":        "「想玩 / 导航 / 移除」三颗 44rpx 按钮在 .tl-ops 里**竖向排列、gap 仅 6rpx**，扩到 60rpx 必然与上下相邻按钮重叠，而其中一颗是破坏性「移除」。正解是把 .tl-ops 改横向排列并重排行尾，需真机视觉确认",
 };
 
 function walk(d, out = []) {
@@ -92,13 +87,18 @@ for (const f of files.filter((x) => x.endsWith(".wxml"))) {
 }
 
 /* ② 这些 class 的高度：取 max(固定 height, min-height, 透明扩热区) */
+/* v1.20.26：口径从「只看高度」升级为「看宽高较小者」。
+ * 原判据只读 height，于是一个 200rpx 宽 × 20rpx 高的长条按钮会被判成合格——那不是触达面积够，
+ * 是尺子量错了维度。实测按 min(宽,高) 复核，全仓仍是同一批 13 个元素（没有因为改口径冒出新红），
+ * 说明这次加强不会给后来者制造假红，可以放心收紧。
+ * 宽度同样只在**显式声明**时才参与判定：由内容撑开的宽度无法静态得知，不假装覆盖。 */
 // 「透明扩热区」= ::before/::after 且**不画任何可见内容**（无 background / border / box-shadow / color）。
 // 这条过滤不能省：本仓有大量装饰伪元素（时间线圆点 .tl-item::before 13rpx、分组折叠 chevron
 // .group-title::after 14rpx、左侧金条 .group-title::before 8x22rpx），它们尺寸很小但**完全不是**
 // 触达面积。第一版把伪元素一律当热区，于是把 .tl-item（整行，靠 padding 撑高）误判成 13rpx，
 // 门禁自己造假红 —— 判据写错比漏判更浪费时间。
 const PAINTS = /(?:^|;)\s*(?:background|background-color|border|border-\w+|box-shadow|color|outline)\s*:/;
-const geo = new Map();            // cls -> { fixed, after }
+const geo = new Map();            // cls -> { fixed, fixedW, afterW, afterH }
 for (const f of files.filter((x) => x.endsWith(".wxss"))) {
   const css = fs.readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -108,17 +108,19 @@ for (const f of files.filter((x) => x.endsWith(".wxss"))) {
       const pseudo = /^\.([A-Za-z0-9_-]+)::?(?:after|before)$/.exec(sel);
       const cls = plain ? plain[1] : (pseudo ? pseudo[1] : null);
       if (!cls || !tapClasses.has(cls)) continue;
-      const g = geo.get(cls) || { fixed: 0, after: 0 };
+      const g = geo.get(cls) || { fixed: 0, fixedW: 0, afterW: 0, afterH: 0 };
       const px = (re) => { const r = re.exec(body); return r ? Number(r[1]) : 0; };
       if (plain) {
         const h = px(/(?:^|;)\s*height\s*:\s*(-?[\d.]+)rpx/);
         const mh = px(/(?:^|;)\s*min-height\s*:\s*(-?[\d.]+)rpx/);
+        const w = px(/(?:^|;)\s*width\s*:\s*(-?[\d.]+)rpx/);
+        const mw = px(/(?:^|;)\s*min-width\s*:\s*(-?[\d.]+)rpx/);
         if (h || mh) g.fixed = Math.max(g.fixed, h, mh);
+        if (w || mw) g.fixedW = Math.max(g.fixedW, w, mw);
       } else if (!PAINTS.test(body)) {
-        // 纯透明伪元素才当扩热区
-        g.after = Math.max(g.after,
-          px(/(?:^|;)\s*width\s*:\s*(-?[\d.]+)rpx/),
-          px(/(?:^|;)\s*height\s*:\s*(-?[\d.]+)rpx/));
+        // 纯透明伪元素才当扩热区；宽和高分别记，不能只用 max —— 100×20 的热区不算达标
+        g.afterW = Math.max(g.afterW, px(/(?:^|;)\s*width\s*:\s*(-?[\d.]+)rpx/));
+        g.afterH = Math.max(g.afterH, px(/(?:^|;)\s*height\s*:\s*(-?[\d.]+)rpx/));
       }
       geo.set(cls, g);
     }
@@ -135,8 +137,10 @@ console.log("【可点元素触达尺寸】");
 const tooSmall = [];    // < HARD
 const advisory = [];    // HARD..RECO
 for (const [cls, g] of geo) {
-  const eff = Math.max(g.fixed, g.after);
-  if (!eff) continue;                        // 没声明高度（由 padding/内容撑起）→ 静态无法判定，不装作覆盖
+  const H = Math.max(g.fixed, g.afterH);
+  const W = Math.max(g.fixedW, g.afterW);
+  if (!H) continue;                          // 高度没声明（由 padding/内容撑起）→ 静态无法判定，不装作覆盖
+  const eff = W ? Math.min(H, W) : H;        // 宽高都已知时取较小者：触达面积由短边决定
   if (eff < HARD) tooSmall.push({ cls, eff, files: [...(tapClasses.get(cls) || [])] });
   else if (eff < RECO) advisory.push({ cls, eff });
 }
