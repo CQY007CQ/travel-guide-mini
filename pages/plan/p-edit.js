@@ -91,7 +91,8 @@ module.exports = {
   } else {
    // 存清洗名（去掉「深度游览…」等前缀/时长括号），与景点池名字精确匹配，重排才能命中
    const nm = T.cleanSpotName(it.name) || it.name;
-   if (!T.isWished(nm)) T.toggleWish(nm, T.segCityOfDay(plan, di) || plan.cityName);
+   // v1.20.32：写入侧也解码 —— 否则脏档每点一次想玩，就把编码串再传播一份到清单里
+   if (!T.isWished(nm)) T.toggleWish(nm, T.decQuery(T.segCityOfDay(plan, di) || plan.cityName || ""));
    wx.showToast({ title: "已加入想玩（重新生成时优先）", icon: "none" });
   }
   this._render(plan);
@@ -104,7 +105,8 @@ module.exports = {
   if (!plan || !plan.days || !plan.days[di] || !plan.days[di].items) return;
   const it = plan.days[di].items[ix];
   if (!it || isFrame(it.name)) return;  // 抵达/出发等框架条目不打卡（原 it.f 取的是渲染字段，原始 item 上不存在 → 拦截失效）
-  const cityName = T.segCityOfDay(plan, di) || plan.cityName || "";
+  // v1.20.32：这段 cityName 既写进打卡记录，也直接出现在 toast「已打卡 · 点亮 XX」里
+  const cityName = T.decQuery(T.segCityOfDay(plan, di) || plan.cityName || "");
   const on = !T.isVisited(it.name);
   const st = T.markVisited(it.name, cityName, on);
   wx.showToast({ title: on ? "已打卡 · 点亮 " + cityName : "已取消打卡", icon: "none" });
@@ -116,7 +118,7 @@ module.exports = {
   const n = e.currentTarget.dataset.name;
   const plan = app.globalData.plan;
   if (!n) return;
-  T.toggleWish(n, plan && plan.cityName);
+  T.toggleWish(n, T.decQuery((plan && plan.cityName) || ""));
   wx.showToast({ title: "已移出想玩", icon: "none" });
   if (plan) this._render(plan); // 防御：plan 未加载时不渲染，避免空引用（生产环境 plan 必存在）
 },
@@ -483,7 +485,8 @@ module.exports = {
   if (!plan) return;
   wx.showModal({
    title: "结束这趟行程？",
-   content: "将清空当前「" + plan.cityName + "」行程回到出发页；账单 / 想玩 / 待办会保留，可随时重新生成。",
+   // v1.20.32：这是系统弹窗正文，旧脏档会弹成「将清空当前「%E5%8C%97%E4%BA%AC」行程」
+   content: "将清空当前「" + T.decQuery(plan.cityName || "") + "」行程回到出发页；账单 / 想玩 / 待办会保留，可随时重新生成。",
    confirmText: "结束行程",
    confirmColor: "#d4a94e",
    success: (res) => {

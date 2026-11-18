@@ -193,14 +193,20 @@ Page(SafePage({
       i, name: x.name, city: x.city || "", planned: !!x.planned, visited: !!x.visited
     }));
     // C1（v1.9.1）：想玩按城市分组（多优先在前；空 city 归「未标注城市」并排最后）
+    // v1.20.32：wish 条目里的 city 可能来自旧脏档行程（编码串），这里既做分组 key
+    // 又直接当分组标题渲染 → 会显示「%E5%8C%97%E4%BA%AC 3 个」。分组仍按原名归并（同城同组），
+    // 展示名单独解一次码；「未标注城市」是代码里造的兜底文案，别再解码（解了也是原样）。
     const wmap = {};
-    wish.forEach(x => { const k = x.city || "未标注城市"; (wmap[k] = wmap[k] || []).push(x); });
+    wish.forEach(x => {
+      const k = x.city || "未标注城市";
+      (wmap[k] = wmap[k] || []).push(x);
+    });
     const wishGroups = Object.keys(wmap)
       .sort((a, b) => {
         if ((a === "未标注城市") !== (b === "未标注城市")) return a === "未标注城市" ? 1 : -1;
         return (wmap[b].length - wmap[a].length) || a.localeCompare(b, "zh");
       })
-      .map(city => ({ city, items: wmap[city] }));
+      .map(city => ({ city: city === "未标注城市" ? city : T.decQuery(city), items: wmap[city] }));
     // 行程存档（不含当前行程本身，避免与「旅行小结」重复展示）与足迹
     const curSig = hasPlan ? ((p.cityName || "") + "|" + p.days.length + "|" + (p.days[0] && p.days[0].date ? String(p.days[0].date).slice(0, 10) : "")) : "";
     const savedPlans = T.listSavedPlans().filter(x => x.sig !== curSig);
@@ -255,7 +261,7 @@ Page(SafePage({
             { key: "map", icon: "map", t: "地图导引", d: "每天真实坐标标点 + 导航" },
             { key: "food", icon: "food", t: "美食名店", d: "必吃清单 + 可导航的老店" },
             { key: "deep", icon: "bulb", t: "城市深度玩法", d: "本地节奏 / 避坑 / 机位 / 顺手加一日" },
-            { key: "assistant", icon: "search", t: "AI 助手 · 拍照识物", d: "问 AI / 拍照识植物地标（联网）/ 离线查美食门票；天气需联网…" },
+            { key: "assistant", icon: "search", t: "AI 助手 · 拍照识物", d: "问 AI / 拍照识物 / 查美食门票（识物需联网）" },
             { key: "toolkit", icon: "sparkle", t: "旅行百宝箱", d: "体检/文案/灵感/百科等 " + TOOL_TOTAL + " 个工具" }
           ]
         },
@@ -587,7 +593,8 @@ Page(SafePage({
   onShareAppMessage() {
     const p = app.globalData.plan;
     return {
-      title: (p ? p.cityName + " · " + (p.totalDays || p.days.length) + " 天攻略，离线也能规划" : "旅行攻略生成器：出发前准备、旅途中都能用") + "（离线可用）",
+      // v1.20.32：分享卡片标题会出现在微信会话里，脏档城市名必须解码
+      title: (p ? T.decQuery(p.cityName || "") + " · " + (p.totalDays || p.days.length) + " 天攻略，离线也能规划" : "旅行攻略生成器：出发前准备、旅途中都能用") + "（离线可用）",
       path: "/pages/index/index"
     };
   },

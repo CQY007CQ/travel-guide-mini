@@ -137,7 +137,9 @@ Page(SafePage({
     const people = hasPlan && plan.people ? plan.people : 0;
     const pace = hasPlan && plan.pace ? ({ leisure: "轻松", balance: "平衡", speed: "特种兵" })[plan.pace] || "" : "";
     const ctx = hasPlan
-      ? ("正在查：" + plan.cityName + (city && plan.cityName !== city ? "（当前：" + city + "）" : "") +
+      // v1.20.32：ctx 是直接渲染给用户看的一行字；旧脏档 cityName 是编码串，
+      // 不但显示成 %E5..，还会跟已解码的 activeCityOf 不相等 → 多带一句多余的「（当前：北京）」
+      ? ("正在查：" + T.decQuery(plan.cityName || "") + (city && T.decQuery(plan.cityName || "") !== city ? "（当前：" + city + "）" : "") +
          (people ? " · " + people + " 人" : "") + (pace ? " · " + pace + "节奏" : "") + " · 离线可用")
       : "先生成一份行程，下面卡片就能直接查";
     // 全场景 AI 速达面板：把小程序全部能力以 AI 语境一站式带到眼前
@@ -604,7 +606,7 @@ Page(SafePage({
     const ground = (offline.ground || "");
     const ctx = this._contextOf(plan, "行程复盘") +
       "\n\n本机真实素材（请以这些为准，只升华不编造任何没发生的事实）：\n" + (ground || "（本机暂无详细素材）");
-    const q = "请帮我写一份这趟「" + (plan.cityName || "") + "」的行程复盘/游记";
+    const q = "请帮我写一份这趟「" + T.decQuery(plan.cityName || "") + "」的行程复盘/游记";
     try { wx.showLoading({ title: "AI 写游记中", mask: false }); } catch (e) {}
     AIAgent.ask("review", q, ctx, PROMPTS.buildSystem("review"))
       .then(function (res) {

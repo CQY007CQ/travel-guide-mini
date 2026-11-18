@@ -1,4 +1,8 @@
-.page { display: flex; flex-direction: column; min-height: 100vh; box-sizing: border-box; padding-bottom: 40rpx; }
+/* v1.20.32：原先没有左右 padding，标题「旅客服务中心」几乎贴在屏幕边缘（真机量测 ~5rpx），
+   而卡片靠 app.wxss 的 .card{margin:0 24rpx} 有 24rpx 边距 → 标题比卡片还靠外，真机上看就是没对齐。
+   补 24rpx 与 guide/deep 两页一致。 */
+.page { display: flex; flex-direction: column; min-height: 100vh; box-sizing: border-box;
+  padding: 0 24rpx 200rpx; }
 
 /* 头部 */
 .svc-head { padding: 10rpx 4rpx 18rpx; }

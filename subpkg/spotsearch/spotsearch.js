@@ -63,8 +63,13 @@ Page(SafePage({
         const plan = app.globalData && app.globalData.plan;
         const opts = [{ k: "all", t: "全部城市", type: "all" }];
         if (plan) {
-          if (plan.cityName && !plan.isProv) opts.push({ k: plan.cityName, t: "仅看 " + plan.cityName, type: "city" });
-          else if (plan.isProv && plan.province) opts.push({ k: plan.province, t: "仅看 " + plan.province + "省", type: "prov" });
+          // v1.20.32：旧脏档的 cityName / province 是 URL 编码串，直接拿去当胶囊文案会显示
+          // 「仅看 %E5%8C%97%E4%BA%AC」（真机截图报障）。k 也必须解码 —— 它要跟景点表里的
+          // 明文城市名做相等筛选，不解码连筛选本身都是失效的。
+          const cName = T.decQuery(plan.cityName || "");
+          const pName = T.decQuery(plan.province || "");
+          if (cName && !plan.isProv) opts.push({ k: cName, t: "仅看 " + cName, type: "city" });
+          else if (plan.isProv && pName) opts.push({ k: pName, t: "仅看 " + pName + "省", type: "prov" });
         }
         this.setData({ scopeOptions: opts });
         // 识物页深链：带 q 进入则按名称预填并搜索（若带 city 且该城在筛选项里则限定范围）

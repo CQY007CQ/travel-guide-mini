@@ -1,5 +1,5 @@
 /* deep：城市深度玩法 —— 变量全部走全局双主题 token，不写死颜色 */
-.page { padding: 20rpx 24rpx 60rpx; }
+.page { padding: 20rpx 24rpx 200rpx; }
 
 .dp-head { padding: 26rpx 28rpx 22rpx; }
 .dp-title-row { display: flex; align-items: center; gap: 10rpx; }

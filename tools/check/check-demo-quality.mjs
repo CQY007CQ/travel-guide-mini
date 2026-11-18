@@ -232,6 +232,74 @@ const checks = [
     must(/fmtLocalDate/.test(st) && /fmtDateTime/.test(st) && /fmtClock/.test(st) && /fmtHM/.test(st),
       "utils/store.js 未导出完整日期格式化 API");
     return "单点 utils/store.js（4 个 API）";
+  }],
+
+  // v1.20.32：深度玩法的 updated 字段会直接渲染成「{{cur.updated}} 整理」给用户看。
+  // 实测 ai-deep-auto.js 里写的是 "2026-11-auto"（内部「自动生成」标记），
+  // 且 subai/deep/deep.js 取的是全局 A.updatedAt()（三次 applyMod 最后一次胜出）
+  // → 每一座城市的深度玩法页顶部都显示「2026-11-auto 整理」，机器标记漏到界面上了。
+  // 「是不是自动生成」已由同级的 auto:true 表达，不需要污染面向用户的版本串。
+  ["深度玩法版本串不得漏内部标记", () => {
+    const files = ["subai/data/ai-deep.js", "subai/data/ai-deep-extra.js", "subai/data/ai-deep-auto.js"];
+    let scanned = 0;
+    const bad = [];
+    for (const rel of files) {
+      if (!has(rel)) continue;
+      scanned++;
+      const src = read(rel);
+      for (const m of src.matchAll(/updated:\s*"([^"]*)"/g)) {
+        if (!/^\d{4}-\d{2}$/.test(m[1])) bad.push(rel + " → " + JSON.stringify(m[1]));
+      }
+    }
+    // 判据下限：扫描范围塌缩成空集时不能静默通过
+    must(scanned >= 2, "深度数据文件只扫到 " + scanned + " 个（< 2），判据可能已失效");
+    must(!bad.length, "深度玩法 updated 不是纯 YYYY-MM（界面会直接显示出来）: " + bad.join("、"));
+    return scanned + " 个文件 / 版本串均为 YYYY-MM";
+  }],
+
+  // v1.20.32：这一版连抓到 5 处「旧脏档的编码城市名漏到界面」——
+  //   找景点「仅看 %E5%8C%97%E4%BA%AC」、结束行程弹窗、AI 助手「正在查：%E5..」、
+  //   地图多站 dayText、识物「当前所在城市」、打卡 toast、分享卡片标题。
+  // 共同形态都是把 plan.cityName / plan.province **直接拼进展示字符串**。
+  // 真源口径：展示一律走 T.decQuery()（不含 % 时原样返回，对正常城市名零副作用）。
+  // 这条只盯 plan.* 这两个字段 —— 局部变量 cityName 可能已经是解码后的值，
+  // 一律禁掉会误报，反而让门禁被无视。
+  ["展示城市名必须过 decQuery（存档里的城市名可能是 URL 编码串）", () => {
+    // 判据形态：一行里同时出现「某个对象的 .cityName / .province」和「字符串拼接」。
+    // 为什么盯任意别名而不只 plan.*：同一份脏数据会经 activeCityOf / 局部变量 p / segs 元素
+    // 流到展示层（实测 more.js 分享标题是 p.cityName，p-render 是 segs.map(s => s.cityName)）。
+    // 排除三类**明确不是展示**的形态：缓存/签名 key（用 "|" 拼）、画布字号计算、相等比较。
+    // 上游已解码 / 数据本身干净的行，允许在**本行或上一行**写 // stale-city-ok 并说明理由。
+    const FIELD = /\b[A-Za-z_$][\w$]*\.(?:cityName|province)\b/;
+    const CONCAT = /\+\s*["'「]|["'」]\s*\+/;
+    const NOT_UI = /"\|"|\|"|ctx\.font|===|!==/;
+    const dirs = ["pages", "subpkg", "subai"];
+    const bad = [];
+    let scanned = 0, exempt = 0;
+    const walk = (rel) => {
+      const abs = path.join(ROOT, rel);
+      for (const e of fs.readdirSync(abs)) {
+        const r = rel + "/" + e;
+        if (fs.statSync(path.join(ROOT, r)).isDirectory()) { walk(r); continue; }
+        if (!r.endsWith(".js")) continue;
+        scanned++;
+        const lines = read(r).split("\n");
+        lines.forEach((line, i) => {
+          const t = line.trim();
+          if (t.startsWith("//") || t.startsWith("*")) return;
+          if (t.indexOf("decQuery") >= 0) return;
+          const prev = i > 0 ? lines[i - 1] : "";
+          if (t.indexOf("stale-city-ok") >= 0 || prev.indexOf("stale-city-ok") >= 0) { exempt++; return; }
+          if (FIELD.test(line) && CONCAT.test(line) && !NOT_UI.test(line)) {
+            bad.push(r + ":" + (i + 1) + "  " + t.slice(0, 90));
+          }
+        });
+      }
+    };
+    for (const d of dirs) if (has(d)) walk(d);
+    must(scanned >= 60, "只扫到 " + scanned + " 个页面 JS（< 60），判据可能已失效");
+    must(!bad.length, "以下位置把城市名/省份裸拼进了展示字符串（应走 T.decQuery）: " + bad.join(" ／ "));
+    return scanned + " 个页面 JS 零裸拼（显式豁免 " + exempt + " 处）";
   }]
 ];
 

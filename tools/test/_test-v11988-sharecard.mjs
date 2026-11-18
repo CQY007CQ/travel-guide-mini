@@ -5,6 +5,12 @@
 // stamp 短路 + 失败静默、onShareAppMessage 有图接 imageUrl / 无图回退。
 import { readFileSync } from "fs";
 import vm from "vm";
+import { createRequire } from "module";
+// v1.20.32：onShareAppMessage 的标题拼接改用 T.decQuery（旧脏档 cityName 是 %E5.. 编码串，
+// 转发到微信会话里会把编码原样显示）。沙盒必须注入**真** T，不能再造一份假 decQuery ——
+// 假实现会和真实现漂移，而 decQuery 本身已有 _test-ai-reach 的 6 条行为断言兜底。
+const req = createRequire(import.meta.url);
+const T = req("../../utils/travel.js");
 // T4 拆文件后，行程页方法分散到 pages/plan/plan.js + 同目录 p-*.js；
 // 抽取统一走 pageSrc（页面 + 兄弟模块），断言面只增不减。
 import { pageSrc } from "../lib/page-src.mjs";
@@ -113,8 +119,8 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
 // ---------- 4. onShareAppMessage 接线 ----------
 {
   const src = grab("pages/plan/plan.js", "onShareAppMessage");
-  const mk = (shareImg) => {
-    const ctx = { app: { globalData: { plan: PLAN } } };
+  const mk = (shareImg, plan) => {
+    const ctx = { app: { globalData: { plan: plan || PLAN } }, T };
     mkCtx(ctx);
     const page = { __shareImg: shareImg };
     return vm.runInContext("(" + src + ")", ctx).call(page);
@@ -124,6 +130,12 @@ const PLAN = { cityName: "太原", province: "山西", savedAt: 123, days: [{ it
   ok("share：深链参数保留（city/days）", withImg.path.indexOf("city=") >= 0 && withImg.path.indexOf("days=") >= 0);
   const noImg = mk(null);
   ok("share：无图回退（不传 imageUrl，纯文字现状）", noImg.imageUrl === undefined);
+  // 旧脏档：cityName 是 URL 编码串，转发标题会直接把它丢进微信会话
+  const enc = mk("wxfile://tmp_share.png", Object.assign({}, PLAN, { cityName: "%E5%A4%AA%E5%8E%9F" }));
+  ok("share：标题里旧脏档的编码城市名已解码", enc.title.indexOf("太原") >= 0 && enc.title.indexOf("%E5") < 0, enc.title);
+  // 对照组：正常城市名不能被 decQuery 改坏
+  const plain = mk("wxfile://tmp_share.png");
+  ok("share：正常城市名原样保留（对照组）", plain.title.indexOf("太原") >= 0, plain.title);
 }
 
 console.log(fail ? "\n❌ " + fail + " 项失败" : "\n✅ 全部通过");

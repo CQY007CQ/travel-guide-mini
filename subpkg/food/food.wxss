@@ -1,4 +1,4 @@
-.page { padding-bottom: 80rpx; }
+.page { padding-bottom: 200rpx; }
 
 /* 多站城市切换条 */
 .segs-scroll { margin: 20rpx 0 -6rpx; white-space: nowrap; }
@@ -52,7 +52,7 @@
 .menu-n { color: var(--t1, #eaeff7); }
 .menu-p { color: var(--t3, #8fa3bc); font-size: calc(22rpx * var(--fs, 1)); margin-left: 16rpx; flex-shrink: 0; }
 .menu-foot { display: block; font-size: calc(19rpx * var(--fs, 1)); margin-top: 8rpx; }
-.menu-empty { font-size: calc(22rpx * var(--fs, 1)); margin-top: 12rpx; }
+.menu-none-tip { font-size: calc(22rpx * var(--fs, 1)); margin: 4rpx 0 12rpx; }
 
 .shop-note { margin-top: 14rpx; font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); line-height: 1.7;
   padding: 12rpx 16rpx; border-radius: 12rpx; background: rgba(var(--ln-rgb, 148,163,184),.04); border-left: 4rpx solid rgba(212,169,78,.5); }

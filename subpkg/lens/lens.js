@@ -66,7 +66,8 @@ Page(SafePage({
     onShowRender(this, "lens", null, () => {
       try {
         const plan = app.globalData && app.globalData.plan;
-        const city = plan ? (T.activeCityOf(plan) || plan.cityName || "") : "";
+        // v1.20.32：activeCityOf / plan.cityName 都不解码，脏档会显示成「当前所在城市：%E5..」
+        const city = plan ? T.decQuery(T.activeCityOf(plan) || plan.cityName || "") : "";
         let hist = [];
         try { hist = S.get(HIST_KEY, []) || []; } catch (e) { hist = []; }
         this.setData({ cloudOn: Cloud.cloudEnabled(), cityName: city || "", history: Array.isArray(hist) ? hist.slice(0, HIST_MAX) : [] });
@@ -139,7 +140,8 @@ Page(SafePage({
   },
 
   _prompt() {
-    const city = this.data.cityName ? ("当前所在城市：" + this.data.cityName + "。") : "";
+    // stale-city-ok：this.data.cityName 在 onLoad 里已过 T.decQuery（见 cityName 的 setData）
+  const city = this.data.cityName ? ("当前所在城市：" + this.data.cityName + "。") : "";
     return city + "请识别这张（这些）照片里的主体。\n" + this._format() +
       "\n注意：若上下文附有本地景点名清单，它只用于「照片确实是那个地标时」统一标准名称；不是就照实作答，严禁套用清单里的名字。";
   },

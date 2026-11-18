@@ -9,7 +9,7 @@
   <!-- 搜索框 -->
   <view class="card search-bar">
     <image lazy-load class="s-ic" src="/images/icons/search.png"/>
-    <input class="s-inp" value="{{qText}}" placeholder="输入关键词，如：雪山 / 古镇 / 免费 / 带娃" confirm-type="search" bindinput="onInput" bindconfirm="onSearch"/>
+    <input class="s-inp" value="{{qText}}" placeholder="如：雪山 / 古镇 / 免费 / 带娃" confirm-type="search" bindinput="onInput" bindconfirm="onSearch"/>
     <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="s-go" bindtap="onSearch">搜索</view>
   </view>
 

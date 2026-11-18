@@ -196,7 +196,8 @@ module.exports = {
     } catch (e) {}
     const path = "/pages/index/index" + (q.length ? "?" + q.join("&") : "");
     const ret = {
-      title: (plan ? "我做了份「" + plan.cityName + "·" + days + "天攻略」，景点路线美食都排好了" : "旅行攻略生成器") + "（离线可用）",
+      // v1.20.32：分享卡片标题会直接出现在微信会话里，旧脏档的编码城市名必须解码后再拼
+      title: (plan ? "我做了份「" + T.decQuery(plan.cityName || "") + "·" + days + "天攻略」，景点路线美食都排好了" : "旅行攻略生成器") + "（离线可用）",
       path: path
     };
     // v1.19.88：转发卡片换黑金分享图（_ensureShareCard 惰性生成；未生成完回退默认卡片，不阻塞分享）

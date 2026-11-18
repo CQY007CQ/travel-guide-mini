@@ -1,4 +1,4 @@
-.page { padding-bottom: 80rpx; }
+.page { padding-bottom: 200rpx; }
 
 .stat-card { display: flex; padding: 24rpx 0; }
 

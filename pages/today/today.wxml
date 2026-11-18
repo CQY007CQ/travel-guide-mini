@@ -5,7 +5,8 @@
     <view wx:if="{{quote}}" class="em-quote">「{{quote.txt}}」</view>
     <view class="em-ic"><image class="em-img" src="/images/icons/compass.png"/></view>
     <view class="em-t">还没有行程</view>
-    <view class="em-s">先去「出发」页生成一份攻略<br/>这里会自动告诉你「今天该干嘛」</view>
+    <view class="em-s">先去「出发」页生成一份攻略</view>
+    <view class="em-s">这里会自动告诉你「今天该干嘛」</view>
     <button class="btn-primary em-btn" bindtap="goIndex">去生成攻略</button>
   </view>
 
@@ -136,7 +137,9 @@
           <text class="tc-badge b-after">行程已结束</text>
         </view>
         <view class="after-sum">
-          {{view.daysSince}} 天前结束了这趟 {{view.cityName}} 之旅<br/>
+          {{view.daysSince}} 天前结束了这趟 {{view.cityName}} 之旅
+        </view>
+        <view class="after-sum">
           一共走了 {{view.spots}} 个景点<block wx:if="{{view.totalMoney > 0}}"> · 记账合计 ¥{{view.totalMoney}}</block>
         </view>
         <!-- v1.8.5 C10：回顾 CTA（足迹 / 年鉴 / 城市经验都在「我的」） -->

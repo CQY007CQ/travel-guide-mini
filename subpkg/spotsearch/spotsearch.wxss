@@ -1,5 +1,5 @@
 /* 按标签找景点 —— 复用全局主题变量（浅/深双主题） */
-.page { padding: 20rpx 22rpx 60rpx; box-sizing: border-box; min-height: 100%; }
+.page { padding: 20rpx 22rpx 200rpx; box-sizing: border-box; min-height: 100%; }
 
 .head { padding: 12rpx 8rpx 18rpx; }
 .h-title { font-size: calc(40rpx * var(--fs, 1)); font-weight: 700; color: var(--t1); letter-spacing: 1rpx; }

@@ -128,6 +128,9 @@ Page(SafePage({
         cityName = segs[s].cityName || cityName;
       }
     }
+    // v1.20.32：上面两个分支用 segs[x].cityName 直接盖掉了 planCityName 的解码结果，
+    // 脏档多站行程时城市名会带 %E5.. 漏进 dayText / markerType 展示。这里兜统一一次。
+    cityName = T.decQuery(cityName || "");
     let mk = [], list = [], realCoords = [];
     let c = null;
     try {

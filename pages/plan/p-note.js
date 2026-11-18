@@ -129,7 +129,8 @@ module.exports = {
  _remindItem(plan) {
   const d = (plan.days && plan.days[0] && String(plan.days[0].date) || "").slice(0, 10);
   if (!d) return null;
-  const city = plan.cityName || (plan.province ? plan.province + " 全省" : "目的地");
+  // v1.20.32：订阅提醒的标题/planId 会直接展示与存档，旧脏档的编码城市名必须解码
+  const city = T.decQuery(plan.cityName || "") || (T.decQuery(plan.province || "") ? T.decQuery(plan.province || "") + " 全省" : "目的地");
   return {
    planId: String(plan.id || "") || city + d,
    date: d,

@@ -112,6 +112,7 @@ module.exports = {
       const tot = this._sumDays(cfg.multiRoute || []);
       return rs + " · 共 " + tot + " 天";
     }
+    // stale-city-ok：cfg 是首页草稿配置，城市名来自城市选择列表（明文），不经过存档
     return (cfg.cityName || "未选城市") + " · " + (cfg.days || 0) + " 天";
   },
 

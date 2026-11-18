@@ -1,5 +1,5 @@
 /* 使用指南：简洁文档风，双主题变量；金色仅作点缀 */
-.page { padding: 20rpx 24rpx 60rpx; }
+.page { padding: 20rpx 24rpx 200rpx; }
 
 /* ── 顶部定位横幅 ── */
 .g-hero {

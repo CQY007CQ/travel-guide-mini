@@ -37,6 +37,7 @@
 
     <view class="card">
       <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/trophy.png"/>地道名店推荐 <text class="dim u-fs20">（{{shopHead}}）</text></view>
+      <view wx:if="{{menuNone}}" class="menu-none-tip dim">本城暂无菜单数据 · 价格为参考人均，到店以实价为准</view>
       <view wx:if="{{budgetTxt}}" class="budget-tip"><image lazy-load class="ic ic-sm" src="/images/icons/wallet.png"/>{{budgetTxt}}</view>
       <view wx:if="{{shopSrc}}" class="budget-tip"><image lazy-load class="ic ic-sm" src="/images/icons/target.png"/>{{shopSrc}}</view>
       <view wx:if="{{dishNote}}" class="budget-tip"><image lazy-load class="ic ic-sm" src="/images/icons/search.png"/>{{dishNote}}</view>
@@ -58,7 +59,6 @@
           </view>
           <text class="menu-foot dim">到店以实价为准</text>
         </view>
-        <view wx:else class="menu-empty dim">菜单整理中…</view>
         <view wx:if="{{item.note}}" class="shop-note"><text class="note-tag">编辑点评</text>{{item.note}}</view>
       </view>
     </view>

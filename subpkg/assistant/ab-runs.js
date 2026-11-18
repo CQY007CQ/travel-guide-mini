@@ -71,7 +71,7 @@ function runPlanOptimize(text, city, ctx) {
   if (!ck) {
     return { text: "暂时没法给行程做体检，去行程页手动看看吧。", actions: [act("pages/plan/plan", "打开行程页 →", {}, "tab")], intent: "planOptimize" };
   }
-  const lines = ["行程体检 · " + (plan.cityName || "") + " " + plan.days.length + " 天 · 得分 " + (ck.score != null ? ck.score : "—")];
+  const lines = ["行程体检 · " + (T.decQuery(plan.cityName || "")) + " " + plan.days.length + " 天 · 得分 " + (ck.score != null ? ck.score : "—")];
   (ck.items || []).slice(0, 5).forEach(function (it) {
     lines.push("· " + (it.label || "") + "：" + (it.ok ? "✓" : "✗") + (it.detail ? "（" + it.detail + "）" : ""));
   });
@@ -87,7 +87,7 @@ function runToday(text, city, ctx) {
   }
   let st = null;
   try { if (T.todayState) st = T.todayState(plan); } catch (e) {}
-  const lines = ["今天速览 · " + (plan.cityName || "")];
+  const lines = ["今天速览 · " + (T.decQuery(plan.cityName || ""))];
   if (st) {
     if (st.phase === "before") lines.push("距出发还有 " + st.daysLeft + " 天（出发日 " + String(plan.depart || "").slice(0, 10) + "）。");
     else if (st.phase === "during") lines.push("正在进行第 " + st.dayNo + "/" + st.total + " 天。");
@@ -105,7 +105,7 @@ function runPrep(text, city, ctx) {
   const plan = ctx && ctx.plan;
   let extra = [];
   try { if (plan && T.packExtra) extra = T.packExtra(plan); } catch (e) {}
-  const lines = ["出行准备" + (plan ? " · " + (plan.cityName || "") : "")];
+  const lines = ["出行准备" + (plan ? " · " + (T.decQuery(plan.cityName || "")) : "")];
   if (extra && extra.length) lines.push("按你行程的特色，建议带上：" + extra.join("、") + "。");
   else lines.push("通用清单已在「出行准备」页整理好（证件、药、充电宝等）。");
   lines.push("打开准备页还能生成自动行李清单。");
@@ -155,7 +155,7 @@ function runEmergency(text, city, ctx) {
   } else {
     lines.push("遇到急症先拨打 120；骨折/出血/中暑等常见情况的处理要点见「旅途应急」页。");
   }
-  const c = city || (ctx && ctx.plan && ctx.plan.cityName) || "";
+  const c = T.decQuery(city || (ctx && ctx.plan && ctx.plan.cityName) || "");
   if (c) {
     let hs = [];
     try { if (EMERGENCY && EMERGENCY.hospitalsOf) hs = EMERGENCY.hospitalsOf(c) || []; } catch (e) {}
@@ -222,7 +222,7 @@ function runLandmarks(text, city) {
 
 /* 穿衣 / 带伞：离线气候库 + 出发月份，绝不编实时天气 */
 function runDress(text, city, ctx) {
-  const c = city || (ctx && ctx.plan && ctx.plan.cityName) || "";
+  const c = T.decQuery(city || (ctx && ctx.plan && ctx.plan.cityName) || "");
   let d = null, brief = null;
   // v1.20.19：未收录城市从 findCity 拿到的是 generic（气候写死 temperate），
   // 旧实现拿它调 dressForMonth / cityBrief，等于拿模板冒充离线气候库 —— 零伪造红线。
@@ -269,7 +269,7 @@ function runRoute(text, city, ctx) {
   const di = (st && st.phase === "during") ? (st.idx || 0) : 0;
   const day = plan.days[di] || {};
   let mv = null;
-  try { mv = T.dayMove ? T.dayMove(day, plan.cityName) : null; } catch (e) {}
+  try { mv = T.dayMove ? T.dayMove(day, T.decQuery(plan.cityName || "")) : null; } catch (e) {}
   const lines = ["第 " + (di + 1) + " 天动线（按离线库真实坐标估算）"];
   if (mv) lines.push("· 全程约 " + mv.km + " km、步行约 " + mv.steps + " 步。");
   const items = (day.items || []).slice(0, 4).map(it => {
@@ -322,6 +322,7 @@ function runRecommend(text, city, ctx) {
   const hasTag = res.prefs && res.prefs.tags && res.prefs.tags.length;
   const lines = ["离线推荐" + (hasTag ? "（已按你的偏好）" : "") + "："];
   res.list.slice(0, 5).forEach(function (x, i) {
+    // stale-city-ok：x 是景点语料对象，x.province 来自随包数据（非用户存档），无需 decQuery
     lines.push((i + 1) + ". " + (x.name || "") + (x.province ? "（" + x.province + "）" : "") + " · " + (x.seasonNote || x.reasonTag || "综合推荐"));
   });
   lines.push("点城市名可直接生成行程；想更精准就说「海边+亲子+5天」这类组合。");
@@ -421,12 +422,12 @@ function runReview(text, city, ctx) {
     }
   } catch (e) {}
   const ground = [];
-  ground.push("行程：" + (plan.cityName || "") + "，" + plan.days.length + " 天。");
+  ground.push("行程：" + (T.decQuery(plan.cityName || "")) + "，" + plan.days.length + " 天。");
   if (spots.length) ground.push("去过的点（" + spots.length + "）：" + spots.join("、") + "。");
   if (notes.length) ground.push("旅行手记（" + notes.length + " 条）：\n" + notes.slice(0, 12).map(function (n) { return "· " + (n.date || "") + " " + (n.txt || ""); }).join("\n"));
   if (ledger.length) ground.push("记账条目 " + ledger.length + " 笔，累计 ¥" + total + "。");
   else if (total > 0) ground.push("累计花费 ¥" + total + "。");
-  const lines = ["行程复盘 · " + (plan.cityName || "") + " " + plan.days.length + " 天"];
+  const lines = ["行程复盘 · " + (T.decQuery(plan.cityName || "")) + " " + plan.days.length + " 天"];
 if (spots.length) lines.push("去过的点：" + spots.slice(0, 12).join("、") + (spots.length > 12 ? " 等" : ""));
   if (notes.length) lines.push("记了 " + notes.length + " 条手记，最近一句：「" + ((notes[notes.length - 1] && notes[notes.length - 1].txt) || "") + "」");
   if (total > 0) lines.push("这趟累计花了 ¥" + total + "（记账 " + ledger.length + " 笔）。");

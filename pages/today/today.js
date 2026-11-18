@@ -57,7 +57,10 @@ Page(SafePage({
     if (!st) { this.setData({ hasPlan: false }); return; }
     // 多站行程显示「今天所在站」，而不是整串「北京 → 西安」
     // v1.20.21：旧脏档城市名含 %XX，展示与城市资料查询统一走解码名（存档不动）
-    const cityName = T.activeCityOf(plan) || T.planCityName(plan);
+    // v1.20.32：activeCityOf 直接返回 segs[k].cityName / plan.cityName，不过 decQuery；
+    // 而 planCityName 只在 __staleCity 被标记时才解码。多站旧脏档会漏成「%E5%8C%97%E4%BA%AC」。
+    // 这里统一再兜一次（decQuery 对不含 % 的正常城市名零副作用）。
+    const cityName = T.decQuery(T.activeCityOf(plan) || T.planCityName(plan));
     const out = { cityName, phase: st.phase, hasPlan: true };
     // v1.8.4 A2：穿衣指数卡（按行程对应月份的当地气候给参考，而非「现在」的月份）
     try {

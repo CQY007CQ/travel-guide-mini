@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.31";
+const APP_VER = "1.20.32";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -710,15 +710,15 @@ function spotTagOf(name, cityName) {
 // v1.20.27：这里原本是 emoji。emoji 字形由系统字体决定（安卓可能变方块），且彩色立体 emoji
 // 与旁边的单色线条图标打架 —— 与 v1.20.25 界面去 emoji 的结论一致。
 // 改为 images/icons/ 下的自绘单色线条图标（白色，配按城市哈希出来的彩色渐变封面）。
-// v1.20.31：缩略图上的「示意图」角标全部去掉（真机截图报障：96rpx 的封面上再叠一行 16rpx
+// v1.20.32：缩略图上的「示意图」角标全部去掉（真机截图报障：96rpx 的封面上再叠一行 16rpx
 // 胶囊文字，字比图标还抢眼，且「示意图」三个字对用户只是噪音）。诚实性靠**形态**表达、
 // 不靠叠字：渐变 + 单色线条图标本身就是明确的图形化占位，没有照片质感，不存在「伪装成
 // 实拍」的歧义；isReal / placeholder 字段照旧，真图仍优先。
 // 边界：哪天封面改成有照片质感的设计（模糊实拍 / 拟真渲染），必须把标注加回来。
-// v1.20.31：住宿 / 交通类的名字天然是长店名（「XX客栈1 | YY民居客栈」），塞进 96rpx 宽的
+// v1.20.32：住宿 / 交通类的名字天然是长店名（「XX客栈1 | YY民居客栈」），塞进 96rpx 宽的
 // 名字条会逐字断行塌成一列（真机截图报障：整张封面全是字）。这两类一律显示类别短词，
 // 完整名称右侧行标题已有；其余名称超 6 字截断，样式层再加单行省略兜底。
-// v1.20.31：封面分类图标从 11 类扩到 30 类（用户真机报障「示意图和内容不匹配」）
+// v1.20.32：封面分类图标从 11 类扩到 30 类（用户真机报障「示意图和内容不匹配」）
 //
 // 病因不是某一张图选错，而是**颗粒度只有 11 类 + 兜底是 mountain**：
 //   旧写法 `COVER_ICON[cat] || 'mountain'` 里，任何没登记的类别都被画成山 ——
@@ -1286,7 +1286,7 @@ function exportICS(plan) {
   "VERSION:2.0",
   "PRODID:-//travel-mini//zh//",
   "CALSCALE:GREGORIAN",
-  "X-WR-CALNAME:" + esc(plan.cityName + " 行程")
+  "X-WR-CALNAME:" + esc(decQuery(plan.cityName) + " 行程")
  ];
  plan.days.forEach((d, di) => {
   const ds = String(d.date || "").slice(0, 10);
@@ -1303,7 +1303,9 @@ function exportICS(plan) {
   lines.push("DTSTAMP:" + stamp);
   lines.push("DTSTART;VALUE=DATE:" + dt);
   lines.push("DTEND;VALUE=DATE:" + dtEnd);
-  lines.push("SUMMARY:" + esc(plan.cityName + " · D" + (di + 1) + " · " + (d.theme || "行程")));
+  // v1.20.32：X-WR-CALNAME 已经过了 decQuery，SUMMARY 这行漏了 → 导进日历后
+  // 每条日程标题都是「%E5%8C%97%E4%BA%AC · D1 · 行程」
+  lines.push("SUMMARY:" + esc(decQuery(plan.cityName) + " · D" + (di + 1) + " · " + (d.theme || "行程")));
   lines.push("DESCRIPTION:" + esc(desc));
   lines.push("END:VEVENT");
  });
@@ -1469,11 +1471,11 @@ function copyPlanText(plan) {
  const fmt = s => String(s || "").slice(0, 10);
  // v1.19.193：退化行程（缺 totalDays/depart，或经「我的攻略」恢复的早期存档）会泄漏 "undefined"；
  // 用兜底值替换，保证复制出的文本始终可读。
- const cityName = plan.cityName || "目的地";
+ const cityName = decQuery(plan.cityName) || "目的地";
  const totalDays = (plan.totalDays != null) ? plan.totalDays : (Array.isArray(plan.days) ? plan.days.length : "");
  const departStr = plan.depart ? fmt(plan.depart) : "未定";
  L.push("" + cityName + " " + totalDays + " 天行程（出发 " + departStr + "，预算 " + budgetLabel(plan.budget) + "）");
- const city = findCity(plan.cityName);
+ const city = findCity(cityName);
  if (city && city.foods && city.foods.length) L.push("必吃：" + city.foods.join("、"));
  if (city && city.travel) L.push("" + city.travel);
  if (city && city.stayTip) L.push("" + city.stayTip);
@@ -1574,22 +1576,29 @@ function delRecent(i) {
 
 /* ---------- 本地攻略速查（离线 · 本地规则库 · 零网络） ---------- */
 // 当前应参考的城市：多站时取今天所在段（无则第一站），单城直接返回 cityName
+// v1.20.32：旧脏档的 cityName 是 URL 编码串（%E5%8C%97%E4%BA%AC）。这里是「当前城市」的
+// 唯一出口，直接原样返回有两个后果：
+//   ① 展示端（地图 dayText / AI 助手「正在查：」/ 识物「当前所在城市」/ 更多页分享标题）
+//      会把编码串显示给用户；
+//   ② **更隐蔽**：拿它去查景点表/美食表/坐标表必然查不到（那些表 key 是明文城市名），
+//      于是静默退化成 generic 模板城 —— 看着有内容，其实全是模板数据。
+// 解码对正常城市名零副作用（不含 % 立即原样返回），存档一个字节都不动。
 function activeCityOf(plan) {
  try {
   if (!plan) return "";
   const segs = Array.isArray(plan.segments) ? plan.segments : null;
-  if (segs && segs.length === 1) return segs[0].cityName || plan.cityName;
+  if (segs && segs.length === 1) return decQuery(segs[0].cityName || plan.cityName);
   if (segs && segs.length > 1) {
    const st = todayState(plan);
    if (st && st.phase === "during" && st.idx != null) {
     for (let k = 0; k < segs.length; k++) {
-     if (st.idx >= segs[k].startDay && st.idx <= segs[k].endDay) return segs[k].cityName;
+     if (st.idx >= segs[k].startDay && st.idx <= segs[k].endDay) return decQuery(segs[k].cityName);
     }
    }
-   return segs[0].cityName || plan.cityName;
+   return decQuery(segs[0].cityName || plan.cityName);
   }
-  return plan.cityName || "";
- } catch (e) { return plan ? (plan.cityName || "") : ""; }
+  return decQuery(plan.cityName || "");
+ } catch (e) { try { return decQuery(plan ? (plan.cityName || "") : ""); } catch (e2) { return plan ? (plan.cityName || "") : ""; } }
 }
 // 取某段（或全城）的名店数家作“吃”的补充
 function _foodNames(cityName, n) {
@@ -1632,7 +1641,7 @@ function askAssistant(rawQ, plan) {
  const L = s => lines.push(s);
  const isGreet = /^(你好|您好|嗨|hi|hello|在吗|hey)/i.test(q);
  if (isGreet) {
-  L("你好呀！我是你的离线旅行助手 \n这趟「" + plan.cityName + " · " + plan.days.length + " 天」我都在线（不用联网）。");
+  L("你好呀！我是你的离线旅行助手 \n这趟「" + decQuery(plan.cityName) + " · " + plan.days.length + " 天」我都在线（不用联网）。");
   L("试着问我：\n· 第2天怎么安排\n· " + city + "天气穿什么\n· 门票要预约吗\n· 吃什么/住哪/预算多少/怎么去");
   return { text: lines.join("\n"), tag: "ok" };
  }
@@ -1871,9 +1880,16 @@ function delPlanSlot(id) {
 function exportCollabPlan(plan) {
  const o = {
   app: "travel-collab", v: 1, savedAt: Date.now(),
-  city: plan && plan.cityName ? plan.cityName : "",
+  city: plan && plan.cityName ? decQuery(plan.cityName) : "",
   wish: getWish().map(w => ({ name: w.name, city: w.city || "" })),
-  plan: plan && plan.days && plan.days.length ? plan : null
+  // v1.20.32：city 字段解了码，但 plan 整份原样塞进包里 —— 旧脏档的 cityName / province
+  // 会以 %E5.. 的形式发给同行人。这里只改导出副本，绝不回写存档。
+  plan: plan && plan.days && plan.days.length
+   ? Object.assign({}, plan, {
+     cityName: decQuery(plan.cityName),
+     province: decQuery(plan.province)
+    })
+   : null
  };
  return JSON.stringify(o);
 }
@@ -2939,9 +2955,12 @@ function tripReview(plan) {
     topDay: topDay, topDayAmt: Math.round(byDate[topDay] || 0),
     topCat: topCat, topCatAmt: Math.round(byCat[topCat] || 0),
     notes: getNotes().length,
-    cityName: plan.cityName || "",
+    // tripReview 是派生对象（不落盘），cityName 只作为展示/查表用 → 与 title 保持同一口径
+    cityName: decQuery(plan.cityName || ""),
     phase: st.phase || "before",
-    title: (plan.cityName || "这次") + " · " + days + " 天小结",
+    // v1.20.32：这条标题会直接渲染在「我的 → 旅行小结」卡片上，脏档会显示成
+    // 「%E5%8C%97%E4%BA%AC · 3 天小结」（真机巡检抓到）
+    title: (decQuery(plan.cityName || "") || "这次") + " · " + days + " 天小结",
     text: days + " 天 · " + (ov.spots || 0) + " 个景点 · 打卡 " + (fp.done || 0) + " 个 · 花了 ¥" + Math.round(spent)
   };
 }
@@ -2970,7 +2989,11 @@ function delMate(i) {
 function tripCountdown(plan) {
   const st = todayState(plan);
   if (!st) return null;
-  const city = plan.cityName || "";
+  // v1.20.32：历史脏档的 cityName 是 URL 编码串（%E5%8C%97%E4%BA%AC），
+  // 这里直接拿去展示会变成「5 天后出发 · %E5%8C%97%E4%BA%AC」（真机截图报障）。
+  // 展示口径统一走 decQuery —— 它对正常城市名零副作用（不含 % 立即原样返回），
+  // 比依赖 plan.__staleCity 标记更可靠（那个标记要页面渲染时才会打上）。
+  const city = decQuery(plan.cityName || "");
   if (st.phase === "before") {
     const n = st.daysLeft;
     return {

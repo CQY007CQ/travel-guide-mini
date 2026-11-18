@@ -328,6 +328,7 @@ Page(SafePage({
   local();
   self.setData({ aiLoading: true, aiPending: true });
   let ctx = "";
+  // stale-city-ok：this.data.cityName 取自城市对象的 name（明文），不经过存档
   try { ctx = Cloud.aiContextOf(plan, "旅行百宝箱") + "\n当前城市：" + (this.data.cityName || "未知") + "。"; } catch (e) { ctx = ""; }
   AIAgent.ask("toolkit", q, ctx)
    .then((r) => {

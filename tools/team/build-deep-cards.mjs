@@ -69,7 +69,7 @@ for (const city of pick) {
   cities[city] = { teaser, blocks };
 }
 
-const out = { v: 1, updated: "2026-11-auto", auto: true, cities };
+const out = { v: 1, updated: "2026-11", auto: true, cities };
 // 无新增城市时直接跳过写盘：写一个 cities:{} 的空壳会把已有机卡片整体清空，
 // 而这种损失在下一次「打开深度玩法页」时才看得出来。
 const BANNER = [

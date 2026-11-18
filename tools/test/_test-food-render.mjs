@@ -104,6 +104,10 @@ async function main() {
         // v1.20.21：food.js 的 _renderShow 改走 T.planCityName（脏档展示名统一出口）。
         // vm 沙箱不跑顶层 require，新增依赖必须显式注入替身，否则这里会静默 fail。
         planCityName: (p) => (p && p.cityName) || "",
+        // v1.20.32：_renderShow 的 fallbackCity 改走 T.decQuery(T.planCityName(plan))。
+        // 这里直接注入**真实现**（文件顶部已 require 真的 utils/travel.js），不另写假函数 ——
+        // 假实现会和真实现漂移，而 decQuery 本身已有 _test-ai-reach / _test-stale-city 兜底。
+        decQuery: (v) => T.decQuery(v),
         themeMode: () => "light",
         fontScale: () => 1,
         applyNav: () => {}
@@ -139,6 +143,15 @@ async function main() {
       r.state.cityCalls.length === 1 && r.state.cityCalls[0][0] === "北京" && r.state.cityCalls[0][1] === "mid",
       JSON.stringify(r.state.cityCalls));
     ok("有攻略：无错误提示", r.state.toasts.length === 0);
+  }
+  {
+    // v1.20.32：旧脏档 cityName 是 URL 编码串。它既会显示成「%E5..」，
+    // 又会让 FOOD_SPOTS 查表落空（表 key 是明文城市名）→ 静默变成空店铺清单。
+    const r = runShow({ plan: { cityName: "%E5%8C%97%E4%BA%AC", days: [{}, {}], budget: "mid" } });
+    ok("脏档：按解码后的城市名渲染（不是编码串）",
+      r.state.cityCalls.length === 1 && r.state.cityCalls[0][0] === "北京",
+      JSON.stringify(r.state.cityCalls));
+    ok("脏档：无错误提示", r.state.toasts.length === 0);
   }
   {
     const r = runShow({ cityFail: true });

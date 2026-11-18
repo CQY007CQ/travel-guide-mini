@@ -52,7 +52,9 @@ Page(SafePage({
       const provCities = isProv ? (T.citiesOf(plan.province) || []).map(c => c.name).filter(Boolean) : [];
       // 多站：segs 提供可切换城市列表；省域：用省内城市列表；单城保持原样
       const segs = (Array.isArray(plan.segments) && plan.segments.length > 1)
-        ? plan.segments.map((s, i) => ({ i, name: s.cityName || "" })).filter(s => s.name)
+        // v1.20.32：segs 的 name 既当城市芯片展示、又拿去查 FOOD_SPOTS / 名店 / 坐标表。
+        // 脏档里是 %E5.. 编码串 → 芯片显示编码，且查表必然查不到（静默变成空清单）。
+        ? plan.segments.map((s, i) => ({ i, name: T.decQuery(s.cityName || "") })).filter(s => s.name)
         : (isProv ? provCities.map((n, i) => ({ i, name: n })) : []);
       let fIdx = 0;
       if (segs.length) {
@@ -63,7 +65,8 @@ Page(SafePage({
         } catch (e) {}
       }
       this.setData({ hasPlan: true, segs, fIdx });
-      const fallbackCity = isProv ? (provCities[0] || plan.province) : T.planCityName(plan);
+      // planCityName 只在 __staleCity 被标记时才解码，这里再兜一次（对明文零副作用）
+      const fallbackCity = isProv ? (provCities[0] || plan.province) : T.decQuery(T.planCityName(plan));
       this._renderCity(segs.length ? segs[fIdx].name : fallbackCity, plan.budget || "mid");
     } catch (e) {
       // v1.19.200：旧版把所有渲染异常都吞掉并 setData({hasPlan:false})，
@@ -129,12 +132,15 @@ Page(SafePage({
       o.sub = s.food ? (s.food + " · " + (s.addr || "")) : (s.addr || "");
       return o;
     });
+    // v1.20.32：全城都没有菜单数据时，别在每张卡里重复刷「菜单整理中…」（17 家店刷 17 遍，
+    // 用户以为一直在加载）。改成列表头一句总说明，卡片里无菜单就不占位。
+    const menuNone = allShops.length > 0 && allShops.every((o) => !o.menu.length);
     this._allShops = allShops;
     this._allFoods = (city && city.foods) || [];
     this.setData({
       cityName,
       note: (city && city.foodNote) || "",
-      shopSrc,
+      shopSrc, menuNone,
       // 内部排序机制不展示（用户不需要知道我们怎么排的，看结果即可）
       budgetTxt: ""
     });
@@ -208,6 +214,7 @@ Page(SafePage({
     if (!plan || !plan.days || !plan.days.length) { wx.showToast({ title: "先生成行程", icon: "none" }); return; }
     const d = this.data;
     const lines = [];
+    // stale-city-ok：d.cityName 在 _renderCity 之前已过 decQuery（见 _renderShow 的 fallbackCity / segs）
     lines.push("当前城市：" + (d.cityName || "未知") + "。");
     const foods = (d.foods || []).slice(0, 12).map(x => x.n).filter(Boolean);
     if (foods.length) lines.push("本地必吃清单（真实离线数据）：" + foods.join("、") + "。");

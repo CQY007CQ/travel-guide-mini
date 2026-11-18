@@ -1,4 +1,4 @@
-.page { padding-bottom: 80rpx; }
+.page { padding-bottom: 200rpx; }
 .day-nav { display: flex; align-items: center; justify-content: space-between; margin: 20rpx 24rpx 6rpx; }
 .dn-btn {
   position: relative;

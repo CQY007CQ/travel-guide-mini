@@ -6,7 +6,8 @@
   <view wx:if="{{!hasPlan}}" class="empty">
     <view class="em-ic"><image class="em-img" src="/images/icons/compass.png"/></view>
     <view class="em-t">还没有行程</view>
-    <view class="em-s">去「出发」选个城市和天数<br/>30 秒生成一份能直接照着走的攻略</view>
+    <view class="em-s">去「出发」选个城市和天数</view>
+    <view class="em-s">30 秒生成一份能直接照着走的攻略</view>
     <button class="btn-primary em-btn" bindtap="goIndex">去生成攻略</button>
   </view>
 

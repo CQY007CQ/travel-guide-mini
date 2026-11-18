@@ -58,7 +58,7 @@ for (let i = 0; i < PARTS.length; i++) {
 
 module.exports = {
   v: 1,
-  updated: "2026-11-auto",
+  updated: "2026-11",
   auto: true,
   cities: cities
 };

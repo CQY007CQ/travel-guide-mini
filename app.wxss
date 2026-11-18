@@ -249,6 +249,10 @@ page {
 .empty .em-t { font-size: calc(31rpx * var(--fs, 1)); font-weight: 700; color: var(--t1, #eaeff7); margin-top: 26rpx; line-height: 1.5; }
 
 .empty .em-s { font-size: calc(24rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin-top: 14rpx; line-height: 1.75; }
+/* v1.20.32：多行空态说明拆成相邻 .em-s 后，第二行不要再叠 14rpx 上间距
+   （原先用 <br/> 想主动断行，但 WXML 里 <br/> 不是有效标签、会被直接忽略，
+   结果全靠容器宽度自然折行 —— 今日页「今天该干嘛」就被切成「今天该干」+「嘛」」） */
+.empty .em-s + .em-s { margin-top: 0; }
 
 .empty .em-btn { margin-top: 34rpx; width: 70%; }
 

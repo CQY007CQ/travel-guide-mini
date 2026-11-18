@@ -92,12 +92,17 @@ module.exports = {
    const wd = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][d0.getDay()];
    const end = new Date(d0); end.setDate(end.getDate() + plan.days.length - 1);
    const dstr = s => (s.getMonth() + 1) + "月" + s.getDate() + "日";
-   chips.push(dstr(d0) + "（" + wd + "）— " + dstr(end));
+   // v1.20.32：1 天行程时 end === d0，旧写法会渲染成「11月20日（周五）— 11月20日（周五）」
+   // （真机截图）。起止同日就没必要重复，只显示单日。
+   chips.push(end.getTime() === d0.getTime()
+    ? dstr(d0) + "（" + wd + "）"
+    : dstr(d0) + "（" + wd + "）— " + dstr(end));
   }
   if (segs) {
-   chips.unshift(segs.map(s => s.cityName + s.days + "天").join(" → ") + " · 共 " + plan.days.length + " 天");
+   // v1.20.32：多站行程的城市名直接来自 segs，脏档会拼出「%E5%8C%97%E4%BA%AC3天 → …」
+   chips.unshift(segs.map(s => T.decQuery(s.cityName) + s.days + "天").join(" → ") + " · 共 " + plan.days.length + " 天");
   } else {
-   if (plan.isProv) chips.unshift("全省精华游 · " + plan.cityName);
+   if (plan.isProv) chips.unshift("全省精华游 · " + T.decQuery(plan.cityName || ""));
   }
   if (plan.travelMode && MODE_LABEL[plan.travelMode]) chips.push(MODE_LABEL[plan.travelMode]);
   if (plan.customAmt > 0) chips.push("自定义总预算 ¥" + plan.customAmt);
@@ -115,7 +120,7 @@ module.exports = {
   const hit = wish.filter(x => arranged.has(x.name)).map(x => x.name);
   const miss = wish.filter(x => !arranged.has(x.name)).map(x => x.name);
 
-  const summaryText = segs ? segs.map(s => s.cityName).join(" → ") + " · " + plan.days.length + "天" + (plan.days.length - 1) + "晚"
+  const summaryText = segs ? segs.map(s => T.decQuery(s.cityName)).join(" → ") + " · " + plan.days.length + "天" + (plan.days.length - 1) + "晚"
    : (dispCity + " · " + plan.days.length + "天" + (plan.days.length - 1) + "晚" + (plan.isProv ? " · 全省精华游" : ""));
   // v1.9：构成统计文案（山水×N · 人文×N …）
   let mixTxt = "";

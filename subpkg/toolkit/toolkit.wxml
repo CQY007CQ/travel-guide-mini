@@ -12,7 +12,7 @@
       <text class="ai-badge" wx:if="{{aiPending && aiLoading}}">本地速答</text>
       <text class="ai-badge" wx:elif="{{out && out.k === 'ai'}}">AI 生成</text></view>
     <view class="ai-row">
-      <input class="ai-inp" placeholder="随便问：这城玩几天合适？带老人怎么排？" value="{{aiQ}}" bindinput="onAIInput" bindconfirm="askAI" confirm-type="send"/>
+      <input class="ai-inp" placeholder="随便问：这城玩几天合适？" value="{{aiQ}}" bindinput="onAIInput" bindconfirm="askAI" confirm-type="send"/>
       <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="ai-btn {{aiLoading ? 'ai-busy' : ''}}" bindtap="askAI">{{aiLoading ? '思考中…' : '问'}}</view>
     </view>
     <view class="ai-tip dim">回答会带上当前城市与行程上下文；无网络时自动回落本地规则库，结果可复制 / 收藏。</view>

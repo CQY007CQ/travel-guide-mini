@@ -47,7 +47,7 @@
           value="{{item.note}}" data-i="{{index}}" bindblur="onTkNote" bindconfirm="onTkNote" />
       </view>
 
-      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="tip-inner dim" bindtap="goToday">行前待办（证件 / 行李打包）在「今天」页按倒计时勾选，点我去 →</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="tip-inner dim" bindtap="goToday">行前待办（证件 / 行李打包）在「今天」页按倒计时勾选，<text class="nw">点我去 →</text></view>
     </view>
 
     <!-- 自动行李清单（按天数 / 出发季节 / 目的地气候 / 行程特色生成） -->
@@ -56,7 +56,7 @@
       <view class="h3 h3-row"><image lazy-load class="ic" src="/images/icons/backpack.png"/>自动行李清单</view>
       <view class="pk-sum">
         <text>已装 {{pack.done}}/{{pack.total}}</text>
-        <text class="dim"> · 按 {{pack.season}}季 · {{planDays}} 天行程生成</text>
+        <text class="dim"> · 按{{pack.season}}季 · {{planDays}} 天行程生成</text>
       </view>
       <view class="pk-bar"><view class="pk-fill" style="width:{{pack.pct}}%"></view></view>
       <block wx:for="{{pack.groups}}" wx:key="title" wx:for-item="g">

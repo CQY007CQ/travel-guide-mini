@@ -1,4 +1,4 @@
-.page { padding-bottom: 80rpx; }
+.page { padding-bottom: 200rpx; }
 .note { font-size: calc(24rpx * var(--fs, 1)); line-height: 1.7; }
 .tk-sum { font-size: calc(22rpx * var(--fs, 1)); color: var(--t3, #8fa3bc); margin: 2rpx 0 8rpx; }
 .tk-head { margin: 4rpx 0 12rpx; }
@@ -75,3 +75,6 @@
 /* 2026-11-09：删除「证件与出行必备」手工清单（与下方自动行李清单重复），相关样式一并移除 */
 .sp-tip { font-size: calc(20rpx * var(--fs, 1)); margin: 12rpx 26rpx 0; line-height: 1.5; }
 .sos-card { border-color: rgba(229, 106, 106, .25); }
+
+/* v1.20.32：窄容器里「点我去 →」的箭头会被挤到下一行，整段声明不折行 */
+.nw { white-space: nowrap; }
