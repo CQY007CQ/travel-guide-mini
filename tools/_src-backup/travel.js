@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.29";
+const APP_VER = "1.20.30";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -706,16 +706,33 @@ function spotTagOf(name, cityName) {
 
 // v1.20.9：生成式封面（零网络 / 零外链 / 零伪造 / 全量覆盖）
 // 给「没有真实照片」的景点一张确定性封面：按 城市|名称 哈希得到稳定渐变 + 类别图标 + 景点名；
-// 用户真实照（it.img，本地相册）优先级最高。这是诚实的「示意图」占位，不是假照片 ——
-// 渲染层必须标注「示意图」，不得伪装成实拍。
-// v1.20.27：这里原本是 emoji（🏯🏛️🏘️🏞️🧸🎡…）。emoji 字形由系统字体决定（安卓可能变方块），
-// 且彩色立体 emoji 与旁边的单色线条图标打架 —— 与 v1.20.25 界面去 emoji 的结论一致。
+// 用户真实照（it.img，本地相册）优先级最高。
+// v1.20.27：这里原本是 emoji。emoji 字形由系统字体决定（安卓可能变方块），且彩色立体 emoji
+// 与旁边的单色线条图标打架 —— 与 v1.20.25 界面去 emoji 的结论一致。
 // 改为 images/icons/ 下的自绘单色线条图标（白色，配按城市哈希出来的彩色渐变封面）。
+// v1.20.30：缩略图上的「示意图」角标全部去掉（真机截图报障：96rpx 的封面上再叠一行 16rpx
+// 胶囊文字，字比图标还抢眼，且「示意图」三个字对用户只是噪音）。诚实性靠**形态**表达、
+// 不靠叠字：渐变 + 单色线条图标本身就是明确的图形化占位，没有照片质感，不存在「伪装成
+// 实拍」的歧义；isReal / placeholder 字段照旧，真图仍优先。
+// 边界：哪天封面改成有照片质感的设计（模糊实拍 / 拟真渲染），必须把标注加回来。
+// v1.20.30：住宿 / 交通类的名字天然是长店名（「XX客栈1 | YY民居客栈」），塞进 96rpx 宽的
+// 名字条会逐字断行塌成一列（真机截图报障：整张封面全是字）。这两类一律显示类别短词，
+// 完整名称右侧行标题已有；其余名称超 6 字截断，样式层再加单行省略兜底。
 const COVER_ICON = {
   "历史古迹": "pagoda", "博物馆": "museum", "宗教": "temple", "古镇": "town",
   "自然风光": "mountain", "亲子": "people", "乐园": "ferris", "美食": "food",
   "海滨": "umbrella", "徒步": "foot", "其他": "pin"
 };
+const COVER_LABEL_MAX = 6;
+const COVER_SHORT = { home: "住宿", bus: "交通" };
+function coverLabelOf(name, icon) {
+  if (COVER_SHORT[icon]) return COVER_SHORT[icon];
+  const s = String(name || "").trim();
+  if (!s) return "";
+  // 按「字」截断（不是码元）：生僻字 / 符号的代理对不会被切成半个
+  const chars = Array.from(s);
+  return chars.length > COVER_LABEL_MAX ? chars.slice(0, COVER_LABEL_MAX).join("") + "…" : s;
+}
 function hslHex(h, s, l) {
   s /= 100; l /= 100;
   const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
@@ -745,18 +762,19 @@ function spotCover(city, name, img) {
   } catch (e) { photo = null; }
   const effectiveImg = img || (photo && photo.fileID) || '';
   const isReal = !!effectiveImg;
+  const fullLabel = (typeof cleanSpotName === 'function') ? (cleanSpotName(nm) || nm) : nm;
   return {
     bg: bg,
     icon: icon,
     cat: cat,
-    label: (typeof cleanSpotName === 'function') ? (cleanSpotName(nm) || nm) : nm,
+    label: coverLabelOf(fullLabel, icon),
+    fullLabel: fullLabel,
     img: effectiveImg,
     photoCredit: photo ? photo.credit : '',
     photoLicense: photo ? photo.license : '',
     photoSrc: photo ? photo.src : '',
     isReal: isReal,
-    placeholder: !isReal,
-    badge: isReal ? '' : '示意图'
+    placeholder: !isReal
   };
 }
 // 多维检索：按城市 + 标签 + 关键词过滤景点，返回 [{name, city, tags, period, note}]

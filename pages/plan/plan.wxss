@@ -65,8 +65,10 @@
 .tl-thumb { width: 96rpx; height: 96rpx; display: block; }
 .tl-thumb.gen { display: flex; align-items: center; justify-content: center; position: relative; }
 .tl-thumb-glyph { width: 48rpx; height: 48rpx; filter: drop-shadow(0 1rpx 2rpx rgba(0,0,0,.28)); }
-.tl-thumb-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 4rpx 6rpx; font-size: 18rpx; line-height: 1.2; color: #fff; text-align: center; background: linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0)); text-shadow: 0 1rpx 2rpx rgba(0,0,0,.4); }
-.tl-thumb-badge { position: absolute; top: 4rpx; right: 4rpx; padding: 2rpx 8rpx; font-size: 16rpx; line-height: 1; color: #fff; background: rgba(0,0,0,.42); border-radius: 999rpx; }
+/* v1.20.30：封面名字条强制单行 + 省略。以前没有 nowrap，中文可任意断行 —— 长店名
+   （「XX客栈1 | YY民居客栈」）在 96rpx 宽里会逐字断行塌成一列（真机截图报障）。
+   内容侧已由 spotCover 收敛成短标签，这里是第二道兜底：漏网的长名只会省略，不会竖排。 */
+.tl-thumb-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 4rpx 4rpx; font-size: 18rpx; line-height: 1.2; color: #fff; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0)); text-shadow: 0 1rpx 2rpx rgba(0,0,0,.4); }
 
 .tl-top { display: flex; align-items: flex-start; flex-wrap: wrap; row-gap: 8rpx; }
 

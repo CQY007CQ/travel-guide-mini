@@ -37,7 +37,8 @@ const app = getAppSafe();
 function isFrame(n) { return T.isFrameName(n); }
 // v1.20.8→v1.20.9：路线缩略图（零网络 / 零域名白名单 / 全量覆盖）
 // 收口到 utils/travel.js 的 spotCover()：稳定渐变 + 分类图标 + 名称，真图 it.img 优先。
-// 无真图时由渲染层标注「示意图」，杜绝伪装成实拍。
+// v1.20.30：不再叠「示意图」角标（图形化封面本身即视觉声明），coverLabel 已由
+// spotCover 收敛成短标签（住宿/交通给类别词，其余超 6 字截断）——见 travel.js 的注释。
 function thumbFor(name, img, city) {
   const cv = T.spotCover(city || "", name, img);
   return {
@@ -47,7 +48,6 @@ function thumbFor(name, img, city) {
     photoCredit: cv.photoCredit || "",
     photoLicense: cv.photoLicense || "",
     coverLabel: cv.label,
-    coverBadge: cv.badge,
     coverCat: cv.cat
   };
 }

@@ -374,8 +374,7 @@
                   data-credit="{{it.photoCredit}}" data-license="{{it.photoLicense}}">©</view>
             <view wx:else class="tl-thumb gen" style="background:{{it.thumbBg}}">
               <image class="tl-thumb-glyph" src="/images/icons/{{it.thumbIcon}}.png"/>
-              <view class="tl-thumb-name">{{it.coverLabel}}</view>
-              <view class="tl-thumb-badge" wx:if="{{it.coverBadge}}">{{it.coverBadge}}</view>
+              <view class="tl-thumb-name" wx:if="{{it.coverLabel}}">{{it.coverLabel}}</view>
             </view>
           </view>
           <view class="tl-main">
