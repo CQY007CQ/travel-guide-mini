@@ -49,7 +49,7 @@ function snap(D) {
  * 无 window（不走网页分支）。同步 require 直接用宿主 Node 的真模块 —— 但 _ha() 因为
  * require.async 存在会返回空表，正是真机行为。
  */
-function boot() {
+function boot(srcOverride) {
   const pending = new Map();
   const resol = (id) => {
     if (String(id).charAt(0) !== ".") throw new Error("沙箱拒绝加载外部模块: " + id);
@@ -59,7 +59,7 @@ function boot() {
 
   const quiet = { warn() {}, log() {}, error() {} };
   const ctx = vm.createContext({ console: quiet, setTimeout, clearTimeout });
-  const src = fs.readFileSync(path.join(UTILS, "data.js"), "utf8");
+  const src = srcOverride != null ? srcOverride : fs.readFileSync(path.join(UTILS, "data.js"), "utf8");
   const fn = vm.runInContext("(function(module, exports, require){" + src + "\n})", ctx);
   const m = { exports: {} };
   fn(m, m.exports, resol);
@@ -124,6 +124,47 @@ ck("基准：Node 同步路径逐酒店非空", REF.hl > 300, "hotelList=" + REF
   await ready;
   ck("住宿分块失败：数据仍标记就绪（降级可用，不白屏）", env.DATA.__dataReady === true);
   ck("住宿分块失败：城市数据完好", (env.DATA.CITIES || []).length === REF.cities);
+}
+
+/* ───── 场景 4：晚到的团队店必须吃到坐标补丁（v1.20.28） ─────
+ * 病情：foodCoord（v206 坐标回写）是 noCreate 的纯回写，applyPacked 里跑过一次，
+ *   但团队美食是第 3 个异步分块、那时还不存在 → 给它补的坐标**全部静默丢弃**：
+ *   不报错、不打日志，只有地图上那些店永远没 pin（当前 382 家全在这个盲区里）。
+ * 这里用「注入一条补丁 + 同城团队独有店」真跑：注入的能拿到坐标，不注入的对照组拿不到。
+ * 注入只改内存里的源码字符串，绝不落盘。 */
+{
+  const CITY = "同江", SHOP = "小不点鱼馆", LAT = 47.911, LON = 132.508;
+  const realSrc = fs.readFileSync(path.join(UTILS, "data.js"), "utf8");
+  const injected = realSrc.replace("const FOOD_COORDS_V206 = {",
+    'const FOOD_COORDS_V206 = {"' + CITY + '":[["' + SHOP + '",' + LAT + "," + LON + "]],");
+  ck("场景 4 前置：注入确实改到了源码（否证测试本身失效）", injected !== realSrc);
+
+  const findShop = (D) => (((D.FOOD_SPOTS || {})[CITY] || []).find((x) => x && x.shop === SHOP)) || null;
+
+  // 对照组：真实源码（补丁里没有这条）→ 店合并进来，但没有坐标
+  const envA = boot();
+  const readyA = envA.DATA.initData();
+  arrive(envA, "d1"); arrive(envA, "d2"); arrive(envA, "food"); arrive(envA, "hotel");
+  await readyA; await flush();
+  const a = findShop(envA.DATA);
+  ck("对照组：团队独有店已并入（否则下面那条断言没意义）", !!a, CITY + "/" + SHOP + " 未出现");
+  ck("对照组：无补丁时该店确实没有坐标", !!a && (a.lat == null || a.lon == null), JSON.stringify(a));
+
+  // 实验组：注入一条同城同店补丁 → 晚到合并后必须写上
+  const envB = boot(injected);
+  const readyB = envB.DATA.initData();
+  arrive(envB, "d1"); arrive(envB, "d2"); arrive(envB, "food"); arrive(envB, "hotel");
+  await readyB; await flush();
+  const b = findShop(envB.DATA);
+  ck("晚到的团队店吃到坐标补丁（applyPacked 之后补跑 foodCoord）",
+    !!b && b.lat === LAT && b.lon === LON, JSON.stringify(b));
+
+  // 体检口径必须跟着变：补到坐标的店不能再算「无坐标」，否则全盘体检会一直报旧数字
+  const stA = envA.DATA.coordStats ? envA.DATA.coordStats() : null;
+  const stB = envB.DATA.coordStats ? envB.DATA.coordStats() : null;
+  ck("坐标补上后体检口径同步（noCoordFood -1）",
+    !!stA && !!stB && stB.noCoordFood === stA.noCoordFood - 1,
+    JSON.stringify({ 对照: stA, 注入: stB }));
 }
 
 /* ───── 结构防回潮：文件位置与 require 形态 ───── */

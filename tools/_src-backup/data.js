@@ -130,6 +130,12 @@ function _applyTeamFood3(mod) {
   const t = (mod && mod.default) || mod;
   if (t && typeof t === "object") _teamFood = t;
   applyStaticTables(1, "teamFood");   // 只合并团队美食这一张表（其余已在 applyPacked 里跑过）
+  // v1.20.28：坐标补丁必须**在团队美食之后**再跑一次。
+  // applyPacked 里 foodCoord 已经跑过，但那时团队店还不存在（它是第 3 个异步分块），
+  // 而 foodCoord 是 noCreate 的纯回写 —— 找不到同名店就跳过，于是「给团队店补的坐标」
+  // 会**全部静默丢弃**：不报错、日志也不打，只有地图上那些店永远没有 pin。
+  // 幂等：when 守卫是 !_hasRealCoord，已有真实坐标的店不会被二次覆盖。
+  applyStaticTables(1, "foodCoord");
   // 团队数据含 355 家店、其中 315 家无坐标，且是 applyPacked 之后才进来，
   // 不重扫会让 coordStats() 停在基数据口径（体检「占位/无坐标被观测」会误判）。
   if (_teamFood) scanFoodCoords();

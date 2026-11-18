@@ -22,6 +22,42 @@
 //   node tools/data/geocode-runner.mjs [--domain=scenic|food|all] [--budget=N] [--dry-run] [--list] [--key-index=N]
 //   （须在宿主网络运行：沙盒禁出网，restapi.amap.com 不可达；用 Bash dangerouslyDisableSandbox:true）
 //
+// ── 补齐「无 pin 美食店」完整作业手册（v1.20.28 核对口径后写定）────────────────────
+// 现状（以 `node tools/data/geocode-runner.mjs --domain=food --list` 为准，别信记忆里的旧数）：
+//   680 家 = 基数据带 (0,0) 占位 298 家 + 团队美食块无坐标 382 家。
+//   这两类以前 **runner 全都漏掉**：基数据那批被 `typeof lat === "number"` 判成「有坐标」，
+//   团队那批根本不在 data-packed 里（运行时才 upsert）。所以 `--list` 长期报「待补 0 条」。
+//
+// ① 拿一把合规 KEY（只有这一步需要本人，约 5 分钟）
+//    - 高德开放平台用**你本人实名**账号登录 → 控制台 → 应用管理 → 创建新应用
+//      （名称随便，如「旅行攻略生成器-离线数据」）。
+//    - 该应用下「添加 Key」→ **服务平台必须选「Web服务」**（不是「微信小程序」：后者绑 AppID、
+//      只能 wx.request 调，本仓是离线脚本；也不是「Web端(JS API)」，那是给浏览器地图用的）。
+//    - 复制那串 32 位 key，**追加一行**到 `tools/geocode.keys`（该文件不进 git，权限 600）。
+//    - 不要在这一步开搜索类接口：`place/text` 是 2026-09-14 封禁依据（协议 4.12.3），本 runner 也硬拦。
+//    - 合规边界（协议原文，不是建议）：3.1 个人认证仅限个人研究学习 —— 小程序已上线属生产用途，
+//      严格口径要走企业认证/商用授权；3.5 禁止落盘 POI 属性，所以这里**只存坐标**，不存菜单/评分/地址。
+//
+// ② 按天跑（每把 key 每天只用一次，单次预算 2000，刻意远离 5000 硬上限）
+//    node tools/data/geocode-runner.mjs --domain=food --budget=2000
+//    - 680 条 1~2 天跑完（每条约 0.5s 请求 + 0.12s 间隔，一轮 15~25 分钟）。
+//    - 命中率现实预期 30~50%：geocode 认的是**地址**，店名能解析的有限，闸门 30km 只拦跨城误命。
+//    - 熔断即停：10044/10003（配额尽）或 10026（账号封禁）当天立刻停手，绝不同日换 key 绕过配额；
+//      次日 dayIndex 自动落到下一把。
+//    - 结果写 `tools/data/v206-food-coords.js` 的 FOOD_COORDS_ADD（幂等合并，NetNew=0 就别打包）。
+//
+// ③ 落地（坐标进包的三步，缺一不可）
+//    node tools/build/_apply-safe.mjs   → 写进 utils/data.js 的 FOOD_COORDS_V206 标记块
+//    node tools/data/pack-data.mjs      → 重打包（否则白屏）
+//    bash allcheck.sh                   → 全绿再升版
+//    **团队那 382 家是关键**：它们是异步分块晚到的，utils/data.js 的 `_applyTeamFood3` 里
+//    必须补跑 `applyStaticTables(1, "foodCoord")`，否则补丁找不到店 → 静默丢弃（护栏 _test-late-chunk 场景 4）。
+//
+// ④ 命中不了的怎么办（不伪造是红线）
+//    - 交给分支机真实采集（团队采集管线会把坐标带回来，落 `tools/team/team-region-*.json`
+//      → `node tools/data/_merge-team-enrich.mjs --pack`）；
+//    - 或维持现状：无坐标店只做「列表展示、不生成地图 pin」，界面上明确写「该店暂无坐标」。
+//
 // 注意：本文件只做「离线富集」—— 结果写入 v201(景点)/v206(美食) 补丁，由 _apply-safe 合并进包；
 //   小程序运行时仍零 key。
 
@@ -103,18 +139,102 @@ function gatherScenic(D, haveSet) {
 }
 
 // ---- 美食店缺坐标收集 ----
+// v1.20.28：旧实现只读基数据，且用 `typeof s.lat === "number"` 判「有坐标」，
+// 于是两类缺口同时被漏掉：
+//   ① 基数据里 298 家带 (0,0) 占位坐标（是 number，被判成有坐标）——它们不会出现在地图上；
+//   ② 团队美食块（subdata3/data/team-food3.js，1078 家）根本不在 data-packed 里，
+//      运行时才由 _applyTeamFood3 upsert 进 FOOD_SPOTS —— 其中 673 条无坐标，
+//      扣掉「与基数据同名店合并、沿用基数据真实坐标」的那部分，运行期实测剩 371 家无 pin。
+// 症状是 `--list` 报「待补 0 条」，而体检一直说 669 家无 pin —— 两边口径不一致却都不报错。
+const _hasUsableCoord = (s) => {
+  const la = +s.lat, lo = +s.lon;
+  return Number.isFinite(la) && Number.isFinite(lo) && !(la === 0 || lo === 0);
+};
+/** 已落地的坐标批：data.js 里 `>>>FOOD_COORDS_V206_*` 标记块（_apply-safe 的写入目标）
+ *  + 待合并的 tools/data/v206-food-coords.js。两处都是加载期回写，data-packed 里看不到。 */
+function loadCoordPatches() {
+  const out = {};
+  const put = (city, list) => {
+    if (!city || !Array.isArray(list)) return;
+    (out[city] = out[city] || []).push(...list.filter(Array.isArray));
+  };
+  try {
+    const src = fs.readFileSync("utils/data.js", "utf8");
+    const b = src.indexOf(">>>FOOD_COORDS_V206_START>>>"), e = src.indexOf("<<<FOOD_COORDS_V206_END<<<");
+    if (b >= 0 && e > b) {
+      const seg = src.slice(b, e);
+      const o = JSON.parse(seg.slice(seg.indexOf("{"), seg.lastIndexOf("}") + 1));
+      for (const c in o) put(c, o[c]);
+    }
+  } catch (err) { console.error("读取 FOOD_COORDS_V206 失败：" + err.message); }
+  try {
+    const raw = fs.readFileSync("tools/data/v206-food-coords.js", "utf8");
+    const o = JSON.parse(raw.slice(raw.indexOf("=") + 1).replace(/;\s*$/, "")).FOOD_COORDS_ADD || {};
+    for (const c in o) put(c, o[c]);
+  } catch (err) { /* 无待合并批次时正常 */ }
+  return out;
+}
+function loadTeamFood() {
+  const f = "subdata3/data/team-food3.js";
+  try {
+    const src = fs.readFileSync(f, "utf8");
+    const i = src.indexOf("const TEAM_FOOD_ENRICH");
+    if (i < 0) return {};
+    const b = src.indexOf("{", i), e = src.indexOf("};", i);
+    if (b < 0 || e < 0) return {};
+    return JSON.parse(src.slice(b, e + 1));
+  } catch (err) {
+    console.error("团队美食块读取失败（" + f + "）：" + err.message);
+    return {};
+  }
+}
 function gatherFood(D) {
   const jobs = [];
+  const seen = new Set();
+  const push = (cn, name) => {
+    const k = cn + " " + name;
+    if (seen.has(k)) return;
+    seen.add(k);
+    jobs.push({ city: cn, name });
+  };
+  // ① 基数据：(0,0) / 非有限数 / 缺失 一律算缺
+  const haveReal = new Set();
+  // 已被历史坐标批覆盖的（data.js 的 FOOD_COORDS_V206 + 待合并的 v206-food-coords.js）也要算「已有」：
+  // 这两处是加载期回写，data-packed 里看不到 → 不排除就会重复排 11 家已补过的店、白烧配额。
+  for (const [city, list] of Object.entries(loadCoordPatches())) {
+    for (const e of (list || [])) {
+      const nm = String((e && e[0]) || "").trim();
+      if (nm && Number.isFinite(+e[1]) && Number.isFinite(+e[2]) && +e[1] !== 0 && +e[2] !== 0) {
+        haveReal.add(city + " " + nm);
+      }
+    }
+  }
   const FS = D.FOOD_SPOTS || {};
   for (const cn in FS) {
     for (const s of (FS[cn] || [])) {
       const nm = String((s && (s.shop || s.name)) || "").trim();
       if (!nm) continue;
-      const hasCoord = typeof s.lat === "number" && typeof s.lon === "number";
-      if (hasCoord) continue;
-      jobs.push({ city: cn, name: nm });
+      if (_hasUsableCoord(s) || haveReal.has(cn + " " + nm)) { haveReal.add(cn + " " + nm); continue; }
+      push(cn, nm);
     }
   }
+  // ② 团队块：只排「合并后仍然没有真实坐标」的 —— 与基数据同名且基数据有真实坐标的，
+  //    运行时 upsert 会沿用基数据坐标（overwrite 带 v != null 守卫，团队条目缺坐标不会覆盖），
+  //    所以它们不算缺口；排进来只会白烧配额。
+  const TEAM = loadTeamFood();
+  let teamAdded = 0;
+  for (const cn in TEAM) {
+    for (const s of (TEAM[cn] || [])) {
+      const nm = String((s && s.shop) || "").trim();
+      if (!nm || _hasUsableCoord(s)) continue;
+      if (haveReal.has(cn + " " + nm)) continue;
+      const before = jobs.length;
+      push(cn, nm);
+      if (jobs.length > before) teamAdded++;
+    }
+  }
+  const baseMissing = jobs.length - teamAdded;
+  console.log("[food] 缺口构成：基数据 (0,0)/缺失 " + baseMissing + " 家 + 团队块无坐标 " + teamAdded + " 家");
   return jobs;
 }
 
