@@ -114,6 +114,30 @@ for (const f of files.filter((x) => x.endsWith(".wxml"))) {
 const missing = [...iconRefs].filter((r) => !fs.existsSync(path.join(ROOT, r.replace(/^\//, "").split("?")[0])));
 ok(missing.length === 0, "wxml 引用的自绘图标全部存在（" + iconRefs.size + " 个引用）", missing.join(" / "));
 
+/* 图标名映射表兜底：封面分类走 `{{it.thumbIcon}}.png` 这类动态拼接，上面的静态引用检查
+ * 按设计跳过它们（不假装覆盖）。但值写错同样是**静默 404**——封面变空白、页面不报错。
+ * 所以把映射表里的每个名字都验一遍文件存在。
+ * 只读**可读源码**（tools/_src-backup 与页面目录）：utils/ 是压缩产物，正则按行匹配不到，
+ * 扫了也是假覆盖。 */
+const mapDirs = ["tools/_src-backup", "pages", "subpkg", "subai", "components"]
+  .map((d) => path.join(ROOT, d)).filter((d) => fs.existsSync(d));
+const iconNames = new Set();
+let mapCount = 0;
+for (const d of mapDirs) {
+  for (const f of walk(d).filter((x) => x.endsWith(".js"))) {
+    const src = fs.readFileSync(f, "utf8");
+    for (const m of src.matchAll(/(?:const|let|var)\s+([A-Z][A-Z0-9_]*_ICON)\s*=\s*\{([\s\S]*?)\n\s*\}/g)) {
+      mapCount++;
+      for (const v of m[2].matchAll(/"([a-z0-9][a-z0-9-]*)"/g)) iconNames.add(v[1]);
+    }
+  }
+}
+const nameMiss = [...iconNames].filter((n) => !fs.existsSync(path.join(ROOT, "images/icons/" + n + ".png")));
+// mapCount / 名字数都要有下限：正则一旦匹配不到，这条会「0 个全通过」——正是本仓反复踩的假绿形态
+ok(mapCount >= 1 && iconNames.size >= 5 && nameMiss.length === 0,
+  "图标名映射表里的每个名字都有对应 PNG（" + mapCount + " 张表 / " + iconNames.size + " 个名字）",
+  (mapCount < 1 || iconNames.size < 5 ? "映射表未匹配到，检查正则是否失效" : "") + nameMiss.join(" / "));
+
 console.log("");
 if (fail === 0) {
   console.log("emoji 门禁通过：" + pass + " 项（emoji 清零 · 图标引用完整 · 扫描范围有效）");
