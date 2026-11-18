@@ -99,7 +99,10 @@ console.log("【加载链路】");
     h.update(k + ":" + crypto.createHash("sha1").update(s).digest("hex") + "\n");
   }
   const fp = h.digest("hex").slice(0, 16);
-  ok("全量数据对象指纹 = 3820090d0968257a（解码优化不得改变任何字节）", fp === "3820090d0968257a", "实测 " + fp);
+  // 指纹随数据变更同步（本次：合并 2026-11-18 西南板块采集补丁，美食 9625→9636 / 富信息 1666→1677）。
+  // 只有「解码链路改坏字节」才算回归；数据本身合法更新时必须一起改这里，否则门禁会锁死数据迭代。
+  const FP = "371676c5d650090b";
+  ok("全量数据对象指纹 = " + FP + "（解码优化不得改变任何字节）", fp === FP, "实测 " + fp);
 }
 
 // 规模锚点必须用 T.ready() 之后的口径，与 check-health 一致：
@@ -110,8 +113,8 @@ console.log("【加载链路】");
   try { await Promise.resolve(T.ready()); } catch (e) { /* ready 失败由下面的断言暴露 */ }
   const shops = Object.values(D.FOOD_SPOTS || {}).reduce((n, a) => n + a.length, 0);
   const cities = Object.keys(D.FOOD_SPOTS || {}).length;
-  ok("ready 后规模锚点：美食 9625 家 / 421 城（对齐 check-health 口径）",
-    shops === 9625 && cities === 421, "实测 " + shops + " 家 / " + cities + " 城");
+  ok("ready 后规模锚点：美食 9636 家 / 421 城（对齐 check-health 口径）",
+    shops === 9636 && cities === 421, "实测 " + shops + " 家 / " + cities + " 城");
 
   console.log("\n" + (fail === 0 ? "✅ 解压/解码对照全部通过" : "❌ " + fail + " 项失败"));
   process.exit(fail === 0 ? 0 : 1);
