@@ -146,7 +146,16 @@ const checks = [
     const declared = [...isTabLine.matchAll(/"(\/[^"]+)"/g)].map((m) => m[1]);
     must(declared.length === tabs.size && declared.every((u) => tabs.has(u)),
       "guide.js 的 tabBar 判定与 app.json.tabBar.list 不一致");
-    return `字号/版本已收敛，${urls.length} 条直达链接有效`;
+    // v1.20.35：免责与边界口径必须写在产品内（v1.20.34 换图形封面后，「缩略图不是照片」此前没有任何一处说明）
+    must(/注意事项与边界/.test(g), "使用指南缺少「注意事项与边界」组（免责口径无处可见）");
+    ["d1", "d2", "d3", "d4", "d5"].forEach((k) =>
+      must(new RegExp('k:\\s*"' + k + '"').test(g), "注意事项组缺条目 " + k));
+    // 弹窗长度红线：模拟器实测 showModal 正文超出约 180 字会被**静默截断**（句子半截消失、无省略号、无滚动）。
+    // 这正是本轮踩到的坑（第一版 219 字，「医院」那句连同末尾整段没显示），故做字数棘轮。
+    const dn = (read("pages/more/more.js").match(/onDataNote\(\)[\s\S]*?\n  \}/) || [""])[0];
+    const cn = (dn.match(/[\u4e00-\u9fa5]/g) || []).length;
+    must(cn > 60 && cn < 165, `数据说明弹窗中文 ${cn} 字，超界（>165 会被 showModal 静默截断，<60 等于没写）`);
+    return `字号/版本已收敛，${urls.length} 条直达链接有效，免责弹窗 ${cn} 字未超截断线`;
   }],
   ["版本一致性：真源 / 产物 / IDE 配置", () => {
     const a = (read("tools/_src-backup/travel.js").match(/const APP_VER = "([^"]+)"/) || [])[1];

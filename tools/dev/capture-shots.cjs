@@ -11,12 +11,14 @@
  * 用法：
  *   NODE_PATH=~/wxauto/node_modules node tools/dev/capture-shots.cjs
  *
- * 产物：../screenshots/01-home.png / 02-recommend.png / 03-more.png / 04-datanote-modal.png
+ * 产物：../screenshots/01-home.png / 02-recommend.png / 03-more.png / 04-datanote-modal.png / 05-guide-notes.png
  *
  * 注意（踩过的坑）：
  *   · pages/more 是 tabBar 页，必须用 switchTab；reLaunch 到 tabBar 页不会跳转（会静默停在原页）。
  *   · page 上没有 evaluate()，只有 data()/setData()/callMethod()；evaluate 在 MiniProgram 实例上。
  *   · 截图接口按文件路径缓存，同一 session 内改动文件后要换输出文件名或另存副本再渲染。
+ *   · showModal 正文超出约 180 字会被静默截断（句子半截消失、没有省略号、没有滚动），
+ *     所以 04 这张图是「弹窗有没有被截」的唯一有效证据 —— 改免责文案后必须重跑核对。
  */
 const fs = require("fs");
 const path = require("path");
@@ -80,6 +82,23 @@ async function scroll(mp, top) {
       await shot(mp, "04-datanote-modal.png");
     } else {
       console.log("  未进入更多页，跳过");
+    }
+
+    // ④ 使用指南：只看「注意事项与边界」这一组并展开最长一条。
+    //    为什么不靠滚动：automator 的 pageScrollTo 在本页会静默不生效（返回成功但位置不动），
+    //    而这里要验的是「长文案不截断、不竖排」，直接把这组数据单独渲染最可靠，也便于讲解。
+    const guide = await mp.navigateTo("/subpkg/guide/guide");
+    await sleep(2600);
+    const gp = guide || (await mp.currentPage());
+    if (gp && String(gp.path).indexOf("guide") >= 0) {
+      const gd = await gp.data();
+      const notes = (gd.groups || []).filter((g) => /注意事项/.test(g.g || ""));
+      console.log("  指南 " + (gd.groups || []).length + " 组 / " + gd.total + " 条 · 注意事项组 " + notes.length + " 个");
+      await gp.setData({ groups: notes.length ? notes : gd.groups, open: "d4" });   // d4 = 「AI 会出错」
+      await sleep(600);
+      await shot(mp, "05-guide-notes.png");
+    } else {
+      console.log("  未进入使用指南，跳过");
     }
   } catch (e) {
     console.log("抓图出错:", e && e.message);

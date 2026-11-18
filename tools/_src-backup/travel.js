@@ -40,7 +40,18 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.34";
+const APP_VER = "1.20.35";
+
+// 随包离线数据的整理截止月份（YYYY-MM）。
+// 为什么单独抽一个常量：此前「数据说明与免责声明」里是硬编码字面量「更新至 2026 年 11 月」，
+// 数据重新采集后没人会想起同步它 —— 用户看到的是过期承诺，属于静默失实。
+// 现在「更多 → 数据说明」与「使用指南 → 数据时效」同读这一处，改数据只改这里。
+const DATA_CUTOFF = "2026-11";
+function dataCutoffTx() {
+  const m = /^(\d{4})-(\d{1,2})$/.exec(String(DATA_CUTOFF || ""));
+  if (!m) return "";
+  return m[1] + " 年 " + Number(m[2]) + " 月";
+}
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -6906,6 +6917,7 @@ module.exports = {
   inspire, bestMonths, dailyInspire, nightCfg, setNightCfg, isNightHour,
   billImgPath, setBillImg, getBillImg, billImgMap, migrateBillImgs, purgeOrphanBillImgs, delBillImg, relinkBillImg,
   APP_VER,
+  DATA_CUTOFF, dataCutoffTx,
   // v1.8.4 档一 / 档二
   dateHintOf, dateHintsForPlan,
   dressForMonth, dressForTemp,

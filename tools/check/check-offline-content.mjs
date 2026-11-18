@@ -68,6 +68,15 @@ const aiBrainSrc = stripCode(pageSrc("subpkg/assistant/ai-brain.js", ROOT));
 const lensSrc = code("subpkg/lens/lens.wxml");
 const mapSrc = code("subpkg/map/map.js");
 log(!/天气已内置|免配置/.test(guideSrc), "使用指南不宣称天气「已内置/免配置」（实需本人和风 Key + 联网）");
+// v1.20.35 回潮防线：v1.20.33 把和风改成「Key + 专属 API Host」两件套，但指南的 b6 仍然只说填 Key。
+// 按旧说法配完调不通、用户会以为功能坏了 —— 配置指引必须与实现同步，这条不只是文案润色。
+// 判据：天气条目整段（含相邻字符）里必须同时出现 Key 与 API Host。
+{
+  const m = guideSrc.match(/\{\s*k:\s*"b6"[\s\S]{0,500}?\}/);
+  const item = m ? m[0] : "";
+  log(!!item && /Key/.test(item) && /API\s*Host/i.test(item),
+    "使用指南天气条目同时写清「Key + 专属 API Host」两件套（只填 Key 的旧说法已失效）");
+}
 log(!/离线速查天气/.test(moreSrc), "更多页不宣称「离线速查天气」（实为联网 + Key）");
 log(!/离线识别，无需联网|离线识别无需联网/.test(aiBrainSrc + lensSrc), "识物文案不宣称「离线识别无需联网」（实走云端多模态）");
 log(!/直接导航（离线可用）/.test(mapSrc), "地图分享卡不宣称导航「离线可用」（导航需联网底图）");

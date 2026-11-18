@@ -65,6 +65,8 @@
     <text class="er-disclaim" wx:if="{{tripHint}}">{{tripHint}}</text>
     <text class="er-nt">{{city}} 暂无已核验的医院名单</text>
     <text class="er-ns">为避免给出并不存在的机构，这里不列具体医院名。请在地图中搜索「医院」或「急诊」，就近前往；急危重症直接拨打 120。</text>
+    <!-- v1.20.35：城市列表里那颗「仅位置」标签此前没有任何解释，用户不知道它和「有名单」的区别 -->
+    <text class="er-ns">切换到城市时标「仅位置」的，表示只收录了该城的中心坐标（仅用于地图搜附近医院的起点），不含具体医院名单。</text>
     <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-mapbtn" wx:if="{{apLat}}" bindtap="onMapSearch">在地图中搜索附近医院</view>
     <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="er-pick" bindtap="onPickCity">切换城市</view>
   </view>
