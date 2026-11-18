@@ -108,7 +108,9 @@ module.exports = {
   },
 
   // 2026-11-09：天气未配置时给出可操作入口 —— 切到「更多」页配置和风 Key（仓库不内置明文 Key）
+  // v1.20.33：和风改为「Key + 专属 API Host」两件套，落地时由 more 页自动展开「合规与密钥」分组
   goKeyConfig() {
+    try { app.globalData.needKeysPanel = Date.now(); } catch (e) { EL.note("plan", e, "设置密钥面板标记失败"); }
     try { wx.switchTab({ url: "/pages/more/more" }); } catch (e) {}
   },
 

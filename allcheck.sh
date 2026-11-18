@@ -154,7 +154,9 @@ step "单测 hotel (多片区·门户 v1.19.145)" bash -c '"$1" tools/test/_test
 # plan 页 summary 卡精简（v1.19.146）：stats 去重 + 倒计时 label/tip
 step "单测 plan146 (summary 精简)" "$NODE" tools/test/_test-plan146.mjs
 # 天气多城按各天所在城市预报（v1.19.151）：mergeWeatherByDay 对齐 + rainyDaySpots 形态/室内命中
-step "单测 weather151 (多城天气对齐)" "$NODE" tools/test/_test-weather151.mjs
+# v1.20.33：和风改「Key + 专属 API Host 两件套」，主机基址回归串在同一步跑（保持 61 步口径）。
+#   钉死的是「Host 为空时 URL 会被拼成 null/v7/...」这一类静默失败 —— 它只表现为「天气暂不可用」。
+step "单测 weather151 (多城天气对齐)" bash -c '"$1" tools/test/_test-weather151.mjs && "$1" tools/test/_test-keys-base.mjs' _ "$NODE"
 # 封面护栏（v1.20.30）与 spotsearch 同属「景点卡片渲染」，串在同一 step 跑，保持 61 步口径不变
 step "单测 spotsearch (按标签找景点·倒排检索 v1.19.163)" bash -c '"$1" tools/test/_test-spotsearch.mjs && "$1" tools/test/_test-cover.mjs && "$1" tools/test/_test-stale-city.mjs' _ "$NODE"
 # 「今日正当时」已于 2026-10-29 按用户要求下线，原接线测试改为「下线守卫」（防被无意加回）

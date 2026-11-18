@@ -1,4 +1,4 @@
-// utils/weather.js —— 行程天气（和风天气 QWeather v7，已备案域名 devapi.qweather.com）
+// utils/weather.js —— 行程天气（和风天气 QWeather v7；请求基址由 keys.js 的 qweatherBase() 提供）
 //
 // 为什么从 open-meteo 换和风：
 //  open-meteo 是海外域名、无中国大陆 ICP 备案，无法加入小程序 request 合法域名白名单，
@@ -8,9 +8,12 @@
 //
 // 配置（统一走 utils/keys.js 单出口，v1.19.184 合规归一）：
 //  1) 去 https://dev.qweather.com 注册（个人主体需实名认证），建项目拿 Key；
-//  2) 把 Key 填到 utils/keys.js 的 DEFAULT.qweatherKey；若账号分配了自定义域名（xxx.qweatherapi.com），改 DEFAULT.qweatherHost；
-//     （也支持运行时 wx.setStorageSync("__app_keys__", {...}) 注入，不重新发版临时换 Key）
-//  3) 小程序后台「开发管理→开发设置→服务器域名」把请求域名加入 request 合法域名；
+//  2) **两件套都要**：Key + 控制台「设置」里分配的专属 API Host（形如 h2a9cf3mhs.xy.qweatherapi.com）。
+//     v1.20.33 起和风公共域名 devapi/api/geoapi.qweather.com 陆续停服，且 API Host 本身是身份认证的一部分
+//     —— 只填 Key 不填 Host，新账号必然调不通。填法：小程序「更多 → 合规与密钥」，或运行时
+//     wx.setStorageSync("__app_keys__", { qweatherKey:"...", qweatherHost:"..." })；
+//  3) 小程序后台「开发管理→开发设置→服务器域名」把**该专属 Host** 加入 request 合法域名
+//     （专属 Host 每账号不同，不加白名单真机一律 url not in domain list，这是最易漏的一步）；
 //  4) 可选：和风控制台「安全域名」加上你的小程序 request 域名，防止 Key 被他人盗用。
 //  合规铁律：Key 必须登记在本人 / 本小程序主体账号下，严禁借用他人 Key（历史借用高德曾致封禁 + 主体不一致）。
 //
@@ -174,7 +177,16 @@ function classifyApiError(d) {
 function fetchPlanWeather(plan, cb) {
   if (!plan || !plan.days || !plan.days.length) { cb([], { type: "empty" }); return; }
   if (typeof wx === "undefined" || !wx.request) { cb([], { type: "env" }); return; }
-  if (!KEYS.qweatherConfigured()) { cb([], { type: "no_key", msg: "天气服务未启用（需在和风后台配置 Key）" }); return; } // Key 未配置 → 明确提示（fail-closed）
+  // v1.20.33：判据从「只看 Key」升级为「Key + 可用请求基址」。
+  // 旧写法在「Key 已填 / Host 未填」时把 url 拼成 "null/v7/weather/7d"，网络层必然失败，
+  // 却被归类成 net/api → 用户永远只看到「服务异常」，真实原因（Host 没配）浮不出来。
+  const qwBase = KEYS.qweatherBase();
+  if (!qwBase) { cb([], { type: "no_key", msg: "需和风 Key + 专属 API Host，点「去配置」填入" }); return; } // 未配置 → 明确提示（fail-closed）
+  // 公共域名（devapi/api/geoapi）自 2026 年起陆续停服：走 legacy 失败时补一句可操作指引，
+  // 否则用户对着「服务异常」无从下手（这正是 v1.20.32 前「天气又不能用」的可诊断性缺口）。
+  const hostHint = KEYS.qweatherHostMode() === "legacy"
+    ? "（和风公共域名已陆续停服，请到「更多 → 合规与密钥」填写控制台分配的专属 API Host）"
+    : "";
   // 行程涉及的城市（去重保序）：有分段用分段城市，否则用 plan.cityName
   const rawCities = (Array.isArray(plan.segments) && plan.segments.length)
     ? plan.segments.map(function (s) { return s.cityName; })
@@ -234,7 +246,7 @@ function fetchPlanWeather(plan, cb) {
   const loadCity = function (city, c, wkey, attempt) {
     const lat = Number(c.lat).toFixed(2), lon = Number(c.lon).toFixed(2);
     wx.request({
-      url: KEYS.qweatherHost() + "/v7/weather/7d",
+      url: qwBase + "/v7/weather/7d",
       data: { location: lon + "," + lat, key: KEYS.qweatherKey() },
       header: { "X-QW-Api-Key": KEYS.qweatherKey() },
       timeout: 15000, // v1.19.161：放宽至 15s，覆盖真机冷启动 TLS 握手；仍失败时由下方重试兜底
@@ -244,6 +256,7 @@ function fetchPlanWeather(plan, cb) {
           if (!d || d.code !== "200" || !Array.isArray(d.daily)) {
             if (d) { // API 返回错误码（Key 无效/超额度/参数等）
               const _e = classifyApiError(d);
+              if (_e) _e.msg = _e.msg + hostHint; // legacy 基址下的失败，把「换专属 Host」写进用户可见文案
               EL.note("weather", (_e && _e.type) || "api", "接口错误: " + ((_e && _e.msg) || ""));
               setErr(_e);
             }
@@ -266,7 +279,7 @@ function fetchPlanWeather(plan, cb) {
           return;
         }
         EL.note("weather", "net", "重试 " + MAX_RETRY + " 次后仍失败: " + city);
-        setErr({ type: "net", msg: "天气加载失败，请重试" });
+        setErr({ type: "net", msg: "天气加载失败，请重试" + hostHint });
         byCity[city] = { byDate: {}, city: city };
         pending--; finish();
       }
@@ -275,7 +288,7 @@ function fetchPlanWeather(plan, cb) {
   cities.forEach(function (city) {
     const c = coordOf(city);
     if (!c) { byCity[city] = { byDate: {}, city: city }; return; } // 无坐标：占位，避免 dayCityOf 误判
-    const wkey = city + "|" + todayYMD + "|" + KEYS.qweatherHost();
+    const wkey = city + "|" + todayYMD + "|" + qwBase; // 缓存按「基址」隔离：换 Host 不会命中旧 Host 的缓存
     const cached = _WX_CACHE[wkey];
     if (cached && (Date.now() - cached.t) < _WX_TTL) { byCity[city] = { byDate: cached.v, city: city }; return; }
     // v1.19.180：内存未命中先看盘（冷启动/切页场景），命中即先出天气，不阻塞首屏

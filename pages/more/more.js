@@ -40,7 +40,21 @@ Page(SafePage({
   _theme() { const d = T.themeMode() === "dark"; this.setData({ td: d }); T.applyNav(); T.applyTabBar(); },
   // v1.11：more 页聚合了十余个模块，任一数据源脏都不该整体白屏
   onLoad() { this.__boot = T.ready().catch(() => null); _preloadMoreMods(this); },
-  onShow() { onShowRender(this, "more"); },
+  onShow() {
+    onShowRender(this, "more");
+    // v1.20.33：从行程页天气卡「去配置」跳来 → 自动展开「合规与密钥」分组。
+    // 该分组默认折叠（keys: true），旧版用户点完按钮落地后还得自己翻找入口，很多人就卡在这一步。
+    try {
+      if (app && app.globalData && app.globalData.needKeysPanel) {
+        app.globalData.needKeysPanel = 0;
+        const c = this.data.collapsed || {};
+        if (c.keys) {
+          const next = Object.assign({}, c, { keys: false });
+          this.setData({ collapsed: next, allCollapsed: Object.keys(next).every((k) => next[k]) });
+        }
+      }
+    } catch (e) { EL.note("more", e, "按需展开密钥分组失败"); }
+  },
   _renderShow() { try { this._theme(); this.refresh(); } catch (e) { try { wx.showToast({ title: "页面刷新异常", icon: "none" }); } catch (_) {} } },
 
   /* ---------- v1.20.7：分组折叠（手风琴） ---------- */
@@ -169,6 +183,14 @@ Page(SafePage({
     // v1.20.8：云环境 ID 现状（fail-closed：未填则空串 → 云端能力关闭）。仅在「更多」页展示状态，不触发任何联网。
     let cloudEnv = "";
     try { cloudEnv = (typeof Cloud.cloudEnv === "function") ? (Cloud.cloudEnv() || "") : ""; } catch (e) {}
+    // v1.20.33：和风两件套现状 —— 旧版这里什么都没有，用户填完 Key 仍不来天气，
+    // 只能靠猜「到底配没配上」。现在把「缺哪一件」直接写在卡片副标题上。
+    let keysTx = "未配置（需和风 Key + 专属 API Host）";
+    try {
+      const _m = KEYS.qweatherHostMode();
+      if (_m === "custom") keysTx = "已配置：Key + 专属 API Host";
+      else if (_m === "legacy") keysTx = "只填了 Key，缺专属 API Host（新账号会失败）";
+    } catch (e) { EL.note("more", e, "读取和风密钥状态失败"); }
     // 深度玩法入口：仅当「目标地（主城或任一串联站）」收录了深度内容时才显示；
     // 未收录（或没有行程）不占坑 —— 避免点进去发现不是自己的目的地。
     const _deepCands = [];
@@ -222,6 +244,7 @@ Page(SafePage({
       review: hasPlan ? T.tripReview(p) : null,
       hasPlan,
       cloudEnv: cloudEnv,
+      keysTx: keysTx,
       wish,
       wishGroups,
       savedPlans,
@@ -478,13 +501,17 @@ Page(SafePage({
     }
   },
 
-  /* ---- 合规与密钥（v1.19.188）：运行时注入本人账号申请的第三方 Key ----
+  /* ---- 合规与密钥（v1.19.188 / v1.20.33）：运行时注入本人账号申请的第三方 Key ----
      不改动源码 / 不重发版即可换成你自己的和风天气 / 高德 Key；
-     经 keys.js 的 __app_keys__ storage 覆盖路径，天气取数即时生效（fail-closed 已内置）。 */
+     经 keys.js 的 __app_keys__ storage 覆盖路径，天气取数即时生效（fail-closed 已内置）。
+     v1.20.33：和风从「只填 Key」改为「Key + API Host 两件套」。
+     原因（外部变化）：和风公共域名 devapi/api/geoapi.qweather.com 自 2026 年起陆续停服，
+     且 API Host 本身也是身份认证的一部分 —— 只填 Key 的旧配置在新账号上必然调不通，
+     而旧版 UI 根本没有填 Host 的入口，用户填完 Key 仍拿不到天气却无从下手。 */
   onSetKeys() {
     wx.showModal({
-      title: "配置和风天气 Key",
-      content: "在 dev.qweather.com 申请免费 Key（须为你本人和风账号）。粘贴后天气即用你的 Key（存本机）；留空则不配置、天气卡不显示。",
+      title: "① 和风天气 Key",
+      content: "在 console.qweather.com → 项目管理 → 创建项目，复制生成的 Key（须为你本人和风账号）。留空则跳过。",
       editable: true,
       placeholderText: "粘贴和风天气 Key",
       success: (r1) => {
@@ -493,20 +520,58 @@ Page(SafePage({
         const patch = {};
         if (qk) patch.qweatherKey = qk;
         wx.showModal({
-          title: "配置高德 Key（可选）",
-          content: "当前小程序用微信内置地图组件，无需 Key；仅当你未来自行调用高德 API 时才需要。留空跳过。",
+          title: "② 和风 API Host",
+          content: "同一控制台「设置 → API Host」里的专属域名（形如 h2a9cf3mhs.xy.qweatherapi.com）。2026 年起公共域名已陆续停服，新账号必须填这一项。填完还需到微信公众平台「开发设置 → 服务器域名」把它加进 request 合法域名，否则真机请求会被拦。",
           editable: true,
-          placeholderText: "粘贴高德 Key（可选）",
+          placeholderText: "粘贴专属 API Host（可含 https://）",
           success: (r2) => {
-            const ak = (r2.content || "").trim();
-            if (ak) patch.amapKey = ak;
-            if (!Object.keys(patch).length) { wx.showToast({ title: "未改动", icon: "none" }); return; }
-            KEYS.setKeys(patch);
-            wx.showToast({ title: "已保存，下次加载天气即生效", icon: "none" });
+            if (!r2.confirm) return;
+            const qh = (r2.content || "").trim();
+            if (qh) patch.qweatherHost = qh;
+            wx.showModal({
+              title: "③ 高德 Key（可选）",
+              content: "当前小程序用微信内置地图组件，无需 Key；仅当你未来自行调用高德 API 时才需要。留空跳过。",
+              editable: true,
+              placeholderText: "粘贴高德 Key（可选）",
+              success: (r3) => {
+                const ak = (r3.content || "").trim();
+                if (ak) patch.amapKey = ak;
+                if (!Object.keys(patch).length) { wx.showToast({ title: "未改动", icon: "none" }); return; }
+                KEYS.setKeys(patch);
+                this._afterSetKeys();
+              }
+            });
           }
         });
       }
     });
+  },
+
+  // 保存后按「两件套是否齐全」给不同反馈：缺 Host 是最常见的半配置状态，
+  // 旧版只回一句「已保存，下次加载天气即生效」—— 用户以为配好了，回行程页还是没天气。
+  _afterSetKeys() {
+    const hasKey = !!KEYS.qweatherKey();
+    const hostOk = !!KEYS.qweatherHostNorm();
+    if (hasKey && hostOk) {
+      wx.showToast({ title: "已配置，回行程页重试即可", icon: "none" });
+      this.refresh();
+      return;
+    }
+    if (!hasKey) {
+      wx.showModal({
+        title: "未配置和风 Key",
+        content: "天气功能需要和风 Key 才能启用，当前仍为空。随时可回到这里重新填写。",
+        showCancel: false
+      });
+      this.refresh();
+      return;
+    }
+    wx.showModal({
+      title: "还缺 API Host",
+      content: "已存 Key，但没填专属 API Host。新账号只填 Key 调不通（公共域名 2026 年起陆续停服）。请到 console.qweather.com「设置 → API Host」复制后，再点一次本项填入。",
+      showCancel: false
+    });
+    this.refresh();
   },
 
   /* ---- 云环境 ID（启用云端 AI / 云同步，v1.20.8） ----

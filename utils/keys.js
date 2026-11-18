@@ -14,8 +14,11 @@
 //     —— 注入的 Key 仍须是注册在本人 / 本小程序主体账号下的 Key（严禁借用他人 Key，见上方铁律②）。
 //   ★ 若要重新编译进包（不推荐，会重新引入明文），把下方对应字段填上本人账号 Key 即可。
 //
-// 现状（v1.20.4）：和风 Key 已移出仓库，改为运行时注入。高德 Key 当前未使用（<map> 组件无需 Key）。
+// 现状（v1.20.33）：和风 Key 已移出仓库，改为运行时注入。高德 Key 当前未使用（<map> 组件无需 Key）。
 // 未注入 Key 时天气功能 fail-closed 静默降级（qweatherConfigured() 返回 false，绝不抛错阻断主流程）。
+// ★ 和风两件套必须配对：2026 年起公共域名 devapi/api/geoapi.qweather.com 陆续停服，
+//   新账号须用控制台「设置 → API Host」分配的专属 Host（形如 h2a9cf3mhs.xy.qweatherapi.com）。
+//   只填 Key 不填 Host → 回落公共域名（老账号或许还能用），新账号必然失败。
 const DEFAULT = {
   qweatherKey: "", // v1.20.4 #1/#19：明文移出仓库，改运行时注入（setKeys）
   qweatherHost: "", // 同上，须与 qweatherKey 配对注入
@@ -52,7 +55,47 @@ function qweatherKey() { return _resolve("qweatherKey"); }
 function qweatherHost() { return _resolve("qweatherHost"); }
 function amapKey() { return _resolve("amapKey"); }
 
+// ── 和风 API Host（v1.20.33）────────────────────────────────────────────────
+// 背景（外部变化，不是本项目改坏的）：和风公共域名 devapi / api / geoapi.qweather.com
+// **自 2026 年起陆续停服**，新账号必须用控制台「设置」里分配的专属 Host
+// （形如 h2a9cf3mhs.xy.qweatherapi.com）；API Host 本身也是身份认证的一部分
+// —— 只拿到 Key 而不知 Host，请求同样调不通。
+// 兜底：未填 Host 时回落公共域名（老账号可能仍可用），失败时由 weather 层给出
+// 「去填专属 API Host」的具体指引，而不是一句无用的「服务异常」。
+const LEGACY_HOST = "https://devapi.qweather.com";
+
+// 规范化 Host：三种写法都实测见过 —— 裸域名 / 带 https:// / 带尾部斜杠，统一成完整基址。
+// 明显不是域名（含空格、中文、无点）→ 返回 null 当未填，绝不把脏串拼进 URL。
+function qweatherHostNorm() {
+  const h = qweatherHost();
+  if (!h) return null;
+  let s = String(h).trim();
+  if (!s) return null;
+  if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+  s = s.replace(/\/+$/, "");
+  const m = /^https?:\/\/([^\s\/:]+)(:\d+)?(\/[^\s]*)?$/i.exec(s);
+  if (!m) return null;
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(m[1])) return null;
+  return s;
+}
+
+// 天气请求基址：要么是完整可用 URL，要么 null —— 禁止再出现 "null/v7/weather/7d" 这种半成品。
+function qweatherBase() {
+  const norm = qweatherHostNorm();
+  if (norm) return norm;
+  return qweatherKey() ? LEGACY_HOST : null;
+}
+
+// 当前走的是专属 Host 还是公共域名：custom / legacy / none。
+// legacy 失败时必须指路「换专属 Host」，否则用户只会看到无从下手的「服务异常」。
+function qweatherHostMode() {
+  if (qweatherHostNorm()) return "custom";
+  return qweatherKey() ? "legacy" : "none";
+}
+
 // 是否已有可用的和风 Key（fail-closed 判据，供 weather 跳过 / 降级）
+// 注意：这里刻意**只看 Key**，不看 Host —— 只填 Key 的老配置仍允许尝试（回落公共域名）。
+// 「Key 有 / Host 空」这种半配置由 qweatherBase() 兜底成合法 URL，不会再拼出坏地址。
 function qweatherConfigured() { return !!qweatherKey(); }
 
 // 云环境 ID（fail-closed：空白 / 占位符 → null → 云能力整体关闭，绝不抛错）
@@ -71,4 +114,4 @@ function setKeys(patch) {
   return false;
 }
 
-module.exports = { qweatherKey, qweatherHost, amapKey, qweatherConfigured, cloudEnv, setKeys, DEFAULT };
+module.exports = { qweatherKey, qweatherHost, qweatherHostNorm, qweatherBase, qweatherHostMode, amapKey, qweatherConfigured, cloudEnv, setKeys, DEFAULT, LEGACY_HOST };

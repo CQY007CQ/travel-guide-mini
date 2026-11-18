@@ -223,11 +223,11 @@
   <view class="wx-off" wx:if="{{wxOff}}">
     <image class="ic ic-sm" src="/images/icons/cloud.png"/>
     <view class="wx-off-t">
-      <view class="wx-off-h">{{wxErrType === 'no_key' ? '天气服务未启用' : (wxErrType === 'window' ? '出发日超出 7 天预报' : '天气暂不可用')}}</view>
+      <view class="wx-off-h">{{wxErrType === 'no_key' ? '天气服务未配置' : (wxErrType === 'window' ? '出发日超出 7 天预报' : '天气暂不可用')}}</view>
       <view class="wx-off-d dim">{{wxErrMsg || '离线或超预报期 · 其他功能不受影响'}}</view>
     </view>
     <view class="wx-off-acts">
-      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="wx-retry" wx:if="{{wxErrType === 'no_key'}}" catchtap="goKeyConfig">填入 Key</view>
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="wx-retry" wx:if="{{wxErrType === 'no_key'}}" catchtap="goKeyConfig">去配置</view>
       <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="wx-retry" wx:if="{{wxErrRetry}}" catchtap="onWxRetry">重试</view>
       <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="wx-close" catchtap="closeWxOff">✕</view>
     </view>
