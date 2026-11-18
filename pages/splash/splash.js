@@ -19,7 +19,10 @@ let T = {};
 try { T = require("../../utils/travel.js") || {}; } catch (e) {
   try { if (typeof console !== "undefined" && console.warn) console.warn("[splash] travel.js 加载失败，开屏页以最小化逻辑运行:", e && e.message); } catch (_) {}
 }
-const KEEP_MS = 1250;   // 入场动画 0~0.95s，留缓冲后自动进入
+// 1250 → 1000（v1.20.24）：入场动画 0~950ms，原缓冲 300ms 偏长。
+// 实测 T.ready() 冷启只要 ~200ms，开机页又不数据（v1.19.66 起不等数据），
+// 后 300ms 是纯等。留 50ms 缓冲足够避免动画被切断。
+const KEEP_MS = 1000;   // 入场动画 0~0.95s，留缓冲后自动进入
 const WD_MS = 700;      // 看门狗重试间隔
 
 Page(SafePage({

@@ -153,6 +153,22 @@ log(/_sendInflight\s*=\s*\{\s*q:\s*v,\s*p:\s*p\s*\}/.test(readFileSync(resolve(R
   /return sendQueued\(v\);/.test(readFileSync(resolve(ROOT, "web/ai-assistant.js"), "utf8")),
   "网页 AI 发送走 Promise 复用 + 排队（不是 boolean 丢弃）");
 
+// v1.20.24：答案缓存的三条防回潮（行为本身由 _test-cross-scene-ai 的 §16 真跑覆盖，
+// 这里只守「别把整段删掉」与「两个关键失效点别断」，防止重构时缓存悄悄退化成永久缓存）。
+//   ① 缓存的命中条件必须同时比对 ctx —— 只比问题会把吉安的答案给北京；
+//   ② 实时类关键词必须参与判定 —— 缺了就会吐 10 分钟前的"实时天气"；
+//   ③ 清空会话必须连带清缓存 —— 否则用户以为清了，同一句立刻弹回旧答案。
+log(/_cacheGet\(k, q, context\)/.test(AGENT_JS) &&
+  /String\(e\.ctx\) !== String\(ctx \|\| ""\)/.test(AGENT_JS),
+  "答案缓存命中必须同时比对上下文（不全等地串城市）");
+log(/CACHE_LIVE = \/\(天气\|气温/.test(AGENT_JS) &&
+  /if \(!CACHE_LIVE\.test\(q\)\)/.test(AGENT_JS),
+  "实时/易变类问题排除在答案缓存之外");
+log(/cacheClear\(\);/.test(AGENT_JS) && /function cacheClear\(\)/.test(AGENT_JS),
+  "清空会话连带清答案缓存（不会弹回旧答案）");
+log(/_cachePut\(k, q, context, r\.text\)/.test(AGENT_JS) && /CACHE_MAX = 40/.test(AGENT_JS),
+  "答案缓存只写成功答案且容量有上限（内存不膨胀）");
+
 console.log(fail === 0
   ? "\n✓ 云端 AI fail-closed 覆盖守卫通过（每个调用点都有 .catch 且失败分支优雅降级）"
   : "\n✗ 存在缺兜底的云端 AI 调用点，请在 .then 失败分支补离线/云端感知回落，并确保 .catch 存在");

@@ -255,6 +255,54 @@ function loadAgent(opts) {
     ok("第二视角快速返回而不是等超时（<50ms）", Date.now() - t0 < 50, (Date.now() - t0) + "ms");
   }
 
+  /* §16 答案缓存（v1.20.24）：同一句话重复提问不再全额重等 8~12s
+     为什么必须真跑：缓存的三个坑（串城市、串实时、清空后不失效）都只在行为上暴露，
+     断言「源码里有 CACHE_LIVE」对错误实现一样是绿的。 */
+  console.log("\n== 答案缓存 ==");
+  {
+    let n = 0;
+    const d = loadAgent({ aiChat: () => { n++; return Promise.resolve({ ok: true, text: "答案" + n }); } });
+    const r1 = await d.api.ask("food", "推荐几家本地小吃", "吉安·3天");
+    const c1 = d.calls.length;
+    const r2 = await d.api.ask("food", "推荐几家本地小吃", "吉安·3天");
+    ok("同句同上下文第二次不再发请求", c1 === 1 && d.calls.length === 1, "calls=" + d.calls.length);
+    ok("命中缓存返回同一份答案并标记 cached", r2.ok === true && r2.text === r1.text && r2.cached === true);
+    ok("命中后仍写回记忆（「那还有别的吗」不会失去指代）",
+      d.api.historyOf("food").filter(m => m.content === "推荐几家本地小吃").length >= 2);
+
+    // 关键：上下文变了（换城市）绝不能命中 —— 否则吉安的答案会被当成北京的
+    const r3 = await d.api.ask("food", "推荐几家本地小吃", "北京·5天");
+    ok("换城市（上下文变）不命中，照常发请求", d.calls.length === 2 && r3.cached !== true,
+      "calls=" + d.calls.length);
+
+    const e2 = loadAgent();
+    await e2.api.ask("today", "今天天气怎么样", "c");
+    await e2.api.ask("today", "今天天气怎么样", "c");
+    ok("实时类问题（含「今天/天气」）不缓存，两次都走云端", e2.calls.length === 2);
+
+    const f3 = loadAgent();
+    await f3.api.ask("food", "冷问题", "c");
+    f3.tick(11 * 60 * 1000);
+    await f3.api.ask("food", "冷问题", "c");
+    ok("超过 10 分钟缓存失效，重新发请求", f3.calls.length === 2);
+
+    const g3 = loadAgent();
+    await g3.api.ask("food", "会被清掉的问题", "c");
+    g3.api.clearHistory();
+    await g3.api.ask("food", "会被清掉的问题", "c");
+    ok("清空会话后缓存一并失效（不再弹回旧答案）", g3.calls.length === 2);
+
+    const h3 = loadAgent({ aiChat: () => Promise.resolve({ ok: false, err: "empty" }) });
+    await h3.api.ask("food", "失败问题", "c");
+    await h3.api.ask("food", "失败问题", "c");
+    ok("失败/空答案不写缓存（下次仍重试）", h3.calls.length === 2);
+
+    const i3 = loadAgent();
+    for (let i = 0; i < 45; i++) await i3.api.ask("food", "问题" + i, "c");
+    ok("缓存容量守住上限 40（内存不膨胀）", i3.api.cacheStats().size <= 40,
+      "size=" + i3.api.cacheStats().size);
+  }
+
   console.log("\n" + pass + " 通过 / " + fail + " 失败");
   process.exit(fail === 0 ? 0 : 1);
 })().catch(e => { console.error(e); process.exit(1); });

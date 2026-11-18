@@ -56,6 +56,52 @@ let _breakUntil = 0;
 // 这里只暴露状态、不改判定：业务错误仍不熔断，60s 到期自动恢复，口径全在主链路这一处。
 function channelCooling() { return Date.now() < _breakUntil; }
 
+// ── 答案缓存：同一句话在同一份上下文下重复提问，直接复用上次答案 ──
+// 为什么需要：AI 延迟 ≈ 输出长度 ÷ 70 字/秒（实测一问 8~12 秒），而用户会反复问同一句 ——
+//   换页回来再问一遍、手滑重发、同一趟行程隔几分钟又想确认。现在每次都全额再等一轮并再烧一次 token。
+//   命中缓存 = 0ms 落屏，且不发请求。
+//
+// 命中条件必须**三条全等**：scene 相同 + 问题完全相同 + 上下文完全相同。
+//   只看问题是不够的：「有什么好吃的」在吉安和北京答案不同，而城市与行程就在 context 里；
+//   因此把 context 整串一起比对（≤1200 字，原生字符串比较，成本可忽略）。
+//   宁可少命中，也不能串城市、串行程 —— 那是"看似聪明实则胡说"的典型来源。
+//
+// 排除实时/易变类问题：含天气、气温、下雨、人流、排队、今天、现在、票价、路况…任一关键词
+//   就既不读也不写缓存。这类答案随时间变化，缓存会在 10 分钟内吐出过期的"实时"信息，比慢更糟。
+//
+// 只存内存、不落盘：进程被回收即失效。宁可多问一次，也不让陈旧答案跨会话存活。
+// 容量 LRU 40 条（单条 ≤1200 字，上限约 48KB），超出淘汰最久未用的那条。
+const _cache = Object.create(null);   // key -> { ctx, text, ts, used }
+const CACHE_TTL = 10 * 60 * 1000;
+const CACHE_MAX = 40;
+// 保守判据：只要沾一点"答案会随时间变"的边就不缓存（宁可多问一次）
+const CACHE_LIVE = /(天气|气温|温度|下雨|雨|雪|风|空气|雾霾|实时|现在|今天|明天|后天|人流|排队|拥挤|开门|营业|闭馆|票价|余票|堵车|路况|航班|延误)/;
+function _cacheKey(scene, q) { return String(scene || "default") + "\u0001" + q; }
+function _cacheGet(scene, q, ctx) {
+  const e = _cache[_cacheKey(scene, q)];
+  if (!e) return null;
+  if (Date.now() - e.ts > CACHE_TTL) { delete _cache[_cacheKey(scene, q)]; return null; }
+  if (String(e.ctx) !== String(ctx || "")) return null;   // 换城市 / 换行程 → 不命中
+  e.used = Date.now();
+  return e.text;
+}
+function _cachePut(scene, q, ctx, text) {
+  if (!text || typeof text !== "string") return;
+  const k = _cacheKey(scene, q);
+  _cache[k] = { ctx: String(ctx || ""), text: text, ts: Date.now(), used: Date.now() };
+  const keys = Object.keys(_cache);
+  if (keys.length <= CACHE_MAX) return;
+  let oldest = keys[0];
+  for (let i = 1; i < keys.length; i++) {
+    if ((_cache[keys[i]].used || 0) < (_cache[oldest].used || 0)) oldest = keys[i];
+  }
+  delete _cache[oldest];
+}
+// 清空会话时必须连带清缓存：否则用户以为"清空了"，再问同一句却立刻弹回旧答案
+function cacheClear() { Object.keys(_cache).forEach(function (k) { delete _cache[k]; }); }
+// 只读出口（单测 / 门禁断言用，不参与业务）
+function cacheStats() { return { size: Object.keys(_cache).length, ttl: CACHE_TTL, max: CACHE_MAX }; }
+
 // 时间戳为什么要落盘：_sceneTs 早期是纯内存，小程序被后台回收后它归零 →
 // 他页取到 0 → now-0 恒大于 10 分钟 TTL → 跨页提示「永不注入」。
 // 症状是「隔天/被回收后再问就接不上」，而 TTL 与注入逻辑本身都是好的，极难定位。
@@ -121,6 +167,7 @@ function clearHistory(scene) {
     if (scene) { delete m[scene]; delete _sceneTs[scene]; }
     else { Object.keys(m).forEach(k => delete m[k]); Object.keys(_sceneTs).forEach(k => delete _sceneTs[k]); }
     _crossTs = 0; // 清空会话后跨页缓存立即失效，不吐 30 秒内的旧问题
+    cacheClear();  // 答案缓存同理：否则「清空会话」后同一句立刻弹回旧答案，等于没清
     _save();
   } catch (e) { EL.note("ai-mem", e, "清空会话失败 → 旧记忆可能仍在（用户以为已清）"); }
 }
@@ -167,6 +214,17 @@ function ask(scene, question, context, systemOverride) {
     // 换了问题：排队。等前一趟结算完（记忆已落）再重新走 ask，顺序与用户输入一致。
     return busy.p.then(function () { return ask(scene, question, context, systemOverride); });
   }
+  // 答案缓存：同一 scene + 同一句话 + 同一份上下文，10 分钟内直接复用（0ms、零 token）
+  if (!CACHE_LIVE.test(q)) {
+    const hit = _cacheGet(k, q, context);
+    if (hit) {
+      // 命中也要写回记忆：否则下一问的 history 里缺这一轮，
+      // 用户紧接着问「那还有别的吗」会失去指代对象。
+      remember(scene, "user", q);
+      remember(scene, "assistant", hit);
+      return Promise.resolve({ ok: true, text: hit, cached: true });
+    }
+  }
   if (Date.now() < _breakUntil) return Promise.resolve({ ok: false, err: "cooldown" });
   return _run(k, scene, q, context, systemOverride);
 }
@@ -183,6 +241,8 @@ function _run(k, scene, q, context, systemOverride) {
       _netFail = 0; _breakUntil = 0;   // 通道恢复：清掉熔断计数，下一次照常走云端
       remember(scene, "user", q);
       remember(scene, "assistant", r.text);
+      // 实时类问题不写缓存（下次仍要走云端拿最新答案）
+      if (!CACHE_LIVE.test(q)) _cachePut(k, q, context, r.text);
     } else if (r && r.transport) {
       // 只有传输层失败才计入熔断（cloud.js 置 transport 标记）
       _netFail++;
@@ -339,5 +399,7 @@ module.exports = {
   memoryStats: memoryStats,
   parsePlanIntent: parsePlanIntent,
   resolveCity: resolveCity,
-  channelCooling: channelCooling
+  channelCooling: channelCooling,
+  cacheStats: cacheStats,
+  cacheClear: cacheClear
 };
