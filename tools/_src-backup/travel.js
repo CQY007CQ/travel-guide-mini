@@ -40,7 +40,7 @@ function ready() {
 }
 
 // 版本号：发版时与 cli upload --version 保持一致（首页 / 更多页底部防呆显示）
-const APP_VER = "1.20.30";
+const APP_VER = "1.20.31";
 
 // 迁移后 CITIES 不内嵌 province，省份归属在 CITY2PROV；此处回填，
 // 使 provinces()/citiesOf()/出发地与目的地选择按省正确分组。
@@ -710,19 +710,80 @@ function spotTagOf(name, cityName) {
 // v1.20.27：这里原本是 emoji。emoji 字形由系统字体决定（安卓可能变方块），且彩色立体 emoji
 // 与旁边的单色线条图标打架 —— 与 v1.20.25 界面去 emoji 的结论一致。
 // 改为 images/icons/ 下的自绘单色线条图标（白色，配按城市哈希出来的彩色渐变封面）。
-// v1.20.30：缩略图上的「示意图」角标全部去掉（真机截图报障：96rpx 的封面上再叠一行 16rpx
+// v1.20.31：缩略图上的「示意图」角标全部去掉（真机截图报障：96rpx 的封面上再叠一行 16rpx
 // 胶囊文字，字比图标还抢眼，且「示意图」三个字对用户只是噪音）。诚实性靠**形态**表达、
 // 不靠叠字：渐变 + 单色线条图标本身就是明确的图形化占位，没有照片质感，不存在「伪装成
 // 实拍」的歧义；isReal / placeholder 字段照旧，真图仍优先。
 // 边界：哪天封面改成有照片质感的设计（模糊实拍 / 拟真渲染），必须把标注加回来。
-// v1.20.30：住宿 / 交通类的名字天然是长店名（「XX客栈1 | YY民居客栈」），塞进 96rpx 宽的
+// v1.20.31：住宿 / 交通类的名字天然是长店名（「XX客栈1 | YY民居客栈」），塞进 96rpx 宽的
 // 名字条会逐字断行塌成一列（真机截图报障：整张封面全是字）。这两类一律显示类别短词，
 // 完整名称右侧行标题已有；其余名称超 6 字截断，样式层再加单行省略兜底。
-const COVER_ICON = {
-  "历史古迹": "pagoda", "博物馆": "museum", "宗教": "temple", "古镇": "town",
-  "自然风光": "mountain", "亲子": "people", "乐园": "ferris", "美食": "food",
-  "海滨": "umbrella", "徒步": "foot", "其他": "pin"
-};
+// v1.20.31：封面分类图标从 11 类扩到 30 类（用户真机报障「示意图和内容不匹配」）
+//
+// 病因不是某一张图选错，而是**颗粒度只有 11 类 + 兜底是 mountain**：
+//   旧写法 `COVER_ICON[cat] || 'mountain'` 里，任何没登记的类别都被画成山 ——
+//   于是水景、峡谷、瀑布、洞穴、草原、沙漠、城墙、桥、宫殿、街巷、演出、温泉
+//   统统变成同一座山（「黄河画廊」是黄河边的崖壁水蚀浮雕，配山峦图自然不对）。
+//
+// 现在的做法：**有序关键词表**（先具体、后笼统），命中即返回；都不命中才给 pin。
+// 兜底从 mountain 改成 pin 是有意的 —— 宁可给一个中性的「地点」标记，
+// 也不要给一个语义错误的「山」。
+// 表内顺序有语义，不要按字母/长短重排：canyon 必须在 water 之前（「黄河画廊」含「河」），
+// waterfall 必须在 cave 之前（「水帘洞」），amuse 必须在 garden 之前（「游乐园」含「园」）。
+const COVER_ICON_RULES = [
+  // 住宿 / 交通 / 饮食：名字最明确，先判（「温泉酒店」应给 home 而不是 hotspring）
+  ["home", /酒店|民宿|客栈|住宿|青旅|宾馆|旅舍|度假村|山庄|招待所|农家院/],
+  ["bus", /站|机场|码头|港口|枢纽|汽车|高铁|地铁|轻轨|轮渡|服务区/],
+  // 具体地貌（必须排在「水」「山」这类泛化词之前）
+  ["waterfall", /瀑布|飞瀑|叠水|水帘/],
+  ["canyon", /峡谷|地缝|天坑|石林|崖|画廊|一线天|绝壁|峡/],
+  ["cave", /溶洞|洞穴|钟乳|暗河|龙宫|石窟|岩洞|洞天|洞/],
+  ["desert", /沙漠|戈壁|沙丘|大漠|雅丹|鸣沙|沙坡|响沙/],
+  ["grass", /草原|草甸|牧场|梯田|麦田|田园|农场|采摘|花海牧场/],
+  ["snowmtn", /雪山|冰川|雪峰|高原|垭口|雪乡|滑雪|雪场|冰雪/],
+  // 桥必须排在「岛」之前：「青岛栈桥」含「岛」字，但它是桥不是海岛
+  ["bridge", /桥/],
+  ["island", /岛|屿|礁|半岛/],
+  ["umbrella", /海滩|海岸|海边|海滨|沙滩|渔港|海湾|赶海|浴场|观海|滨海/],
+  ["hotspring", /温泉|汤池|汤泉|泡汤/],
+  ["water", /湖|江|河|溪|泉|潭|湿地|水库|漂流|泛舟|游船|竹筏|水乡|水街|沟/],
+  ["flower", /樱花|油菜花|桃花|荷花|梅花|赏花|薰衣草|郁金香|向日葵|花田|花海/],
+  // 建筑 / 文化（比地貌更具体，排在「山」之前）
+  ["wall", /城墙|城门|关隘|长城|城楼|瓮城|关城|烽火|边墙/],
+  ["palace", /宫殿|故宫|王府|相府|府邸|衙署|大院|庄园|行宫|故居|纪念馆|会址|陵|墓|兵马俑/],
+  ["temple", /寺|庙|庵|道观|教堂|清真|佛|禅|祠/],
+  ["pagoda", /塔|舍利/],
+  ["museum", /博物馆|美术馆|展览馆|陈列馆|科技馆|艺术馆|博览|书院|图书馆|碑林|碑刻/],
+  ["show", /演出|剧场|剧院|表演|秀场|实景|印象|千古情/],
+  ["paw", /动物园|海洋馆|海洋世界|水族|野生动物/],
+  ["ferris", /乐园|游乐园|主题公园|欢乐谷|迪士尼|方特|水世界|游乐场/],
+  ["town", /古镇|古城|古村|老街|民俗村|文化村|古街|村落|古寨/],
+  ["street", /街|巷|弄|集市|市场|夜市|步行街|商街/],
+  ["city", /摩天|天际线|广场|商圈|地标|大厦|金融街|CBD/i],
+  // 泛化地貌 / 玩法（吸收前面没命中的）
+  ["camera", /观景|观景台|平台|日出|日落|夜景|全景|机位|瞭望|观星/],
+  ["flag", /革命|烈士|旧址|抗战|根据地|苏维埃|会议址|纪念碑/],
+  ["garden", /园林|植物园|公园|盆景|竹林|竹海|湿地公园|园$/],
+  ["mountain", /山|峰|岭|岳|崮|界|崖壁/],
+  ["foot", /徒步|栈道|步道|古道|登山|索道/],
+  ["food", /美食|小吃|米线|火锅|烧烤|餐厅|饭庄|面馆|菜馆|食府|夜市小吃/]
+];
+const COVER_ICON_FALLBACK = "pin";
+// 行程框架行（抵达/前往/入住/继续游览…）语义和景点不同，单独分流。
+// 历史 bug：这些行一律给了 food 图标 —— 「入住 XX 客栈」显示成一副刀叉。
+function coverIconOf(name) {
+  const s = String(name || "");
+  if (!s) return COVER_ICON_FALLBACK;
+  if (typeof isFrameName === "function" && isFrameName(s)) {
+    if (/入住|退房|回酒店|落脚/.test(s)) return "home";
+    if (/继续游览|登山|索道/.test(s)) return "camera";
+    return "bus";                                  // 抵达 / 前往 / 返程 / 出发前往
+  }
+  for (let i = 0; i < COVER_ICON_RULES.length; i++) {
+    if (COVER_ICON_RULES[i][1].test(s)) return COVER_ICON_RULES[i][0];
+  }
+  return COVER_ICON_FALLBACK;
+}
 const COVER_LABEL_MAX = 6;
 const COVER_SHORT = { home: "住宿", bus: "交通" };
 function coverLabelOf(name, icon) {
@@ -747,11 +808,7 @@ function spotCover(city, name, img) {
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
   const hue = h % 360, hue2 = (hue + 34) % 360;
   const bg = 'linear-gradient(135deg,' + hslHex(hue, 56, 62) + ',' + hslHex(hue2, 64, 44) + ')';
-  let icon = 'mountain';
-  if (typeof isFrameName === 'function' && isFrameName(nm)) icon = 'food';
-  else if (/酒店|民宿|客栈|住宿|青旅|宾馆|旅舍|度假村/.test(nm)) icon = 'home';
-  else if (/站|机场|码头|汽车|高铁|港口|枢纽|地铁|轻轨/.test(nm)) icon = 'bus';
-  else { const tg = spotTagOf(nm, city); const cat = (tg && tg[0]) ? tg[0] : '其他'; icon = COVER_ICON[cat] || 'mountain'; }
+  let icon = coverIconOf(nm);
   let cat = '其他';
   try { const tg = spotTagOf(nm, city); cat = (tg && tg[0]) ? tg[0] : '其他'; } catch (e) {}
   // 真实照片：优先数据自带的 img，其次查 CC 图映射（cloud:// fileID）。映射默认关闭 → 行为零变化。

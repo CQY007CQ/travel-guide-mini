@@ -126,9 +126,20 @@ let mapCount = 0;
 for (const d of mapDirs) {
   for (const f of walk(d).filter((x) => x.endsWith(".js"))) {
     const src = fs.readFileSync(f, "utf8");
+    // 形态 ①：对象字面量映射表（const X_ICON = { "历史古迹": "pagoda", ... }）
     for (const m of src.matchAll(/(?:const|let|var)\s+([A-Z][A-Z0-9_]*_ICON)\s*=\s*\{([\s\S]*?)\n\s*\}/g)) {
       mapCount++;
       for (const v of m[2].matchAll(/"([a-z0-9][a-z0-9-]*)"/g)) iconNames.add(v[1]);
+    }
+    // 形态 ②：有序规则表（v1.20.31 起封面用这种：const COVER_ICON_RULES = [ ["home", /…/], … ]）
+    // 每项第一个元素就是图标名 —— 只在行首匹配，避免把正则里的字符串也当成图标名
+    for (const m of src.matchAll(/(?:const|let|var)\s+([A-Z][A-Z0-9_]*_ICON_RULES)\s*=\s*\[([\s\S]*?)\n\];/g)) {
+      mapCount++;
+      for (const v of m[2].matchAll(/^\s*\["([a-z0-9][a-z0-9-]*)",/gm)) iconNames.add(v[1]);
+    }
+    // 形态 ③：兜底常量（const COVER_ICON_FALLBACK = "pin"）—— 它也是要渲染的图标名
+    for (const m of src.matchAll(/(?:const|let|var)\s+[A-Z][A-Z0-9_]*_ICON_FALLBACK\s*=\s*"([a-z0-9][a-z0-9-]*)"/g)) {
+      iconNames.add(m[1]);
     }
   }
 }

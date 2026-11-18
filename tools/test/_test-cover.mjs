@@ -112,5 +112,72 @@ const a1 = cover("吕梁", "碛口古镇"), a2 = cover("吕梁", "碛口古镇")
 ck("二次调用 bg 完全一致", a1.bg === a2.bg, a1.bg + " vs " + a2.bg);
 ck("不同城市同景点配色不同", cover("吕梁", "古镇").bg !== cover("太原", "古镇").bg);
 
+/* ────────────────────────────────────────────────────────────────────────
+ * [6] 图标与景点语义匹配（v1.20.31）
+ *
+ * 病因：旧实现 `COVER_ICON[cat] || 'mountain'`，颗粒度只有 11 类且未命中兜底成山 ——
+ * 全量 24797 个景点名里 **37% 画成山**、21% 画成塔、34% 是 pin，三种图占了 92%。
+ * 「黄河画廊」（黄河边崖壁水蚀浮雕）配山峦图就是这么来的。
+ *
+ * 这里锁三件事：
+ *   ① 具体景点必须命中具体类别（33 例精确断言，含顺序敏感的那几个）
+ *   ② 兜底必须是 pin，不许再是 mountain
+ *   ③ 全量语料的山/塔占比不许反弹（防有人重排规则表又退回「都能变山」）
+ * ──────────────────────────────────────────────────────────────────────── */
+console.log("[6] 图标语义匹配（30 类有序规则表）");
+const ICON_CASES = [
+  // 顺序敏感：canyon 必须在 water 之前（「黄河画廊」含「河」）
+  ["黄河画廊", "canyon"], ["壶口瀑布", "waterfall"], ["水帘洞", "waterfall"],
+  // 顺序敏感：bridge 必须在 island 之前（「青岛栈桥」含「岛」）
+  ["青岛栈桥", "bridge"], ["鼓浪屿", "island"],
+  // 顺序敏感：ferris 必须在 garden 之前（「游乐园」含「园」）
+  ["上海迪士尼", "ferris"], ["颐和园", "garden"], ["人民公园", "garden"],
+  // 地貌细分
+  ["云冈石窟", "cave"], ["鸣沙山", "desert"], ["那拉提草原", "grass"],
+  ["玉龙雪山", "snowmtn"], ["九寨沟", "water"], ["西湖", "water"],
+  ["张家界", "mountain"], ["五台山", "mountain"], ["大连滨海路", "umbrella"],
+  // 建筑 / 文化细分
+  ["碛口古镇", "town"], ["平遥古城", "town"], ["乔家大院", "palace"],
+  ["秦始皇兵马俑", "palace"], ["北京故宫", "palace"], ["晋祠", "temple"],
+  ["西安城墙", "wall"], ["钟楼街", "street"], ["南京路步行街", "street"],
+  ["德云社剧场", "show"], ["延安革命旧址", "flag"], ["外滩夜景", "camera"],
+  ["长隆野生动物园", "paw"], ["太原南站", "bus"],
+  // 行程框架行分流（历史 bug：「入住 XX 客栈」显示成刀叉）
+  ["入住 平遥古城客栈", "home"], ["前往 晋中", "bus"], ["抵达 太原", "bus"]
+];
+let iconBad = 0;
+for (const [nm, want] of ICON_CASES) {
+  const got = cover("", nm).icon;
+  if (got !== want) { iconBad++; ck("「" + nm + "」→ " + want, false, "实际 " + got); }
+}
+ck("具体景点全部命中正确类别（" + ICON_CASES.length + " 例）", iconBad === 0, iconBad + " 例不符");
+// 兜底：未命中必须是 pin。这条是「黄河画廊变山」的根因锁
+ck("未命中兜底是 pin 而不是 mountain", cover("", "某某小卖部").icon === "pin", cover("", "某某小卖部").icon);
+ck("空名兜底是 pin", cover("", "").icon === "pin");
+// 规则表里出现的每个图标都必须真有 PNG —— 漏文件在真机上是**静默空白**（不报错、只是图没了）
+const ICON_DIR = path.join(ROOT, "images/icons");
+const usedIcons = new Set(ICON_CASES.map((c) => cover("", c[0]).icon));
+usedIcons.add("pin");
+for (const ic of [...usedIcons]) {
+  ck("图标文件存在：" + ic + ".png", fs.existsSync(path.join(ICON_DIR, ic + ".png")));
+}
+
+// 全量语料统计：类别数 / 山占比 / 塔占比（防回退成「都能变山」）
+const D = req("./utils/data.js");
+const allNames = new Set();
+((D.CITIES) || []).forEach((c) => {
+  (c.experiences || []).forEach((e) => { if (e && e.name) allNames.add(e.name); });
+  (c.spots || []).forEach((s) => { const n = typeof s === "string" ? s : (s && s.name); if (n) allNames.add(n); });
+});
+const dist = {};
+let N = 0;
+for (const nm of allNames) { dist[cover("", nm).icon] = (dist[cover("", nm).icon] || 0) + 1; N++; }
+const pct = (k) => (dist[k] || 0) * 100 / N;
+ck("语料规模可解析（>10000 个景点名）", N > 10000, N + " 个");
+ck("实际在用的图标类别 ≥ 25", Object.keys(dist).length >= 25, Object.keys(dist).length + " 类");
+ck("山占比 < 15%（旧实现 37%）", pct("mountain") < 15, pct("mountain").toFixed(1) + "%");
+ck("塔占比 < 5%（旧实现 21%）", pct("pagoda") < 5, pct("pagoda").toFixed(1) + "%");
+ck("中性兜底 pin < 30%", pct("pin") < 30, pct("pin").toFixed(1) + "%");
+
 console.log("\n封面护栏：" + pass + " 项通过 / " + fail + " 项失败");
 process.exit(fail ? 1 : 0);
