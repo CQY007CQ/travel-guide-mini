@@ -122,32 +122,44 @@ ok(missing.length === 0, "wxml 引用的自绘图标全部存在（" + iconRefs.
 const mapDirs = ["tools/_src-backup", "pages", "subpkg", "subai", "components"]
   .map((d) => path.join(ROOT, d)).filter((d) => fs.existsSync(d));
 const iconNames = new Set();
-let mapCount = 0;
+// v1.20.34：封面分类表的图标走**另一套图**（images/covers/*.png，96x96），与 icons/ 的
+// 32x32 UI 图标分开收集、分开校验。为什么不是同一套：封面要 104rpx、图标 60rpx，在
+// pixelRatio 3.5 的设备上要撑到 ~100 物理像素，32x32 拉伸 2.5 倍会发虚（真机报障
+// 「规格和图不匹配」）。混在一起查会变成「要么封面缺文件、要么被迫合并两套图」。
+const coverIconNames = new Set();
+let mapCount = 0, coverMapCount = 0;
 for (const d of mapDirs) {
   for (const f of walk(d).filter((x) => x.endsWith(".js"))) {
     const src = fs.readFileSync(f, "utf8");
-    // 形态 ①：对象字面量映射表（const X_ICON = { "历史古迹": "pagoda", ... }）
+    // 形态 ①：对象字面量映射表（const X_ICON = { "历史古迹": "pagoda", ... }）→ images/icons/
     for (const m of src.matchAll(/(?:const|let|var)\s+([A-Z][A-Z0-9_]*_ICON)\s*=\s*\{([\s\S]*?)\n\s*\}/g)) {
       mapCount++;
       for (const v of m[2].matchAll(/"([a-z0-9][a-z0-9-]*)"/g)) iconNames.add(v[1]);
     }
-    // 形态 ②：有序规则表（v1.20.31 起封面用这种：const COVER_ICON_RULES = [ ["home", /…/], … ]）
+    // 形态 ②：有序规则表（const COVER_ICON_RULES = [ ["home", /…/], … ]）→ images/covers/
     // 每项第一个元素就是图标名 —— 只在行首匹配，避免把正则里的字符串也当成图标名
     for (const m of src.matchAll(/(?:const|let|var)\s+([A-Z][A-Z0-9_]*_ICON_RULES)\s*=\s*\[([\s\S]*?)\n\];/g)) {
-      mapCount++;
-      for (const v of m[2].matchAll(/^\s*\["([a-z0-9][a-z0-9-]*)",/gm)) iconNames.add(v[1]);
+      coverMapCount++;
+      for (const v of m[2].matchAll(/^\s*\["([a-z0-9][a-z0-9-]*)",/gm)) coverIconNames.add(v[1]);
     }
-    // 形态 ③：兜底常量（const COVER_ICON_FALLBACK = "pin"）—— 它也是要渲染的图标名
+    // 形态 ③：兜底常量（const COVER_ICON_FALLBACK = "pin"）—— 它也是要渲染的封面图标
     for (const m of src.matchAll(/(?:const|let|var)\s+[A-Z][A-Z0-9_]*_ICON_FALLBACK\s*=\s*"([a-z0-9][a-z0-9-]*)"/g)) {
-      iconNames.add(m[1]);
+      coverIconNames.add(m[1]);
     }
   }
 }
 const nameMiss = [...iconNames].filter((n) => !fs.existsSync(path.join(ROOT, "images/icons/" + n + ".png")));
-// mapCount / 名字数都要有下限：正则一旦匹配不到，这条会「0 个全通过」——正是本仓反复踩的假绿形态
-ok(mapCount >= 1 && iconNames.size >= 5 && nameMiss.length === 0,
+// mapCount / 名字数都要有下限：正则一旦匹配不到，这条会「0 个全通过」——正是本仓反复踩的假绿形态。
+// 下限取 3（当前唯一一张对象表是 subai/deep 的 BLOCK_ICON，4 项）：v1.20.34 把封面
+// 分类表分流到下方独立断言后，这里只剩少量 UI 图标，但「0 匹配」仍然必须红。
+ok(mapCount >= 1 && iconNames.size >= 3 && nameMiss.length === 0,
   "图标名映射表里的每个名字都有对应 PNG（" + mapCount + " 张表 / " + iconNames.size + " 个名字）",
-  (mapCount < 1 || iconNames.size < 5 ? "映射表未匹配到，检查正则是否失效" : "") + nameMiss.join(" / "));
+  (mapCount < 1 || iconNames.size < 3 ? "映射表未匹配到，检查正则是否失效" : "") + nameMiss.join(" / "));
+
+const coverMiss = [...coverIconNames].filter((n) => !fs.existsSync(path.join(ROOT, "images/covers/" + n + ".png")));
+ok(coverMapCount >= 1 && coverIconNames.size >= 20 && coverMiss.length === 0,
+  "封面分类表的每个图标都有 images/covers/*.png（" + coverIconNames.size + " 个名字）",
+  (coverMapCount < 1 || coverIconNames.size < 20 ? "封面表未匹配到，检查正则是否失效" : "") + coverMiss.join(" / "));
 
 console.log("");
 if (fail === 0) {

@@ -374,7 +374,7 @@
             <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" wx:if="{{it.img && it.photoCredit}}" class="tl-credit" catchtap="onPhotoCredit"
                   data-credit="{{it.photoCredit}}" data-license="{{it.photoLicense}}">©</view>
             <view wx:else class="tl-thumb gen" style="background:{{it.thumbBg}}">
-              <image class="tl-thumb-glyph" src="/images/icons/{{it.thumbIcon}}.png"/>
+              <image class="tl-thumb-glyph" src="/images/covers/{{it.thumbIcon}}.png"/>
               <view class="tl-thumb-name" wx:if="{{it.coverLabel}}">{{it.coverLabel}}</view>
             </view>
           </view>

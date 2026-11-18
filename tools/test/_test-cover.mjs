@@ -124,24 +124,41 @@ ck("不同城市同景点配色不同", cover("吕梁", "古镇").bg !== cover("
  *   ② 兜底必须是 pin，不许再是 mountain
  *   ③ 全量语料的山/塔占比不许反弹（防有人重排规则表又退回「都能变山」）
  * ──────────────────────────────────────────────────────────────────────── */
-console.log("[6] 图标语义匹配（30 类有序规则表）");
+console.log("[6] 图标语义匹配（50 类有序规则表）");
 const ICON_CASES = [
+  // 顺序敏感：dam 必须在 canyon 之前（「三峡大坝」含「峡」）与 river 之前（「都江堰」含「江」）
+  ["三峡大坝", "dam"], ["都江堰", "dam"],
   // 顺序敏感：canyon 必须在 water 之前（「黄河画廊」含「河」）
   ["黄河画廊", "canyon"], ["壶口瀑布", "waterfall"], ["水帘洞", "waterfall"],
-  // 顺序敏感：bridge 必须在 island 之前（「青岛栈桥」含「岛」）
-  ["青岛栈桥", "bridge"], ["鼓浪屿", "island"],
-  // 顺序敏感：ferris 必须在 garden 之前（「游乐园」含「园」）
-  ["上海迪士尼", "ferris"], ["颐和园", "garden"], ["人民公园", "garden"],
-  // 地貌细分
-  ["云冈石窟", "cave"], ["鸣沙山", "desert"], ["那拉提草原", "grass"],
-  ["玉龙雪山", "snowmtn"], ["九寨沟", "water"], ["西湖", "water"],
-  ["张家界", "mountain"], ["五台山", "mountain"], ["大连滨海路", "umbrella"],
-  // 建筑 / 文化细分
-  ["碛口古镇", "town"], ["平遥古城", "town"], ["乔家大院", "palace"],
-  ["秦始皇兵马俑", "palace"], ["北京故宫", "palace"], ["晋祠", "temple"],
-  ["西安城墙", "wall"], ["钟楼街", "street"], ["南京路步行街", "street"],
-  ["德云社剧场", "show"], ["延安革命旧址", "flag"], ["外滩夜景", "camera"],
-  ["长隆野生动物园", "paw"], ["太原南站", "bus"],
+  // 顺序敏感：terrace 在 grass 之前（含「田」）；glacier/ski 在 snowmtn 之前（含「雪」）
+  ["元阳梯田", "terrace"], ["呼伦贝尔草原", "grass"],
+  ["海螺沟冰川", "glacier"], ["亚布力滑雪场", "ski"], ["玉龙雪山", "snowmtn"],
+  // 顺序敏感：ruins / wall 在 town 之前（都含「古城」）
+  ["良渚古城遗址", "ruins"], ["平遥古城墙", "wall"], ["丽江古城", "town"],
+  // 顺序敏感：statue 在 temple 之前（含「佛」）；tower 在 pagoda 之前（含「塔」）
+  ["乐山大佛", "statue"], ["晋祠", "temple"], ["东方明珠塔", "tower"], ["大雁塔", "pagoda"],
+  // 顺序敏感：aquarium 在 paw 之前（含「水族」）；paw 在 garden 之前（「动物园」以园结尾）
+  ["珠海长隆海洋王国", "aquarium"], ["长隆野生动物园", "paw"],
+  // 顺序敏感：bridge 在 island 之前（「青岛栈桥」含「岛」）；lake 在 island 之前（「千岛湖」）
+  ["青岛栈桥", "bridge"], ["鼓浪屿", "island"], ["千岛湖", "lake"],
+  // 顺序敏感：town 在 lake/river 之前（「丽江古城」含「江」已在上方）；「江南」不是江
+  ["江南水乡", "water"], ["漓江", "river"], ["九寨沟", "water"],
+  // 顺序敏感：ferris 在 garden 之前（「游乐园」含「园」）
+  ["上海迪士尼", "ferris"], ["常州中华恐龙园", "ferris"], ["颐和园", "garden"], ["人民公园", "garden"],
+  // 地貌细分（v1.20.34 新增：湖 / 河 / 湿地 / 火山 / 冰川 / 梯田 / 森林）
+  ["西湖", "lake"], ["茶卡盐湖", "lake"], ["长白山天池", "lake"], ["汉城湖", "lake"],
+  ["西溪湿地", "wetland"], ["五大连池火山", "volcano"], ["张家界", "mountain"], ["莫干山", "mountain"],
+  ["鸣沙山", "desert"], ["那拉提草原", "grass"], ["大连滨海路", "umbrella"], ["三亚亚龙湾", "umbrella"],
+  ["蜀南竹海", "forest"],
+  // 建筑 / 文化细分（新增：土楼 / 造像 / 遗址 / 校园 / 现代塔 / 市集）
+  ["福建土楼", "fort"], ["开平碉楼", "fort"], ["云冈石窟", "cave"], ["龙门石窟", "cave"],
+  ["圆明园遗址", "ruins"], ["武汉大学", "school"], ["武大樱花", "flower"],
+  ["碛口古镇", "town"], ["乌镇", "town"], ["西塘古镇", "town"],
+  ["乔家大院", "palace"], ["秦始皇兵马俑", "palace"], ["北京故宫", "palace"],
+  ["西安城墙", "wall"], ["钟楼街", "street"], ["回民街", "street"], ["永兴坊", "street"],
+  ["德云社剧场", "show"], ["延安革命旧址", "flag"], ["外滩夜景", "city"], ["天安门广场", "city"],
+  ["独库公路", "road"], ["草原天路", "road"],
+  ["太原南站", "bus"],
   // 行程框架行分流（历史 bug：「入住 XX 客栈」显示成刀叉）
   ["入住 平遥古城客栈", "home"], ["前往 晋中", "bus"], ["抵达 太原", "bus"]
 ];
@@ -154,12 +171,106 @@ ck("具体景点全部命中正确类别（" + ICON_CASES.length + " 例）", ic
 // 兜底：未命中必须是 pin。这条是「黄河画廊变山」的根因锁
 ck("未命中兜底是 pin 而不是 mountain", cover("", "某某小卖部").icon === "pin", cover("", "某某小卖部").icon);
 ck("空名兜底是 pin", cover("", "").icon === "pin");
-// 规则表里出现的每个图标都必须真有 PNG —— 漏文件在真机上是**静默空白**（不报错、只是图没了）
-const ICON_DIR = path.join(ROOT, "images/icons");
-const usedIcons = new Set(ICON_CASES.map((c) => cover("", c[0]).icon));
-usedIcons.add("pin");
-for (const ic of [...usedIcons]) {
-  ck("图标文件存在：" + ic + ".png", fs.existsSync(path.join(ICON_DIR, ic + ".png")));
+
+/* ────────────────────────────────────────────────────────────────────────
+ * [7] 封面图标规格与配色语义（v1.20.34）
+ *
+ * 病因（用户真机报障「示意图有点小、规格和图不匹配」）：
+ *   封面 96rpx、图标 48rpx，在 pixelRatio=3.5 的设备上图标要占 80~100 物理像素，
+ *   而源图是 images/icons/ 里的 **32x32** 小图（给列表行内 32rpx 场景画的）——
+ *   等于被拉伸 2.5 倍，线条发虚。且旧版色相是全局哈希 %360，颜色不携带语义。
+ *
+ * 现在：封面图标独立成 images/covers/*.png（96x96），色相按类别色域给基值。
+ * 这里锁三件事，都是「漏了会静默」的：
+ *   ① 规则表用到的每个图标都必须真有 96x96 的 covers 文件（缺文件在真机上是静默空白）
+ *   ② 渲染层必须引用 /images/covers/，不能又指回 /images/icons/ 的 32x32
+ *   ③ 山=绿系 / 水=蓝系 / 古建=暖色系；同类不同景点仍要能区分（不许所有封面同色）
+ * ──────────────────────────────────────────────────────────────────────── */
+console.log("[7] 封面图标规格（96x96 独立一套）与配色语义");
+const COVERS_DIR = path.join(ROOT, "images", "covers");
+const ruleIcons = new Set();
+{
+  // 从 travel.js 真源里抠出规则表用到的所有 icon 名（比手写清单可靠：加规则不会漏）
+  const src = fs.readFileSync(path.join(ROOT, "tools/_src-backup/travel.js"), "utf8");
+  const block = src.slice(src.indexOf("const COVER_ICON_RULES = ["), src.indexOf("const COVER_ICON_FALLBACK"));
+  for (const m of block.matchAll(/\[\s*"([a-z]+)"\s*,/g)) ruleIcons.add(m[1]);
+  ruleIcons.add("pin"); // 兜底
+}
+ck("规则表解析出的图标类别 ≥ 45", ruleIcons.size >= 45, ruleIcons.size + " 类");
+const missingCovers = [...ruleIcons].filter((ic) => !fs.existsSync(path.join(COVERS_DIR, ic + ".png")));
+ck("每个规则图标都有 images/covers/*.png（缺文件真机静默空白）", missingCovers.length === 0, missingCovers.join(","));
+
+// 尺寸必须真的是 96x96：源图分辨率不够就白改了（这条是「规格与用法不匹配」的直接护栏）
+const pngSize = (buf) => ({ w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) });
+const badSize = [];
+for (const ic of ruleIcons) {
+  const p = path.join(COVERS_DIR, ic + ".png");
+  if (!fs.existsSync(p)) continue;
+  const { w, h } = pngSize(fs.readFileSync(p));
+  if (w < 96 || h < 96 || w !== h) badSize.push(ic + "=" + w + "x" + h);
+}
+ck("封面图标均为 ≥96x96 的正方形（替换 32x32 旧图的核心目的）", badSize.length === 0, badSize.join(","));
+
+// 渲染层引用的目录：plan 页与检索页都必须走 covers，不许回退到 icons 的 32x32
+for (const rel of ["pages/plan/plan.wxml", "subpkg/spotsearch/spotsearch.wxml"]) {
+  const wxml = stripWxmlComments(fs.readFileSync(path.join(ROOT, rel), "utf8"));
+  ck(rel + " 引用 /images/covers/", wxml.indexOf("/images/covers/") >= 0);
+  ck(rel + " 不再用 /images/icons/ 画封面图标", !/\/images\/icons\/\{\{[^}]*[Cc]over/.test(wxml) && !/\/images\/icons\/\{\{[^}]*thumbIcon/.test(wxml));
+}
+
+// 尺寸比例：图标要明显大于半封（旧版 48/96=50%，且被名字条压住）。
+// 从 WXSS 真读数值，不写死断言 —— 改样式改坏了必须红。
+{
+  const css = fs.readFileSync(path.join(ROOT, "pages/plan/plan.wxss"), "utf8");
+  const num = (re) => { const m = css.match(re); return m ? parseFloat(m[1]) : NaN; };
+  const thumb = num(/\.tl-thumb-wrap\s*\{[^}]*width:\s*(\d+)rpx/);
+  const glyph = num(/\.tl-thumb-glyph\s*\{[^}]*width:\s*(\d+)rpx/);
+  const padB = num(/\.tl-thumb\.gen\s*\{[^}]*padding-bottom:\s*(\d+)rpx/);
+  ck("封面尺寸可解析（.tl-thumb-wrap width）", !isNaN(thumb), String(thumb));
+  ck("封面 ≥ 100rpx（旧版 96rpx 偏小）", thumb >= 100, thumb + "rpx");
+  ck("图标 ≥ 56rpx 且占封面 > 55%（旧版 48rpx / 50%）", glyph >= 56 && glyph / thumb > 0.55, glyph + "/" + thumb);
+  // 名字条不许压住图标：图标（去掉底部留白后居中）必须与名字条分居上下
+  ck("封面底部为名字条预留 ≥ 24rpx（图标不再被压住）", padB >= 24, padB + "rpx");
+  ck("图标在留白区内容得下（封面−留白 ≥ 图标高）", thumb - padB >= glyph, (thumb - padB) + " vs " + glyph);
+}
+
+// 配色语义：把 hue 从 bg 里反解不出来（bg 是 hex），改成按长度比对 + 类别近似判定
+// —— 直接断言「不同类别的封面几乎不撞色」比断言具体 hex 更耐改（调色不改语义也不该红）。
+{
+  const SAMPLE = {
+    nature: ["华山", "张家界", "那拉提草原"],       // 山/草 → 绿系
+    water: ["西湖", "壶口瀑布", "漓江"],            // 湖/瀑/河 → 蓝青系
+    heritage: ["北京故宫", "大雁塔", "西安城墙"]     // 古建 → 暖色系（红橙黄）
+  };
+  const hueOf = (city, nm) => {
+    const bg = cover(city, nm).bg;
+    const m = bg.match(/#([0-9a-f]{6})/i);
+    if (!m) return null;
+    const r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    if (d < 0.02) return -1;
+    let hh;
+    if (mx === r) hh = ((g - b) / d) % 6;
+    else if (mx === g) hh = (b - r) / d + 2;
+    else hh = (r - g) / d + 4;
+    return (hh * 60 + 360) % 360;
+  };
+  const inBand = (h, lo, hi) => (lo <= hi ? (h >= lo && h <= hi) : (h >= lo || h <= hi));
+  for (const nm of SAMPLE.nature) {
+    const hh = hueOf("", nm);
+    ck("自然「" + nm + "」落在绿色域 80~200°", hh !== null && inBand(hh, 80, 200), String(hh && hh.toFixed(0)));
+  }
+  for (const nm of SAMPLE.water) {
+    const hh = hueOf("", nm);
+    ck("水景「" + nm + "」落在蓝青色域 165~230°", hh !== null && inBand(hh, 165, 230), String(hh && hh.toFixed(0)));
+  }
+  for (const nm of SAMPLE.heritage) {
+    const hh = hueOf("", nm);
+    ck("古建「" + nm + "」落在暖色域 330~70°", hh !== null && inBand(hh, 330, 70), String(hh && hh.toFixed(0)));
+  }
+  // 对照组：连排的三个古建景点不许同色（旧版 +34 偏移把两段色一起推到橄榄绿，三张几乎一样）
+  const trio = ["大雁塔", "回民街", "秦始皇兵马俑博物馆"].map((n) => cover("", n).bg);
+  ck("连排古建三张封面互不相同", new Set(trio).size === 3, JSON.stringify(trio.map((x) => x.slice(20, 28))));
 }
 
 // 全量语料统计：类别数 / 山占比 / 塔占比（防回退成「都能变山」）
@@ -174,7 +285,7 @@ let N = 0;
 for (const nm of allNames) { dist[cover("", nm).icon] = (dist[cover("", nm).icon] || 0) + 1; N++; }
 const pct = (k) => (dist[k] || 0) * 100 / N;
 ck("语料规模可解析（>10000 个景点名）", N > 10000, N + " 个");
-ck("实际在用的图标类别 ≥ 25", Object.keys(dist).length >= 25, Object.keys(dist).length + " 类");
+ck("实际在用的图标类别 ≥ 45（v1.20.34 从 30 类扩到 50 类）", Object.keys(dist).length >= 45, Object.keys(dist).length + " 类");
 ck("山占比 < 15%（旧实现 37%）", pct("mountain") < 15, pct("mountain").toFixed(1) + "%");
 ck("塔占比 < 5%（旧实现 21%）", pct("pagoda") < 5, pct("pagoda").toFixed(1) + "%");
 ck("中性兜底 pin < 30%", pct("pin") < 30, pct("pin").toFixed(1) + "%");

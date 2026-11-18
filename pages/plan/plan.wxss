@@ -61,10 +61,14 @@
 .tl-main { flex: 1; min-width: 0; }
 
 /* v1.20.8：路线缩略图 —— 零网络生成配图，破局纯文字；将来有真实照片（it.img）优先显示 */
-.tl-thumb-wrap { width: 96rpx; height: 96rpx; margin-right: 16rpx; flex-shrink: 0; border-radius: 14rpx; overflow: hidden; box-shadow: 0 2rpx 8rpx rgba(20,30,50,.16); background: #e8eef7; }
-.tl-thumb { width: 96rpx; height: 96rpx; display: block; }
-.tl-thumb.gen { display: flex; align-items: center; justify-content: center; position: relative; }
-.tl-thumb-glyph { width: 48rpx; height: 48rpx; filter: drop-shadow(0 1rpx 2rpx rgba(0,0,0,.28)); }
+.tl-thumb-wrap { width: 104rpx; height: 104rpx; margin-right: 16rpx; flex-shrink: 0; border-radius: 16rpx; overflow: hidden; box-shadow: 0 2rpx 8rpx rgba(20,30,50,.16); background: #e8eef7; }
+.tl-thumb { width: 104rpx; height: 104rpx; display: block; }
+/* v1.20.34：封面放大 96→104rpx、图标 48→60rpx，并给底部名字条留出 26rpx ——
+   上一版图标与名字条直接重叠（实测图标 23px、名字条 11.6px 都在 46px 的封面里，
+   名字条压住图标下沿），且图标源图只有 32x32，在 pixelRatio 3.5 的设备上要撑到
+   80 物理像素 → 线条发虚。现改用 images/covers/ 的 96x96 专用图标（60rpx≈100 物理像素）。 */
+.tl-thumb.gen { display: flex; align-items: center; justify-content: center; position: relative; padding-bottom: 26rpx; box-sizing: border-box; }
+.tl-thumb-glyph { width: 60rpx; height: 60rpx; filter: drop-shadow(0 1rpx 2rpx rgba(0,0,0,.3)); }
 /* v1.20.30：封面名字条强制单行 + 省略。以前没有 nowrap，中文可任意断行 —— 长店名
    （「XX客栈1 | YY民居客栈」）在 96rpx 宽里会逐字断行塌成一列（真机截图报障）。
    内容侧已由 spotCover 收敛成短标签，这里是第二道兜底：漏网的长名只会省略，不会竖排。 */
