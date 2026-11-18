@@ -20,10 +20,6 @@
         <!-- 构成统计作为次指标紧邻 stats，与标题同组，弱化层级 -->
         <view class="mix-line dim" wx:if="{{mixTxt}}"><image class="ic ic-sm" src="/images/icons/pie.png"/>{{mixTxt}}</view>
       </view>
-      <!-- 有限数据层：诚实提示内容收集中 -->
-      <view class="limited-notice" wx:if="{{limitedNotice}}"><text class="ln-ic">✦</text><text>该城攻略采集中，先给你框架，补齐后自动更新</text></view>
-      <!-- v1.20.19：旧版「城市名未解码」生成的假城行程，升级后诚实提示 + 重生成入口（不删用户数据） -->
-      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="limited-notice" wx:if="{{staleCity}}" catchtap="goIndex"><text class="ln-ic">✦</text><text>这份旧行程的城市名未正确解码，内容可能不完整 · 点此重新生成</text></view>
       <view class="sum-ops">
         <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="sop {{isFav ? 'sop-fav-on' : ''}}" wx:if="{{!segs.length && !isProv}}" catchtap="onFav">
           <image class="sop-ic" src="/images/icons/{{isFav ? 'heart-on' : 'heart'}}.png"/>
@@ -34,6 +30,14 @@
         <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="sop sop-end" catchtap="onEnd"><image class="sop-ic" src="/images/icons/close.png"/><text class="sop-tx">结束</text></view>
       </view>
     </view>
+
+    <!-- 两条全宽提示必须在 .sum-row **之外**。放在行内时它们是 flex 子项、按 max-content 占宽，
+         会把 .sum-main（flex:1 → basis 0）挤成「一列一个汉字」——用户看到的是标题竖排、整块塌陷
+         （2026-11-18 真机截图报障）。与下方 chips / sample-bar / hints 同级才是它们本来的位置。 -->
+    <!-- 有限数据层：诚实提示内容收集中 -->
+    <view class="limited-notice" wx:if="{{limitedNotice}}"><text class="ln-ic">✦</text><text>该城攻略采集中，先给你框架，补齐后自动更新</text></view>
+    <!-- v1.20.19：旧版「城市名未解码」生成的假城行程，升级后诚实提示 + 重生成入口（不删用户数据） -->
+    <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="limited-notice" wx:if="{{staleCity}}" catchtap="goIndex"><text class="ln-ic">✦</text><text>这份旧行程的城市名未正确解码，内容可能不完整 · 点此重新生成</text></view>
 
     <!-- 元信息 chips（对齐网页 banner：日期段/倒计时/季节/最佳月份/出行模式/预算） -->
     <view class="chips" wx:if="{{metaChips.length}}">
