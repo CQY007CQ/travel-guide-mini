@@ -1199,5 +1199,18 @@ assert("无自身空城仍返回空数组", T.nearbyCities("火星城xyz", 6).le
 const nearText = AI.handle("杭州附近还有哪好玩", { city: "北京" });
 assert("AI『附近』回答已剔除自身", nearText && nearText.intent === "near" && !/· 杭州市?（/.test(nearText.text || ""), nearText && (nearText.text || "").slice(0, 80));
 
+// ── store.js 日期导出完整性（迭代 #13）──
+// pages/index/m-tile.js 的 _draftTimeTxt（用户打开首页草稿列表时执行）调用 S.fmtHM(dt)，
+// 但 store.js 的 module.exports 漏了 fmtHM → 点开草稿列表即 "S.fmtHM is not a function"。
+// check-demo-quality 门禁只断言源码字符串里出现 fmtHM（定义处有），漏拦导出缺失。
+console.log("== 55. store 日期导出完整性（fmtHM 首页草稿列表调用） ==");
+const ST = req("./utils/store.js");
+assert("store 导出 fmtHM 为函数", typeof ST.fmtHM === "function");
+assert("fmtHM 补零 09:05", typeof ST.fmtHM === "function" && ST.fmtHM(new Date(2026, 0, 2, 9, 5, 3)) === "09:05", ST.fmtHM && ST.fmtHM(new Date(2026, 0, 2, 9, 5, 3)));
+assert("fmtHM 午夜 00:00", typeof ST.fmtHM === "function" && ST.fmtHM(new Date(2026, 0, 2, 0, 0, 0)) === "00:00");
+assert("fmtHM 非法入参回退今天时刻且不抛错", (() => { try { return /^[0-9]{2}:[0-9]{2}$/.test(ST.fmtHM("bad-date")); } catch (e) { return false; } })());
+assert("既有日期导出未被破坏", ["fmtLocalDate", "fmtDateTime", "fmtClock"].every(k => typeof ST[k] === "function"));
+assert("m-tile 草稿时间文案核心调用返回字符串", typeof ST.fmtHM === "function" && typeof ST.fmtHM(new Date(2026, 0, 2, 9, 5, 0)) === "string");
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

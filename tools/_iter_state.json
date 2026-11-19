@@ -1,6 +1,6 @@
 {
-  "count": 12,
-  "runs": 12,
+  "count": 13,
+  "runs": 13,
   "log": [
     {
       "n": 1,
@@ -73,6 +73,12 @@
       "date": "2026-11-17",
       "ver": "1.20.20",
       "summary": "fix(nearbyCities): 库里『杭州/杭州市』同城双写法并存，旧实现用 c.name===cityName 严格相等排除自身→带后缀别名排不掉（『杭州附近』首条竟是『杭州市 3km』），眉山/眉山市双写各占一名额；改用 canonCityName 归一做自身判断+同城去重，返回 name 保持原样零下游影响。新增 check-new block 54（10 断言）；单测 529/0，allcheck 全绿（EXIT=0，未升版、未碰 keys、不 push）"
+    },
+    {
+      "n": 13,
+      "date": "2026-11-19",
+      "ver": "1.20.39",
+      "summary": "fix(store): module.exports 漏导出 fmtHM，而 pages/index/m-tile.js 的 _draftTimeTxt（打开首页草稿列表时执行）调用 S.fmtHM(dt) → 运行时 'S.fmtHM is not a function'；check-demo-quality 门禁只查源码字符串含 fmtHM（定义处有）漏拦导出缺失。补导出 + 新增 check-new block 55（6 断言）；单测 535/0，allcheck 全绿（EXIT=0，未升版、未碰 keys、不 push）"
     }
   ]
 }

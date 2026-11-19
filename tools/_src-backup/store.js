@@ -150,4 +150,4 @@ const setJSON = (k, v) => {
   try { return set(k, JSON.stringify(v)); } catch (e) { _note("序列化失败（循环引用/不可序列化）: " + k, e); return false; }
 };
 
-module.exports = { get, getArr, getObj, set, del, usage, sizeOf, fmtLocalDate, fmtDateTime, fmtClock, getDrafts, saveDraft, delDraft, getJSON, setJSON };
+module.exports = { get, getArr, getObj, set, del, usage, sizeOf, fmtLocalDate, fmtDateTime, fmtHM, fmtClock, getDrafts, saveDraft, delDraft, getJSON, setJSON };
