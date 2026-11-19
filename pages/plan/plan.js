@@ -39,7 +39,7 @@ Page(SafePage(Object.assign({
   // 行程天气卡（和风天气；失败静默隐藏）
   wxShow: false, wxList: [], wxOff: false, wxIsMulti: false, wxLoading: false,
   // v1.19.153：天气失败态可辨识（不再一律「天气暂不可用」）
-  wxErrType: "", wxErrMsg: "", wxErrRetry: false,
+  wxErrType: "", wxErrTitle: "", wxErrMsg: "", wxErrRetry: false,
   // 雨雪天备选：目的地有雨/雪时推荐室内或雨/雪景友好景点
   rainyShow: false, rainySpots: [], rainyKinds: [], rainyKindsTx: "",
   wxLongTripHint: false, // v1.19.182：行程 >7 天，仅前 7 天有预报的兜底提示

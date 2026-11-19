@@ -171,6 +171,33 @@ function classifyApiError(d) {
   return { type: "api", msg: "天气服务暂时异常" };
 }
 
+// 传输层失败的分类（v1.20.38）。
+// wx.request 的 fail 回调**只有 errMsg**，没有 code / statusCode —— 旧版 fail() 干脆把整个
+// err 参数丢掉，一律归成 {type:"net"} + 「天气加载失败，请重试」。这对下面这一类失败是致命的：
+//   ① 「request:fail url not in domain list」= 专属 API Host 没加进 request 合法域名。
+//      它只需要在微信公众平台配置一次就能**永久**解决，但旧版提示让人以为「网络抖了，再点一次」，
+//      于是用户反复重试、开发者反复怀疑代码 —— 这正是「天气又不能用了」反复出现的可诊断性缺口。
+//      更麻烦的是：开发者工具默认「不校验合法域名」，本地/Node 永远绿，只有真机/体验版会红，
+//      所以这一条必须由真机上的文案自己说出来。
+//   ② 「request:fail timeout」= 弱网或超时（这一条才真的该给「重试」）
+//   ③ 其它传输层失败
+function classifyNetError(errMsg, base) {
+  const s = String(errMsg || "").toLowerCase();
+  let host = "";
+  try { host = String(base || "").replace(/^https?:\/\//i, "").split("/")[0]; } catch (e) { host = ""; }
+  if (/not in domain list|domain list/.test(s)) {
+    // 文案刻意压到两行内：这段显示在行程页的天气失败卡（.wx-off-d，20rpx，可用宽约 21 字/行），
+    // 写长了一屏就全是字，反而没人读。完整说明在「更多 → 合规与密钥」与使用指南里。
+    return {
+      type: "domain",
+      msg: "域名未加白" + (host ? "（" + host + "）" : "") +
+        "：在微信公众平台「服务器域名」加入 request 合法域名后重进小程序"
+    };
+  }
+  if (/timeout|timed out/.test(s)) return { type: "net", msg: "天气请求超时，请检查网络后重试" };
+  return { type: "net", msg: "天气加载失败，请重试" };
+}
+
 // 拉取整份 plan 期间的自然日天气；多城行程按各天所在城市分别拉取
 // （v1.19.151 修复：旧版只用首站城市，导致后续城市的天也显示首站天气）。对齐 plan.days[i].date。
 // 回调 cb(list, err)：成功 err=null；失败 err={type,msg}（type∈ empty/env/no_key/nocity/quota/auth/param/api/net/window）。
@@ -270,7 +297,19 @@ function fetchPlanWeather(plan, cb) {
         } catch (e) { EL.note("weather", e, "响应解析失败: " + city); byCity[city] = { byDate: {}, city: city }; }
         pending--; finish();
       },
-      fail() {
+      fail(err) {
+        // v1.20.38：用起 err.errMsg（旧版整个参数丢掉）。见 classifyNetError 头部说明。
+        const em = (err && err.errMsg) || "";
+        const ce = classifyNetError(em, qwBase);
+        if (ce.type === "domain") {
+          // 域名未加白：请求在客户端就被拦掉，重试 100 次结果一样 —— 只发一次就判死，
+          // 既省掉 400ms 的无意义退避，也让用户第一眼看到真正要做的那件事。
+          EL.note("weather", "domain", "域名未加白: " + em + " | base=" + qwBase);
+          setErr(ce);
+          byCity[city] = { byDate: {}, city: city };
+          pending--; finish();
+          return;
+        }
         if (attempt < MAX_RETRY) {
           // 仅对传输层失败（超时/网络抖动）重试；API 错误码（auth/quota/param）不重试
           // v1.20.15：退避窗口写成 400 * attempt 时，attempt=0 → 0ms，等于「立刻重试」，
@@ -278,8 +317,8 @@ function fetchPlanWeather(plan, cb) {
           setTimeout(function () { loadCity(city, c, wkey, attempt + 1); }, 400 * (attempt + 1));
           return;
         }
-        EL.note("weather", "net", "重试 " + MAX_RETRY + " 次后仍失败: " + city);
-        setErr({ type: "net", msg: "天气加载失败，请重试" + hostHint });
+        EL.note("weather", "net", "重试 " + MAX_RETRY + " 次后仍失败: " + city + " | " + em);
+        setErr({ type: "net", msg: ce.msg + hostHint });
         byCity[city] = { byDate: {}, city: city };
         pending--; finish();
       }

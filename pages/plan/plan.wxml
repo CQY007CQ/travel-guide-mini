@@ -223,11 +223,13 @@
   <view class="wx-off" wx:if="{{wxOff}}">
     <image class="ic ic-sm" src="/images/icons/cloud.png"/>
     <view class="wx-off-t">
-      <view class="wx-off-h">{{wxErrType === 'no_key' ? '天气服务未配置' : (wxErrType === 'window' ? '出发日超出 7 天预报' : '天气暂不可用')}}</view>
+      <view class="wx-off-h">{{wxErrTitle || '天气暂不可用'}}</view>
       <view class="wx-off-d dim">{{wxErrMsg || '离线或超预报期 · 其他功能不受影响'}}</view>
     </view>
     <view class="wx-off-acts">
-      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="wx-retry" wx:if="{{wxErrType === 'no_key'}}" catchtap="goKeyConfig">去配置</view>
+      <!-- v1.20.38：domain（域名未加白）也给这个入口 —— 用户下一步要去微信公众平台加白，
+           但先去「合规与密钥」看一眼当前填的 Host 是什么，才知道该加白哪个域名。 -->
+      <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="wx-retry" wx:if="{{wxErrType === 'no_key' || wxErrType === 'domain'}}" catchtap="goKeyConfig">{{wxErrType === 'domain' ? '看配置' : '去配置'}}</view>
       <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="wx-retry" wx:if="{{wxErrRetry}}" catchtap="onWxRetry">重试</view>
       <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="wx-close" catchtap="closeWxOff">✕</view>
     </view>

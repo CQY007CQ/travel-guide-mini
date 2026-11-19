@@ -218,5 +218,66 @@ ok("盘上 10.5 分钟的预报两次都能出（不因修时间戳而丢天气�
 ok("盘上缓存回填不再冒充「刚取的」（第二次仍回盘确认，不是靠 Date.now() 续命）",
   diskReads === 2);
 
+// ⑤ v1.20.38：「域名未加白」必须自己说出来，而且不重试。
+//    病情（用户第 N 次报「天气不能用了」）：wx.request 的 fail 回调只有 errMsg，旧版 fail()
+//    把整个参数丢掉 → 「request:fail url not in domain list」被归成 net +「天气加载失败，请重试」。
+//    这条失败只靠「微信公众平台加一次合法域名」就能永久解决，但提示让人以为是网络抖了：
+//    用户反复点重试、开发者反复怀疑代码。而且它**只在真机/体验版出现**（开发者工具默认不校验
+//    合法域名，本地与 Node 全绿），所以必须由真机上的文案自己把原因讲出来。
+const domDelays = [];
+global.setTimeout = (fn, ms) => { domDelays.push(ms); return savedST(fn, 0); };
+let domReq = 0, domErr = null, domList = null;
+global.wx = {
+  request(o) { domReq++; if (o && typeof o.fail === "function") o.fail({ errMsg: "request:fail url not in domain list" }); },
+  getStorageSync(k) { return k === "__app_keys__" ? K_INJ : null; },
+  setStorageSync() {}
+};
+W.fetchPlanWeather({ cityName: "北京", days: [{ date: dNear, cityName: "北京" }] }, (l, e) => { domList = l; domErr = e; });
+await new Promise((r) => savedST(r, 30));
+global.setTimeout = savedST;
+global.wx = savedWx2;
+ok("域名未加白 → 判 domain，不再笼统归成 net", !!domErr && domErr.type === "domain", JSON.stringify(domErr));
+ok("域名未加白 → 只发一次请求、零退避重试（重试结果必然相同）",
+  domReq === 1 && domDelays.length === 0, "req=" + domReq + " delays=" + JSON.stringify(domDelays));
+ok("域名未加白的文案直接点名要加白的那个域名",
+  /devapi\.qweather\.com/.test((domErr && domErr.msg) || ""), (domErr && domErr.msg) || "");
+ok("域名未加白仍正常进 finish（页面进空态，不会永久卡在「加载中」）",
+  Array.isArray(domList) && domList.length === 0);
+
+// 对照组：同样是失败，但 timeout 必须仍然判 net 并保留重试 ——
+// 否则「domain 不重试」可能只是把**所有**失败都变成不重试的假绿（③ 已覆盖重试次数，这里只锁类型）
+{
+  let tmoErr = null;
+  // 超时这条路会走 400ms 退避重试，所以这里同样把 setTimeout 压成 0ms 真跑，
+  // 否则只等 30ms 时回调还没到、tmoErr 仍是 null（会误报成「超时被吞」）。
+  const savedST2 = global.setTimeout;
+  global.setTimeout = (fn, ms) => savedST2(fn, 0);
+  global.wx = {
+    request(o) { if (o && typeof o.fail === "function") o.fail({ errMsg: "request:fail timeout" }); },
+    getStorageSync(k) { return k === "__app_keys__" ? K_INJ : null; },
+    setStorageSync() {}
+  };
+  // 用北京而不是随便找个城市：没有坐标的城市会走「无坐标占位」分支、根本不发请求，
+  // 那样对照组会因为「压根没请求」而恒 FAIL（不是业务问题，是选错了样本）。
+  W.fetchPlanWeather({ cityName: "北京", days: [{ date: dNear, cityName: "北京" }] }, (l, e) => { tmoErr = e; });
+  await new Promise((r) => savedST2(r, 30));
+  global.setTimeout = savedST2;
+  global.wx = savedWx2;
+  ok("对照组：超时仍判 net（不因新增 domain 分支把超时也吞掉）", !!tmoErr && tmoErr.type === "net", JSON.stringify(tmoErr));
+}
+
+// ⑥ 文案映射完整性：weather 层产出的每一种 err.type，都必须在行程页的 WX_ERR_TITLE 里有标题。
+//    漏一种的后果是静默的 —— 页面标题回落成「天气暂不可用」，等于错误分类白做一遍
+//    （v1.20.38 加 domain 时就是靠这条把「加了分类但没改 WXML」这种半成品挡住）。
+{
+  let wxSrc = "";
+  try { wxSrc = readFileSync(process.cwd() + "/utils/weather.js", "utf8"); } catch (e) {}
+  let pSvcSrc = "";
+  try { pSvcSrc = readFileSync(process.cwd() + "/pages/plan/p-svc.js", "utf8"); } catch (e) {}
+  const types = new Set([...wxSrc.matchAll(/type\s*:\s*"([a-z_]+)"/g)].map((m) => m[1]));
+  const missing = [...types].filter((t) => pSvcSrc.indexOf(t + ":") < 0);
+  ok("weather 产出的每种 err.type 都有对应标题（共 " + types.size + " 种）", types.size > 0 && missing.length === 0, missing.join(","));
+}
+
 console.log(fail ? ("\n✗ weather151 单测失败 " + fail + " 项") : "\n✓ weather151 单测全部通过");
 process.exit(fail ? 1 : 0);

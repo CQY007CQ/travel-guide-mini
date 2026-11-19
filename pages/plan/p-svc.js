@@ -4,6 +4,25 @@
 const C = require("./plan-ctx.js");
 const { app, T, S, A, W, EL, Cloud, AIAgent, AN, isFrame, thumbFor, MODE_LABEL, getSeason, ymdLocal } = C;
 
+// 天气失败标题（v1.20.38）：标题先说「卡在哪一步」，正文再说「怎么解决」。
+// 旧版 WXML 里是嵌套三元，只有 no_key / window / 其它三档 —— 新增 domain 时如果不动这里，
+// 用户看到的仍是「天气暂不可用」，等于白做了错误分类。
+// domain = 专属 API Host 没加进 request 合法域名（真机最易漏的一步，只在真机出现）。
+const WX_ERR_TITLE = {
+  no_key: "天气服务未配置",
+  domain: "天气域名未加白",
+  auth: "天气 Key 无效",
+  quota: "天气额度用尽",
+  window: "出发日超出 7 天预报",
+  nodata: "该地区暂无天气数据",
+  env: "当前环境不支持天气",
+  nocity: "未识别到行程城市",
+  empty: "暂无行程",
+  param: "天气请求参数有误",
+  api: "天气服务暂时异常",
+  net: "天气网络请求失败"
+};
+
 module.exports = {
  // 行程天气（和风天气 QWeather；首站城市预报，失败静默隐藏天气卡）
  _maybeLoadWx(plan) {
@@ -18,7 +37,7 @@ module.exports = {
   // v1.19.153：回调改为 cb(list, err)；失败时按 err.type 给出可辨识文案，不再一律「天气暂不可用」
   W.fetchPlanWeather(plan, (list, err) => {
    if (err) {
-     // type ∈ empty/env/no_key/nocity/nodata/quota/auth/param/api/net/window
+     // type ∈ empty/env/no_key/nocity/nodata/quota/auth/param/api/net/domain/window
      let msg = err.msg || "";
      if (!msg) {
        if (err.type === "empty") msg = "暂无行程，先生成一份攻略";
@@ -28,11 +47,12 @@ module.exports = {
        else msg = "天气服务暂时异常";
      }
      // 仅「可能恢复」的失败（网络/额度/授权/服务异常/参数）才给重试；no_key/window/env/empty/nocity 重试无意义
+     // domain（域名未加白）也**不给重试**：请求在客户端就被微信拦掉，重试结果一样，只需要去后台配置一次。
      const recover = (err.type === "net" || err.type === "quota" || err.type === "auth" || err.type === "api" || err.type === "param");
-     this.setData({ wxOff: true, wxShow: false, wxList: [], rainyShow: false, rainySpots: [], wxErrType: err.type || "api", wxErrMsg: msg, wxErrRetry: !!recover, wxLoading: false });
+     this.setData({ wxOff: true, wxShow: false, wxList: [], rainyShow: false, rainySpots: [], wxErrType: err.type || "api", wxErrTitle: WX_ERR_TITLE[err.type] || "天气暂不可用", wxErrMsg: msg, wxErrRetry: !!recover, wxLoading: false });
      return;
    }
-   if (!list || !list.length) { this.setData({ wxOff: true, wxShow: false, wxList: [], rainyShow: false, rainySpots: [], wxErrType: "", wxErrMsg: "天气暂不可用", wxErrRetry: false, wxLoading: false }); return; }
+   if (!list || !list.length) { this.setData({ wxOff: true, wxShow: false, wxList: [], rainyShow: false, rainySpots: [], wxErrType: "", wxErrTitle: "天气暂不可用", wxErrMsg: "天气暂不可用", wxErrRetry: false, wxLoading: false }); return; }
    const today = T.fmtLocalDate(new Date());
    const wxList = list.map((w, wi) => {
     const p = String(w.date).split("-");
@@ -88,7 +108,7 @@ module.exports = {
    const _longHint = (plan.days && plan.days.length > 7);
    // 多城/全省游：分段 >1 或同一份预报里出现不止一座城市 → 卡片标「各站按所在城市预报」并逐日显示城市
    const multi = !!segs || (wxList.length > 1 && wxList.some(function (w, i) { return i > 0 && w.city && wxList[0].city && w.city !== wxList[0].city; }));
-   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: multi, wxLoading: false, wxErrType: "", wxErrMsg: "", wxErrRetry: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx, view: this.data.view, wxLongTripHint: _longHint });
+   this.setData({ wxShow: true, wxOff: false, wxList: wxList, wxIsMulti: multi, wxLoading: false, wxErrType: "", wxErrTitle: "", wxErrMsg: "", wxErrRetry: false, rainyShow: rainySpots.length > 0, rainySpots: rainySpots, rainyKinds: rainyKinds, rainyKindsTx: rainyKindsTx, view: this.data.view, wxLongTripHint: _longHint });
   });
  },
 

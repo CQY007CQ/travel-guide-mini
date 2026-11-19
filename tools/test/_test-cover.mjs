@@ -211,6 +211,109 @@ for (const ic of ruleIcons) {
 }
 ck("封面图标均为 ≥96x96 的正方形（替换 32x32 旧图的核心目的）", badSize.length === 0, badSize.join(","));
 
+/* ────────────────────────────────────────────────────────────────────────
+ * [7b] 对称类图标不许「画歪」（v1.20.38 真机报障）
+ *
+ * 病情（用户真机截图质问「这个的那个标为什么是歪着的？」）：
+ *   temple 图标（汉昭烈庙 / 晋祠这类庙宇）旧写法是三处不对称叠在一起：
+ *     ① 主梁 P(2.5,5.5)→P(21.5,4.2)：左低右高，斜率 -1.3/19 ≈ **-3.9°**（主因）
+ *     ② 两柱顶起点不等高：左 6.6 / 右 6.2
+ *     ③ 宝顶压在斜梁上，视觉重心偏右
+ *   作者本意大概是「透视感」，但 96x96 源图缩到真机 56rpx（≈40~56 物理像素）后，
+ *   3.9° 只有 2~3 像素的落差 —— 读起来不是透视，是**手抖画歪**。
+ *
+ * 为什么断言「点集镜像」而不是断言像素：
+ *   这两件事在这里等价 —— 绘制脚本里每个 P(x,y) 就是最终像素的唯一来源，
+ *   而 x=12 是 24 单位网格的中轴。真跑像素要自带 PNG 解码（产物是 PNG8 调色板 +
+ *   tRNS，Node 无内置解码器），反而引入「解码写错 → 静默假绿」的新风险。
+ *   点集镜像的判据同时能抓住「斜梁」和「柱顶不等高」两种画法错误，且失败信息直接
+ *   指出是哪个点没有镜像伙伴，改起来不用猜。
+ *
+ * 覆盖范围：只锁**本来就该左右对称**的建筑类图标（庙门 / 宫殿 / 塔 / 博物馆 /
+ *   住宿 / 兜底针）。山、河、街、城、坝这类本来就故意不对称，锁它们会变成假红。
+ * ──────────────────────────────────────────────────────────────────────── */
+console.log("[7b] 对称类图标不许画歪（点集镜像校验）");
+{
+  const pyPath = path.join(ROOT, "tools/dev/_gen-covers.py");
+  // 先剥掉三引号文档串与 # 注释：temple 的文档里**原样写着旧坐标**（P(2.5,5.5)→P(21.5,4.2)），
+  // 不剥就会把「病历」当成「绘制点」解析 —— 首版就是这么误判自己的。
+  const py = fs.readFileSync(pyPath, "utf8")
+    .replace(/"""[\s\S]*?"""/g, "")
+    .replace(/#[^\n]*/g, "");
+  const AXIS = 12;              // 24 单位网格中轴
+  const EPS = 1e-6;
+  // 取某个 def 的函数体：到下一个顶格 def 为止
+  const bodyOf = (name) => {
+    const i = py.indexOf("\ndef " + name + "(");
+    if (i < 0) return "";
+    const rest = py.slice(i + 1);
+    const j = rest.indexOf("\ndef ", 1);
+    return j < 0 ? rest : rest.slice(0, j);
+  };
+  const ptsOf = (body) => [...body.matchAll(/P\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)/g)]
+    .map((m) => ({ x: parseFloat(m[1]), y: parseFloat(m[2]) }));
+
+  // ① 严格点对点镜像：只对「每个 P() 都是线段端点、且自身左右对称」的图标。
+  //    temple 旧版在这里必死 —— 主梁两端 (2.5,5.5)/(21.5,4.2) 的 y 不等，
+  //    两柱起点 (6.5,6.6)/(17.5,6.2) 也不等，两处都找不到镜像伙伴。
+  {
+    const pts = ptsOf(bodyOf("temple"));
+    ck("庙门绘制点不少于 8 个（解析没跑空）", pts.length >= 8, pts.length + " 个");
+    const unpaired = pts.filter((p) => !pts.some((q) =>
+      Math.abs(q.x - (2 * AXIS - p.x)) < EPS && Math.abs(q.y - p.y) < EPS));
+    ck("庙门每个绘制点都有镜像伙伴（斜梁 / 柱顶不等高会立刻判红）", unpaired.length === 0,
+      unpaired.length + "/" + pts.length + " 个未配对，如 " + JSON.stringify(unpaired[0])
+      + "（应存在 x=" + (unpaired[0] ? 2 * AXIS - unpaired[0].x : "?") + " y=" + (unpaired[0] && unpaired[0].y) + "）");
+  }
+
+  // ② 逐行镜像（宽松档）：对用 rectangle 画的图标，矩形只写了对角两点
+  //    （pagoda 写的是 P(3.5,17) 与 P(20.5,21.2)），另一条的左边缘并不在点集里，
+  //    直接按「同一 y 上的左右端点」判会把对称图形判成歪。所以先把矩形的四个角补齐。
+  //    home 不在名单里 —— 它只有左侧一扇窗，本来就该是不对称的（锁它会变成假红）。
+  {
+    const ROW_ICONS = ["temple", "palace", "pagoda", "museum", "pin"];
+    const rectCorners = (body) => {
+      const out = [];
+      for (const m of body.matchAll(
+        /rectangle\(\s*\[\s*P\((-?[\d.]+)\s*,\s*(-?[\d.]+)\)\s*,\s*P\((-?[\d.]+)\s*,\s*(-?[\d.]+)\)\s*\]/g)) {
+        const [x1, y1, x2, y2] = [m[1], m[2], m[3], m[4]].map(parseFloat);
+        out.push({ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x1, y: y2 }, { x: x2, y: y2 });
+      }
+      return out;
+    };
+    const bad = [];
+    for (const ic of ROW_ICONS) {
+      const body = bodyOf(ic);
+      const pts = ptsOf(body).concat(rectCorners(body));
+      const rows = new Map();
+      for (const p of pts) {
+        const k = p.y.toFixed(3);
+        const cur = rows.get(k) || [];
+        cur.push(p.x); rows.set(k, cur);
+      }
+      for (const [y, xs] of rows) {
+        if (xs.length < 2) continue;
+        if (Math.abs(Math.min(...xs) + Math.max(...xs) - 2 * AXIS) > EPS) {
+          bad.push(ic + " y=" + y + " x∈[" + Math.min(...xs) + "," + Math.max(...xs) + "]");
+        }
+      }
+    }
+    ck("对称类图标逐行左右端点镜像（" + ROW_ICONS.length + " 类）", bad.length === 0, bad.join(" | "));
+  }
+
+  // ③ 「横梁必须水平」单独再锁一道：temple 至少要两道水平横线（屋面檐口 + 通长横枋）。
+  //    旧版主梁 y 是 5.5→4.2（根本不是水平线），这一条单独就能判死。
+  {
+    const pts = ptsOf(bodyOf("temple"));
+    const rows = new Map();
+    for (const p of pts) rows.set(p.y.toFixed(3), (rows.get(p.y.toFixed(3)) || []).concat(p.x));
+    const level = [...rows.entries()].filter(([, xs]) =>
+      xs.length >= 2 && Math.abs(Math.min(...xs) + Math.max(...xs) - 2 * AXIS) < EPS);
+    ck("庙门水平横线 ≥ 2 道（屋面 + 横枋）", level.length >= 2,
+      "只有 " + level.length + " 道：" + JSON.stringify([...rows.entries()]));
+  }
+}
+
 // 渲染层引用的目录：plan 页与检索页都必须走 covers，不许回退到 icons 的 32x32
 for (const rel of ["pages/plan/plan.wxml", "subpkg/spotsearch/spotsearch.wxml"]) {
   const wxml = stripWxmlComments(fs.readFileSync(path.join(ROOT, rel), "utf8"));
