@@ -42,10 +42,24 @@ function _readOverride() {
   return null;
 }
 
-// 解析某个字段：运行时 storage 注入优先，否则用 DEFAULT；非法值回落 null（fail-closed）
+// 本机密钥文件（v1.20.39）：`utils/keys.local.js` 由本人填写真实 Key，**被 .gitignore 忽略**
+// —— 它随小程序包上传（所以任何设备装上就开箱可用，不用一台台手填），但不进公开仓库
+// （`check-secrets` 的 LOCAL_POOLS 机制：允许存在、必须被忽略且未被 git 跟踪）。
+// 优先级：运行时 storage 注入 > 本机文件 > DEFAULT（DEFAULT 仍为空，仓库里永远没有明文）。
+// 为什么不用云函数代理：那才是真正不泄露的形态，但需要新部署一个云函数；
+// 个人主体 + 仅组内使用，先取「不进公开仓库」这一档。包里仍可被解包提取 —— 这是小程序前端的
+// 固有事实，Key 一旦要「零配置可用」就必然在包内，无法规避。
+let LOCAL = null;
+try { LOCAL = require("./keys.local.js"); } catch (e) { LOCAL = null; }
+if (!LOCAL || typeof LOCAL !== "object") LOCAL = {};
+
+// 解析某个字段：storage 注入 > keys.local.js > DEFAULT；非法值回落 null（fail-closed）
 function _resolve(field) {
   const ov = _readOverride();
-  const v = (ov && typeof ov[field] === "string" && ov[field]) ? ov[field] : DEFAULT[field];
+  let v = null;
+  if (ov && typeof ov[field] === "string" && ov[field]) v = ov[field];
+  else if (typeof LOCAL[field] === "string" && LOCAL[field]) v = LOCAL[field];
+  else v = DEFAULT[field];
   if (!v || typeof v !== "string") return null;
   if (PLACEHOLDER.test(v)) return null;
   return v;

@@ -70,3 +70,7 @@ tools/official-roster/cache/
 
 # 本地云开发登录配置（只在本机，含环境与登录缓存，不入库）
 .cloudbase/
+
+# 本机第三方密钥（v1.20.39）：真实 Key 只写在这里，随小程序包上传（任何设备装上即用），
+# 但**永不进公开仓库**。缺失时 keys.js 的 try/catch 兜底为未配置，微信编译实测可通过。
+utils/keys.local.js

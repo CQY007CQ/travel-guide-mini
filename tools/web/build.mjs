@@ -36,10 +36,16 @@ const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const EXCLUDE_DIRS = new Set(["tools", "node_modules", "web", "images", "docs", "shots", "outputs", ".git"]);
 const MANIFEST = "subdata/data/_manifest.js";
 
+// v1.20.39：本机密钥文件（utils/keys.local.js，含真实 Key）绝不能进网页版 ——
+// 网页版是公开分享链接，把它注册进模块表等于把 Key 挂到公网 URL 上。
+// 小程序端仍需它（随包上传＝任何设备装上即用），所以只在**网页构建**这一侧排除。
+const EXCLUDE_FILES = new Set(["utils/keys.local.js"]);
+
 function walkJs(dir, out = []) {
   for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
     if (e.name.startsWith(".")) continue;
     const rel = dir ? dir + "/" + e.name : e.name;
+    if (EXCLUDE_FILES.has(rel)) continue;
     if (e.isDirectory()) {
       if (EXCLUDE_DIRS.has(e.name) || dir === "" && EXCLUDE_DIRS.has(rel)) continue;
       if (EXCLUDE_DIRS.has(rel.split("/")[0])) continue;

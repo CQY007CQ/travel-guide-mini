@@ -36,7 +36,10 @@ const TEXT_EXT = /\.(js|mjs|cjs|json|wxml|wxss|md|html|htm|sh|py|ts|txt|yml|yaml
 const MAX_SIZE = 2.5 * 1024 * 1024;   // 数据块跳过（内含 base64，一定误报）
 
 // 本机凭据池：不进包、不进 git。允许存在，但纳入「是否被误提交」的断言。
-const LOCAL_POOLS = ["tools/geocode.keys", "tools/geocode.key"];
+// v1.20.39 新增 utils/keys.local.js：它**会**进小程序包（这正是目的：任何设备装上即用），
+// 但被 .gitignore 忽略、不进公开仓库。注意它与上面两个 geocode 池的性质不同 ——
+// geocode 是纯工具侧凭据（连包都不进），这个是随包密钥，靠「不进 git」控制曝光面。
+const LOCAL_POOLS = ["tools/geocode.keys", "tools/geocode.key", "utils/keys.local.js"];
 // 外部官方页面抓取缓存（tools/data/_collect-official-roster.mjs --fetch 的只读原文）：
 // 政府站点 HTML 自带 32 位资源哈希/会话串，不是本仓凭据；但它是外部内容，不能无条件信任，
 // 故豁免同时强制「被 .gitignore 覆盖 + 未进入 git index」，且只豁免这一个目录。
@@ -142,7 +145,14 @@ for (const rel of all) {
   if (LOCAL_POOLS.includes(rel)) {
     const gi = fs.existsSync(path.join(ROOT, ".gitignore"))
       ? fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8") : "";
-    const covered = /geocode\.keys/.test(gi) && /geocode\.key(?!s)/.test(gi);
+    // v1.20.39：判据从「两个写死的 geocode 正则」改成「该文件路径本身出现在 .gitignore 里」。
+    // 旧写法只要 geocode 那两条在，任何新登记的凭据池都会**自动通过**——等于新增池子时
+    // 「有没有被忽略」这道断言形同虚设（keys.local.js 会被误判为已覆盖）。
+    const covered = gi.split(/\r?\n/).some((ln) => {
+      const t = ln.trim();
+      if (!t || t.startsWith("#")) return false;
+      return t === rel || t === "/" + rel;
+    });
     if (!covered) problems.push(rel + " → 本地凭据池未被 .gitignore 覆盖");
     if (trackedInIndex(rel)) problems.push(rel + " → 本地凭据池已被 git 跟踪（明文将进入公开仓库）");
     const n = (src.match(HEX32) || []).length;
@@ -188,6 +198,15 @@ for (const rel of all) {
       problems.push(rel + ":" + ln + " → 未在允许清单的外链");
     });
   });
+}
+
+// v1.20.39：本机密钥文件被 .gitignore 保护，但**构建产物**可能绕过这层保护 ——
+// 网页版由同一份源码打包（tools/web/build.mjs 走 walkJs 收全包 .js），
+// 一旦把它注册进模块表，Key 就挂到公开分享链接上了。这里直接断言副本不存在。
+// （web build 已加 EXCLUDE_FILES 排除；这条是第二道，防有人改回去。）
+{
+  const leak = path.join(ROOT, "web", "lib", "keys.local.js");
+  if (fs.existsSync(leak)) problems.push("web/lib/keys.local.js → 本机密钥被网页版构建复制（公开链接泄露）");
 }
 
 const uniq = [...new Set(problems)];
