@@ -684,6 +684,7 @@ function _sleep(ms) { return new Promise((r) => { try { setTimeout(r, ms); } cat
 
 let _ready = null;
 let _loadErr = false; // v1.19.60：上次加载有失败分块 → 允许再次 initData 重试（供首页「重试加载」）
+let _syncChunkErr = false; // Node 同步就绪段是否有分块加载失败（决定 initData 要不要补跑）
 function initData() {
   if (_ready && !_loadErr) return _ready;
   _ready = (async () => {
@@ -715,9 +716,17 @@ function initData() {
       // v1.20.7：团队美食数据在 subdata3 普通模块里（非 packed），单独取并合并。
       try { _applyTeamFood3(require("../subdata3/data/team-food3.js")); } catch (e) { lastErr = e; }
     } else {
-      // Node / 测试端：无 require.async，直接同步 require（可用变量；微信那条约束不适用）
-      for (const p of CHUNK_PATHS) {
-        try { applyPacked(require(p)); } catch (e) { lastErr = e; }
+      // Node / 测试端：无 require.async，直接同步 require（可用变量；微信那条约束不适用）。
+      // ★ 本文件末尾「Node 同步就绪段」在模块加载期已跑过同一批 applyPacked（并合并 team/hotel 分块），
+      //   这里**绝不能再跑一遍**：applyStaticTables 已经给城市对象补过字段（areas/hotelList 归一化等），
+      //   二次 mergeInto 时拿新解出的原始对象去和「已改过字段的旧对象」逐 JSON 比对，去重必然失效，
+      //   于是同名城市被追加第二份。实测虚增 121 条：城市池 751→872、真实城市 424→544，
+      //   连带语料规模卡、体检真值、考核材料 7 份全部口径偏高；而真机只跑一次、读数是 751 正确值。
+      //   只在同步就绪段真的没跑成（_syncChunkErr）时才补跑一次。
+      if (!DATA.__dataReady || _syncChunkErr) {
+        for (const p of CHUNK_PATHS) {
+          try { applyPacked(require(p)); } catch (e) { lastErr = e; }
+        }
       }
     }
     _loadErr = !!lastErr;
@@ -742,7 +751,7 @@ DATA.__packBaseOnly = _PACK_BASE_ONLY;
 // window.__dataReadyP 链路统一控制，避免「脚本还没到、require 就抛错」丢数据。
 if (typeof require.async !== "function" && typeof window === "undefined") {
   for (const p of CHUNK_PATHS) {
-    try { applyPacked(require(p)); } catch (e) { /* 数据缺失时保留空兜底 */ }
+    try { applyPacked(require(p)); } catch (e) { _syncChunkErr = true; /* 数据缺失时保留空兜底，由 initData 补跑重试 */ }
   }
   // v1.20.7：团队美食数据（subdata3 普通模块）。路径用变量，避免微信端把跨分包同步 require 打成告警。
   try { _applyTeamFood3(require("../subdata3/data/team-food3.js")); } catch (e) { /* 缺失则不合并 */ }

@@ -95,6 +95,28 @@ if (s) {
     s.region.reduce((a, b) => a + b.n, 0) + " vs " + s.cities);
   ok("ready 标记为 true", s.ready === true);
 
+  /* ---------- 5a. 城市池不得有重名条目（v1.20.37） ----------
+     真实事故：utils/data.js 在 Node 下把 applyPacked 跑了两遍 —— 模块加载期的同步就绪段一次，
+     initData() 的 else 分支又一次。第二次 mergeInto 时，城市对象已被 applyStaticTables 补过字段，
+     拿出来和「已改过字段的旧对象」逐 JSON 比对，去重必然失效 → 同名城市被追加第二份。
+     症状是全站口径一起虚高：城市池 751→872、真实城市 424→544、体验 26357→30776，
+     而真机只跑一次、读数一直正确，于是「材料 vs 真机」长期对不上且无人能定位。
+     这条断言直接盯「重名」这个最硬的特征，比盯某个具体数字更难绕过。
+     若将来真有合法的跨省同名城市（如「朝阳」区与「朝阳」市），必须带 province 区分后再放宽此处。 */
+  {
+    const all = (T.D && T.D.CITIES) || [];
+    const seen = new Set(), dups = [];
+    for (const c of all) {
+      const n = String((c && c.name) || "");
+      if (!n) continue;
+      if (seen.has(n)) dups.push(n); else seen.add(n);
+    }
+    ok("城市池无重名条目（applyPacked 重复执行会立刻判红）", dups.length === 0,
+      "重名 " + dups.length + " 条：" + dups.slice(0, 8).join("、"));
+    ok("城市池条目数与去重后一致", all.length === seen.size,
+      all.length + " 条 vs " + seen.size + " 个不同名字");
+  }
+
   /* ---------- 5b. 城市口径双轨（2026-11-10） ----------
      防回潮：曾经把「有真实美食店的城数」误当成城市总数，也没说清 751 条里含别名。 */
   ok("城市池条目数 > 去重后真实城市数", s.cityEntries > s.cities,

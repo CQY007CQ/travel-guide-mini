@@ -115,8 +115,8 @@ console.log("【加载链路】");
   try { await Promise.resolve(T.ready()); } catch (e) { /* ready 失败由下面的断言暴露 */ }
   const shops = Object.values(D.FOOD_SPOTS || {}).reduce((n, a) => n + a.length, 0);
   const cities = Object.keys(D.FOOD_SPOTS || {}).length;
-  ok("ready 后规模锚点：美食 9636 家 / 421 城（对齐 check-health 口径）",
-    shops === 9636 && cities === 421, "实测 " + shops + " 家 / " + cities + " 城");
+  ok("ready 后规模锚点：美食 9320 家 / 421 城（对齐 check-health 口径）",
+    shops === 9320 && cities === 421, "实测 " + shops + " 家 / " + cities + " 城");
 
   console.log("\n" + (fail === 0 ? "✅ 解压/解码对照全部通过" : "❌ " + fail + " 项失败"));
   process.exit(fail === 0 ? 0 : 1);
