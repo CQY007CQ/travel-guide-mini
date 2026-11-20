@@ -112,23 +112,31 @@ function _remember(text, r, ctx) {
   } catch (e) {}
 }
 
-/* ───────── 场景注册表（驱动「全场景 AI 速达」面板 / pageSuggestions / topicReply） ───────── */
+/* ───────── 场景注册表（驱动「全场景 AI 速达」面板 / pageSuggestions / topicReply） ─────────
+ * v1.20.40：15 个 tile 的图标改为**一一对应、语义可辨**（真机截图 08-AI助手.png 取证）：
+ *   旧表里 3 个 star（深度玩法/我的攻略/行程复盘）、2 个 search（生成行程/按标签找景点）、
+ *   2 个 home（出行准备/设置偏好）、2 个 coin（花费记账/旅行百宝箱）—— 功能能点，
+ *   但 15 宫格里一眼扫过去分不清哪个是哪个，等于没给视觉线索。
+ *   现在按各自动作选图：生成→路线、体检→靶心、准备→行李箱、标签→标签、
+ *   深度→亮点、记账→钱包、百宝箱→背包、攻略→书本、设置→齿轮、复盘→趋势。
+ *   门禁 check-ai-scenarios 断言「图标文件存在 + 全表不重复」，改回去立刻判红。
+ */
 const SCENARIOS = [
-  { key: "generate",       page: "index",      label: "生成行程", icon: "search.png", sample: "帮我生成成都 3 天行程", desc: "选目的地和天数，离线排出逐日安排" },
-  { key: "food",           page: "food",       label: "必吃美食", icon: "food.png",   sample: "成都吃什么",          desc: "按城市列出必吃清单与人均" },
-  { key: "today",          page: "today",      label: "今天安排", icon: "calendar.png", sample: "今天该干嘛",        desc: "进行中行程的今日速览与花费" },
-  { key: "planOptimize",   page: "plan",       label: "行程体检", icon: "ticket.png", sample: "我的行程有没有问题",  desc: "动线/节奏/重复/预算五维体检" },
-  { key: "prep",           page: "prep",       label: "出行准备", icon: "home.png",   sample: "要带什么",            desc: "按行程特色生成行李清单" },
-  { key: "spotsearch",     page: "spotsearch", label: "按标签找景点", icon: "search.png", sample: "杭州 亲子景点",  desc: "历史/自然/亲子/古镇等主题筛选" },
-  { key: "deep",           page: "deep",       label: "深度玩法", icon: "star.png",   sample: "成都深度玩法",        desc: "机位、避坑、当地人玩法" },
-  { key: "ledger",         page: "ledger",     label: "花费记账", icon: "coin.png",   sample: "今天花了多少",        desc: "本机账本累计与预算进度" },
-  { key: "help-emergency", page: "help",       label: "旅途应急", icon: "shield.png", sample: "附近医院",            desc: "分诊指引 + 就近医院" },
-  { key: "lens",           page: "lens",       label: "拍照识物", icon: "camera.png", sample: "拍照识物",            desc: "对着建筑/植物/招牌拍一张讲讲它的故事" },
-  { key: "travelsvc",      page: "travelsvc",  label: "出行服务", icon: "bus.png",    sample: "出行服务",            desc: "订票/打车/机场车站入口" },
-  { key: "toolkit",        page: "toolkit",    label: "旅行百宝箱", icon: "coin.png", sample: "工具箱",              desc: "汇率/时差/换算等小工具" },
-  { key: "guide",          page: "myguides",   label: "我的攻略", icon: "star.png",   sample: "我的攻略",            desc: "保存与复用生成过的行程" },
-  { key: "settings",       page: "more",       label: "设置偏好", icon: "home.png",   sample: "设置",                desc: "主题/字体/偏好/数据管理" },
-  { key: "review",         page: "assistant",  label: "行程复盘", icon: "star.png",   sample: "帮我复盘这趟行程",    desc: "基于真实手记/记账/去过的地方升华成游记" }
+  { key: "generate",       page: "index",      label: "生成行程", icon: "route.png",     sample: "帮我生成成都 3 天行程", desc: "选目的地和天数，离线排出逐日安排" },
+  { key: "food",           page: "food",       label: "必吃美食", icon: "food.png",      sample: "成都吃什么",          desc: "按城市列出必吃清单与人均" },
+  { key: "today",          page: "today",      label: "今天安排", icon: "calendar.png",  sample: "今天该干嘛",        desc: "进行中行程的今日速览与花费" },
+  { key: "planOptimize",   page: "plan",       label: "行程体检", icon: "target.png",    sample: "我的行程有没有问题",  desc: "动线/节奏/重复/预算五维体检" },
+  { key: "prep",           page: "prep",       label: "出行准备", icon: "luggage.png",   sample: "要带什么",            desc: "按行程特色生成行李清单" },
+  { key: "spotsearch",     page: "spotsearch", label: "按标签找景点", icon: "tag.png",   sample: "杭州 亲子景点",      desc: "历史/自然/亲子/古镇等主题筛选" },
+  { key: "deep",           page: "deep",       label: "深度玩法", icon: "sparkle.png",   sample: "成都深度玩法",        desc: "机位、避坑、当地人玩法" },
+  { key: "ledger",         page: "ledger",     label: "花费记账", icon: "wallet.png",    sample: "今天花了多少",        desc: "本机账本累计与预算进度" },
+  { key: "help-emergency", page: "help",       label: "旅途应急", icon: "shield.png",    sample: "附近医院",            desc: "分诊指引 + 就近医院" },
+  { key: "lens",           page: "lens",       label: "拍照识物", icon: "camera.png",    sample: "拍照识物",            desc: "对着建筑/植物/招牌拍一张讲讲它的故事" },
+  { key: "travelsvc",      page: "travelsvc",  label: "出行服务", icon: "bus.png",       sample: "出行服务",            desc: "订票/打车/机场车站入口" },
+  { key: "toolkit",        page: "toolkit",    label: "旅行百宝箱", icon: "backpack.png",sample: "工具箱",              desc: "汇率/时差/换算等小工具" },
+  { key: "guide",          page: "myguides",   label: "我的攻略", icon: "book.png",      sample: "我的攻略",            desc: "保存与复用生成过的行程" },
+  { key: "settings",       page: "more",       label: "设置偏好", icon: "gear.png",      sample: "设置",                desc: "主题/字体/偏好/数据管理" },
+  { key: "review",         page: "assistant",  label: "行程复盘", icon: "trend.png",     sample: "帮我复盘这趟行程",    desc: "基于真实手记/记账/去过的地方升华成游记" }
 ];
 
 /* ───────── 扩展意图表（顺序：更具体者优先） ───────── */

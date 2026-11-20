@@ -1,0 +1,305 @@
+{
+  "seed": 20261119,
+  "rounds": 100,
+  "elapsedMs": 3308,
+  "cases": 100,
+  "checks": 4401,
+  "issues": [],
+  "byTag": {},
+  "slow": [
+    {
+      "fn": "recommend",
+      "ms": 1242,
+      "n": 100,
+      "per": 12.42
+    },
+    {
+      "fn": "buildProvPlan",
+      "ms": 574,
+      "n": 100,
+      "per": 5.74
+    },
+    {
+      "fn": "buildMultiPlan",
+      "ms": 493,
+      "n": 100,
+      "per": 4.93
+    },
+    {
+      "fn": "searchSpots",
+      "ms": 455,
+      "n": 100,
+      "per": 4.55
+    },
+    {
+      "fn": "buildPlan",
+      "ms": 345,
+      "n": 100,
+      "per": 3.45
+    },
+    {
+      "fn": "ledgerMonthly",
+      "ms": 19,
+      "n": 100,
+      "per": 0.19
+    },
+    {
+      "fn": "spotLookup",
+      "ms": 16,
+      "n": 100,
+      "per": 0.16
+    },
+    {
+      "fn": "exportLedgerCSV",
+      "ms": 14,
+      "n": 100,
+      "per": 0.14
+    },
+    {
+      "fn": "spotCover",
+      "ms": 13,
+      "n": 100,
+      "per": 0.13
+    },
+    {
+      "fn": "tripDraft",
+      "ms": 12,
+      "n": 100,
+      "per": 0.12
+    },
+    {
+      "fn": "rainyDayPlan",
+      "ms": 7,
+      "n": 100,
+      "per": 0.07
+    },
+    {
+      "fn": "holidayHint",
+      "ms": 7,
+      "n": 100,
+      "per": 0.07
+    },
+    {
+      "fn": "packSmart",
+      "ms": 6,
+      "n": 100,
+      "per": 0.06
+    },
+    {
+      "fn": "addLedger",
+      "ms": 6,
+      "n": 100,
+      "per": 0.06
+    },
+    {
+      "fn": "weekLedgerTxt",
+      "ms": 4,
+      "n": 100,
+      "per": 0.04
+    },
+    {
+      "fn": "planCheckup",
+      "ms": 3,
+      "n": 100,
+      "per": 0.03
+    },
+    {
+      "fn": "evaluatePlan",
+      "ms": 3,
+      "n": 100,
+      "per": 0.03
+    },
+    {
+      "fn": "luggageCheck",
+      "ms": 3,
+      "n": 100,
+      "per": 0.03
+    },
+    {
+      "fn": "packByPlan",
+      "ms": 3,
+      "n": 100,
+      "per": 0.03
+    },
+    {
+      "fn": "copyPlan",
+      "ms": 3,
+      "n": 100,
+      "per": 0.03
+    },
+    {
+      "fn": "dayMove",
+      "ms": 3,
+      "n": 100,
+      "per": 0.03
+    },
+    {
+      "fn": "budgetTotalObj",
+      "ms": 3,
+      "n": 100,
+      "per": 0.03
+    },
+    {
+      "fn": "tripScoreOf",
+      "ms": 2,
+      "n": 100,
+      "per": 0.02
+    },
+    {
+      "fn": "foodTop3",
+      "ms": 2,
+      "n": 100,
+      "per": 0.02
+    },
+    {
+      "fn": "foodPriceRange",
+      "ms": 2,
+      "n": 100,
+      "per": 0.02
+    },
+    {
+      "fn": "spotTiming",
+      "ms": 2,
+      "n": 100,
+      "per": 0.02
+    },
+    {
+      "fn": "triage",
+      "ms": 2,
+      "n": 100,
+      "per": 0.02
+    },
+    {
+      "fn": "tripCheck",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "swapCandidates",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "foodSpotsFor",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "foodMapOf",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "mealPlanOf",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "seasonWeather",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "weatherFallback",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "provFoodOf",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "realCity",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "iouStats",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "hospitalsOf",
+      "ms": 1,
+      "n": 100,
+      "per": 0.01
+    },
+    {
+      "fn": "tripHealth",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "budgetGauge",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "tripOverview",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "tripReview",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "dateHintsForPlan",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "routeAdvice",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "dayAddSpot",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "dayRemoveSpot",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "cityFoodOf",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "spotDayLines",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    },
+    {
+      "fn": "getLedger",
+      "ms": 0,
+      "n": 100,
+      "per": 0
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 //       双端（小程序 ai-brain / 网页 ai-assistant）AI 能力对齐、写操作零伪造。
 // 不接入 allcheck.sh（避免改动回归步数触发材料口径门禁），由自我迭代循环/CI 按需调用。
 import { createRequire } from "module";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { pageSrc } from "../lib/page-src.mjs";
 
@@ -305,6 +305,18 @@ for (const [f, forbidden] of AB_CYCLES) {
 log(abCycBad.length === 0,
   "ab-* 依赖严格单向 ab-core→ab-write→ab-runs→ai-brain（无 require 环）" +
   (abCycBad.length ? "（成环：" + abCycBad.join(",") + "）" : ""));
+
+// v1.20.40：15 宫格图标语义区分（真机截图 08-AI助手.png 取证）——
+// 旧表 3 个 star / 2 个 search / 2 个 home / 2 个 coin，功能能点但一眼分不清。
+// 这里断言运行时场景表（不是 grep 源码）图标全不重复且文件真存在；改回重复图标立刻判红。
+const iconList = scs.map((s) => s && s.icon).filter(Boolean);
+const dupIcons = iconList.filter((ic, i) => iconList.indexOf(ic) !== i);
+log(iconList.length === scs.length && dupIcons.length === 0,
+  "AI 速达 tile 图标互不重复（" + iconList.length + " 个）" + (dupIcons.length ? "（重复：" + [...new Set(dupIcons)].join(",") + "）" : ""));
+const badIconName = iconList.filter((ic) => !/^[a-z0-9-]+\.png$/.test(ic));
+log(badIconName.length === 0, "tile 图标文件名合法（禁 emoji / 子路径 / 动态拼接）", badIconName.join(","));
+const missingIcon = iconList.filter((ic) => !existsSync(resolve(ROOT, "images/icons", ic)));
+log(missingIcon.length === 0, "每个 tile 图标都有真实 images/icons/*.png（缺文件真机静默空白）", missingIcon.join(","));
 
 console.log(fail === 0 ? "\n✓ AI 全场景覆盖守卫通过" : "\n✗ AI 覆盖守卫存在 " + fail + " 项失败");
 process.exit(fail === 0 ? 0 : 1);
