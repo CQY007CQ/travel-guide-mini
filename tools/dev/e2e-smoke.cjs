@@ -74,14 +74,19 @@ function ok(name, cond, extra) {
     console.log("\n【② subdata3 团队美食分块】");
     // 注入的行程必须是**结构合法**的（days 是数组、items 非空），否则各页 refresh() 会因
     // 拿到畸形 plan 抛错 —— 那是测试脚本自己的锅，不能记成产品缺陷（本次调试踩过）。
+    // v1.20.41：补 date + 动态今天。旧夹具只有 items、depart 写死 2026-12-01 ——
+    // 任何按日期判状态的页面（todayState / 天气 7 天窗口）都会走空态分支，
+    // 而「有内容」类断言常常被空态文案骗过去（真机抓拍时发现 sweep 就中过）。
     await mp.evaluate((city) => {
+      const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      const t0 = ymd(new Date());
       const app = getApp();
       app.globalData.plan = {
         cityName: city,
         budget: "mid",
-        depart: "2026-12-01",
+        depart: t0,
         people: 1,
-        days: [{ items: [{ name: "抵达" + city, period: "上午" }] }]
+        days: [{ date: t0, cityName: city, items: [{ name: "抵达" + city, period: "上午" }] }]
       };
       return true;
     }, PROBE_CITY);

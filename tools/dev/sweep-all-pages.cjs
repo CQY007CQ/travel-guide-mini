@@ -70,16 +70,23 @@ function richness(d) {
 
   // 注入合法行程（结构必须真的合法：days 是数组、items 非空，否则各页 refresh 会抛错，
   // 那是测试脚本自己的锅，不能记成产品缺陷）
-  await mp.evaluate(() => {
+  // v1.20.41：补 days[].date + 用今天/明天。旧夹具只有 items、depart 写死 2026-12-01：
+  //   ① todayState() 首行 `if (!first) return null` → 今日页直接走空态，
+  //      而 richness() 把空态的 quote 文案当「有内容」→ **今日页一直假绿**（真机抓拍才暴露）；
+  //   ② 写死 depart 会随日期漂移落进 7 天窗口外，天气卡判 window，测不到真实路径。
+  const fixtureDates = await mp.evaluate(() => {
+    const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    const t0 = ymd(new Date()), t1 = ymd(new Date(Date.now() + 86400000));
     getApp().globalData.plan = {
-      cityName: "吉安", budget: "mid", depart: "2026-12-01", people: 2,
+      cityName: "吉安", budget: "mid", depart: t0, people: 2,
       days: [
-        { items: [{ name: "抵达吉安", period: "上午" }, { name: "青原山", period: "下午" }] },
-        { items: [{ name: "井冈山", period: "上午" }] }
+        { date: t0, cityName: "吉安", items: [{ name: "抵达吉安", period: "上午" }, { name: "青原山", period: "下午" }] },
+        { date: t1, cityName: "吉安", items: [{ name: "井冈山", period: "上午" }] }
       ]
     };
-    return true;
+    return { t0, t1 };
   });
+  console.log("  行程夹具日期 " + JSON.stringify(fixtureDates));
 
   console.log("\n【① 21 个页面逐个进入】");
   for (const page of PAGES) {
@@ -110,6 +117,21 @@ function richness(d) {
       (SELF_REDIRECT[page] ? "（闪屏自动进首页，属设计）" : ""));
     ok(rich.ok, page + " 有内容（非白屏）",
       rich.arrs.slice(0, 3).join(",") + (rich.strs.length ? " 文本 " + rich.strs.slice(0, 2).join(",") : ""));
+    // v1.20.41：今日页必须真有行程。旧断言只看「有任一非空字符串」，
+    // 空态的 quote（每天一句旅行小话）也会让它绿 —— 夹具漏 date 时整个今日页零覆盖却报通过。
+    // 真判据：hasPlan===true 且 state.phase 来自 todayState()。
+    if (page === "pages/today/today") {
+      ok(!!(d && d.hasPlan === true && d.state && d.state.phase === "during"),
+        "今日页真有行程（hasPlan=true · state.phase=during，不是空态假绿）",
+        "hasPlan=" + (d && d.hasPlan) + " phase=" + (d && d.state && d.state.phase));
+    }
+    // 行程页时间线：真机抓拍时 pageScrollTo 静默失效，卡片始终在首屏下方拿不到截图。
+    // 数据层先锁住「view[].items 非空」，避免连条目都没有却因为 view 数组非空而假绿。
+    if (page === "pages/plan/plan") {
+      const tl = (d && Array.isArray(d.view) ? d.view : []).reduce((n, day) =>
+        n + (day && Array.isArray(day.items) ? day.items.length : 0), 0);
+      ok(tl >= 2, "行程页时间线有条目（view[].items 合计 ≥2，截图取证失败时仍有据）", "条目 " + tl);
+    }
     ok(bad === 0, page + " 无新增运行时错误", bad ? bad + " 条" : "");
   }
 
