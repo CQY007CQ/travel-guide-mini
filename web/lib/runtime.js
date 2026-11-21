@@ -75,7 +75,10 @@
     __amapState.promise = new Promise(function (resolve) {
       try {
         var s = document.createElement("script");
-        s.src = "https://webapi.amap.com/maps?v=2.0&key=" + encodeURIComponent(key) + "&plugin=AMap.Scale,AMap.ToolBar";
+        // v2.0：marker / 版权正常，底图空白的根因是 CSP connect-src 没放行瓦片域名
+        // （v2.0 瓦片走 XHR，不是 <img>）。index.html 已补 https://*.is.autonavi.com。
+        // v1.4.15 试过：本浏览器连 marker 都不画，整块空白，故回到 v2.0。
+        s.src = "https://webapi.amap.com/maps?v=2.0&key=" + encodeURIComponent(key);
         s.async = true;
         var timer = setTimeout(function () { resolve(false); }, 12000);
         s.onload = function () {
@@ -138,6 +141,9 @@
         });
         if (overlays.length) map.add(overlays);
         if (markers.length) { try { map.setFitView(); } catch (e2) {} }
+        // 网页版是整页重绘，容器尺寸在初始化瞬间可能还是 0 → 瓦片按 0 尺寸算全白。
+        // 下一帧强制 resize 一次，让 SDK 按最终布局重新算瓦片。
+        try { setTimeout(function () { if (el.isConnected) map.resize(); }, 60); } catch (e3) {}
         el.classList.add("map-real");
         __amapState.maps.push(map);
         return true;

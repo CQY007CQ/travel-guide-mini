@@ -99,11 +99,15 @@ ck("助手页识物入口无条件展示（不依赖 hasPlan / 生成攻略）",
   /class="card lens-card" bindtap="goLens"/.test(asstWxml) &&
   !/class="card lens-card"[^>]*wx:if/.test(asstWxml));
 // 网页版曾整条链路不通：runtime 无 wx.chooseMedia、Cloud.uploadImage 直接 web-upload-unsupported。
-// 现在网页用 <input type=file> 垫片选图 + CloudBase SDK storage.uploadFile 上传，双端同源。
-ck("网页版识图链路可用：chooseMedia 垫片 + 云存储上传（不再 web-upload-unsupported）",
+// v1.20.42 改走 base64 直传（llmProxy 原生支持 imageBase64），**不再依赖云存储 uploadFile** ——
+// 那条路要求云开发环境开「匿名登录」，用户没开时识物永远落兜底页，而开关只能在控制台改。
+// 断言「网页版有可用识图通道」而非绑死某一种上传实现：
+//   chooseMedia 垫片 + FileReader 读 data URL + aiVision 识别 data: 前缀走 imageBase64。
+ck("网页版识图链路可用：chooseMedia 垫片 + base64 直传（不依赖云存储/匿名登录）",
   /chooseMedia: function/.test(runtimeJs) && /type\s*=\s*"file"/.test(runtimeJs) &&
   /createObjectURL/.test(runtimeJs) &&
-  /cb\.uploadFile\(\{\s*cloudPath/.test(cloudJs) &&
+  /readAsDataURL/.test(cloudJs) && /data:image\//.test(cloudJs) &&
+  /imageBase64:\s*inlineBase64/.test(cloudJs) &&
   !/web-upload-unsupported/.test(cloudJs));
 
 // 云函数原始错误含 errCode/Require stack/callId，曾原样拼进 localNote 刷屏并把地点列表挤出屏幕。

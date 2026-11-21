@@ -340,16 +340,25 @@ function uploadImage(filePath) {
       const ext = m ? m[1] : "jpg";
       const cloudPath = "lens/" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "." + ext;
       if (isWeb()) {
-        // 网页端走 CloudBase JS SDK 的 storage.uploadFile（FormData），与 callFunction 同一 app 实例。
-        // filePath 是 wx.chooseMedia 垫片产出的 objectURL（同时供 <image src> 预览），先 fetch 成 Blob 再传。
-        const cb = (typeof window !== "undefined") && window.__cloudbase;
-        if (!cb || !cb.uploadFile) { bad(new Error("cloud-web-not-ready")); return; }
+        // v1.20.42：网页端**不上传云存储**，直接把图片读成 data URL 交给 aiVision 走
+        // imageBase64 直传（llmProxy 已支持）。原因：云存储 uploadFile 要求云开发环境
+        // 开启「匿名登录」，用户没开时必然 `cloud-web-not-ready` → 识物永远落回兜底页，
+        // 而这一步在控制台才能改。base64 直传只要 callFunction 能用就行，绕开整个存储环节。
+        // filePath 是 chooseMedia 垫片产出的 blob: objectURL（同时供 <image> 预览）。
         const toBlob = (typeof filePath === "string" && /^blob:/.test(filePath))
           ? fetch(filePath).then(function (r) { return r.blob(); })
           : Promise.resolve(filePath);
-        toBlob.then(function (blob) { return cb.uploadFile({ cloudPath: cloudPath, file: blob }); })
-          .then(function (res) { ok((res && (res.fileID || res.fileId)) || ""); })
-          .catch(function (err) { bad(err); });
+        toBlob.then(function (blob) {
+          return new Promise(function (res, rej) {
+            const fr = new FileReader();
+            fr.onload = function () { res(String(fr.result || "")); };
+            fr.onerror = function () { rej(new Error("file-read-failed")); };
+            fr.readAsDataURL(blob);
+          });
+        }).then(function (dataUrl) {
+          if (!dataUrl || dataUrl.indexOf("data:image/") !== 0) { bad(new Error("image-read-empty")); return; }
+          ok(dataUrl);   // 以 data: 开头 —— aiVision 会识别并改走 imageBase64
+        }).catch(function (err) { bad(err); });
         return;
       }
       if (typeof wx === "undefined" || !wx.cloud || typeof wx.cloud.uploadFile !== "function") {
@@ -371,18 +380,25 @@ function aiVision(opts) {
   opts = opts || {};
   return new Promise(function (resolve) {
     if (!cloudEnabled()) { resolve({ ok: false, err: "cloud-disabled" }); return; }
-    const ids = Array.isArray(opts.imageFileIDs) ? opts.imageFileIDs.filter(Boolean).slice(0, 3) : [];
+    const rawIds = Array.isArray(opts.imageFileIDs) ? opts.imageFileIDs.filter(Boolean).slice(0, 3) : [];
+    // v1.20.42：网页版 uploadImage 返回的是 data:image/... 的 data URL（不走云存储）。
+    // 这里按前缀分流：data: → imageBase64 直传；cloud:// → 原 fileID 下载路径。
+    // 多张时只取第一张直传（llmProxy 的 imageBase64 是单张字段；多图场景小程序仍走 fileIDs）。
+    const inlineIdx = rawIds.findIndex(function (x) { return typeof x === "string" && x.indexOf("data:image/") === 0; });
+    const inlineBase64 = inlineIdx >= 0 ? rawIds[inlineIdx] : (opts.imageBase64 || null);
+    const ids = rawIds.filter(function (x) { return typeof x !== "string" || x.indexOf("data:") !== 0; });
     const payload = {
       prompt: (typeof opts.prompt === "string" && opts.prompt.trim()) ? opts.prompt.trim() : null,
       system: (typeof opts.system === "string" && opts.system.trim()) ? opts.system.trim() : null,
       context: (typeof opts.context === "string" && opts.context.trim()) ? opts.context.trim() : null,
       imageFileID: opts.imageFileID || null,
       imageFileIDs: ids.length ? ids : null,
-      imageBase64: opts.imageBase64 || null,
+      imageBase64: inlineBase64,
       model: (typeof opts.model === "string" && opts.model.trim()) ? opts.model.trim() : null,
       max_tokens: (typeof opts.max_tokens === "number" && opts.max_tokens > 0) ? opts.max_tokens : 700
     };
     if (!payload.imageFileID && !payload.imageFileIDs && !payload.imageBase64) { resolve({ ok: false, err: "no-image" }); return; }
+    if (payload.imageBase64 && payload.imageFileIDs) { payload.imageFileIDs = null; }  // 直传与 fileID 二选一，避免云函数优先走下载路径
     withTimeout(callFunction("llmProxy", payload), AI_VISION_TIMEOUT_MS).then(function (r) {
       if (r && r.ok && r.text) resolve({ ok: true, text: String(r.text), model: r.model || "", source: r.source || "ai" });
       else {
