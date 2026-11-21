@@ -119,11 +119,13 @@ function richness(d) {
       rich.arrs.slice(0, 3).join(",") + (rich.strs.length ? " 文本 " + rich.strs.slice(0, 2).join(",") : ""));
     // v1.20.41：今日页必须真有行程。旧断言只看「有任一非空字符串」，
     // 空态的 quote（每天一句旅行小话）也会让它绿 —— 夹具漏 date 时整个今日页零覆盖却报通过。
-    // 真判据：hasPlan===true 且 state.phase 来自 todayState()。
+    // 真判据：hasPlan===true 且 state 是 todayState() 返回的 **phase 字符串**（"during"）。
+    // 本次修复：上一版写成 d.state.phase 是错的 —— 页面 setData({state: st.phase})，
+    // state 本身就是字符串，再取 .phase 恒 undefined → 真跑时把正确页面判红（真机实测暴露）。
     if (page === "pages/today/today") {
-      ok(!!(d && d.hasPlan === true && d.state && d.state.phase === "during"),
-        "今日页真有行程（hasPlan=true · state.phase=during，不是空态假绿）",
-        "hasPlan=" + (d && d.hasPlan) + " phase=" + (d && d.state && d.state.phase));
+      ok(!!(d && d.hasPlan === true && d.state === "during"),
+        "今日页真有行程（hasPlan=true · state=during，不是空态假绿）",
+        "hasPlan=" + (d && d.hasPlan) + " state=" + (d && d.state));
     }
     // 行程页时间线：真机抓拍时 pageScrollTo 静默失效，卡片始终在首屏下方拿不到截图。
     // 数据层先锁住「view[].items 非空」，避免连条目都没有却因为 view 数组非空而假绿。
