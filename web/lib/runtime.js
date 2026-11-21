@@ -1075,6 +1075,50 @@
 
   /** 事件委托：把 DOM 事件翻译成小程序的 e.currentTarget.dataset / e.detail */
   function bindEvents() {
+    /* 中文输入法修复：composition 期间绝不派发 input 事件。
+       网页版 paint() 是整页 replaceChildren 重建，而中文输入法每敲一个字母都会触发
+       compositionupdate → 若此时派发 input → handler setData → paint 重建 DOM →
+       <input> 被换成新节点，输入法的 composition 上下文丢失，候选框消失、字打不出来。
+       做法：composition 期间只让浏览器自己改 value（不动 DOM），把目标元素存起来；
+       compositionend 后再派发一次 input（带最终 value）。英文/数字不触发 composition，
+       行为与原来完全一致。 */
+    var composing = null;   // { el, handlerName, hit }
+    root.addEventListener("compositionstart", function (ev) {
+      var el = ev.target;
+      while (el && el !== root && !(el.__ev && (el.__ev["on:input"] || el.__ev["catch:input"]))) el = el.parentElement;
+      if (el && el !== root) {
+        var e2 = el.__ev;
+        composing = {
+          el: el,
+          handlerName: e2["catch:input"] || e2["on:input"],
+          catchIt: !!e2["catch:input"]
+        };
+      }
+    }, true);
+    var endComposition = function (ev) {
+      if (!composing) return;
+      var c = composing; composing = null;
+      // 输入法的最终值要等 compositionend 的同一个 tick 才写进 input.value，
+      // 延后到下一帧派发，确保拿到的是完整汉字而不是中间拼音。
+      setTimeout(function () {
+        if (!c.el || !c.el.isConnected || !c.handlerName || !current) return;
+        var handler = current[c.handlerName];
+        if (typeof handler !== "function") return;
+        var dataset = {};
+        if (c.el.dataset) for (var d in c.el.dataset) dataset[d] = c.el.dataset[d];
+        try {
+          handler.call(current, {
+            type: "input", timeStamp: Date.now(),
+            target: { id: c.el.id, dataset: dataset, value: c.el.value },
+            currentTarget: { id: c.el.id, dataset: dataset },
+            detail: { value: c.el.value },
+            preventDefault: function () {}, stopPropagation: function () {}
+          });
+        } catch (err) { console.error("[web] composition 输入处理异常", err); }
+      }, 0);
+    };
+    root.addEventListener("compositionend", endComposition, true);
+
     // touchcancel / reset 原在 wxml 编译器里有映射，这里却没监听 → 拖拽中断收尾、表单重置永不触发
     var map = { click: "click", input: "input", change: "change", blur: "blur", focus: "focus",
       submit: "submit", reset: "reset", contextmenu: "contextmenu", touchstart: "touchstart",
@@ -1087,6 +1131,10 @@
       error: "error" };
     Object.keys(map).forEach(function (domEvt) {
       root.addEventListener(domEvt, function (ev) {
+        // 中文输入法 composition 期间的 input 事件必须吞掉，否则 setData → paint 重建
+        // DOM 会把输入法上下文打断（详见 bindEvents 顶部注释）。最终值在 compositionend
+        // 后再补发一次，不丢字。ev.isComposing 是标准标志，composing 是兜底。
+        if (domEvt === "input" && (composing || (ev && ev.isComposing))) return;
         // scroll 事件不冒泡到 handler 名，需要单独找带 __ev 的祖先
         var el = ev.target;
         var handlerName = null, catchIt = false, hit = null;

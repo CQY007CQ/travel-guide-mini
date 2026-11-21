@@ -34,6 +34,22 @@ const must = (cond, msg) => { if (!cond) throw new Error(msg); };
 const count = (s, needle) => s.split(needle).length - 1;
 
 const checks = [
+  ["网页版中文输入：composition 期间不重建 DOM（输入法不被打断）", () => {
+    // v1.20.42 真 bug：网页版 paint() 每次 input 都整页 replaceChildren，中文输入法
+    // compositionupdate 触发 setData → DOM 被换 → 输入法上下文丢失，字打不出来。
+    // 修法：composition 期间吞掉 input，compositionend 后补发一次完整值。
+    // 这里断言真实源码的四个关键点（不是「源码有某串字」的软断言，而是成对存在的判据）。
+    const rt = read("web/lib/runtime.js");
+    must(rt.includes('addEventListener("compositionstart"'), "缺 compositionstart 监听");
+    must(rt.includes('addEventListener("compositionend"'), "缺 compositionend 监听");
+    must(/domEvt === "input" && \(composing \|\| \(ev && ev\.isComposing\)\)/.test(rt),
+      "composition 期间的 input 未被吞掉，DOM 仍会被重建");
+    const ei = rt.indexOf("var endComposition = function");
+    must(ei >= 0, "缺 compositionend 补发函数");
+    const endBlock = rt.slice(ei, ei + 1200);
+    must(/setTimeout\(function \(\)/.test(endBlock) && /detail: \{ value: c\.el\.value \}/.test(endBlock),
+      "compositionend 后未补发完整值的 input 事件");
+  }],
   ["sysTheme：新接口返回即定案，浅色主题不再掉进废弃兜底", () => {
     const s = slice(read("tools/_src-backup/travel.js"), "function sysTheme()", "// 实际生效主题");
     must(s.includes('return b.theme === "dark" ? "dark" : "light";'), "缺少 dark/light 一次性返回");
