@@ -344,7 +344,18 @@ function resolveCity(name) {
 // 行程意图解析（本地离线版）：纯关键字/正则抽取，零网络、零云依赖。
 // 与云端版互补：云端未配置时仍能把「成都 3 天亲子穷游」拆成结构化参数，喂给本地 T.buildPlan。
 // 只产出参数，绝不产出景点/路线/价格（内容一律由本地生成器出，零伪造）。
-const PLAN_CN_NUM = { 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+// 中文天数解析：旧的单字表把「十二天」读成 2 天、「十一天」读成 1 天 ——
+// 离线一句话生成行程时，长行程被当短行程排景点，预算/节奏也跟着错（线上真实路径：
+// subpkg/assistant 的 onNLRun → parsePlanIntent → 本地解析器）。覆盖 十 / 十X / X十 / X十Y。
+const CN_DIGIT = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+function cnDaysOf(s) {
+  const t = String(s == null ? "" : s).trim();
+  if (/^\d+$/.test(t)) return parseInt(t, 10);
+  if (CN_DIGIT[t] != null) return CN_DIGIT[t];
+  if (t === "十") return 10;
+  const m = /^([二两三四五六七八九])?十([一二三四五六七八九])?$/.exec(t);
+  return m ? (m[1] ? CN_DIGIT[m[1]] : 1) * 10 + (m[2] ? CN_DIGIT[m[2]] : 0) : 0;
+}
 function parsePlanIntentLocal(text) {
   const q = String(text || "").trim();
   if (!q) return null;
@@ -352,8 +363,8 @@ function parsePlanIntentLocal(text) {
   const city = resolveCity(q);
   if (city) out.city = city;
   // 天数
-  const dm = q.match(/(\d+|[一二两三两四五六七八九十])\s*(?:天|日|晚|天\d|日游)/);
-  if (dm) { const n = parseInt(dm[1], 10) || PLAN_CN_NUM[dm[1]]; if (n) out.days = Math.max(1, Math.min(14, n)); }
+  const dm = q.match(/(\d+|[零一二两三四五六七八九十]{1,3})\s*(?:天|日|晚)/);
+  if (dm) { const n = cnDaysOf(dm[1]); if (n) out.days = Math.max(1, Math.min(14, n)); }
   // 预算
   if (/穷游|省钱|便宜|经济|低预算|预算有限|不贵|省一点|学生|低消费/.test(q)) out.budget = "low";
   else if (/奢华|高端|豪华|不差钱|高预算|精品|贵一点|高消费/.test(q)) out.budget = "high";
@@ -411,6 +422,7 @@ module.exports = {
   clearHistory: clearHistory,
   memoryStats: memoryStats,
   parsePlanIntent: parsePlanIntent,
+  parsePlanIntentLocal: parsePlanIntentLocal,
   resolveCity: resolveCity,
   channelCooling: channelCooling,
   cacheStats: cacheStats,

@@ -1212,5 +1212,24 @@ assert("fmtHM 非法入参回退今天时刻且不抛错", (() => { try { return
 assert("既有日期导出未被破坏", ["fmtLocalDate", "fmtDateTime", "fmtClock"].every(k => typeof ST[k] === "function"));
 assert("m-tile 草稿时间文案核心调用返回字符串", typeof ST.fmtHM === "function" && typeof ST.fmtHM(new Date(2026, 0, 2, 9, 5, 0)) === "string");
 
+// ── 离线一句话生成：中文多位数天数解析（迭代 #14）──
+// parsePlanIntentLocal 旧单字表 /(\d+|[一二三...十])/ 会把「十二天」末字「二」当天数 → 2 天，
+// 「十一天」→1 天；首页/AI 助手离线拆参据此决定景点密度与预算，长行程被当短行程排。
+console.log("== 56. AI 离线拆参中文多位数天数 ==");
+assert("离线解析器已导出可测", typeof AG.parsePlanIntentLocal === "function");
+assert("十二天 → 12（旧 bug 误判 2）", AG.parsePlanIntentLocal("成都十二天亲子穷游").days === 12, JSON.stringify(AG.parsePlanIntentLocal("成都十二天亲子穷游")));
+assert("十一天 → 11（旧 bug 误判 1）", AG.parsePlanIntentLocal("成都十一天").days === 11);
+assert("十天 → 10（单字回归）", AG.parsePlanIntentLocal("成都十天").days === 10);
+assert("三天 → 3（单字回归）", AG.parsePlanIntentLocal("成都三天").days === 3);
+assert("两天 → 2（两字回归）", AG.parsePlanIntentLocal("成都两天").days === 2);
+assert("阿拉伯 7 天 → 7", AG.parsePlanIntentLocal("成都7天").days === 7);
+assert("3天2晚 → 取首段 3", AG.parsePlanIntentLocal("成都3天2晚").days === 3);
+assert("十五天 → 14（解析 15 后按 1-14 上限收敛，不再错成 5）", AG.parsePlanIntentLocal("成都十五天").days === 14);
+assert("其它字段不受影响（城市/预算/人群）", (() => {
+  const o = AG.parsePlanIntentLocal("成都十二天亲子穷游");
+  return o.city === "成都" && o.budget === "low" && o.travelMode === "family";
+})(), JSON.stringify(AG.parsePlanIntentLocal("成都十二天亲子穷游")));
+assert("无天数表述不误中", !(AG.parsePlanIntentLocal("成都好好玩一玩") || {}).days);
+
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);
