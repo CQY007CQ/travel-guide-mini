@@ -28,7 +28,8 @@ Page(SafePage({
     source: "",         // 来源标识（显示「AI 生成」）
     voted: false,       // 是否触发二次核验（多链投票）
     err: "",            // 失败/未配置提示
-    cloudOn: false,     // 云端是否开启
+    cloudOn: false,     // 云端是否「已配置 且 通道就绪」（只判断配置会造成能力宣称不实）
+    cloudHint: "云端未开启 · 可用本机离线对照",   // 未就绪时的准确原因（区分没配置 / 没登录）
     textMode: false,    // 文字问模式
     textInput: "",
     cityName: "",
@@ -70,7 +71,18 @@ Page(SafePage({
         const city = plan ? T.decQuery(T.activeCityOf(plan) || plan.cityName || "") : "";
         let hist = [];
         try { hist = S.get(HIST_KEY, []) || []; } catch (e) { hist = []; }
-        this.setData({ cloudOn: Cloud.cloudEnabled(), cityName: city || "", history: Array.isArray(hist) ? hist.slice(0, HIST_MAX) : [] });
+        // 「已就绪」必须是真话：cloudEnabled() 只说明「填了云环境 ID」，不代表通道能用。
+        // v1.20.43：网页版匿名登录没开时 cloudEnabled() 仍是 true，页面顶着「云端 AI 已就绪 · 多链核验」
+        // 却必然失败 —— 属于能力宣称不实。改为「已配置 且 通道就绪」才亮绿灯，并给出具体卡点。
+        const configured = Cloud.cloudEnabled();
+        const on = configured && !!Cloud.ready();
+        let hint = "云端未开启 · 可用本机离线对照";
+        if (configured && !on) {
+          hint = (typeof Cloud.isWeb === "function" && Cloud.isWeb())
+            ? "云端未登录 · 需开启匿名登录后可拍照识别"
+            : "云端通道未就绪 · 可用本机离线对照";
+        }
+        this.setData({ cloudOn: on, cloudHint: hint, cityName: city || "", history: Array.isArray(hist) ? hist.slice(0, HIST_MAX) : [] });
       } catch (e) { try { EL.push("lens.onShow", e); } catch (_) {} }
     });
   },
@@ -222,11 +234,20 @@ Page(SafePage({
   // 这里只映射成一句人话；技术细节仍由 EL.push 记进本机异常日志，排查不丢信息。
   _friendlyErr(e) {
     const s = String((e && e.message) || e || "");
+    // 云函数遇到「没配 LLM_API_KEY / 视觉模型不支持图片」这类配置问题时会直接给一句中文 hint，
+    // 那是用户唯一能照着做的下一步 —— 再套一层「云端识别暂时不可用」等于把指路牌扔掉。
+    // 只透传短的中文句子，带堆栈/调用栈特征的仍然走映射。
+    if (/[\u4e00-\u9fa5]/.test(s) && s.length <= 120 && !/\bat\s+\w+\(|errCode|Require stack/.test(s)) return s;
     if (/Cannot find module|504002|BASE_FUNCTIONS_EXECUTE_FAIL/.test(s)) return "云端识别服务暂时不可用";
     if (/timeout|超时|ETIMEDOUT/.test(s)) return "云端识别超时，请重试";
     if (/cloud-disabled|not-configured|未开启/.test(s)) return "云端识别未开启";
     if (/limit|配额|quota|429/.test(s)) return "云端识别额度用尽，请稍后再试";
-    if (/upload|上传/.test(s)) return "照片上传失败，请检查网络";
+    // v1.20.43：旧版把这一类统一说成「照片上传失败，请检查网络」，而真实原因往往是
+    // ①通道没就绪（匿名登录没开）②照片读不出来 —— 都跟网络无关，用户照着提示排查是白费。
+    if (/cloud-web-not-ready|cloud-not-ready/.test(s)) return "云端通道未就绪（网页版需在云开发控制台开启匿名登录）";
+    if (/upload-timeout/.test(s)) return "照片上传超时，请重试";
+    if (/image-read-empty|file-read-failed|empty-file-path/.test(s)) return "照片读取失败，请重新选一张";
+    if (/upload|上传/.test(s)) return "照片上传失败，请重试";
     return "云端识别暂时不可用";
   },
 
@@ -260,6 +281,16 @@ Page(SafePage({
     if (!this.data.imgs.length) { wx.showToast({ title: "先拍一张或从相册选", icon: "none" }); return; }
     if (!Cloud.cloudEnabled()) {
       self._openLocalCompare("云端 AI 未开启（需在云函数 llmProxy 配置多模态 LLM_MODEL）。");
+      return;
+    }
+    // v1.20.43：通道明确不可用就别让用户白等「压缩 → 上传 12s → 识别 25s」再失败。
+    // 注意只拦「明确失败」，不拦「还在登录」——页面刚打开那一秒 __cloudbase 仍是 undefined，
+    // 用 ready() 一刀切会把「登录中」误判成不可用（见 utils/cloud.js 的 channelState）。
+    const chState = (typeof Cloud.channelState === "function") ? Cloud.channelState() : (Cloud.ready() ? "ready" : "not-ready");
+    if (chState === "login-failed" || chState === "not-ready") {
+      self._openLocalCompare(chState === "login-failed"
+        ? "网页版云端通道未登录：请到云开发控制台「身份源列表」开启「匿名登录」，开启后本页可直接拍照识别。"
+        : "云端通道未就绪：请在微信开发者工具确认云开发环境已开通、llmProxy 已部署。");
       return;
     }
     self.setData(Object.assign({}, self._blank(), { loading: true, busyTip: "正在压缩图片…" }));

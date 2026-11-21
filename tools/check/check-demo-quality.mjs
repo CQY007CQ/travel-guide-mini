@@ -34,6 +34,33 @@ const must = (cond, msg) => { if (!cond) throw new Error(msg); };
 const count = (s, needle) => s.split(needle).length - 1;
 
 const checks = [
+  ["网页版识图：环境判据不得掺入登录状态，照片上传不得被 CSP 拦", () => {
+    // v1.20.43 真 bug（用户截图）：识物永远报「照片上传失败，请检查网络」。
+    // 两层：
+    // ① utils/cloud.js 的 isWeb() 旧判据是 window.__cloudbase，而适配器「匿名登录成功才挂载」，
+    //    登录一失败（控制台没开匿名登录）就让 isWeb()=false → 网页端误走 wx.cloud 分支 →
+    //    wx.cloud.uploadFile 在垫片里不存在 → cloud-not-ready。一个控制台开关伪装成网络故障。
+    // ② uploadImage 在网页端 fetch(blob: objectURL) 读图，而 CSP 的 connect-src 没放行 blob:
+    //    → "Refused to connect"，同样表现为上传失败。
+    const cloud = read("utils/cloud.js");
+    const isWebBlock = slice(cloud, "function isWeb()", "function cloudEnv()");
+    must(/typeof document !== "undefined"/.test(isWebBlock),
+      "isWeb() 未把「有 document」作为浏览器判据：匿名登录失败会让整条网页云链路误走 wx.cloud");
+    must(!/return \(typeof window !== "undefined"\) && !!\(window\.__cloudbase\);/.test(isWebBlock),
+      "旧写法回潮：isWeb() 又只用 window.__cloudbase 判定（与登录状态耦合）");
+    const csp = (/content="(default-src[^"]*)"/.exec(read("web/index.html")) || [])[1] || "";
+    const connect = (/;\s*connect-src\s+([^;]+)/.exec(csp) || [])[1] || "";
+    must(/(^|\s)blob:/.test(connect),
+      "connect-src 缺 blob:：网页版 fetch(blob: objectURL) 读图被 CSP 拦 → 识图永远上传失败");
+    // 就绪声明必须属实：cloudEnabled() 只说明填了云环境 ID
+    const lens = read("subpkg/lens/lens.js");
+    must(/!!Cloud\.ready\(\)/.test(lens) && /cloudOn:\s*(on|configured)/.test(lens),
+      "lens 的 cloudOn 未叠加 ready()：会顶着「云端 AI 已就绪」却必然失败（能力宣称不实）");
+    must(/if \(chState === "login-failed" \|\| chState === "not-ready"\)/.test(lens),
+      "identify() 缺通道就绪守卫：用户会白等压缩+上传+识别全流程");
+    must(/channelState: channelState/.test(cloud),
+      "cloud 未导出 channelState：调用方无法区分「登录中」与「登录失败」，必然误判");
+  }],
   ["网页版中文输入：composition 期间不重建 DOM（输入法不被打断）", () => {
     // v1.20.42 真 bug：网页版 paint() 每次 input 都整页 replaceChildren，中文输入法
     // compositionupdate 触发 setData → DOM 被换 → 输入法上下文丢失，字打不出来。

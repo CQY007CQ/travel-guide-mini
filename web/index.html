@@ -11,15 +11,15 @@
      与 restapi.amap.com/v3/log/init（JSONP），两者被拦则 canvas 一个都不生成、底图永远空白
      （marker/copyright 是本地 DOM 绘制，所以看起来"地图在但没底图"，极易误判成 key 白名单问题）。
      故 script-src 统一放行 https://*.amap.com，并在 connect/img/style/font 一并覆盖。 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.amap.com https://*.autonavi.com; style-src 'self' 'unsafe-inline' https://*.amap.com; img-src 'self' data: blob: https://*.tcloudbaseapp.com https://*.myqcloud.com https://*.amap.com https://*.is.autonavi.com https://*.autonavi.com; font-src 'self' data: https://*.amap.com; connect-src 'self' https://*.qweatherapi.com https://*.amap.com https://*.is.autonavi.com https://*.autonavi.com https://*.tcloudbasegateway.com https://*.tcloudbaseapp.com https://*.cloudbase.net https://*.tencentcloudapi.com; worker-src 'self' blob:; child-src 'self' blob:"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.amap.com https://*.autonavi.com; style-src 'self' 'unsafe-inline' https://*.amap.com; img-src 'self' data: blob: https://*.tcloudbaseapp.com https://*.myqcloud.com https://*.amap.com https://*.is.autonavi.com https://*.autonavi.com; font-src 'self' data: https://*.amap.com; connect-src 'self' blob: data: https://*.qweatherapi.com https://*.amap.com https://*.is.autonavi.com https://*.autonavi.com https://*.tcloudbasegateway.com https://*.tcloudbaseapp.com https://*.cloudbase.net https://*.tencentcloudapi.com; worker-src 'self' blob:; child-src 'self' blob:"/>
 <title>旅行攻略生成器 · 网页版</title>
 <!-- 网页首屏加速：data.js（2.4MB 离线库）改为 <script async> 懒加载，先让出首屏解析/绘制，
      其 onload 后再 resolve 这个承诺；utils/data.js 的 initData 网页分支 await 它再解包，
      既不被同步解压阻塞，又保证解包时数据块工厂已注册（否则 require 抛错丢数据）。 -->
 <script>window.__dataReadyP=new Promise(function(r){window.__dataReadyResolve=r;});</script>
-<link rel="stylesheet" href="lib/app.css?v=ef9c8cf2"/>
-<link rel="stylesheet" href="shell.css?v=ef9c8cf2"/>
-<link rel="stylesheet" href="ai-assistant.css?v=ef9c8cf2"/>
+<link rel="stylesheet" href="lib/app.css?v=cae5774d"/>
+<link rel="stylesheet" href="shell.css?v=cae5774d"/>
+<link rel="stylesheet" href="ai-assistant.css?v=cae5774d"/>
 </head>
 <body>
   <!-- 启动遮罩：数据包解压需要一点时间，避免白屏 -->
@@ -41,15 +41,15 @@
     <a class="tb" data-p="pages/more/more"><img alt="更多"/><span>更多</span></a>
   </nav>
 
-  <script defer src="lib/map-key.js?v=ef9c8cf2"></script>
-  <script defer src="lib/modules.js?v=ef9c8cf2"></script>
-  <script async src="lib/data.js?v=ef9c8cf2" onload="window.__dataReadyResolve&&window.__dataReadyResolve()" onerror="window.__dataReadyResolve&&window.__dataReadyResolve()"></script>
-  <script defer src="lib/tpl.js?v=ef9c8cf2"></script>
-  <script defer src="lib/nav.js?v=ef9c8cf2"></script>
-  <script defer src="lib/runtime.js?v=ef9c8cf2"></script>
-  <script defer src="lib/cloud-web.js?v=ef9c8cf2"></script>
-  <script defer src="app.js?v=ef9c8cf2"></script>
-  <script defer src="ai-assistant.js?v=ef9c8cf2"></script>
+  <script defer src="lib/map-key.js?v=cae5774d"></script>
+  <script defer src="lib/modules.js?v=cae5774d"></script>
+  <script async src="lib/data.js?v=cae5774d" onload="window.__dataReadyResolve&&window.__dataReadyResolve()" onerror="window.__dataReadyResolve&&window.__dataReadyResolve()"></script>
+  <script defer src="lib/tpl.js?v=cae5774d"></script>
+  <script defer src="lib/nav.js?v=cae5774d"></script>
+  <script defer src="lib/runtime.js?v=cae5774d"></script>
+  <script defer src="lib/cloud-web.js?v=cae5774d"></script>
+  <script defer src="app.js?v=cae5774d"></script>
+  <script defer src="ai-assistant.js?v=cae5774d"></script>
 
   <!-- 网页版数据互通：导出 / 导入备份文件（与小程序同 schema，可跨端迁移数据） -->
   <div id="webDataBar">

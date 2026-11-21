@@ -3,7 +3,7 @@
   <view class="card head">
     <view class="h2"><image lazy-load class="ic" src="/images/icons/camera.png"/>AI 识物 · 旅途科普</view>
     <view class="sub">拍一张或多张（不同角度）旅途中的花草、地标或美食，多条独立判断互相核验，并讲讲能碰不能碰、值不值得看的小知识。</view>
-    <view class="cloud-tag {{cloudOn ? 'on' : 'off'}}">{{cloudOn ? '云端 AI 已就绪 · 多链核验' : '云端未开启 · 可用本机离线对照'}}</view>
+    <view class="cloud-tag {{cloudOn ? 'on' : 'off'}}">{{cloudOn ? '云端 AI 已就绪 · 多链核验' : cloudHint}}</view>
   </view>
 
   <!-- 拍照 / 相册（支持多张不同角度，提升识别准确率） -->

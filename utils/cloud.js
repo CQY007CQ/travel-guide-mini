@@ -33,12 +33,18 @@ function setPairedUid(code) {
     return true;
   } catch (e) { EL.note("cloud", e, "写入配对同步码失败"); return false; }
 }
-// 是否运行在网页版（@cloudbase/js-sdk 适配器已挂 window.__cloudbase）。
-// 注意：网页版 runtime 也提供 window.wx 垫片，所以不能用「typeof wx === undefined」判别，
-// 必须以「window.__cloudbase 是否被适配器挂载」为唯一判据，否则会误走 wx.cloud 分支。
+// 是否运行在网页版。
+// 判据必须只回答「这是不是浏览器环境」，**不能**掺进「云 SDK 是否初始化成功」——
+// 旧版用 window.__cloudbase 当唯一判据，而适配器是「匿名登录成功才挂载」，于是
+// 匿名登录一失败（控制台没开 / 403）就会让 isWeb() 变 false，网页端整体误走 wx.cloud 分支：
+// uploadImage 进 wx.cloud.uploadFile（垫片没有）→ cloud-not-ready → 识物永远报
+// 「照片上传失败，请检查网络」。一个控制台开关能把整条链路伪装成网络故障。
+// 现在：window.__cloudbase 已挂 → 肯定是网页；否则只要有 document 就是浏览器（小程序运行环境无 document）。
 function isWeb() {
   try {
-    return (typeof window !== "undefined") && !!(window.__cloudbase);
+    if (typeof window === "undefined") return false;
+    if (window.__cloudbase) return true;
+    return typeof document !== "undefined";
   } catch (e) { return false; }
 }
 
@@ -82,6 +88,20 @@ function reinit() {
   _inited = false;
   _initPromise = null;
   return init();
+}
+
+// 通道状态（比 ready() 多一档）：网页端的 __cloudbase 有三种形态 ——
+//   object = 匿名登录成功、可用     undefined = 适配器还没走完登录（可能就绪，别急着判死）
+//   null   = 登录明确失败（控制台没开匿名登录）
+// 只有把「登录中」和「登录失败」分开，调用方才不会在页面刚打开那一秒误判成不可用。
+function channelState() {
+  try {
+    if (!isWeb()) return ready() ? "ready" : "not-ready";
+    if (typeof window === "undefined") return "not-ready";
+    if (window.__cloudbase) return "ready";
+    if (window.__cloudbase === null) return "login-failed";
+    return "logging-in";
+  } catch (e) { return "not-ready"; }
 }
 
 // 通道是否真正可用
@@ -417,6 +437,7 @@ module.exports = {
   init: init,
   reinit: reinit,
   ready: ready,
+  channelState: channelState,
   callFunction: callFunction,
   localUid: localUid,
   ensureUid: ensureUid,
