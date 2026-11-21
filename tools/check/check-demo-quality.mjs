@@ -54,8 +54,12 @@ const checks = [
       "connect-src 缺 blob:：网页版 fetch(blob: objectURL) 读图被 CSP 拦 → 识图永远上传失败");
     // 就绪声明必须属实：cloudEnabled() 只说明填了云环境 ID
     const lens = read("subpkg/lens/lens.js");
-    must(/!!Cloud\.ready\(\)/.test(lens) && /cloudOn:\s*(on|configured)/.test(lens),
-      "lens 的 cloudOn 未叠加 ready()：会顶着「云端 AI 已就绪」却必然失败（能力宣称不实）");
+    must(/Cloud\.channelState/.test(lens),
+      "lens 未用 channelState：分不出「登录中」与「登录失败」，页面会把能用的功能说成不能用");
+    must(/state === "logging-in"/.test(lens),
+      "缺「登录中」轮询：onShow 赶在异步登录之前，结论会被定格成「未登录」");
+    must(/cloudOn:\s*on\b/.test(lens) && !/cloudOn:\s*Cloud\.cloudEnabled\(\)/.test(lens),
+      "lens 的 cloudOn 又退回只看 cloudEnabled：会顶着「云端 AI 已就绪」却必然失败（能力宣称不实）");
     must(/if \(chState === "login-failed" \|\| chState === "not-ready"\)/.test(lens),
       "identify() 缺通道就绪守卫：用户会白等压缩+上传+识别全流程");
     must(/channelState: channelState/.test(cloud),

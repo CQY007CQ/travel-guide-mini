@@ -71,20 +71,46 @@ Page(SafePage({
         const city = plan ? T.decQuery(T.activeCityOf(plan) || plan.cityName || "") : "";
         let hist = [];
         try { hist = S.get(HIST_KEY, []) || []; } catch (e) { hist = []; }
-        // 「已就绪」必须是真话：cloudEnabled() 只说明「填了云环境 ID」，不代表通道能用。
-        // v1.20.43：网页版匿名登录没开时 cloudEnabled() 仍是 true，页面顶着「云端 AI 已就绪 · 多链核验」
-        // 却必然失败 —— 属于能力宣称不实。改为「已配置 且 通道就绪」才亮绿灯，并给出具体卡点。
-        const configured = Cloud.cloudEnabled();
-        const on = configured && !!Cloud.ready();
-        let hint = "云端未开启 · 可用本机离线对照";
-        if (configured && !on) {
-          hint = (typeof Cloud.isWeb === "function" && Cloud.isWeb())
-            ? "云端未登录 · 需开启匿名登录后可拍照识别"
-            : "云端通道未就绪 · 可用本机离线对照";
-        }
-        this.setData({ cloudOn: on, cloudHint: hint, cityName: city || "", history: Array.isArray(hist) ? hist.slice(0, HIST_MAX) : [] });
+        this.setData({ cityName: city || "", history: Array.isArray(hist) ? hist.slice(0, HIST_MAX) : [] });
+        this._refreshCloudTag(0);
       } catch (e) { try { EL.push("lens.onShow", e); } catch (_) {} }
     });
+  },
+
+  // 「已就绪」必须是真话，但也不能把「正在登录」说成「未登录」。
+  // v1.20.43：网页版匿名登录是异步的（适配器要在 SDK 加载后才挂 window.__cloudbase），
+  // onShow 往往赶在登录完成之前——若此时就把结论写死，页面会一直显示「云端未登录」，
+  // 而实际几秒后就能用（比假宣称「已就绪」更冤：好功能被自己说成坏的）。
+  // 所以遇到 logging-in 就短轮询，登录一落地立刻改绿灯。
+  _refreshCloudTag(tries) {
+    const n = typeof tries === "number" ? tries : 0;
+    try {
+      const configured = Cloud.cloudEnabled();
+      const state = (typeof Cloud.channelState === "function")
+        ? Cloud.channelState()
+        : (Cloud.ready() ? "ready" : "not-ready");
+      if (configured && state === "logging-in" && n < 12) {
+        this.setData({ cloudOn: false, cloudHint: "正在连接云端…" });
+        const self = this;
+        this._cloudTimer = setTimeout(function () { self._refreshCloudTag(n + 1); }, 500);
+        return;
+      }
+      const on = configured && state === "ready";
+      let hint = "云端未开启 · 可用本机离线对照";
+      if (configured && !on) {
+        hint = state === "login-failed"
+          ? "云端未登录 · 需开启匿名登录后可拍照识别"
+          : (typeof Cloud.isWeb === "function" && Cloud.isWeb())
+            ? "云端未登录 · 需开启匿名登录后可拍照识别"
+            : "云端通道未就绪 · 可用本机离线对照";
+      }
+      this.setData({ cloudOn: on, cloudHint: hint });
+    } catch (e) { EL.push("lens._refreshCloudTag", e); }
+  },
+
+  onUnload() {
+    // 空 catch 有棘轮基线（只降不升），这里必须留痕而不是静默吞
+    try { clearTimeout(this._cloudTimer); } catch (e) { EL.note("lens", e, "清理云端状态轮询定时器失败"); }
   },
 
   _renderShow() { try { this._theme(); } catch (e) {} },
