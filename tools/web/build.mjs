@@ -342,6 +342,27 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
   }
 }
 
+/* ───────────── 7.5 地图 Key（本机文件 → 生成物） ─────────────
+ * web/map-key.local.js 含真实高德 Web端(JS API) Key，被 .gitignore 忽略、不进公开仓库。
+ * 这里把它复制成 web/lib/map-key.js（同样 gitignored，且 check-secrets 的 GENERATED 豁免），
+ * runtime.js 只在 window.__AMAP_KEY__ 非空时加载高德 JS API，否则回落 SVG 示意图。
+ * 关键：Key 绝不写进任何已提交文件 —— 网页版是公开分享链接，前端 Key 靠域名白名单保护。
+ */
+{
+  const src = path.join(ROOT, "web/map-key.local.js");
+  const dst = path.join(ROOT, "web/lib/map-key.js");
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, dst);
+    const raw = fs.readFileSync(dst, "utf8");
+    const hasKey = /__AMAP_KEY__\s*=\s*["'][0-9a-f]{32}["']/i.test(raw);
+    console.log("地图 Key：已注入 web/lib/map-key.js（" + (hasKey ? "含真实 Key，加载高德底图" : "空占位，回落示意图") + "）");
+  } else {
+    // 没有本机 Key 时不要留旧的生成物 —— 否则改了 Key 后删源文件仍会用旧 Key
+    if (fs.existsSync(dst)) fs.unlinkSync(dst);
+    console.log("地图 Key：未找到 web/map-key.local.js，网页版使用 SVG 示意图（离线零外链）");
+  }
+}
+
 /* ───────────── 8. 缓存破除 ───────────── */
 // 静态站点最常见的坑：改了 css/js 但浏览器还在用旧缓存，排查时极度误导
 // （本次就出现「rpx 基准已修，页面尺寸没变」）。这里给 index.html 的资源引用统一打版本号。
@@ -360,6 +381,7 @@ console.log("产出：data.js " + sz("data.js") + " ｜ modules.js " + sz("modul
     // 云互通：cloud-web.js 是手写适配器（必随包）；cloudbase-sdk.js 由下方从 node_modules 拷贝（缺失仅告警）。
     // 两者都纳入内容 hash，SDK 升级时懒加载 URL 也会自动破缓存。
     "web/lib/cloud-web.js", "web/lib/cloudbase-sdk.js",
+    "web/lib/map-key.js",   // Key 变化也要破缓存，否则浏览器仍加载旧 Key
   ];
   const h = crypto.createHash("sha1");
   for (const rel of deps) {

@@ -59,7 +59,98 @@
     return out;
   }
 
-  /* ── 网页版地图示意图 ──
+  /* ── 网页版真实地图（高德 JS API） ──
+     有 window.__AMAP_KEY__（由 gitignored 的 web/map-key.local.js 注入）时加载高德 JS API，
+     用 markers / polyline 画真实底图；没有 Key 或脚本加载失败时自动回落 __schematic()。
+     为什么可以：web-view 那条合规红线只约束「小程序内嵌网页」，网页版本身是独立页面。
+     前端 Key 靠高德控制台的域名白名单保护 —— 分享域名必须加白，否则 INVALID_USER_DOMAIN。 */
+  var __amapState = { loading: false, ready: false, key: "", maps: [] };
+  function __amapKey() {
+    try { return String(window.__AMAP_KEY__ || "").trim(); } catch (e) { return ""; }
+  }
+  function __amapLoad(key) {
+    if (__amapState.ready && window.AMap) return Promise.resolve(true);
+    if (__amapState.loading) return __amapState.promise;
+    __amapState.loading = true; __amapState.key = key;
+    __amapState.promise = new Promise(function (resolve) {
+      try {
+        var s = document.createElement("script");
+        s.src = "https://webapi.amap.com/maps?v=2.0&key=" + encodeURIComponent(key) + "&plugin=AMap.Scale,AMap.ToolBar";
+        s.async = true;
+        var timer = setTimeout(function () { resolve(false); }, 12000);
+        s.onload = function () {
+          clearTimeout(timer);
+          var ok = !!(window.AMap && typeof window.AMap.Map === "function");
+          __amapState.ready = ok; resolve(ok);
+        };
+        s.onerror = function () { clearTimeout(timer); resolve(false); };
+        document.head.appendChild(s);
+      } catch (e) { resolve(false); }
+    });
+    return __amapState.promise;
+  }
+  function __amapRender(el, props, key) {
+    __amapLoad(key).then(function (ok) {
+      if (!ok || !el.isConnected) return false;   // 页面已重绘则放弃，别往废弃节点上画
+      try {
+        var AMap = window.AMap;
+        var center = [+(props.longitude || 116.4), +(props.latitude || 39.9)];
+        var map = new AMap.Map(el, {
+          center: center, zoom: +(props.scale || 13),
+          mapStyle: document.documentElement.classList.contains("td") ? "amap://styles/dark" : "amap://styles/normal",
+          viewMode: "2D", resizeEnable: true
+        });
+        var overlays = [];
+        var lines = Array.isArray(props.polyline) ? props.polyline : [];
+        lines.forEach(function (l) {
+          var ps = ((l && l.points) || []).filter(function (q) { return q && isFinite(q.latitude) && isFinite(q.longitude); });
+          if (ps.length < 2) return;
+          overlays.push(new AMap.Polyline({
+            path: ps.map(function (q) { return [+q.longitude, +q.latitude]; }),
+            strokeColor: l.color || "#d4a94e", strokeWeight: l.width || 4, strokeOpacity: 0.9
+          }));
+        });
+        var markers = Array.isArray(props.markers) ? props.markers : [];
+        var evm = props.__ev || {};
+        var mkHandler = evm["on:markertap"] || evm["catch:markertap"] || evm["on:callouttap"] || evm["catch:callouttap"];
+        markers.forEach(function (m) {
+          if (!(m && isFinite(m.latitude) && isFinite(m.longitude))) return;
+          var label = (m.callout && m.callout.content != null) ? String(m.callout.content) : "";
+          var mk = new AMap.Marker({
+            position: [+m.longitude, +m.latitude],
+            label: label ? { content: label, direction: "top" } : undefined,
+            title: label || undefined,
+            cursor: "pointer"
+          });
+          if (mkHandler) {
+            mk.on("click", function () {
+              if (!current || typeof current[mkHandler] !== "function") return;
+              try {
+                current[mkHandler].call(current, {
+                  type: "markertap", detail: { markerId: m.id },
+                  currentTarget: { id: el.id, dataset: {} }, target: { id: el.id, dataset: {} },
+                  timeStamp: Date.now()
+                });
+              } catch (err) { console.error("[web] markertap 异常", err); }
+            });
+          }
+          overlays.push(mk);
+        });
+        if (overlays.length) map.add(overlays);
+        if (markers.length) { try { map.setFitView(); } catch (e2) {} }
+        el.classList.add("map-real");
+        __amapState.maps.push(map);
+        return true;
+      } catch (e) { return false; }
+    }).then(function (ok) {
+      // 加载/初始化失败 → 回落示意图（页面重绘后 el 已失效就跳过）
+      if (!ok && el.isConnected && !el.classList.contains("map-real")) {
+        try { el.innerHTML = __schematic(props); } catch (e) {}
+      }
+    });
+  }
+
+  /* ── 网页版地图示意图（无 Key / 加载失败时的兜底） ──
      合规红线：离线零 key，不加载任何在线地图 SDK / 底图。
      但空 div 会让演示与用户以为页面坏了，故用真实经纬度把「编号标点 + 当天连线」
      等距投影成 SVG 示意图（非底图），既保留合规又让地图页有内容、可讲解。
@@ -145,8 +236,10 @@
         el.appendChild(document.createTextNode(String(c)));
       }
     }
-    // 网页版地图：把编译后的 map 占位 div 换成「真实坐标示意图」（散点+连线，非底图）。
+    // 网页版地图：有本机 Key → 高德真实底图；无 Key / 加载失败 → 真实坐标 SVG 示意图。
     if (tag === "div" && el.classList && el.classList.contains("the-map") && props && props.id === "map") {
+      var amapKey = __amapKey();
+      if (amapKey) { __amapRender(el, props, amapKey); return el; }
       try {
         el.classList.add("map-schem");
         el.innerHTML = __schematic(props);

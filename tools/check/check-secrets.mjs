@@ -39,7 +39,7 @@ const MAX_SIZE = 2.5 * 1024 * 1024;   // 数据块跳过（内含 base64，一�
 // v1.20.39 新增 utils/keys.local.js：它**会**进小程序包（这正是目的：任何设备装上即用），
 // 但被 .gitignore 忽略、不进公开仓库。注意它与上面两个 geocode 池的性质不同 ——
 // geocode 是纯工具侧凭据（连包都不进），这个是随包密钥，靠「不进 git」控制曝光面。
-const LOCAL_POOLS = ["tools/geocode.keys", "tools/geocode.key", "utils/keys.local.js"];
+const LOCAL_POOLS = ["tools/geocode.keys", "tools/geocode.key", "utils/keys.local.js", "web/map-key.local.js"];
 // 外部官方页面抓取缓存（tools/data/_collect-official-roster.mjs --fetch 的只读原文）：
 // 政府站点 HTML 自带 32 位资源哈希/会话串，不是本仓凭据；但它是外部内容，不能无条件信任，
 // 故豁免同时强制「被 .gitignore 覆盖 + 未进入 git index」，且只豁免这一个目录。
@@ -55,7 +55,7 @@ const EXTERNAL_CACHE = "tools/official-roster/cache";
 // 不削弱对 utils/keys.js 等真源的扫描）。同属「生成的第三方打包产物」，与上方 modules/data 同类。
 const GENERATED = new Set([
   "web/lib/modules.js", "web/lib/data.js", "web/lib/tpl.js", "web/lib/app.css", "web/lib/nav.js",
-  "web/lib/cloudbase-sdk.js"
+  "web/lib/cloudbase-sdk.js", "web/lib/map-key.js"   // map-key.js：由 gitignored 的 map-key.local.js 注入，见 build.mjs
 ]);
 
 const ALLOW_URL = [

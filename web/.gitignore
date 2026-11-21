@@ -5,3 +5,6 @@ lib/modules.js
 lib/tpl.js
 lib/nav.js
 lib/cloudbase-sdk.js
+# 本机地图 Key（含明文，绝不进 git；构建时注入 lib/map-key.js）
+map-key.local.js
+lib/map-key.js

@@ -74,3 +74,6 @@ tools/official-roster/cache/
 # 本机第三方密钥（v1.20.39）：真实 Key 只写在这里，随小程序包上传（任何设备装上即用），
 # 但**永不进公开仓库**。缺失时 keys.js 的 try/catch 兜底为未配置，微信编译实测可通过。
 utils/keys.local.js
+
+# 网页版地图 Key（明文，绝不进公开仓库；构建注入 web/lib/map-key.js 同样忽略）
+web/map-key.local.js
