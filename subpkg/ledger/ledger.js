@@ -53,6 +53,10 @@ Page(SafePage({
     tripFilter: "__all", curSig: "", curLabel: "",   // v1.11：删除未使用的 trips
     iou: [], iouMate: "", iouWhat: "", iouAmt: "", iouDir: "lend", iouSt: null,
     vouchN: 0, phrases: [],
+    // v1.20.43：一句话记账的输入值与解析结果必须声明初始值。
+    // 漏声明时 wxml 的 value="{{quick}}" 拿到 undefined —— 小程序原生 input 显示为空看不出来，
+    // 网页版却被渲染成字面量 "undefined"（用户截图报障）。两者一起补。
+    quick: "", quickParsed: null,
     // v1.8.5：本周统计 / 删除撤销胶囊
     week: null, undoRow: null, week7: null, mstory: null,
     // 2026-10-29：三组折叠 —— 记账页原本 20 个区块平铺，核心操作被图表夹在中间；

@@ -80,6 +80,22 @@ const checks = [
       "缺 __amapReset：SDK 首载失败后 promise 被钉死成 false，全站地图永久降级成示意图");
     must(/ResizeObserver/.test(rt), "缺尺寸变化重算：容器晚定尺寸时底图仍可能空白");
   }],
+  ["网页版渲染器：input 的 value 必须把 null/undefined 归一成空串", () => {
+    // v1.20.43 真 bug（用户截图报障）：账本页「一句话记账」输入框里显示字面量 undefined。
+    // 成因两层：① ledger 的 data 漏声明 quick/quickParsed（wxml 写 value="{{quick}}"）
+    // ② 浏览器里 el.value = undefined 会被字符串化成 "undefined"。
+    // 小程序原生 input 对 undefined 宽容（显示空），所以这类缺陷只在网页版暴露 ——
+    // 只补数据声明不够，渲染器这层必须自己兜住，否则任何一个页面漏声明都会重现。
+    const rt = read("web/lib/runtime.js");
+    must(/if \(k === "value"\) \{ el\.value = \(v == null \? "" : v\); continue; \}/.test(rt),
+      "runtime 写 value 时未归一 null/undefined：输入框会显示字面量 undefined");
+    must(!/if \(k === "value"\) \{ el\.value = v; continue; \}/.test(rt),
+      "旧写法回潮：el.value = v 会把 undefined 字符串化");
+    // 账本页的初始值声明也要在（双保险，且让小程序端语义正确）
+    const lg = read("subpkg/ledger/ledger.js");
+    must(/quick:\s*""\s*,\s*quickParsed:\s*null/.test(lg), "ledger data 缺 quick/quickParsed 初始值");
+    must(/value="\{\{quick\}\}"/.test(read("subpkg/ledger/ledger.wxml")), "ledger.wxml 的绑定名变了，断言需同步");
+  }],
   ["sysTheme：新接口返回即定案，浅色主题不再掉进废弃兜底", () => {
     const s = slice(read("tools/_src-backup/travel.js"), "function sysTheme()", "// 实际生效主题");
     must(s.includes('return b.theme === "dark" ? "dark" : "light";'), "缺少 dark/light 一次性返回");

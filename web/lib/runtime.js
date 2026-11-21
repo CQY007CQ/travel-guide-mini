@@ -242,7 +242,11 @@
       if (k === "__ds") { for (var d in v) el.dataset[d] = v[d]; continue; }
       if (k === "class") { if (v) el.className = v; continue; }
       if (k === "style") { if (v) el.setAttribute("style", v); continue; }
-      if (k === "value") { el.value = v; continue; }
+      // 注意：必须把 null/undefined 归一成空串。`el.value = undefined` 在浏览器里会被
+      // 字符串化成字面量 "undefined"，于是输入框里直接显示 undefined —— 而小程序原生
+      // input 对 undefined 是宽容的（显示为空），所以这类「wxml 绑了 data 里没声明的变量」
+      // 只在网页版暴露，极容易被当成渲染器错乱。见 ledger 的 value="{{quick}}"。
+      if (k === "value") { el.value = (v == null ? "" : v); continue; }
       if (k === "checked") { el.checked = !!v && v !== "false"; continue; }
       if (k === "disabled") { el.disabled = v === true || v === "true" || v === ""; continue; }
       if (v === true || v === "") { el.setAttribute(k, ""); continue; }
