@@ -1004,7 +1004,21 @@
   function schedule() {
     if (pending) return;
     pending = true;
-    requestAnimationFrame(function () { pending = false; paint(); });
+    requestAnimationFrame(function () {
+      pending = false;
+      // v1.20.43：中文输入法组合刚结束的那一帧不能整页重建 DOM。
+      // IME 的 compositionend → 补发 input → setData → 本回调，此时浏览器还在做
+      // IME 收尾；paint() 的 replaceChildren 会把 <input> 换掉，候选词/光标/选区丢失。
+      // 只把「这一帧」推后到 setTimeout(0)（下一轮事件循环，IME 已收尾），
+      // 实时搜索等依赖重绘的功能照常工作，只是晚一帧。
+      var ae = (typeof document !== "undefined") && document.activeElement;
+      if (ae && ae.__imeJustEnded && root && root.contains(ae)) {
+        ae.__imeJustEnded = false;
+        setTimeout(function () { if (current) paint(); }, 0);
+        return;
+      }
+      paint();
+    });
   }
 
   /**
@@ -1102,6 +1116,9 @@
       // 延后到下一帧派发，确保拿到的是完整汉字而不是中间拼音。
       setTimeout(function () {
         if (!c.el || !c.el.isConnected || !c.handlerName || !current) return;
+        // 标记「IME 刚结束」：schedule() 看到当前焦点元素带此标记，会把紧随其后的
+        // 整页重绘推到下一轮事件循环，等浏览器 IME 收尾完成再重建（否则中文丢字）。
+        c.el.__imeJustEnded = true;
         var handler = current[c.handlerName];
         if (typeof handler !== "function") return;
         var dataset = {};
