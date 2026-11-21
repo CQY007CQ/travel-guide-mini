@@ -190,7 +190,22 @@ module.exports = {
   _ensureForm() {
     let provs = [];
     try { provs = T.provinces() || []; } catch (e) { provs = []; }
-    if (!provs.length) { this.setData({ dataFailed: true }); return; }
+    if (!provs.length) {
+      // v1.20.44：这里拿到的「空」有两种含义 —— ①数据真的坏了 ②冷启动分包还没解包完。
+      // onLoad 里 `T.ready().catch(() => null)` 把失败吞成成功，boot.then 照常往下跑，
+      // 于是②被当成①，用户一进首页就看到「加载失败」卡片，还得自己点重试（实测截图报障）。
+      // 先自动补抽一次，两次都空才把重试卡片交给用户。
+      if (!this.__dataAutoRetried) {
+        this.__dataAutoRetried = true;
+        this.setData({ dataFailed: false, loadingData: true });
+        const self = this;
+        setTimeout(function () { self.retryData(); }, 600);
+        return;
+      }
+      this.setData({ dataFailed: true, loadingData: false });
+      return;
+    }
+    this.__dataAutoRetried = false;
     // v1.20.10：冷启动时数据未就绪，onLoad 里「依赖城市数据那一轮」被挂起，这里是唯一重入点。
     // 顺序关键：先补跑（内部可能改写 provIdx/cityIdx，例如深链/偏好指定的城市），
     // 再按「当前」provIdx/cityIdx 重算选择器 —— 反过来会把深链选中的城市盖回默认值。

@@ -168,6 +168,15 @@ function backToWarm(keep) {
   ck("onLoad 有「数据就绪才跑」的分支", /provs\.length/.test(onLoadBody) && /_initIndexData\(\)/.test(onLoadBody));
   const genSrc = nodeRequire("fs").readFileSync(path.join(ROOT, "pages", "index", "m-generate.js"), "utf8");
   ck("_ensureForm 会消费挂起标记", /__needIndexInit/.test(genSrc) && /_initIndexData\(\)/.test(genSrc));
+  // v1.20.44：ready() 的失败被 onLoad 的 catch 吞成「成功返回 null」，boot.then 照常跑，
+  // 于是「分包还没解包完」被当成「数据坏了」直接甩失败卡片（用户实测截图报障，还得手点重试）。
+  // 要求：首次为空先自动补抽一次，第二次仍空才置 dataFailed。
+  ck("数据为空时先自动补抽一次，再才把重试卡片交给用户",
+    /__dataAutoRetried/.test(genSrc) &&
+    genSrc.indexOf("__dataAutoRetried") < genSrc.indexOf("setData({ dataFailed: true"));
+  const onLoadSrc2 = nodeRequire("fs").readFileSync(path.join(ROOT, "pages", "index", "index.js"), "utf8");
+  ck("数据就绪失败要留痕（不再静默吞成 null）",
+    /ready\(\)\.catch\(\(err\)/.test(onLoadSrc2) && /首页数据就绪失败/.test(onLoadSrc2));
 }
 
 console.log("\n" + (fail === 0 ? "全部通过" : "有失败项") + `：${pass} passed / ${fail} failed`);

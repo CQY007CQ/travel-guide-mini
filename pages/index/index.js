@@ -99,7 +99,12 @@ Page(SafePage(Object.assign({
     guideSeen: false,              // v1.18：首访引导看过即不再常驻（一次性轻提示）
   },
   onLoad(options) {
-    this.__boot = T.ready().catch(() => null);
+    // v1.20.44：失败必须留痕。原先 `.catch(() => null)` 把 ready 失败吞成「成功返回 null」，
+    // 下游 onShowRender 的 boot.then 照常执行 → 分不清「数据坏了」和「还没解包完」。
+    this.__boot = T.ready().catch((err) => {
+      require("../../utils/errlog.js").note("index", err, "首页数据就绪失败");
+      return null;
+    });
     this.__opts = options || null;
     // 与城市数据无关的字段先落地：日期选择器、历史/收藏、引导标记都不依赖分包数据。
     let provs = [];

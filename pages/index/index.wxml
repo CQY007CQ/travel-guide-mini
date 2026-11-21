@@ -15,8 +15,8 @@
   <view class="card data-fail" wx:if="{{dataFailed}}">
     <view class="df-badge">!</view>
     <view class="df-main">
-      <text class="df-t">城市数据加载失败</text>
-      <text class="df-s">网络不稳，点下方重试</text>
+      <text class="df-t">城市数据还没准备好</text>
+      <text class="df-s">分包数据首次加载稍慢，重试一次即可</text>
     </view>
     <view hover-class="tap-hover" hover-start-time="0" hover-stay-time="80" class="df-btn {{loadingData ? 'df-loading' : ''}}" bindtap="retryData">{{loadingData ? '重试中…' : '重试加载'}}</view>
   </view>
