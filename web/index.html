@@ -5,16 +5,21 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"/>
 <meta name="theme-color" content="#0d0d0d"/>
 <!-- #114 安全门禁：限定资源与出站连接仅来自同源 + 已知天气/地理 API，抑制 XSS 影响面与任意出站。
-     内联 script/style 暂放行（'unsafe-inline'）；可选大模型(api.openai.com)被拦后会优雅回退离线助手。 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://webapi.amap.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tcloudbaseapp.com https://*.myqcloud.com https://webapi.amap.com https://*.is.autonavi.com https://*.amap.com; font-src 'self' data:; connect-src 'self' https://*.qweatherapi.com https://*.amap.com https://webapi.amap.com https://restapi.amap.com https://*.is.autonavi.com *.tcloudbaseg.com *.tcloudbaseapp.com *.cloudbase.net *.tcb-api.tencentcloudapi.com"/>
+     内联 script/style 暂放行（'unsafe-inline'）；可选大模型(api.openai.com)被拦后会优雅回退离线助手。
+     v1.20.43：地图底图空白的真因是 CSP 的 script-src 只放行了 webapi.amap.com ——
+     高德 JS API v2.0 运行时还会动态加载 jsapi-service.amap.com/mapsplugincdn（DomRender 渲染引擎）
+     与 restapi.amap.com/v3/log/init（JSONP），两者被拦则 canvas 一个都不生成、底图永远空白
+     （marker/copyright 是本地 DOM 绘制，所以看起来"地图在但没底图"，极易误判成 key 白名单问题）。
+     故 script-src 统一放行 https://*.amap.com，并在 connect/img/style/font 一并覆盖。 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.amap.com https://*.autonavi.com; style-src 'self' 'unsafe-inline' https://*.amap.com; img-src 'self' data: blob: https://*.tcloudbaseapp.com https://*.myqcloud.com https://*.amap.com https://*.is.autonavi.com https://*.autonavi.com; font-src 'self' data: https://*.amap.com; connect-src 'self' https://*.qweatherapi.com https://*.amap.com https://*.is.autonavi.com https://*.autonavi.com https://*.tcloudbasegateway.com https://*.tcloudbaseapp.com https://*.cloudbase.net https://*.tencentcloudapi.com; worker-src 'self' blob:; child-src 'self' blob:"/>
 <title>旅行攻略生成器 · 网页版</title>
 <!-- 网页首屏加速：data.js（2.4MB 离线库）改为 <script async> 懒加载，先让出首屏解析/绘制，
      其 onload 后再 resolve 这个承诺；utils/data.js 的 initData 网页分支 await 它再解包，
      既不被同步解压阻塞，又保证解包时数据块工厂已注册（否则 require 抛错丢数据）。 -->
 <script>window.__dataReadyP=new Promise(function(r){window.__dataReadyResolve=r;});</script>
-<link rel="stylesheet" href="lib/app.css?v=881fbaa1"/>
-<link rel="stylesheet" href="shell.css?v=881fbaa1"/>
-<link rel="stylesheet" href="ai-assistant.css?v=881fbaa1"/>
+<link rel="stylesheet" href="lib/app.css?v=655c55bb"/>
+<link rel="stylesheet" href="shell.css?v=655c55bb"/>
+<link rel="stylesheet" href="ai-assistant.css?v=655c55bb"/>
 </head>
 <body>
   <!-- 启动遮罩：数据包解压需要一点时间，避免白屏 -->
@@ -36,15 +41,15 @@
     <a class="tb" data-p="pages/more/more"><img alt="更多"/><span>更多</span></a>
   </nav>
 
-  <script defer src="lib/map-key.js?v=881fbaa1"></script>
-  <script defer src="lib/modules.js?v=881fbaa1"></script>
-  <script async src="lib/data.js?v=881fbaa1" onload="window.__dataReadyResolve&&window.__dataReadyResolve()" onerror="window.__dataReadyResolve&&window.__dataReadyResolve()"></script>
-  <script defer src="lib/tpl.js?v=881fbaa1"></script>
-  <script defer src="lib/nav.js?v=881fbaa1"></script>
-  <script defer src="lib/runtime.js?v=881fbaa1"></script>
-  <script defer src="lib/cloud-web.js?v=881fbaa1"></script>
-  <script defer src="app.js?v=881fbaa1"></script>
-  <script defer src="ai-assistant.js?v=881fbaa1"></script>
+  <script defer src="lib/map-key.js?v=655c55bb"></script>
+  <script defer src="lib/modules.js?v=655c55bb"></script>
+  <script async src="lib/data.js?v=655c55bb" onload="window.__dataReadyResolve&&window.__dataReadyResolve()" onerror="window.__dataReadyResolve&&window.__dataReadyResolve()"></script>
+  <script defer src="lib/tpl.js?v=655c55bb"></script>
+  <script defer src="lib/nav.js?v=655c55bb"></script>
+  <script defer src="lib/runtime.js?v=655c55bb"></script>
+  <script defer src="lib/cloud-web.js?v=655c55bb"></script>
+  <script defer src="app.js?v=655c55bb"></script>
+  <script defer src="ai-assistant.js?v=655c55bb"></script>
 
   <!-- 网页版数据互通：导出 / 导入备份文件（与小程序同 schema，可跨端迁移数据） -->
   <div id="webDataBar">

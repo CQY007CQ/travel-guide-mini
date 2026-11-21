@@ -50,6 +50,36 @@ const checks = [
     must(/setTimeout\(function \(\)/.test(endBlock) && /detail: \{ value: c\.el\.value \}/.test(endBlock),
       "compositionend 后未补发完整值的 input 事件");
   }],
+  ["网页版真实地图：CSP 必须放行高德渲染引擎（否则底图永久空白）", () => {
+    // v1.20.43 真 bug：地图长期「有标点、有版权、就是没有底图」。
+    // 曾误判成 key 域名白名单没配（让用户去控制台折腾了几轮），实际是 CSP 拦了三样东西：
+    //   ① jsapi-service.amap.com/mapsplugincdn —— v2.0 的动态渲染引擎本体
+    //   ② restapi.amap.com/v3/log/init        —— JSONP 上报
+    //   ③ DomRender 内部 new Function/eval    —— 缺 'unsafe-eval' 直接 EvalError
+    // 三者缺任一都表现为「容器有 amap-maps 外壳、marker 照画、canvas 为 0」，极易看错方向。
+    const html = read("web/index.html");
+    const m = /content="(default-src[^"]*)"/.exec(html);
+    must(m, "web/index.html 缺 CSP meta");
+    const csp = m[1];
+    const dir = (k) => {
+      const g = new RegExp("(?:^|;)\\s*" + k + "\\s+([^;]+)").exec(csp);
+      return g ? g[1].trim() : "";
+    };
+    const scriptSrc = dir("script-src");
+    must(/https:\/\/\*\.amap\.com/.test(scriptSrc),
+      "script-src 未通配 *.amap.com：jsapi-service/restapi 会被拦 → 底图永久空白");
+    must(/'unsafe-eval'/.test(scriptSrc),
+      "script-src 缺 'unsafe-eval'：高德 DomRender 引擎用 eval 初始化 → EvalError、canvas 不生成");
+    must(/https:\/\/\*\.is\.autonavi\.com/.test(dir("connect-src")), "connect-src 未放行瓦片域名 *.is.autonavi.com");
+    must(/https:\/\/\*\.tcloudbasegateway\.com/.test(dir("connect-src")),
+      "connect-src 缺 *.tcloudbasegateway.com：云开发登录被拦成 Failed to fetch（不是「匿名登录没开」）");
+    must(!/tcloudbaseg\.com/.test(dir("connect-src")),
+      "connect-src 还留着笔误域名 tcloudbaseg.com（真名是 tcloudbasegateway.com）");
+    const rt = read("web/lib/runtime.js");
+    must(rt.includes("function __amapReset()"),
+      "缺 __amapReset：SDK 首载失败后 promise 被钉死成 false，全站地图永久降级成示意图");
+    must(/ResizeObserver/.test(rt), "缺尺寸变化重算：容器晚定尺寸时底图仍可能空白");
+  }],
   ["sysTheme：新接口返回即定案，浅色主题不再掉进废弃兜底", () => {
     const s = slice(read("tools/_src-backup/travel.js"), "function sysTheme()", "// 实际生效主题");
     must(s.includes('return b.theme === "dark" ? "dark" : "light";'), "缺少 dark/light 一次性返回");

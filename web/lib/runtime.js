@@ -68,6 +68,12 @@
   function __amapKey() {
     try { return String(window.__AMAP_KEY__ || "").trim(); } catch (e) { return ""; }
   }
+  /* v1.20.43：失败必须复位 loading —— 旧版一旦首次加载失败（弱网/瞬断）就把 promise 钉死成 false，
+     之后所有地图容器都直接走示意图，「刷新也不回来」，只有重开标签页才恢复。 */
+  function __amapReset() {
+    __amapState.loading = false;
+    __amapState.promise = null;
+  }
   function __amapLoad(key) {
     if (__amapState.ready && window.AMap) return Promise.resolve(true);
     if (__amapState.loading) return __amapState.promise;
@@ -75,20 +81,21 @@
     __amapState.promise = new Promise(function (resolve) {
       try {
         var s = document.createElement("script");
-        // v2.0：marker / 版权正常，底图空白的根因是 CSP connect-src 没放行瓦片域名
-        // （v2.0 瓦片走 XHR，不是 <img>）。index.html 已补 https://*.is.autonavi.com。
-        // v1.4.15 试过：本浏览器连 marker 都不画，整块空白，故回到 v2.0。
+        // v2.0：marker / 版权正常，底图空白的根因是 CSP 没放行 jsapi-service.amap.com（DomRender
+        // 渲染引擎）与 restapi.amap.com（JSONP）—— 不是 key 域名白名单。详见 index.html 的 CSP 注释。
         s.src = "https://webapi.amap.com/maps?v=2.0&key=" + encodeURIComponent(key);
         s.async = true;
-        var timer = setTimeout(function () { resolve(false); }, 12000);
+        var timer = setTimeout(function () { __amapReset(); resolve(false); }, 12000);
         s.onload = function () {
           clearTimeout(timer);
           var ok = !!(window.AMap && typeof window.AMap.Map === "function");
-          __amapState.ready = ok; resolve(ok);
+          __amapState.ready = ok;
+          if (!ok) __amapReset();     // 脚本回来了但 AMap 没就绪（被拦/半截）→ 允许下次重试
+          resolve(ok);
         };
-        s.onerror = function () { clearTimeout(timer); resolve(false); };
+        s.onerror = function () { clearTimeout(timer); __amapReset(); resolve(false); };
         document.head.appendChild(s);
-      } catch (e) { resolve(false); }
+      } catch (e) { __amapReset(); resolve(false); }
     });
     return __amapState.promise;
   }
@@ -97,6 +104,12 @@
       if (!ok || !el.isConnected) return false;   // 页面已重绘则放弃，别往废弃节点上画
       try {
         var AMap = window.AMap;
+        // 整页重绘会丢掉旧容器：及时 destroy 旧实例，否则每重绘一次就多一份地图 + 瓦片缓存常驻内存
+        __amapState.maps = __amapState.maps.filter(function (it) {
+          if (it && it.el && it.el.isConnected) return true;
+          try { if (it && it.map) it.map.destroy(); } catch (e0) {}
+          return false;
+        });
         var center = [+(props.longitude || 116.4), +(props.latitude || 39.9)];
         var map = new AMap.Map(el, {
           center: center, zoom: +(props.scale || 13),
@@ -142,10 +155,23 @@
         if (overlays.length) map.add(overlays);
         if (markers.length) { try { map.setFitView(); } catch (e2) {} }
         // 网页版是整页重绘，容器尺寸在初始化瞬间可能还是 0 → 瓦片按 0 尺寸算全白。
-        // 下一帧强制 resize 一次，让 SDK 按最终布局重新算瓦片。
-        try { setTimeout(function () { if (el.isConnected) map.resize(); }, 60); } catch (e3) {}
+        // 旧版只 resize 一次（60ms）；首屏字体/数据晚到会让容器在之后才定尺寸，于是"地图空白，
+        // 切一下页面才出来"。改为多次兜底 + 尺寸变化即重算，并在尺寸稳定后停止观察。
+        try {
+          var __fit = function () {
+            if (!el.isConnected) return false;
+            try { map.resize(); } catch (e4) {}
+            return true;
+          };
+          setTimeout(__fit, 60); setTimeout(__fit, 320); setTimeout(__fit, 900);
+          if (typeof ResizeObserver === "function") {
+            var ro = new ResizeObserver(function () { __fit(); });
+            ro.observe(el);
+            setTimeout(function () { try { ro.disconnect(); } catch (e5) {} }, 4000);
+          }
+        } catch (e3) {}
         el.classList.add("map-real");
-        __amapState.maps.push(map);
+        __amapState.maps.push({ map: map, el: el });
         return true;
       } catch (e) { return false; }
     }).then(function (ok) {
