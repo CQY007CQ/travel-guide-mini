@@ -15,6 +15,20 @@ const req = createRequire(process.cwd() + "/");
 const W = req("./utils/weather.js");
 const KEYS = req("./utils/keys.js");
 
+// v1.20.42：本机 keys.local.js 可能已填真实 Key（随包上传，零配置可用）。
+// 本测试验证的是「配置解析逻辑」——「空配置 → no_key / 只填 Key → 公共域名」等分支，
+// 必须脱离本机配置状态才能稳定复现。keys.js 的 LOCAL 与这里的 LOCAL_FILE 是同一个
+// module.exports 对象，测试期间清空、收尾还原，既不改文件也不影响其它用例。
+let LOCAL_FILE = null;
+try { LOCAL_FILE = req("./utils/keys.local.js"); } catch (e) { LOCAL_FILE = null; }
+const SAVED_LOCAL = LOCAL_FILE ? { qweatherKey: LOCAL_FILE.qweatherKey, qweatherHost: LOCAL_FILE.qweatherHost } : null;
+if (LOCAL_FILE) { LOCAL_FILE.qweatherKey = ""; LOCAL_FILE.qweatherHost = ""; }
+const restoreLocal = () => {
+  if (!LOCAL_FILE || !SAVED_LOCAL) return;
+  LOCAL_FILE.qweatherKey = SAVED_LOCAL.qweatherKey;
+  LOCAL_FILE.qweatherHost = SAVED_LOCAL.qweatherHost;
+};
+
 let fail = 0;
 const ok = (n, c, d) => {
   console.log((c ? "  ✓ " : "  ✗ FAIL: ") + n + (c || d === undefined ? "" : "  [" + d + "]"));
@@ -191,5 +205,6 @@ const CUSTOM = "h2a9cf3mhs.xy.qweatherapi.com";
   ok("产物里 URL 由基址拼出（含 qweatherBase 调用）", /qweatherBase\(\)/.test(src));
 }
 
+restoreLocal();   // 还原本机真实 Key，别让测试改变后续用例/进程的配置
 console.log(fail ? ("\n✗ keys-base 单测失败 " + fail + " 项") : "\n✓ keys-base 单测全部通过");
 process.exit(fail ? 1 : 0);

@@ -10,6 +10,12 @@ const KEYS = req("./utils/keys.js");
 let fail = 0;
 const ok = (n, c) => { console.log((c ? "  ✓ " : "  ✗ FAIL: ") + n); if (!c) fail++; };
 
+// 本地日期串（按今天+n 天）：天气 7 天窗口按「真实今天」判，夹具不能写死日期
+const YMD = (n) => {
+  const d = new Date(); d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+};
+
 // 多城行程：北京 2 天 + 西安 3 天（含 1 天超窗口，应被跳过）
 const plan = {
   cityName: "北京",
@@ -18,23 +24,27 @@ const plan = {
     { cityName: "西安", startDay: 2, endDay: 4 }
   ],
   days: [
-    { date: "2026-11-01", cityName: "北京" },
-    { date: "2026-11-02", cityName: "北京" },
-    { date: "2026-11-03", cityName: "西安" },
-    { date: "2026-11-04", cityName: "西安" },
-    { date: "2026-11-05", cityName: "西安" },
+    // v1.20.42：日期必须动态取「今天起」。写死 2026-11-01 在当天（11-21）已是过去，
+    // fetchPlanWeather 的 7 天窗口会在发请求前短路 window —— 仓库无 Key 时先命中 no_key
+    // 掩盖了这一点；一旦本机填入真实 Key，断言「真 Key 时要发请求」就假红。
+    { date: YMD(0), cityName: "北京" },
+    { date: YMD(1), cityName: "北京" },
+    { date: YMD(2), cityName: "西安" },
+    { date: YMD(3), cityName: "西安" },
+    { date: YMD(4), cityName: "西安" },
     { date: "2099-01-01", cityName: "北京" } // 超窗口，应被跳过
   ]
 };
+const wxDay = (n, o) => Object.assign({ date: YMD(n), code: 0, icon: "sun", isRain: false, isSnow: false, isThunder: false }, o);
 const byCity = {
   "北京": { city: "北京", byDate: {
-    "2026-11-01": { date: "2026-11-01", code: 0, icon: "sun", desc: "晴", tmax: 15, tmin: 5, isRain: false, isSnow: false, isThunder: false },
-    "2026-11-02": { date: "2026-11-02", code: 61, icon: "rain", desc: "小雨", tmax: 12, tmin: 4, isRain: true, isSnow: false, isThunder: false }
+    [YMD(0)]: wxDay(0, { desc: "晴", tmax: 15, tmin: 5 }),
+    [YMD(1)]: wxDay(1, { code: 61, icon: "rain", desc: "小雨", tmax: 12, tmin: 4, isRain: true })
   } },
   "西安": { city: "西安", byDate: {
-    "2026-11-03": { date: "2026-11-03", code: 71, icon: "snow", desc: "雪", tmax: 2, tmin: -3, isRain: false, isSnow: true, isThunder: false },
-    "2026-11-04": { date: "2026-11-04", code: 0, icon: "sun", desc: "晴", tmax: 8, tmin: -1, isRain: false, isSnow: false, isThunder: false },
-    "2026-11-05": { date: "2026-11-05", code: 0, icon: "sun", desc: "晴", tmax: 9, tmin: 0, isRain: false, isSnow: false, isThunder: false }
+    [YMD(2)]: wxDay(2, { code: 71, icon: "snow", desc: "雪", tmax: 2, tmin: -3, isSnow: true }),
+    [YMD(3)]: wxDay(3, { desc: "晴", tmax: 8, tmin: -1 }),
+    [YMD(4)]: wxDay(4, { desc: "晴", tmax: 9, tmin: 0 })
   } }
 };
 
